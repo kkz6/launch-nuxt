@@ -52,7 +52,7 @@ export const serverService = {
    */
   list: () => {
     const { get } = useApi();
-    return get<ApiResponse<{ servers: Server[]; total: number }>>("/servers");
+    return get<ApiResponse<Server[]>>("/servers");
   },
 
   /**

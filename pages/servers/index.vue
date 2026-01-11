@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { Server as ServerIcon, LoaderCircle } from "lucide-vue-next";
-import { Button } from "~/components/ui/button";
 import { Card, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import type { Server } from "~/types";
@@ -73,7 +72,7 @@ const formatDate = (dateString: string) => {
 onMounted(async () => {
   try {
     const response = await serverService.list();
-    servers.value = response.data.servers;
+    servers.value = response.data;
   } catch {
     // Handle error silently
   } finally {
@@ -93,12 +92,7 @@ onMounted(async () => {
           Manage your servers
         </p>
       </div>
-      <Button as-child>
-        <NuxtLink to="/servers/create">
-          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-          Create
-        </NuxtLink>
-      </Button>
+      <ServerCreateServerDialog />
     </header>
 
     <div class="flex w-full justify-between gap-8">
@@ -108,7 +102,7 @@ onMounted(async () => {
         @update:model-value="handleTabChange"
       >
         <div
-          class="flex w-full flex-row items-center justify-between gap-4 overflow-y-hidden border-b border-b-divider max-sm:overflow-x-auto"
+          class="flex w-full flex-row items-center justify-between gap-4 overflow-y-hidden border-b border-b-border max-sm:overflow-x-auto"
         >
           <TabsList class="relative bg-transparent px-0">
             <TabsTrigger
