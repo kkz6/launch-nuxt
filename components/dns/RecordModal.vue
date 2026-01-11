@@ -181,14 +181,16 @@ const onSubmit = handleSubmit(async (formValues) => {
   <Dialog v-model:open="isOpen" @update:open="handleClose">
     <SharedConfirmationDialog ref="confirmationDialog" />
     <DialogTrigger as-child>
-      <slot name="trigger">
-        <Button v-if="record" variant="ghost" size="icon" class="h-8 w-8">
-          <Icon name="lucide:pencil" class="h-4 w-4" />
-        </Button>
-        <Button v-else>
-          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-          Add Record
-        </Button>
+      <slot>
+        <slot name="trigger">
+          <Button v-if="record" variant="ghost" size="icon" class="h-8 w-8">
+            <Icon name="lucide:pencil" class="h-4 w-4" />
+          </Button>
+          <Button v-else>
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            Add Record
+          </Button>
+        </slot>
       </slot>
     </DialogTrigger>
     <DialogContent class="sm:max-w-xl">
