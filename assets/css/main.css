@@ -254,12 +254,12 @@
 
   /* Font for landing pages */
   .font-site {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Geist', system-ui, sans-serif;
   }
 
-  /* Site heading font (Sora for headings) */
+  /* Site heading font */
   .font-site-heading {
-    font-family: 'Sora', sans-serif;
+    font-family: 'Geist', sans-serif;
   }
 }
 

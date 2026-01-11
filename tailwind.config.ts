@@ -17,11 +17,10 @@ const config = {
     },
     extend: {
       fontFamily: {
-        sans: ['Inter, sans-serif', { fontFeatureSettings: 'cv11"' }],
-        inter: ['Inter', 'sans-serif'],
-        mono: ['JetBrains Mono', 'Roboto Mono', 'monospace'],
-        display: ['Outfit', 'sans-serif'],
-        site: ['Sora', 'sans-serif'],
+        sans: ['Geist', 'system-ui', 'sans-serif'],
+        mono: ['Geist Mono', 'JetBrains Mono', 'monospace'],
+        display: ['Geist', 'sans-serif'],
+        site: ['Geist', 'sans-serif'],
       },
       fontSize: {
         xs: ['0.75rem', { lineHeight: '1.5' }],

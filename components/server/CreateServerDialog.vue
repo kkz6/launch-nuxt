@@ -160,12 +160,12 @@ const fetchOptions = async () => {
       sshKeyService.list(),
     ]);
 
-    phpVersions.value = optionsData.phpVersions;
-    databaseTypes.value = optionsData.databaseTypes;
-    serverTypes.value = optionsData.serverTypes;
-    operatingSystems.value = optionsData.operatingSystems;
-    plans.value = optionsData.plans;
-    canCreateServer.value = optionsData.canCreateServer;
+    phpVersions.value = optionsData.data.phpVersions;
+    databaseTypes.value = optionsData.data.databaseTypes;
+    serverTypes.value = optionsData.data.serverTypes;
+    operatingSystems.value = optionsData.data.operatingSystems;
+    plans.value = optionsData.data.plans;
+    canCreateServer.value = optionsData.data.canCreateServer;
     serverProviders.value = providersData.data;
     sshKeys.value = sshData.data;
   } catch {
