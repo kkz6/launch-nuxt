@@ -45,6 +45,7 @@ const commandSchema = toTypedSchema(
 
 const { handleSubmit, resetForm, setFieldError } = useForm({
   validationSchema: commandSchema,
+  validateOnMount: false,
   initialValues: {
     command: '',
   },

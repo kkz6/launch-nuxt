@@ -45,6 +45,7 @@ const form = useForm({
     description: "",
     public_key: "",
   },
+  validateOnMount: false,
 });
 
 const handleClose = (open: boolean) => {

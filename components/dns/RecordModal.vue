@@ -90,6 +90,7 @@ const recordSchema = toTypedSchema(
 
 const { handleSubmit, resetForm, setFieldError, values, setFieldValue } = useForm({
   validationSchema: recordSchema,
+  validateOnMount: false,
   initialValues: {
     name: props.record?.name || '',
     value: props.record?.value || '',

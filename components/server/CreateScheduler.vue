@@ -61,6 +61,7 @@ const schema = toTypedSchema(z.object({
 
 const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
   validationSchema: schema,
+  validateOnMount: false,
   initialValues: {
     command: props.cron?.command || '',
     user: props.cron?.user || 'launch',

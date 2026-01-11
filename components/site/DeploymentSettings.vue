@@ -65,6 +65,7 @@ const siteProp = props.site as Site & {
 
 const { handleSubmit, setFieldError, resetForm } = useForm({
   validationSchema: deploymentSchema,
+  validateOnMount: false,
   initialValues: {
     shared_directories: siteProp.shared_directories?.join('\n') || '',
     shared_files: siteProp.shared_files?.join('\n') || '',

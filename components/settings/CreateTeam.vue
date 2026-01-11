@@ -40,6 +40,7 @@ const form = useForm({
   initialValues: {
     name: "",
   },
+  validateOnMount: false,
 });
 
 const handleClose = (open: boolean) => {

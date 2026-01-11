@@ -57,6 +57,7 @@ const schema = toTypedSchema(z.object({
 
 const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
   validationSchema: schema,
+  validateOnMount: false,
   initialValues: {
     command: props.daemon?.command || '',
     directory: props.daemon?.directory || '',

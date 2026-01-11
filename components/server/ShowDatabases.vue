@@ -16,6 +16,34 @@ const isLoading = ref(true)
 const isSyncing = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
+// Create a map of database IDs to names for the CreateDatabaseUser component
+const databasesMap = computed(() => {
+  const map: Record<string, string> = {}
+  for (const db of databases.value) {
+    map[db.id] = db.name
+  }
+  return map
+})
+
+// State for editing a database user
+const editingUser = ref<DatabaseUser | null>(null)
+const isEditDialogOpen = ref(false)
+
+const editUser = (user: DatabaseUser) => {
+  editingUser.value = user
+  isEditDialogOpen.value = true
+}
+
+const onEditDialogClose = () => {
+  isEditDialogOpen.value = false
+  editingUser.value = null
+}
+
+const onUserUpdated = () => {
+  onEditDialogClose()
+  fetchData()
+}
+
 const fetchData = async () => {
   try {
     const [dbData, usersData] = await Promise.all([
@@ -124,6 +152,17 @@ onMounted(fetchData)
   <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
+    <!-- Edit Database User Dialog -->
+    <ServerCreateDatabaseUser
+      v-if="editingUser"
+      :server-id="serverId"
+      :databases="databasesMap"
+      :user="editingUser"
+      :open="isEditDialogOpen"
+      @update:open="(val) => { if (!val) onEditDialogClose() }"
+      @updated="onUserUpdated"
+    />
+
     <!-- Databases Card -->
     <Card class="bg-background">
       <CardHeader>
@@ -214,6 +253,12 @@ onMounted(fetchData)
             :columns="userColumns"
             :actions="[
               {
+                label: 'Edit',
+                icon: 'lucide:pencil',
+                onClick: editUser,
+                show: (user: DatabaseUser) => user.name !== 'root',
+              },
+              {
                 label: 'Delete',
                 icon: 'lucide:trash-2',
                 onClick: deleteUser,
@@ -226,7 +271,7 @@ onMounted(fetchData)
             empty-description="Create your first database user to get started."
           >
             <template #empty>
-              <ServerCreateDatabaseUser :server-id="serverId" @created="fetchData" />
+              <ServerCreateDatabaseUser :server-id="serverId" :databases="databasesMap" @created="fetchData" />
             </template>
 
             <template #cell-status="{ row }">
@@ -240,7 +285,7 @@ onMounted(fetchData)
           </SharedDataTable>
 
           <div v-if="databaseUsers.length > 0" class="mt-6">
-            <ServerCreateDatabaseUser :server-id="serverId" @created="fetchData" />
+            <ServerCreateDatabaseUser :server-id="serverId" :databases="databasesMap" @created="fetchData" />
           </div>
         </template>
       </CardContent>

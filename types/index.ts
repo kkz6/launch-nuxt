@@ -175,6 +175,9 @@ export interface Site extends InstallationStatus {
   tls_setting: string;
   zero_downtime_deployment: boolean;
   deployment_releases_retention: number;
+  auto_deployment?: boolean;
+  queue_deployments?: boolean;
+  auto_restart_queue?: boolean;
   repository_url?: string | null;
   repository?: string | undefined;
   repository_branch: string | undefined;

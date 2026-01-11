@@ -54,6 +54,7 @@ const siteSchema = toTypedSchema(
 
 const { handleSubmit, setFieldError } = useForm({
   validationSchema: siteSchema,
+  validateOnMount: false,
   initialValues: {
     php_version: props.site.php_version,
     web_folder: props.site.web_folder,

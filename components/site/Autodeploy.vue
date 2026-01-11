@@ -6,25 +6,27 @@ import { Label } from '~/components/ui/label'
 interface Props {
   serverId: string
   siteId: string
+  autoDeployment?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  autoDeployment: false,
+})
 
-const isEnabled = ref(false)
-const isLoading = ref(true)
+const emit = defineEmits<{
+  updated: []
+}>()
 
-const fetchStatus = async () => {
-  try {
-    const data = await $api<{ data: { auto_deploy: boolean } }>(`/servers/${props.serverId}/sites/${props.siteId}/autodeploy`)
-    isEnabled.value = data.data.auto_deploy
-  } catch {
-    // Silent fail
-  } finally {
-    isLoading.value = false
-  }
-}
+const isEnabled = ref(props.autoDeployment)
+const isLoading = ref(false)
+
+// Sync with prop changes
+watch(() => props.autoDeployment, (newVal) => {
+  isEnabled.value = newVal
+})
 
 const toggleAutodeploy = async (enabled: boolean) => {
+  isLoading.value = true
   try {
     await $api(`/servers/${props.serverId}/sites/${props.siteId}/autodeploy`, {
       method: 'POST',
@@ -32,13 +34,14 @@ const toggleAutodeploy = async (enabled: boolean) => {
     })
     isEnabled.value = enabled
     toast.success(enabled ? 'Auto-deploy enabled' : 'Auto-deploy disabled')
+    emit('updated')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.error(err.data?.message || 'Failed to update auto-deploy')
+  } finally {
+    isLoading.value = false
   }
 }
-
-onMounted(fetchStatus)
 </script>
 
 <template>

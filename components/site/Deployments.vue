@@ -117,6 +117,7 @@ onMounted(fetchDeployments)
               </div>
               <SiteDeploymentLogs
                 v-if="deployment.task_id"
+                :server-id="serverId"
                 :task-id="deployment.task_id"
                 :commit-message="getCommitHeading(deployment.commit_data?.message)"
                 :commit-sha="deployment.commit_data?.sha?.substring(0, 6)"

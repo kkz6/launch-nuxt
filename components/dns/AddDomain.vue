@@ -63,6 +63,7 @@ const { handleSubmit, resetForm, setFieldError } = useForm({
     address: '',
     provider: '',
   },
+  validateOnMount: false,
 })
 
 const handleClose = (open = false) => {
