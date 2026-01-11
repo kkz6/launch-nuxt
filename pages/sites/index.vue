@@ -10,6 +10,7 @@ import {
 import type { Site } from '~/types'
 
 definePageMeta({
+  layout: 'default',
   middleware: 'auth',
 })
 

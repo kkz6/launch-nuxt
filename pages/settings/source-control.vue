@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { format } from 'date-fns'
 
 definePageMeta({
+  layout: 'settings',
   middleware: 'auth',
 })
 

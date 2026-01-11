@@ -110,44 +110,51 @@ export interface TeamInvitation {
 export interface Server {
   id: string
   team_id: string
-  user_id: string
-  source_control_id: string
-  server_provider_id: string
+  user_id?: string
+  source_control_id?: string
+  server_provider_id?: string
   name: string
-  description: string
+  description?: string
   provider: string
-  provider_data: Record<string, string>
-  type: 'php' | 'database'
+  provider_label?: string
+  provider_data?: Record<string, string>
+  type: string
+  type_label?: string
   connected: boolean
-  cpu_cores: string
-  memory_in_mb: string
-  storage_in_gb: string
+  monitoring_enabled?: boolean
+  cpu_cores?: string
+  memory_in_mb?: string
+  storage_in_gb?: string
   operating_system: string
+  operating_system_label?: string
   status: string
+  status_label?: string
   public_ipv4: string
-  private_ipv4: string
-  public_key: string
-  private_key: string
-  user_public_key: string
+  private_ipv4?: string
+  public_key?: string
+  private_key?: string
+  user_public_key?: string
   username: string
-  password: string
-  database_password: string
-  ssh_port: string
-  working_directory: string
-  completed_provision_steps: string
+  password?: string
+  database_password?: string
+  ssh_port: number | string
+  working_directory?: string
+  completed_provision_steps?: string
   provisioned_at: string
-  provision_command: string
-  uninstallation_requested_at: string
-  updates: string
-  auto_update: string
-  available_updates: string
-  security_updates: string
-  last_update_check: string
-  progress: string
+  provision_command?: string
+  uninstallation_requested_at?: string
+  updates?: string
+  auto_update: boolean | string
+  available_updates?: string
+  security_updates?: string
+  last_update_check?: string
+  progress: number | string
   progress_step: string
   created_at: string
-  name_with_ip: string
-  sites_count: number
+  updated_at?: string
+  name_with_ip?: string
+  sites_count?: number
+  services_count?: number
 }
 
 export interface Site extends InstallationStatus {
