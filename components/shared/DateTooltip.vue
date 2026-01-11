@@ -1,53 +1,75 @@
 <script setup lang="ts">
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 interface Props {
-  date: string | Date
-  format?: 'relative' | 'full' | 'date' | 'time'
+  date: string | Date;
+  className?: string;
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  format: 'relative',
-})
+const props = defineProps<Props>();
+const slots = useSlots();
 
-const formattedDate = computed(() => {
-  const d = new Date(props.date)
+const relativeDate = computed(() => {
+  const d = new Date(props.date);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffSecs = Math.floor(diffMs / 1000);
+  const diffMins = Math.floor(diffSecs / 60);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+  const diffYears = Math.floor(diffDays / 365);
 
-  if (props.format === 'full') {
-    return d.toLocaleString()
+  if (diffSecs < 60) return "just now";
+  if (diffMins < 60)
+    return `${diffMins} minute${diffMins === 1 ? "" : "s"} ago`;
+  if (diffHours < 24)
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  if (diffDays < 30)
+    return `${diffWeeks} week${diffWeeks === 1 ? "" : "s"} ago`;
+  if (diffMonths < 12) {
+    if (diffMonths === 0) return "about 1 month ago";
+    if (diffDays < 45) return "about 1 month ago";
+    return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
   }
-  if (props.format === 'date') {
-    return d.toLocaleDateString()
-  }
-  if (props.format === 'time') {
-    return d.toLocaleTimeString()
-  }
+  return `${diffYears} year${diffYears === 1 ? "" : "s"} ago`;
+});
 
-  // Relative format
-  const now = new Date()
-  const diffMs = now.getTime() - d.getTime()
-  const diffSecs = Math.floor(diffMs / 1000)
-  const diffMins = Math.floor(diffSecs / 60)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
+const fullDate = computed(() => {
+  const d = new Date(props.date);
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+});
 
-  if (diffSecs < 60) return 'just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
-
-  return d.toLocaleDateString()
-})
-
-const fullDate = computed(() => new Date(props.date).toLocaleString())
+const hasSlotContent = computed(() => !!slots.default);
 </script>
 
 <template>
-  <TooltipProvider>
+  <TooltipProvider :delay-duration="0">
     <Tooltip>
-      <TooltipTrigger as-child>
-        <span class="cursor-help">
-          <slot>{{ formattedDate }}</slot>
+      <TooltipTrigger>
+        <span
+          :class="[
+            'flex items-center text-left text-muted-foreground',
+            className,
+          ]"
+        >
+          <slot />
+          <template v-if="hasSlotContent">&nbsp;</template>
+          {{ relativeDate }}
         </span>
       </TooltipTrigger>
       <TooltipContent>

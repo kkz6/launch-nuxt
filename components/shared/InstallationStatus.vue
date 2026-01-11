@@ -1,41 +1,36 @@
 <script setup lang="ts">
-import { Badge } from '~/components/ui/badge'
-import type { InstallationStatus } from '~/types'
+import { Settings } from "lucide-vue-next";
+import type { InstallationStatus } from "~/types";
 
 interface Props extends InstallationStatus {
-  className?: string
+  className?: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 const status = computed(() => {
+  if (props.installation_failed_at) {
+    return { text: "Installation failed", loading: false };
+  }
   if (props.uninstallation_failed_at) {
-    return { label: 'Uninstall Failed', variant: 'destructive' as const }
+    return { text: "Uninstallation failed", loading: false };
   }
   if (props.uninstallation_requested_at) {
-    return { label: 'Uninstalling...', variant: 'secondary' as const }
-  }
-  if (props.installation_failed_at) {
-    return { label: 'Failed', variant: 'destructive' as const }
+    return { text: "Uninstalling", loading: true };
   }
   if (props.installed_at) {
-    return { label: 'Installed', variant: 'default' as const }
+    return { text: "Installed", loading: false };
   }
-  return { label: 'Installing...', variant: 'secondary' as const }
-})
-
-const isInstalling = computed(() => {
-  return !props.installed_at && !props.installation_failed_at
-})
+  return { text: "Installing", loading: true };
+});
 </script>
 
 <template>
-  <Badge :variant="status.variant" :class="className">
-    <Icon
-      v-if="isInstalling"
-      name="lucide:loader-2"
-      class="mr-1 h-3 w-3 animate-spin"
+  <div :class="['flex flex-row items-center', className]">
+    <Settings
+      v-if="status.loading"
+      class="mr-1.5 h-5 w-5 animate-spin text-gray-400"
     />
-    {{ status.label }}
-  </Badge>
+    <span>{{ status.text }}</span>
+  </div>
 </template>

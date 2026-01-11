@@ -29,11 +29,17 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 
-interface Props {
-  providers: Record<string, string>
+interface DnsProvider {
+  id: string;
+  provider: string;
+  label: string;
 }
 
-const props = defineProps<Props>()
+interface Props {
+  providers: DnsProvider[];
+}
+
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
   created: []
@@ -92,8 +98,8 @@ const onSubmit = handleSubmit(async (values) => {
 })
 
 const providerOptions = computed(() =>
-  Object.entries(props.providers).map(([value, label]) => ({ value, label }))
-)
+  props.providers.map((p) => ({ value: p.id, label: p.label }))
+);
 </script>
 
 <template>
