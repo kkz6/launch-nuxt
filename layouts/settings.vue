@@ -40,7 +40,7 @@ const isActive = (href: string) => {
 <template>
   <div
     id="app-container"
-    class="bg-radial relative flex min-h-screen w-full flex-col bg-background"
+    class="relative flex min-h-screen w-full flex-col bg-background"
   >
     <LayoutNavbar />
     <main class="flex w-full flex-col items-center pt-6">
