@@ -47,6 +47,7 @@ const domainSchema = toTypedSchema(
 
 const { handleSubmit, setFieldError } = useForm({
   validationSchema: domainSchema,
+  validateOnMount: false,
   initialValues: {
     label: props.domain.label,
   },

@@ -79,7 +79,5 @@ const phpVersions: Record<string, string> = {
         </div>
       </CardContent>
     </Card>
-
-    <SiteLaravelFeatures v-if="site.type === 'laravel'" :server-id="server.id" :site-id="site.id" :site="site" />
   </div>
 </template>

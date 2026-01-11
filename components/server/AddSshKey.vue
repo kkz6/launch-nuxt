@@ -39,6 +39,7 @@ const schema = toTypedSchema(z.object({
 
 const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
   validationSchema: schema,
+  validateOnMount: false,
   initialValues: {
     name: '',
     public_key: '',

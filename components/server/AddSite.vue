@@ -35,7 +35,15 @@ const emit = defineEmits<{
 
 const isOpen = ref(false)
 const isLoading = ref(false)
-const phpVersions = ref<Record<string, string>>({})
+const hasSubmitted = ref(false)
+
+interface PhpVersion {
+  value: string
+  label: string
+  is_default: boolean
+}
+
+const phpVersions = ref<PhpVersion[]>([])
 const sourceControls = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -70,27 +78,28 @@ const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
 
 type StringFields = 'address' | 'php_version' | 'web_folder' | 'source_control_id' | 'repository_branch'
 const setStringField = (field: StringFields, value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : '')
+  setFieldValue(field, value != null ? String(value) : '', false)
 }
 
 const fetchOptions = async () => {
   try {
     const [phpData, scData] = await Promise.all([
-      $api<{ data: Record<string, string> }>(`/servers/${props.serverId}/php-versions`),
+      $api<{ data: PhpVersion[] }>(`/servers/${props.serverId}/php-versions`),
       $api<{ data: Record<string, string> }>('/source-controls'),
     ])
     phpVersions.value = phpData.data
     sourceControls.value = scData.data
 
-    if (Object.keys(phpVersions.value).length > 0) {
-      setFieldValue('php_version', Object.keys(phpVersions.value)[0])
+    if (phpVersions.value.length > 0) {
+      const defaultVersion = phpVersions.value.find(v => v.is_default)
+      setFieldValue('php_version', defaultVersion?.value ?? phpVersions.value[0].value, false)
     }
   } catch {
     // Silent fail - options will be empty
   }
 }
 
-const onSubmit = handleSubmit(async (data) => {
+const submitHandler = handleSubmit(async (data) => {
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -123,11 +132,18 @@ const onSubmit = handleSubmit(async (data) => {
   }
 })
 
+const onSubmit = () => {
+  hasSubmitted.value = true
+  submitHandler()
+}
+
 watch(isOpen, (open) => {
   if (open) {
     fetchOptions()
+    hasSubmitted.value = false
   } else {
     resetForm()
+    hasSubmitted.value = false
   }
 })
 </script>
@@ -159,7 +175,7 @@ watch(isOpen, (open) => {
             placeholder="example.com"
             @update:model-value="setStringField('address', $event)"
           />
-          <p v-if="errors.address" class="text-sm text-destructive">{{ errors.address }}</p>
+          <p v-if="hasSubmitted && errors.address" class="text-sm text-destructive">{{ errors.address }}</p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -170,8 +186,8 @@ watch(isOpen, (open) => {
                 <SelectValue placeholder="Select PHP version" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="(label, value) in phpVersions" :key="value" :value="value">
-                  {{ label }}
+                <SelectItem v-for="version in phpVersions" :key="version.value" :value="version.value">
+                  {{ version.label }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -179,7 +195,7 @@ watch(isOpen, (open) => {
 
           <div class="space-y-2">
             <Label for="type">Site Type</Label>
-            <Select :model-value="values.type" @update:model-value="setFieldValue('type', $event as 'laravel' | 'wordpress' | 'generic')">
+            <Select :model-value="values.type" @update:model-value="(val) => val && setFieldValue('type', val as 'laravel' | 'wordpress' | 'generic', false)">
               <SelectTrigger>
                 <SelectValue placeholder="Select site type" />
               </SelectTrigger>
@@ -212,7 +228,7 @@ watch(isOpen, (open) => {
             </div>
             <Switch
               :checked="values.zero_downtime_deployment"
-              @update:checked="setFieldValue('zero_downtime_deployment', $event)"
+              @update:checked="(val: boolean) => setFieldValue('zero_downtime_deployment', val, false)"
             />
           </div>
         </div>

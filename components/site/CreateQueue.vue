@@ -64,6 +64,7 @@ const queueSchema = toTypedSchema(
 
 const { handleSubmit, resetForm, setFieldError } = useForm({
   validationSchema: queueSchema,
+  validateOnMount: false,
   initialValues: {
     queue_connection: props.redisInstalled ? 'redis' : 'database',
     queue: 'default',

@@ -46,6 +46,7 @@ const schema = toTypedSchema(z.object({
 
 const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
   validationSchema: schema,
+  validateOnMount: false,
   initialValues: {
     name: props.firewallRule?.name || '',
     action: (props.firewallRule?.action as 'allow' | 'deny') || 'allow',

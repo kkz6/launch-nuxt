@@ -35,7 +35,7 @@ const getCommitHeading = (message: string): string => {
           Zero Downtime
         </Badge>
       </CardTitle>
-      <SiteAutodeploy :server-id="server.id" :site-id="site.id" />
+      <SiteAutodeploy :server-id="server.id" :site-id="site.id" :auto-deployment="site.auto_deployment" />
     </CardHeader>
     <CardContent class="flex flex-col gap-4">
       <div v-if="site.latest_deployment" class="flex flex-col gap-2">

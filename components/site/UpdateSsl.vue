@@ -60,6 +60,7 @@ const sslSchema = toTypedSchema(
 
 const { handleSubmit, values, setFieldError, resetForm } = useForm({
   validationSchema: sslSchema,
+  validateOnMount: false,
   initialValues: {
     tls_setting: props.site.tls_setting || 'auto',
     private_key: (props.site as any).activeCertificate?.private_key || '',

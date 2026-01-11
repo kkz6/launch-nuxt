@@ -94,6 +94,7 @@ const schema = toTypedSchema(
 
 const { handleSubmit, setFieldValue, values, errors, resetForm } = useForm({
   validationSchema: schema,
+  validateOnMount: false,
   initialValues: {
     name: "",
     service_provider: "digitalocean",

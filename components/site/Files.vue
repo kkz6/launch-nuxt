@@ -1,16 +1,24 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import { Eye, EyeOff } from 'lucide-vue-next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
+import { Textarea } from '~/components/ui/textarea'
+import { Toggle } from '~/components/ui/toggle'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 
-interface FileEntry {
+interface FileInfo {
   name: string
-  path: string
-  type: 'file' | 'directory'
-  size: number
-  modified: string
-  permissions: string
+  description?: string
+  show_route: string
+  update_route: string
 }
 
 interface Props {
@@ -20,19 +28,25 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const files = ref<FileEntry[]>([])
-const currentPath = ref('')
+const files = ref<FileInfo[]>([])
+const selectedFileIndex = ref<string>('')
+const contents = ref('')
 const isLoading = ref(true)
-const pathHistory = ref<string[]>([])
+const isFetching = ref(false)
+const isUpdating = ref(false)
+const isVisible = ref(true)
+const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
-const fetchFiles = async (path: string = '') => {
+const selectedFile = computed(() => {
+  if (selectedFileIndex.value === '') return null
+  return files.value[Number(selectedFileIndex.value)]
+})
+
+const fetchFiles = async () => {
   isLoading.value = true
   try {
-    const data = await $api<{ data: FileEntry[]; path: string }>(`/servers/${props.serverId}/sites/${props.siteId}/files`, {
-      params: { path },
-    })
+    const data = await $api<{ data: FileInfo[] }>(`/servers/${props.serverId}/sites/${props.siteId}/files`)
     files.value = data.data
-    currentPath.value = data.path
   } catch {
     toast.error('Failed to load files')
   } finally {
@@ -40,86 +54,151 @@ const fetchFiles = async (path: string = '') => {
   }
 }
 
-const navigateTo = (path: string) => {
-  pathHistory.value.push(currentPath.value)
-  fetchFiles(path)
-}
+const fetchFileContents = async () => {
+  if (!selectedFile.value) return
 
-const goBack = () => {
-  const previousPath = pathHistory.value.pop()
-  if (previousPath !== undefined) {
-    fetchFiles(previousPath)
+  isFetching.value = true
+  try {
+    const data = await $api<{ contents: string }>(selectedFile.value.show_route)
+    contents.value = data.contents
+  } catch {
+    toast.error('Failed to load file contents')
+  } finally {
+    isFetching.value = false
   }
 }
 
-const formatSize = (bytes: number): string => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+const saveFile = async () => {
+  if (!selectedFile.value || !confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: `Update ${selectedFile.value.name}`,
+    description: 'Are you sure you want to update this file? This action will overwrite the current file contents.',
+    confirmText: 'Update',
+    cancelText: 'Cancel',
+  })
+
+  if (!result.ok) {
+    toast.info('Cancelled')
+    return
+  }
+
+  isUpdating.value = true
+  try {
+    const response = await $api<{ message: string }>(selectedFile.value.update_route, {
+      method: 'PATCH',
+      body: { contents: contents.value },
+    })
+    toast.success(response.message || 'File updated successfully')
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || 'Failed to update file')
+  } finally {
+    isUpdating.value = false
+  }
 }
 
-onMounted(() => fetchFiles())
+watch(selectedFileIndex, (newVal) => {
+  if (newVal !== '') {
+    contents.value = ''
+    isVisible.value = true
+    fetchFileContents()
+  }
+})
+
+onMounted(fetchFiles)
 </script>
 
 <template>
   <Card class="bg-background">
+    <SharedConfirmationDialog ref="confirmationDialog" />
     <CardHeader>
       <CardTitle class="text-xl">Files</CardTitle>
-      <CardDescription>Browse and manage site files</CardDescription>
+      <CardDescription>View and edit site configuration files</CardDescription>
     </CardHeader>
-    <CardContent>
-      <div class="mb-4 flex items-center gap-2">
-        <Button variant="outline" size="sm" :disabled="pathHistory.length === 0" @click="goBack">
-          <Icon name="lucide:arrow-left" class="h-4 w-4" />
-        </Button>
-        <div class="flex-1">
-          <Input :model-value="currentPath" readonly class="font-mono text-sm" />
-        </div>
-        <Button variant="outline" size="sm" @click="() => fetchFiles(currentPath)">
-          <Icon name="lucide:refresh-cw" class="h-4 w-4" />
-        </Button>
-      </div>
 
+    <CardContent class="flex flex-col gap-4">
       <div v-if="isLoading" class="flex items-center justify-center py-8">
         <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
 
-      <div v-else-if="files.length === 0" class="flex flex-col items-center justify-center py-8 text-muted-foreground">
-        <Icon name="lucide:folder-open" class="mb-2 h-8 w-8" />
-        <span>Empty directory</span>
-      </div>
+      <template v-else>
+        <div class="space-y-2">
+          <Label>Select File</Label>
+          <Select v-model="selectedFileIndex">
+            <SelectTrigger class="w-full">
+              <SelectValue placeholder="Select a file to edit" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                v-for="(file, index) in files"
+                :key="index"
+                :value="String(index)"
+              >
+                {{ file.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div v-else class="rounded-md border">
-        <div class="grid grid-cols-12 gap-4 border-b bg-muted/50 px-4 py-2 text-sm font-medium text-muted-foreground">
-          <div class="col-span-6">Name</div>
-          <div class="col-span-2">Size</div>
-          <div class="col-span-2">Modified</div>
-          <div class="col-span-2">Permissions</div>
-        </div>
-        <div
-          v-for="file in files"
-          :key="file.path"
-          class="grid cursor-pointer grid-cols-12 gap-4 border-b px-4 py-2 text-sm hover:bg-muted/50 last:border-b-0"
-          @click="file.type === 'directory' ? navigateTo(file.path) : null"
-        >
-          <div class="col-span-6 flex items-center gap-2">
-            <Icon
-              :name="file.type === 'directory' ? 'lucide:folder' : 'lucide:file'"
-              class="h-4 w-4 text-muted-foreground"
-            />
-            <span :class="{ 'font-medium': file.type === 'directory' }">{{ file.name }}</span>
+        <Card v-if="selectedFile" class="bg-background">
+          <div v-if="isFetching" class="flex items-center justify-center py-8">
+            <Icon name="lucide:loader-2" class="mr-2 h-5 w-5 animate-spin" />
+            <span>Loading file contents...</span>
           </div>
-          <div class="col-span-2 text-muted-foreground">
-            {{ file.type === 'file' ? formatSize(file.size) : '-' }}
+
+          <div v-else-if="isUpdating" class="flex items-center justify-center py-8">
+            <Icon name="lucide:loader-2" class="mr-2 h-5 w-5 animate-spin" />
+            <span>Updating file...</span>
           </div>
-          <div class="col-span-2 text-muted-foreground">
-            <SharedDateTooltip :date="file.modified" />
-          </div>
-          <div class="col-span-2 font-mono text-muted-foreground">{{ file.permissions }}</div>
-        </div>
-      </div>
+
+          <template v-else>
+            <CardHeader class="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle class="text-xl">{{ selectedFile.name }}</CardTitle>
+                <CardDescription v-if="selectedFile.description">
+                  {{ selectedFile.description }}
+                </CardDescription>
+              </div>
+
+              <Toggle
+                :pressed="!isVisible"
+                aria-label="Toggle visibility"
+                @update:pressed="isVisible = !$event"
+              >
+                <EyeOff v-if="!isVisible" class="h-4 w-4 text-muted-foreground" />
+                <Eye v-else class="h-4 w-4 text-muted-foreground" />
+              </Toggle>
+            </CardHeader>
+
+            <CardContent class="w-full space-y-4">
+              <div class="relative">
+                <Textarea
+                  v-model="contents"
+                  :disabled="isVisible"
+                  class="h-96 resize-none font-mono text-sm"
+                  :class="{ 'blur-sm select-none': isVisible }"
+                  placeholder="File contents will appear here..."
+                />
+                <div
+                  v-if="isVisible"
+                  class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-md bg-background/50"
+                  @click="isVisible = false"
+                >
+                  <span class="text-sm text-muted-foreground">Click to reveal and edit</span>
+                </div>
+              </div>
+
+              <div class="flex justify-end">
+                <Button :disabled="isVisible || isUpdating" @click="saveFile">
+                  <Icon v-if="isUpdating" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                  Save Changes
+                </Button>
+              </div>
+            </CardContent>
+          </template>
+        </Card>
+      </template>
     </CardContent>
   </Card>
 </template>
