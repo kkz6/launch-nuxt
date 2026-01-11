@@ -133,7 +133,7 @@ onMounted(fetchData)
                 label: 'Status',
                 width: '15%',
               }] : []),
-              { key: 'installed_at', label: 'Installed', width: '15%' },
+              { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' as const },
             ]"
             :actions="[
               { label: 'View Logs', icon: 'lucide:scroll-text' },
@@ -146,6 +146,12 @@ onMounted(fetchData)
           >
             <template #empty>
               <ServerCreateDaemon :server-id="serverId" @created="fetchData" />
+            </template>
+
+            <template #cell-running="{ value }">
+              <Badge :variant="value ? 'success' : 'secondary'">
+                {{ value ? 'Running' : 'Stopped' }}
+              </Badge>
             </template>
           </SharedDataTable>
 

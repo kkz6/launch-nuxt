@@ -105,10 +105,12 @@ const providerOptions = computed(() =>
 <template>
   <Dialog v-model:open="isOpen" @update:open="handleClose">
     <DialogTrigger as-child>
-      <Button>
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Domain
-      </Button>
+      <slot>
+        <Button>
+          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+          Add Domain
+        </Button>
+      </slot>
     </DialogTrigger>
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>

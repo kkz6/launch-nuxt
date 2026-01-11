@@ -74,7 +74,7 @@ onMounted(fetchData)
               { key: 'user', label: 'User', width: '15%' },
               { key: 'frequency', label: 'Frequency', width: '20%' },
               { key: 'status', label: 'Status', width: '15%' },
-              { key: 'installed_at', label: 'Installed', width: '15%' },
+              { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' },
             ]"
             :actions="[
               { label: 'View Logs', icon: 'lucide:scroll-text' },
@@ -86,6 +86,10 @@ onMounted(fetchData)
           >
             <template #empty>
               <ServerCreateScheduler :server-id="serverId" @created="fetchData" />
+            </template>
+
+            <template #cell-status="{ row }">
+              <SharedInstallationStatus v-bind="row" />
             </template>
           </SharedDataTable>
 
