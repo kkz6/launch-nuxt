@@ -146,7 +146,7 @@ onMounted(async () => {
 
           <div
             v-else
-            class="mt-6 grid w-full flex-wrap gap-5 pb-10 sm:grid-cols-2 lg:grid-cols-3"
+            class="mt-6 grid w-full flex-wrap gap-5 sm:grid-cols-2 lg:grid-cols-3"
           >
             <NuxtLink
               v-for="server in servers"

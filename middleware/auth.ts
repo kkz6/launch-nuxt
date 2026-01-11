@@ -1,4 +1,10 @@
 export default defineNuxtRouteMiddleware(async () => {
+  // Skip auth check on server - we can't access localStorage there
+  // The client-side check will handle the redirect if needed
+  if (import.meta.server) {
+    return;
+  }
+
   const { waitForAuth, isAuthenticated, user } = useAuth();
   const { getAccessToken } = useApi();
 
