@@ -34,6 +34,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const config = useRuntimeConfig()
+const { token } = useAuth()
 const rawLogs = ref('')
 const filteredLogs = ref<LogLine[]>([])
 const autoScroll = ref(true)
@@ -151,13 +152,13 @@ const connectWebSocket = () => {
   rawLogs.value = ''
   filteredLogs.value = []
 
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   const params = new URLSearchParams({
     serverId: props.serverId,
     entity: props.entity,
     entityId: props.entityId,
     tail: lines.value.toString(),
     search: search.value,
+    token: token.value || '',
   })
 
   if (logType.value) {
@@ -167,9 +168,8 @@ const connectWebSocket = () => {
     params.set('software', props.software)
   }
 
-  const apiBase = config.public.apiBase as string
-  const wsHost = new URL(apiBase).host
-  const wsUrl = `${protocol}//${wsHost}/terminal/logs?${params.toString()}`
+  const wsBase = config.public.wsBase as string
+  const wsUrl = `${wsBase}/terminal/logs?${params.toString()}`
 
   ws = new WebSocket(wsUrl)
 
