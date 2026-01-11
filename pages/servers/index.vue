@@ -101,23 +101,15 @@ onMounted(async () => {
         class="w-full"
         @update:model-value="handleTabChange"
       >
-        <div
-          class="flex w-full flex-row items-center justify-between gap-4 overflow-y-hidden border-b border-b-border max-sm:overflow-x-auto"
-        >
-          <TabsList class="relative bg-transparent px-0">
+        <div class="border-b border-border">
+          <TabsList class="h-auto gap-0 bg-transparent p-0">
             <TabsTrigger
               v-for="tab in tabs"
               :key="tab.value"
               :value="tab.value"
-              class="relative rounded-md px-5 py-2.5 hover:bg-zinc-100 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:hover:bg-zinc-100 dark:hover:bg-zinc-800 dark:data-[state=active]:hover:bg-zinc-800"
+              class="relative -mb-px rounded-none border-b border-transparent px-4 pb-3 pt-2 text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
-              <span class="relative z-[1] w-full">{{ tab.label }}</span>
-              <div
-                v-if="tab.value === activeTab"
-                class="absolute -bottom-[5.5px] w-full"
-              >
-                <div class="h-0.5 rounded-t-md bg-foreground" />
-              </div>
+              {{ tab.label }}
             </TabsTrigger>
           </TabsList>
         </div>
