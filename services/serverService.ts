@@ -68,7 +68,7 @@ export const serverService = {
    */
   getCreateOptions: () => {
     const { get } = useApi();
-    return get<CreateServerOptions>("/servers/create-options");
+    return get<ApiResponse<CreateServerOptions>>("/servers/create-options");
   },
 
   /**
