@@ -1,0 +1,156 @@
+<script setup lang="ts">
+import { toast } from 'vue-sonner'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
+import { Button } from '~/components/ui/button'
+import { Badge } from '~/components/ui/badge'
+
+interface Command {
+  id: string
+  command: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  output?: string
+  user: {
+    id: string
+    name: string
+  }
+  created_at: string
+}
+
+interface Props {
+  serverId: string
+  siteId: string
+}
+
+const props = defineProps<Props>()
+
+const commands = ref<Command[]>([])
+const isLoading = ref(true)
+const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+const statusColors: Record<string, string> = {
+  pending: 'bg-yellow-500',
+  running: 'bg-blue-500 animate-pulse',
+  completed: 'bg-green-500',
+  failed: 'bg-red-500',
+}
+
+const fetchCommands = async () => {
+  try {
+    const data = await $api<{ data: Command[] }>(`/servers/${props.serverId}/sites/${props.siteId}/commands`)
+    commands.value = data.data
+  } catch {
+    toast.error('Failed to load commands')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+const deleteCommand = async (command: Command) => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Delete Command',
+    description: 'Are you sure you want to delete this command from history?',
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    destructive: true,
+  })
+
+  if (result.ok) {
+    try {
+      await $api(`/servers/${props.serverId}/sites/${props.siteId}/commands/${command.id}`, {
+        method: 'DELETE',
+      })
+      commands.value = commands.value.filter((c) => c.id !== command.id)
+      toast.success('Command deleted')
+    } catch {
+      toast.error('Failed to delete command')
+    }
+  }
+}
+
+const runCommandAgain = async (command: Command) => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Run Command Again',
+    description: `Are you sure you want to run "${command.command}" again?`,
+    confirmText: 'Run',
+    cancelText: 'Cancel',
+  })
+
+  if (result.ok) {
+    try {
+      await $api(`/servers/${props.serverId}/sites/${props.siteId}/commands/${command.id}/again`, {
+        method: 'POST',
+      })
+      toast.success('Command execution started')
+      fetchCommands()
+    } catch {
+      toast.error('Failed to run command')
+    }
+  }
+}
+
+onMounted(fetchCommands)
+</script>
+
+<template>
+  <Card class="bg-background">
+    <SharedConfirmationDialog ref="confirmationDialog" />
+    <CardHeader>
+      <CardTitle class="text-xl">SSH Commands</CardTitle>
+      <CardDescription>Run and manage SSH commands on your site</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div v-if="isLoading" class="flex items-center justify-center py-8">
+        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+
+      <template v-else>
+        <SharedDataTable
+          :data="commands"
+          :columns="[
+            { key: 'user', label: 'User', width: '15%' },
+            { key: 'command', label: 'Command', width: '35%' },
+            { key: 'created_at', label: 'Created', width: '20%' },
+            { key: 'status', label: 'Status', width: '15%' },
+          ]"
+          :actions="[
+            { label: 'Run Again', icon: 'lucide:rotate-ccw', onClick: runCommandAgain },
+            { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteCommand, destructive: true },
+          ]"
+          empty-title="No commands found"
+          empty-icon="lucide:terminal"
+        >
+          <template #cell-user="{ row }">
+            {{ row.user?.name || 'Unknown' }}
+          </template>
+
+          <template #cell-command="{ row }">
+            <code class="rounded bg-muted px-2 py-1 text-sm">{{ row.command }}</code>
+          </template>
+
+          <template #cell-created_at="{ row }">
+            <SharedDateTooltip :date="row.created_at" />
+          </template>
+
+          <template #cell-status="{ row }">
+            <div class="flex items-center gap-2">
+              <span :class="['h-2.5 w-2.5 rounded-full', statusColors[row.status] || 'bg-gray-500']" />
+              <span class="capitalize">{{ row.status }}</span>
+            </div>
+          </template>
+
+          <template #empty>
+            <SiteRunCommand :server-id="serverId" :site-id="siteId" @executed="fetchCommands" />
+          </template>
+        </SharedDataTable>
+
+        <div v-if="commands.length > 0" class="mt-6">
+          <SiteRunCommand :server-id="serverId" :site-id="siteId" @executed="fetchCommands" />
+        </div>
+      </template>
+    </CardContent>
+  </Card>
+</template>
