@@ -1,4 +1,4 @@
-<script setup lang="ts" generic="T extends Record<string, unknown>">
+<script setup lang="ts" generic="T extends object">
 import {
   Table,
   TableBody,
@@ -50,6 +50,7 @@ const props = withDefaults(defineProps<Props>(), {
 defineSlots<{
   empty(): unknown
   actions(props: { item: T }): unknown
+  [key: `cell-${string}`]: (props: { row: T; value: unknown }) => unknown
 }>()
 
 const getValue = (item: T, key: string): unknown => {
@@ -91,12 +92,18 @@ const getValue = (item: T, key: string): unknown => {
             :key="String(column.key)"
             :class="[column.className, { 'hidden sm:table-cell': column.hideOnMobile }]"
           >
-            <template v-if="column.render">
-              <component :is="() => column.render!(getValue(item, String(column.key)), item)" />
-            </template>
-            <template v-else>
-              {{ getValue(item, String(column.key)) }}
-            </template>
+            <slot
+              :name="`cell-${String(column.key)}`"
+              :row="item"
+              :value="getValue(item, String(column.key))"
+            >
+              <template v-if="column.render">
+                <component :is="() => column.render!(getValue(item, String(column.key)), item)" />
+              </template>
+              <template v-else>
+                {{ getValue(item, String(column.key)) }}
+              </template>
+            </slot>
           </TableCell>
           <TableCell v-if="actions.length > 0 || $slots.actions" class="text-right">
             <slot name="actions" :item="item">

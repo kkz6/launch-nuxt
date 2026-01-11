@@ -260,7 +260,7 @@ onMounted(fetchDomainData)
 
                 <template #cell-ttl="{ row }">
                   <span v-if="row.proxied && row.ttl === 1">Auto</span>
-                  <span v-else-if="row.ttl > 0">{{ row.ttl }}</span>
+                  <span v-else-if="row.ttl && row.ttl > 0">{{ row.ttl }}</span>
                   <span v-else>-</span>
                 </template>
 

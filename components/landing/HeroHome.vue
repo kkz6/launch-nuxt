@@ -38,7 +38,7 @@ const providers = ['AWS', 'DigitalOcean', 'Hetzner', 'Vultr', 'Linode']
             Zero-Downtime Deployments
           </div>
 
-          <h1 class="font-site text-4xl font-bold leading-[1.1] tracking-tight md:text-5xl lg:text-6xl">
+          <h1 class="font-site-heading text-4xl font-bold leading-[1.1] tracking-tight md:text-5xl lg:text-6xl">
             <span class="text-[hsl(var(--site-text))]">Deploy at</span>
             <br />
             <span class="site-text-gradient">Light Speed</span>

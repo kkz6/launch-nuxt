@@ -45,17 +45,17 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    /* Site/Landing page variables */
-    --site-bg: 220 20% 4%;
-    --site-surface: 220 15% 8%;
-    --site-surface-elevated: 220 12% 12%;
-    --site-border: 220 10% 18%;
-    --site-text: 0 0% 95%;
-    --site-text-muted: 220 10% 60%;
-    --site-accent: 165 80% 50%;
-    --site-accent-secondary: 280 90% 65%;
-    --site-gradient-start: 165 80% 50%;
-    --site-gradient-end: 200 90% 55%;
+    /* Site/Landing page variables - Light mode */
+    --site-bg: 0 0% 100%;
+    --site-surface: 220 14% 96%;
+    --site-surface-elevated: 220 13% 91%;
+    --site-border: 220 13% 87%;
+    --site-text: 220 20% 10%;
+    --site-text-muted: 220 10% 45%;
+    --site-accent: 165 80% 40%;
+    --site-accent-secondary: 280 90% 55%;
+    --site-gradient-start: 165 80% 40%;
+    --site-gradient-end: 200 90% 45%;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -116,6 +116,18 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Site/Landing page variables - Dark mode */
+    --site-bg: 220 20% 4%;
+    --site-surface: 220 15% 8%;
+    --site-surface-elevated: 220 12% 12%;
+    --site-border: 220 10% 18%;
+    --site-text: 0 0% 95%;
+    --site-text-muted: 220 10% 60%;
+    --site-accent: 165 80% 50%;
+    --site-accent-secondary: 280 90% 65%;
+    --site-gradient-start: 165 80% 50%;
+    --site-gradient-end: 200 90% 55%;
   }
 }
 
@@ -234,6 +246,23 @@
   /* Font for landing pages */
   .font-site {
     font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Site heading font (Sora for headings) */
+  .font-site-heading {
+    font-family: 'Sora', sans-serif;
+  }
+}
+
+/* Site animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
