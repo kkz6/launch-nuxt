@@ -1,29 +1,30 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
 export default defineNuxtConfig({
-  compatibilityDate: '2024-11-01',
+  compatibilityDate: "2024-11-01",
   devtools: { enabled: true },
 
   modules: [
-    '@nuxtjs/tailwindcss',
-    '@nuxtjs/color-mode',
-    '@pinia/nuxt',
-    '@vueuse/nuxt',
-    '@vee-validate/nuxt',
-    '@nuxt/icon',
+    "@nuxtjs/tailwindcss",
+    "@nuxtjs/color-mode",
+    "@pinia/nuxt",
+    "@vueuse/nuxt",
+    "@vee-validate/nuxt",
+    "@nuxt/icon",
+    "motion-v/nuxt",
   ],
 
-  css: ['~/assets/css/main.css'],
+  css: ["~/assets/css/main.css"],
 
   colorMode: {
-    classSuffix: '',
-    preference: 'system',
-    fallback: 'light',
-    storageKey: 'nuxt-color-mode',
+    classSuffix: "",
+    preference: "system",
+    fallback: "light",
+    storageKey: "nuxt-color-mode",
   },
 
   tailwindcss: {
-    cssPath: '~/assets/css/main.css',
-    configPath: 'tailwind.config.ts',
+    cssPath: "~/assets/css/main.css",
+    configPath: "tailwind.config.ts",
   },
 
   typescript: {
@@ -33,47 +34,52 @@ export default defineNuxtConfig({
 
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8000/api',
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8000/api",
     },
   },
 
   app: {
     head: {
-      title: 'Launch',
+      title: "Launch",
       meta: [
-        { charset: 'utf-8' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { charset: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
       ],
       link: [
-        { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+        { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
         {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap',
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Sora:wght@400;500;600;700&display=swap",
         },
       ],
     },
   },
 
   imports: {
-    dirs: ['composables/**', 'utils/**', 'stores/**'],
+    dirs: ["composables/**", "utils/**", "stores/**", "services/**"],
   },
 
   components: [
     {
-      path: '~/components/ui',
+      path: "~/components/ui",
       pathPrefix: false,
-      ignore: ['**/index.ts'],
+      ignore: ["**/index.ts"],
     },
     {
-      path: '~/components',
+      path: "~/components",
       pathPrefix: true,
-      ignore: ['ui/**'],
+      ignore: ["ui/**"],
     },
   ],
 
   vite: {
     optimizeDeps: {
-      include: ['radix-vue', 'class-variance-authority', 'clsx', 'tailwind-merge'],
+      include: [
+        "radix-vue",
+        "class-variance-authority",
+        "clsx",
+        "tailwind-merge",
+      ],
     },
   },
-})
+});

@@ -12,6 +12,7 @@ import {
 } from '~/components/ui/breadcrumb'
 
 definePageMeta({
+  layout: 'default',
   middleware: 'auth',
 })
 

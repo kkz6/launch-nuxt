@@ -38,6 +38,12 @@ const rawLogs = ref('')
 const filteredLogs = ref<LogLine[]>([])
 const autoScroll = ref(true)
 const lines = ref(100)
+const linesString = computed({
+  get: () => String(lines.value),
+  set: (val: string) => {
+    lines.value = parseInt(val, 10)
+  },
+})
 const search = ref('')
 const typeFilter = ref<string[]>([])
 const scrollRef = ref<HTMLDivElement | null>(null)
@@ -229,7 +235,7 @@ onUnmounted(() => {
       <div class="space-y-4">
         <div v-if="!hideOptions" class="flex flex-wrap items-start justify-between gap-4 sm:items-center">
           <div class="flex flex-wrap gap-4">
-            <Select v-model="String(lines)">
+            <Select v-model="linesString">
               <SelectTrigger class="w-[130px]">
                 <SelectValue placeholder="Lines" />
               </SelectTrigger>

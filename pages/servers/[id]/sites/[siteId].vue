@@ -12,6 +12,7 @@ import {
 import type { Server, Site, Deployment } from '~/types'
 
 definePageMeta({
+  layout: 'default',
   middleware: 'auth',
 })
 

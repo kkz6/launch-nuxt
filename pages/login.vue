@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import { AnimatePresence, Motion } from 'motion-v'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Checkbox } from '~/components/ui/checkbox'
 import { Separator } from '~/components/ui/separator'
-import { Alert, AlertDescription } from '~/components/ui/alert'
 
 definePageMeta({
   layout: 'guest',
@@ -16,8 +16,7 @@ useHead({
   title: 'Sign in',
 })
 
-const { login, isLoading: authLoading } = useAuth()
-const config = useRuntimeConfig()
+const { login, checkUserStatus, isLoading: authLoading } = useAuth()
 
 const email = ref('')
 const password = ref('')
@@ -37,23 +36,15 @@ const handleEmailSubmit = async () => {
   errors.value = {}
 
   try {
-    const response = await $fetch<{
-      userExists: boolean
-      requiresVerification: boolean
-      hasPasskeys: boolean
-    }>('/auth/check-user-status', {
-      method: 'POST',
-      baseURL: config.public.apiBase as string,
-      body: { email: email.value },
-    })
+    const status = await checkUserStatus(email.value)
 
-    if (!response.userExists) {
+    if (!status.user_exists) {
       errors.value = { email: 'No account found with this email address.' }
       return
     }
 
-    userHasPasskeys.value = response.hasPasskeys
-    showPasskeyOption.value = response.hasPasskeys
+    userHasPasskeys.value = status.has_two_factor
+    showPasskeyOption.value = status.has_two_factor
     emailSubmitted.value = true
     showPasswordField.value = true
   } catch {
@@ -120,85 +111,145 @@ const handlePasskeyLogin = async () => {
         </NuxtLink>
       </p>
 
-      <!-- Email Form -->
-      <form v-if="!showPasswordField" class="space-y-4" @submit.prevent="handleEmailSubmit">
-        <div class="space-y-2">
-          <Label for="email">Email</Label>
-          <Input
-            id="email"
-            v-model="email"
-            type="email"
-            placeholder="m@example.com"
-            autofocus
-            required
-          />
-          <p v-if="errors.email" class="text-sm text-destructive">{{ errors.email }}</p>
-        </div>
-        <Button type="submit" class="w-full" :disabled="loading || !email">
-          <Icon v-if="loading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          {{ loading ? 'Checking...' : 'Continue' }}
-        </Button>
-      </form>
-
-      <!-- Password Form -->
-      <div v-else class="space-y-4">
-        <div class="flex items-center justify-between">
-          <div class="flex-1">
-            <p class="text-sm text-muted-foreground">Signing in as</p>
-            <p class="font-medium">{{ email }}</p>
-          </div>
-          <Button type="button" variant="ghost" size="sm" @click="handleChangeEmail">
-            Change
-          </Button>
-        </div>
-
-        <!-- Passkey Option -->
-        <div v-if="showPasskeyOption && userHasPasskeys">
-          <Button
-            type="button"
-            variant="outline"
-            class="w-full"
-            :disabled="passkeyLoading || loading"
-            @click="handlePasskeyLogin"
+      <ClientOnly>
+        <AnimatePresence mode="wait">
+          <!-- Email Form -->
+          <Motion
+            v-if="!showPasswordField"
+            key="email-form"
+            class="space-y-4"
+            :initial="{ opacity: 0, x: -20 }"
+            :animate="{ opacity: 1, x: 0 }"
+            :exit="{ opacity: 0, x: -20 }"
+            :transition="{ duration: 0.2, ease: 'easeOut' }"
           >
-            <Icon v-if="passkeyLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            <Icon v-else name="lucide:fingerprint" class="mr-2 h-4 w-4" />
-            {{ passkeyLoading ? 'Authenticating...' : 'Sign in with Passkey' }}
-          </Button>
-          <div class="relative my-6">
-            <div class="absolute inset-0 flex items-center">
-              <Separator class="w-full" />
+            <form class="space-y-4" @submit.prevent="handleEmailSubmit">
+              <div class="space-y-2">
+                <Label for="email">Email</Label>
+                <Input
+                  id="email"
+                  v-model="email"
+                  type="email"
+                  placeholder="m@example.com"
+                  autofocus
+                  required
+                />
+                <p v-if="errors.email" class="text-sm text-destructive">{{ errors.email }}</p>
+              </div>
+              <Button type="submit" class="w-full" :disabled="loading || !email">
+                <Icon v-if="loading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                {{ loading ? 'Checking...' : 'Continue' }}
+              </Button>
+            </form>
+          </Motion>
+
+          <!-- Password Form -->
+          <Motion
+            v-else
+            key="password-form"
+            class="space-y-4"
+            :initial="{ opacity: 0, x: 20 }"
+            :animate="{ opacity: 1, x: 0 }"
+            :exit="{ opacity: 0, x: 20 }"
+            :transition="{ duration: 0.2, ease: 'easeOut' }"
+          >
+            <Motion
+              class="flex items-center justify-between"
+              :initial="{ opacity: 0, y: -10 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.2, delay: 0.1 }"
+            >
+              <div class="flex-1">
+                <p class="text-sm text-muted-foreground">Signing in as</p>
+                <p class="font-medium">{{ email }}</p>
+              </div>
+              <Button type="button" variant="ghost" size="sm" @click="handleChangeEmail">
+                Change
+              </Button>
+            </Motion>
+
+            <!-- Passkey Option -->
+            <Motion
+              v-if="showPasskeyOption && userHasPasskeys"
+              :initial="{ opacity: 0, y: 10 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.2, delay: 0.15 }"
+            >
+              <Button
+                type="button"
+                variant="outline"
+                class="w-full"
+                :disabled="passkeyLoading || loading"
+                @click="handlePasskeyLogin"
+              >
+                <Icon v-if="passkeyLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                <Icon v-else name="lucide:fingerprint" class="mr-2 h-4 w-4" />
+                {{ passkeyLoading ? 'Authenticating...' : 'Sign in with Passkey' }}
+              </Button>
+              <div class="relative my-6">
+                <div class="absolute inset-0 flex items-center">
+                  <Separator class="w-full" />
+                </div>
+                <div class="relative flex justify-center text-xs uppercase">
+                  <span class="bg-background px-2 text-muted-foreground">Or use password</span>
+                </div>
+              </div>
+            </Motion>
+
+            <Motion
+              :initial="{ opacity: 0, y: 10 }"
+              :animate="{ opacity: 1, y: 0 }"
+              :transition="{ duration: 0.2, delay: 0.2 }"
+            >
+              <form class="space-y-4" @submit.prevent="handlePasswordSubmit">
+                <div class="space-y-2">
+                  <Label for="password">Password</Label>
+                  <Input
+                    id="password"
+                    v-model="password"
+                    type="password"
+                    autofocus
+                    required
+                  />
+                  <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                  <Checkbox id="remember" v-model:checked="remember" />
+                  <Label for="remember" class="text-sm font-normal">Remember me</Label>
+                </div>
+
+                <Button type="submit" class="w-full" :disabled="loading || authLoading">
+                  <Icon v-if="loading || authLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                  {{ loading || authLoading ? 'Signing in...' : 'Sign in' }}
+                </Button>
+              </form>
+            </Motion>
+          </Motion>
+        </AnimatePresence>
+
+        <!-- SSR Fallback -->
+        <template #fallback>
+          <form class="space-y-4" @submit.prevent="handleEmailSubmit">
+            <div class="space-y-2">
+              <Label for="email">Email</Label>
+              <Input
+                id="email"
+                v-model="email"
+                type="email"
+                placeholder="m@example.com"
+                autofocus
+                required
+              />
+              <p v-if="errors.email" class="text-sm text-destructive">{{ errors.email }}</p>
             </div>
-            <div class="relative flex justify-center text-xs uppercase">
-              <span class="bg-background px-2 text-muted-foreground">Or use password</span>
-            </div>
-          </div>
-        </div>
-
-        <form class="space-y-4" @submit.prevent="handlePasswordSubmit">
-          <div class="space-y-2">
-            <Label for="password">Password</Label>
-            <Input
-              id="password"
-              v-model="password"
-              type="password"
-              autofocus
-              required
-            />
-            <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <Checkbox id="remember" v-model:checked="remember" />
-            <Label for="remember" class="text-sm font-normal">Remember me</Label>
-          </div>
-
-          <Button type="submit" class="w-full" :disabled="loading || authLoading">
-            <Icon v-if="loading || authLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            {{ loading || authLoading ? 'Signing in...' : 'Sign in' }}
-          </Button>
-        </form>
-      </div>
+            <Button type="submit" class="w-full" :disabled="loading || !email">
+              <Icon v-if="loading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+              {{ loading ? 'Checking...' : 'Continue' }}
+            </Button>
+          </form>
+        </template>
+      </ClientOnly>
 
       <p class="mt-6 text-sm text-muted-foreground">
         Forgot your password?

@@ -1,107 +1,262 @@
 <script setup lang="ts">
-import { Badge } from '~/components/ui/badge'
-import { Button } from '~/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card'
-import type { Server } from '~/types'
+import { Server as ServerIcon, LoaderCircle } from "lucide-vue-next";
+import { Button } from "~/components/ui/button";
+import { Card, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import type { Server } from "~/types";
+import { serverService } from "~/services/serverService";
 
 definePageMeta({
-  middleware: 'auth',
-})
+  layout: "default",
+  middleware: "auth",
+});
 
 useHead({
-  title: 'Servers',
-})
+  title: "Servers",
+});
 
-const servers = ref<Server[]>([])
-const isLoading = ref(true)
+const router = useRouter();
+const servers = ref<Server[]>([]);
+const isLoading = ref(true);
+const activeTab = ref("servers");
 
 const serviceProviders: Record<string, string> = {
-  digitalocean: 'DigitalOcean',
-  hetzner: 'Hetzner',
-  linode: 'Linode',
-  vultr: 'Vultr',
-  aws: 'AWS',
-  custom_server: 'Custom Server',
-}
+  digitalocean: "DigitalOcean",
+  hetzner: "Hetzner",
+  linode: "Linode",
+  vultr: "Vultr",
+  aws: "AWS",
+  custom_server: "Custom",
+};
+
+const serverStatus: Record<string, string> = {
+  running: "Running",
+  provisioning: "Provisioning",
+  new: "Creating",
+  starting: "Starting",
+  failed: "Failed",
+  deleting: "Deleting",
+  unknown: "Unknown",
+};
+
+const tabs = [
+  { value: "servers", label: "Servers", route: "/servers" },
+  { value: "domains", label: "Domains", route: "/dns" },
+  { value: "settings", label: "Settings", route: "/settings" },
+];
+
+const handleTabChange = (value: string | number) => {
+  const tab = tabs.find((t) => t.value === String(value));
+  if (tab && tab.route !== "/servers") {
+    router.push(tab.route);
+  }
+};
+
+const formatDate = (dateString: string) => {
+  if (!dateString) return "";
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "today";
+  if (diffDays === 1) return "yesterday";
+  if (diffDays < 30) return `${diffDays} days ago`;
+  if (diffDays < 365) {
+    const months = Math.floor(diffDays / 30);
+    return `${months} ${months === 1 ? "month" : "months"} ago`;
+  }
+  const years = Math.floor(diffDays / 365);
+  return `${years} ${years === 1 ? "year" : "years"} ago`;
+};
 
 onMounted(async () => {
   try {
-    const response = await $api<{ data: Server[] }>('/servers')
-    servers.value = response.data
+    const response = await serverService.list();
+    servers.value = response.data.servers;
   } catch {
     // Handle error silently
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-})
+});
 </script>
 
 <template>
-  <div class="space-y-8">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight">Servers</h1>
-        <p class="text-muted-foreground">Manage your cloud servers</p>
+  <div class="gap-12">
+    <header
+      class="mb-6 flex w-full flex-wrap items-center justify-between gap-2"
+    >
+      <div class="flex flex-col gap-2">
+        <h1 class="text-xl font-bold lg:text-3xl">Servers</h1>
+        <p class="text-muted-foreground lg:text-medium">
+          Manage your servers
+        </p>
       </div>
       <Button as-child>
         <NuxtLink to="/servers/create">
           <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-          Add Server
+          Create
         </NuxtLink>
       </Button>
-    </div>
+    </header>
 
-    <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-8 w-8 animate-spin text-muted-foreground" />
-    </div>
-
-    <div v-else-if="servers.length === 0" class="flex flex-col items-center justify-center py-12">
-      <Icon name="lucide:server" class="mb-4 h-12 w-12 text-muted-foreground" />
-      <h3 class="text-lg font-semibold">No servers yet</h3>
-      <p class="mb-4 text-muted-foreground">Get started by creating your first server</p>
-      <Button as-child>
-        <NuxtLink to="/servers/create">Create Server</NuxtLink>
-      </Button>
-    </div>
-
-    <div v-else class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <NuxtLink
-        v-for="server in servers"
-        :key="server.id"
-        :to="`/servers/${server.id}`"
-        class="block"
+    <div class="flex w-full justify-between gap-8">
+      <Tabs
+        v-model="activeTab"
+        class="w-full"
+        @update:model-value="handleTabChange"
       >
-        <Card class="transition-colors hover:bg-muted/50">
-          <CardHeader>
-            <div class="flex items-center justify-between">
-              <CardTitle class="text-lg">{{ server.name }}</CardTitle>
-              <Badge :variant="server.connected ? 'default' : 'destructive'">
-                {{ server.connected ? 'Connected' : 'Disconnected' }}
-              </Badge>
-            </div>
-            <CardDescription class="flex items-center gap-2">
-              <Icon name="lucide:globe" class="h-3 w-3" />
-              {{ server.public_ipv4 }}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">
-                {{ serviceProviders[server.provider] || server.provider }}
-              </span>
-              <span class="text-muted-foreground">
-                {{ server.sites_count }} {{ server.sites_count === 1 ? 'site' : 'sites' }}
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-      </NuxtLink>
+        <div
+          class="flex w-full flex-row items-center justify-between gap-4 overflow-y-hidden border-b border-b-divider max-sm:overflow-x-auto"
+        >
+          <TabsList class="relative bg-transparent px-0">
+            <TabsTrigger
+              v-for="tab in tabs"
+              :key="tab.value"
+              :value="tab.value"
+              class="relative rounded-md px-5 py-2.5 hover:bg-zinc-100 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:hover:bg-zinc-100 dark:hover:bg-zinc-800 dark:data-[state=active]:hover:bg-zinc-800"
+            >
+              <span class="relative z-[1] w-full">{{ tab.label }}</span>
+              <div
+                v-if="tab.value === activeTab"
+                class="absolute -bottom-[5.5px] w-full"
+              >
+                <div class="h-0.5 rounded-t-md bg-foreground" />
+              </div>
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="servers" class="w-full">
+          <div v-if="isLoading" class="flex items-center justify-center py-12">
+            <Icon
+              name="lucide:loader-2"
+              class="h-8 w-8 animate-spin text-muted-foreground"
+            />
+          </div>
+
+          <div
+            v-else-if="servers.length === 0"
+            class="mt-6 flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
+          >
+            <ServerIcon class="size-10 text-muted-foreground md:size-28" />
+            <span>No servers added yet. Click on Create server.</span>
+          </div>
+
+          <div
+            v-else
+            class="mt-6 grid w-full flex-wrap gap-5 pb-10 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            <NuxtLink
+              v-for="server in servers"
+              :key="server.id"
+              :to="server.status === 'running' ? `/servers/${server.id}` : '#'"
+              class="w-full lg:max-w-md"
+              :class="{ 'pointer-events-none': server.status !== 'running' }"
+            >
+              <Card
+                class="group relative w-full transition-colors"
+                :class="[
+                  server.status === 'failed' || server.status === 'unknown'
+                    ? 'bg-gray-700/10'
+                    : 'bg-transparent hover:bg-card',
+                ]"
+              >
+                <!-- Provisioning progress bar -->
+                <div
+                  v-if="server.status === 'provisioning'"
+                  class="pointer-events-none absolute inset-0 animate-pulse rounded-lg bg-green-500/20 opacity-20 transition-all ease-in-out"
+                  :style="{ width: `${server.progress || 0}%` }"
+                />
+
+                <CardHeader>
+                  <CardTitle
+                    class="relative flex items-center justify-between gap-2"
+                  >
+                    <span class="flex flex-col gap-1.5">
+                      <div class="flex items-center gap-2">
+                        <ServerIcon class="size-4 text-muted-foreground" />
+                        <span class="text-base font-medium leading-none">
+                          {{ server.name }}
+                        </span>
+                      </div>
+                      <span class="text-sm font-medium text-muted-foreground">
+                        {{ server.provider_label || serviceProviders[server.provider] || server.provider }}
+                      </span>
+                      <span class="text-sm font-medium text-muted-foreground">
+                        {{ server.public_ipv4 }}
+                      </span>
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+
+                <CardFooter class="relative pt-4">
+                  <div
+                    class="flex w-full flex-row justify-between gap-2 text-sm max-sm:flex-wrap sm:gap-4"
+                  >
+                    <!-- Provisioning/Creating/Failed status -->
+                    <template
+                      v-if="
+                        server.status === 'provisioning' ||
+                        server.status === 'new' ||
+                        server.status === 'failed' ||
+                        server.status === 'deleting'
+                      "
+                    >
+                      <div
+                        class="flex w-full flex-col justify-between gap-1 text-sm max-sm:flex-wrap"
+                      >
+                        <div class="flex items-center space-x-2">
+                          <LoaderCircle
+                            v-if="server.status !== 'failed'"
+                            class="h-4 w-4 animate-spin"
+                          />
+                          <span>{{
+                            serverStatus[server.status] || server.status
+                          }}</span>
+                        </div>
+                        <span class="text-muted-foreground">
+                          Created {{ formatDate(server.created_at) }}
+                        </span>
+                      </div>
+                    </template>
+
+                    <!-- Running status -->
+                    <template v-else-if="server.status === 'running'">
+                      <div
+                        class="flex w-full flex-row justify-between gap-2 text-sm max-sm:flex-wrap sm:gap-4"
+                      >
+                        <div class="flex flex-col">
+                          <span>{{ server.status_label || serverStatus[server.status] }}</span>
+                          <span class="text-muted-foreground">
+                            Provisioned {{ formatDate(server.provisioned_at) }}
+                          </span>
+                        </div>
+                        <span>
+                          {{ server.services_count ?? server.sites_count ?? 0 }}
+                          {{ (server.services_count ?? server.sites_count ?? 0) === 1 ? "site" : "sites" }}
+                        </span>
+                      </div>
+                    </template>
+
+                    <!-- Other status -->
+                    <template v-else>
+                      <div class="flex flex-col">
+                        <span>{{ server.status_label || serverStatus[server.status] || server.status }}</span>
+                      </div>
+                      <span>
+                        {{ server.services_count ?? server.sites_count ?? 0 }}
+                        {{ (server.services_count ?? server.sites_count ?? 0) === 1 ? "site" : "sites" }}
+                      </span>
+                    </template>
+                  </div>
+                </CardFooter>
+              </Card>
+            </NuxtLink>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   </div>
 </template>

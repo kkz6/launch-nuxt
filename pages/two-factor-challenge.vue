@@ -1,72 +1,69 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { authService } from "~/services/authService";
 
 definePageMeta({
-  layout: 'guest',
-})
+  layout: "guest",
+});
 
 useHead({
-  title: 'Two-factor Confirmation',
-})
+  title: "Two-factor Confirmation",
+});
 
-const config = useRuntimeConfig()
+const { setTokens } = useApi();
+const { setUser } = useAuth();
 
-const code = ref('')
-const recoveryCode = ref('')
-const isRecovery = ref(false)
-const errors = ref<Record<string, string>>({})
-const loading = ref(false)
+const code = ref("");
+const recoveryCode = ref("");
+const isRecovery = ref(false);
+const errors = ref<Record<string, string>>({});
+const loading = ref(false);
 
 const handleSubmit = async () => {
-  loading.value = true
-  errors.value = {}
+  loading.value = true;
+  errors.value = {};
 
   try {
     const body = isRecovery.value
       ? { recovery_code: recoveryCode.value }
-      : { code: code.value }
+      : { code: code.value };
 
-    const response = await $fetch<{ token: string; user: import('~/types').User }>(
-      '/auth/two-factor-challenge',
-      {
-        method: 'POST',
-        baseURL: config.public.apiBase as string,
-        body,
-      }
-    )
+    const response = await authService.twoFactor.challenge(body);
 
-    const { setToken, setUser } = useAuth()
-    setToken(response.token)
-    setUser(response.user)
+    // Set tokens and user
+    setTokens(response.data.access_token, response.data.refresh_token);
+    setUser(response.data.user);
 
-    toast.success('Logged in successfully')
-    navigateTo('/dashboard')
+    toast.success("Logged in successfully");
+    navigateTo("/dashboard");
   } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'data' in error) {
-      const fetchError = error as { data?: { message?: string; errors?: Record<string, string[]> } }
-      const key = isRecovery.value ? 'recovery_code' : 'code'
+    if (error && typeof error === "object" && "data" in error) {
+      const fetchError = error as {
+        data?: { message?: string; errors?: Record<string, string[]> };
+      };
+      const key = isRecovery.value ? "recovery_code" : "code";
       if (fetchError.data?.errors?.[key]) {
-        errors.value = { [key]: fetchError.data.errors[key][0] }
+        errors.value = { [key]: fetchError.data.errors[key][0] };
       } else {
-        errors.value = { [key]: fetchError.data?.message || 'Invalid code' }
+        errors.value = { [key]: fetchError.data?.message || "Invalid code" };
       }
     } else {
-      errors.value = { code: 'An error occurred. Please try again.' }
+      errors.value = { code: "An error occurred. Please try again." };
     }
   } finally {
-    loading.value = false
+    loading.value = false;
   }
-}
+};
 
 const toggleRecovery = () => {
-  isRecovery.value = !isRecovery.value
-  code.value = ''
-  recoveryCode.value = ''
-  errors.value = {}
-}
+  isRecovery.value = !isRecovery.value;
+  code.value = "";
+  recoveryCode.value = "";
+  errors.value = {};
+};
 </script>
 
 <template>
@@ -76,12 +73,14 @@ const toggleRecovery = () => {
         <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
       </div>
 
-      <h3 class="mb-2 text-lg font-semibold text-foreground">Two-factor Confirmation</h3>
+      <h3 class="mb-2 text-lg font-semibold text-foreground">
+        Two-factor Confirmation
+      </h3>
       <p class="mb-8 text-sm text-muted-foreground">
         {{
           isRecovery
-            ? 'Please confirm access to your account by entering one of your emergency recovery codes.'
-            : 'Please confirm access to your account by entering the authentication code provided by your authenticator application.'
+            ? "Please confirm access to your account by entering one of your emergency recovery codes."
+            : "Please confirm access to your account by entering the authentication code provided by your authenticator application."
         }}
       </p>
 
@@ -112,12 +111,18 @@ const toggleRecovery = () => {
             autofocus
             required
           />
-          <p v-if="errors.code" class="text-sm text-destructive">{{ errors.code }}</p>
+          <p v-if="errors.code" class="text-sm text-destructive">
+            {{ errors.code }}
+          </p>
         </div>
 
         <Button type="submit" class="w-full" :disabled="loading">
-          <Icon v-if="loading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          {{ loading ? 'Verifying...' : 'Log in' }}
+          <Icon
+            v-if="loading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          {{ loading ? "Verifying..." : "Log in" }}
         </Button>
       </form>
 
@@ -127,7 +132,7 @@ const toggleRecovery = () => {
           class="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
           @click="toggleRecovery"
         >
-          {{ isRecovery ? 'Use an authentication code' : 'Use a recovery code' }}
+          {{ isRecovery ? "Use an authentication code" : "Use a recovery code" }}
         </button>
       </div>
     </div>
