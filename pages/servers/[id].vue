@@ -31,13 +31,31 @@ definePageMeta({
 });
 
 const route = useRoute();
+const router = useRouter();
 const serverId = computed(() => route.params.id as string);
 
 const server = ref<Server | null>(null);
 const sites = ref<Site[]>([]);
-const activeTab = ref("sites");
 const isLoading = ref(true);
 const isTerminalOpen = ref(false);
+
+// Valid tab values
+const validTabs = ["sites", "databases", "networks", "logs", "daemons", "schedulers", "advanced"];
+
+// Get initial tab from query params or default to "sites"
+const getInitialTab = () => {
+  const tabFromQuery = route.query.tab as string;
+  return validTabs.includes(tabFromQuery) ? tabFromQuery : "sites";
+};
+
+const activeTab = ref(getInitialTab());
+
+// Sync tab changes to URL query params
+watch(activeTab, (newTab) => {
+  router.replace({
+    query: { ...route.query, tab: newTab },
+  });
+});
 
 // Scroll state for tabs
 const scrollRef = ref<HTMLDivElement | null>(null);

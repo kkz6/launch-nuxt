@@ -17,13 +17,31 @@ definePageMeta({
 })
 
 const route = useRoute()
+const router = useRouter()
 const serverId = computed(() => route.params.id as string)
 const siteId = computed(() => route.params.siteId as string)
 
 const server = ref<Server | null>(null)
 const site = ref<Site | null>(null)
-const activeTab = ref('general')
 const isLoading = ref(true)
+
+// Valid tab values
+const validTabs = ['general', 'deployments', 'files', 'logs', 'queues', 'commands', 'settings']
+
+// Get initial tab from query params or default to "general"
+const getInitialTab = () => {
+  const tabFromQuery = route.query.tab as string
+  return validTabs.includes(tabFromQuery) ? tabFromQuery : 'general'
+}
+
+const activeTab = ref(getInitialTab())
+
+// Sync tab changes to URL query params
+watch(activeTab, (newTab) => {
+  router.replace({
+    query: { ...route.query, tab: newTab },
+  })
+})
 
 const applicationTypes: Record<string, string> = {
   laravel: 'Laravel',
