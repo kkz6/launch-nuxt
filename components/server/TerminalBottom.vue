@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import type { Server } from "~/types";
+import ServerTerminal from "~/components/server/ServerTerminal.vue";
 
 interface Props {
   server: Server;
@@ -40,6 +41,7 @@ const connectionStatus = ref<ConnectionStatus>("connecting");
 const selectedUser = ref<TerminalUser>("launcher");
 const terminalKey = ref(0);
 const showWarning = ref(true);
+const terminalRef = ref<InstanceType<typeof ServerTerminal> | null>(null);
 
 const toggleMaximize = () => {
   if (isMaximized.value) {
@@ -53,8 +55,14 @@ const toggleMaximize = () => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleUserChange = (user: any) => {
   selectedUser.value = user as TerminalUser;
-  // Force terminal reconnect with new user
-  terminalKey.value++;
+};
+
+const handleConnectionStatusChange = (status: ConnectionStatus) => {
+  connectionStatus.value = status;
+};
+
+const handleReconnect = () => {
+  terminalRef.value?.reconnect();
 };
 
 // Reset warning when terminal opens
@@ -64,10 +72,6 @@ watch(
     if (open) {
       showWarning.value = true;
       connectionStatus.value = "connecting";
-      // Simulate connection after a delay (in real implementation, this would be from WebSocket)
-      setTimeout(() => {
-        connectionStatus.value = "connected";
-      }, 1500);
     }
   }
 );
@@ -185,8 +189,8 @@ onBeforeUnmount(() => {
                 variant="ghost"
                 size="icon"
                 class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-                title="Clear terminal"
-                @click="terminalKey++"
+                title="Reconnect"
+                @click="handleReconnect"
               >
                 <RotateCcw class="h-3 w-3" />
               </Button>
@@ -240,38 +244,15 @@ onBeforeUnmount(() => {
 
         <!-- Terminal content -->
         <div class="flex-1 overflow-hidden bg-black">
-          <div
+          <ServerTerminal
+            v-if="isOpen"
             :key="terminalKey"
-            class="flex h-full items-center justify-center"
-          >
-            <div
-              v-if="connectionStatus === 'connecting'"
-              class="flex flex-col items-center gap-2"
-            >
-              <Icon
-                name="lucide:loader-2"
-                class="h-6 w-6 animate-spin text-zinc-500"
-              />
-              <span class="text-sm text-zinc-500">Connecting...</span>
-            </div>
-            <div
-              v-else-if="connectionStatus === 'connected'"
-              class="flex h-full w-full flex-col p-4 font-mono text-sm text-green-400"
-            >
-              <div class="mb-2">
-                Connected to {{ server.name }} ({{ server.public_ipv4 }}) as
-                {{ selectedUser }}
-              </div>
-              <div class="text-zinc-500">
-                $ <span class="animate-pulse">_</span>
-              </div>
-              <p class="mt-4 text-xs text-zinc-600">
-                Note: Full terminal functionality requires WebSocket connection
-                to the server.
-              </p>
-            </div>
-            <div v-else class="text-sm text-red-400">Connection failed</div>
-          </div>
+            ref="terminalRef"
+            :server-id="server.id"
+            :username="selectedUser"
+            :is-maximized="isMaximized"
+            @connection-status-change="handleConnectionStatusChange"
+          />
         </div>
       </div>
     </Transition>
