@@ -36,10 +36,10 @@ export interface CommitData {
 }
 
 export interface InstallationStatus {
-  installed_at: Date | null;
-  installation_failed_at: Date | null;
-  uninstallation_requested_at: Date | null;
-  uninstallation_failed_at: Date | null;
+  installed_at?: string | null;
+  installation_failed_at?: string | null;
+  uninstallation_requested_at?: string | null;
+  uninstallation_failed_at?: string | null;
 }
 
 export interface PaginatedResponse<T> {

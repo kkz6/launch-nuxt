@@ -263,6 +263,13 @@
   }
 }
 
+/* Modal scroll lock */
+.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+
 /* Site animations */
 @keyframes fadeInUp {
   from {

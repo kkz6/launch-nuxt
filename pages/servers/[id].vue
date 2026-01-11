@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ChevronLeft, ChevronRight, Terminal } from "lucide-vue-next";
+import { toast } from "vue-sonner";
 import {
   Tabs,
   TabsContent,
@@ -6,6 +8,7 @@ import {
   TabsTrigger,
 } from "~/components/ui/tabs";
 import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,6 +16,12 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from "~/components/ui/breadcrumb";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import type { Server, Site } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -28,6 +37,12 @@ const server = ref<Server | null>(null);
 const sites = ref<Site[]>([]);
 const activeTab = ref("sites");
 const isLoading = ref(true);
+const isTerminalOpen = ref(false);
+
+// Scroll state for tabs
+const scrollRef = ref<HTMLDivElement | null>(null);
+const canScrollLeft = ref(false);
+const canScrollRight = ref(false);
 
 const tabs = [
   { value: "sites", label: "Sites", icon: "lucide:globe" },
@@ -48,6 +63,17 @@ const serviceProviders: Record<string, string> = {
   custom_server: "Custom Server",
 };
 
+const checkScroll = () => {
+  const el = scrollRef.value;
+  if (!el) return;
+  canScrollLeft.value = el.scrollLeft > 0;
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth;
+};
+
+const scrollBy = (amount: number) => {
+  scrollRef.value?.scrollBy({ left: amount, behavior: "smooth" });
+};
+
 onMounted(async () => {
   try {
     const [serverData, sitesData] = await Promise.all([
@@ -57,6 +83,13 @@ onMounted(async () => {
     server.value = serverData.data;
     sites.value = sitesData.data;
     useHead({ title: server.value?.name || "Server" });
+
+    // Initialize scroll check
+    nextTick(() => {
+      checkScroll();
+      scrollRef.value?.addEventListener("scroll", checkScroll);
+      window.addEventListener("resize", checkScroll);
+    });
   } catch {
     navigateTo("/servers");
   } finally {
@@ -64,9 +97,15 @@ onMounted(async () => {
   }
 });
 
+onBeforeUnmount(() => {
+  scrollRef.value?.removeEventListener("scroll", checkScroll);
+  window.removeEventListener("resize", checkScroll);
+});
+
 const copyIp = () => {
   if (server.value?.public_ipv4) {
     navigator.clipboard.writeText(server.value.public_ipv4);
+    toast.success("IP address copied to clipboard");
   }
 };
 </script>
@@ -105,12 +144,25 @@ const copyIp = () => {
             </h1>
           </div>
           <div v-if="server.provider" class="flex h-fit w-fit flex-row gap-2">
-            <Badge :variant="server.connected ? 'default' : 'destructive'">
+            <Badge :variant="server.connected ? 'success' : 'destructive'">
               {{ server.connected ? "Connected" : "Disconnected" }}
             </Badge>
-            <Badge variant="outline" class="cursor-pointer" @click="copyIp">
-              {{ server.public_ipv4 }}
-            </Badge>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Badge
+                    variant="outline"
+                    class="cursor-pointer"
+                    @click="copyIp"
+                  >
+                    {{ server.public_ipv4 }}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Click to copy IP address</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <Badge>
               {{
                 server.provider === "custom_server"
@@ -130,17 +182,86 @@ const copyIp = () => {
     </div>
 
     <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="mb-3 flex h-auto justify-start gap-0 bg-background p-0">
-        <TabsTrigger
-          v-for="tab in tabs"
-          :key="tab.value"
-          :value="tab.value"
-          class="relative w-[120px] overflow-hidden whitespace-nowrap rounded-none border border-border py-2 shadow-sm shadow-black/5 first:rounded-s last:rounded-e data-[state=active]:bg-muted data-[state=active]:after:bg-primary after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5"
-        >
-          <Icon :name="tab.icon" class="-ms-0.5 me-1.5 h-4 w-4 opacity-60" />
-          {{ tab.label }}
-        </TabsTrigger>
-      </TabsList>
+      <div class="flex w-full items-center gap-4">
+        <!-- Tabs with scroll -->
+        <div class="relative min-w-0 flex-1">
+          <!-- Left scroll button -->
+          <div class="absolute inset-y-0 left-0 z-10 flex items-center">
+            <button
+              v-if="canScrollLeft"
+              class="mb-3 rounded-full bg-background p-1 shadow"
+              aria-label="Scroll left"
+              @click="scrollBy(-100)"
+            >
+              <ChevronLeft class="h-4 w-4" />
+            </button>
+          </div>
+
+          <!-- Right scroll button -->
+          <div class="absolute inset-y-0 right-0 z-10 flex items-center">
+            <button
+              v-if="canScrollRight"
+              class="mb-3 rounded-full bg-background p-1 shadow"
+              aria-label="Scroll right"
+              @click="scrollBy(100)"
+            >
+              <ChevronRight class="h-4 w-4" />
+            </button>
+          </div>
+
+          <div
+            ref="scrollRef"
+            class="scrollbar-none w-full overflow-x-auto whitespace-nowrap"
+            :style="{
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }"
+          >
+            <TabsList
+              class="mb-3 flex h-auto min-w-max justify-start -space-x-px bg-background p-0"
+            >
+              <TabsTrigger
+                v-for="tab in tabs"
+                :key="tab.value"
+                :value="tab.value"
+                class="relative w-[120px] whitespace-nowrap rounded-none border border-border py-2 shadow-sm shadow-black/5 first:rounded-s last:rounded-e after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 data-[state=active]:bg-muted data-[state=active]:after:bg-primary"
+              >
+                <Icon
+                  :name="tab.icon"
+                  class="-ms-0.5 me-1.5 h-4 w-4 shrink-0 opacity-60"
+                />
+                <span class="truncate">{{ tab.label }}</span>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
+
+        <!-- Terminal Button -->
+        <div v-if="server.connected" class="flex-shrink-0">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  class="relative mb-3"
+                  variant="ghost"
+                  size="icon"
+                  @click="isTerminalOpen = true"
+                >
+                  <Terminal class="h-4 w-4" />
+                  <span
+                    v-if="isTerminalOpen"
+                    class="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 animate-pulse rounded-full bg-green-500"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Open Terminal</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
 
       <TabsContent value="sites" class="pt-2.5">
         <ServerShowSites :sites="sites" :server="server" />
@@ -170,5 +291,13 @@ const copyIp = () => {
         <ServerAdvancedSettings :server="server" />
       </TabsContent>
     </Tabs>
+
+    <!-- Server Terminal -->
+    <ServerTerminalBottom
+      v-if="server.connected"
+      :server="server"
+      :is-open="isTerminalOpen"
+      @close="isTerminalOpen = false"
+    />
   </div>
 </template>
