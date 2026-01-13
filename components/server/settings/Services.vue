@@ -7,8 +7,18 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+
+interface ServiceStatusDetails {
+  pid?: string
+  memory_usage?: string
+  started_at?: string
+  processes?: string[]
+  connections?: string[]
+  additional_info?: Record<string, string>
+}
 
 interface Service {
   id: string
@@ -24,6 +34,10 @@ interface Service {
   software_label: string
   created_at: string
   updated_at: string
+  last_status_check?: string
+  status_details?: ServiceStatusDetails
+  status_output?: string
+  image_path?: string
 }
 
 interface Props {
@@ -38,8 +52,14 @@ const loadingAction = ref<{ software: string; action: string } | null>(null)
 const isInstallDialogOpen = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
+// Status dialog state
+const isStatusDialogOpen = ref(false)
+const selectedServiceForStatus = ref<Service | null>(null)
+
 // Map service types to image paths
-const getServiceImagePath = (type: string) => {
+const getServiceImagePath = (service: Service) => {
+  if (service.image_path) return service.image_path
+
   const imageMap: Record<string, string> = {
     php: '/images/services/php.svg',
     mysql: '/images/services/mysql.svg',
@@ -52,7 +72,7 @@ const getServiceImagePath = (type: string) => {
     node: '/images/services/node.svg',
     launch_agent: '/images/services/launch_agent.svg',
   }
-  return imageMap[type] || '/images/services/package_manager.svg'
+  return imageMap[service.type] || '/images/services/package_manager.svg'
 }
 
 const fetchServices = async () => {
@@ -94,6 +114,57 @@ const serviceAction = async (service: Service, action: 'start' | 'stop' | 'resta
   }
 }
 
+const checkStatus = async (service: Service) => {
+  loadingAction.value = { software: service.software, action: 'status' }
+
+  try {
+    toast.info(`Checking status of ${service.name}...`)
+    const response = await $api<{
+      status: string
+      status_label: string
+      last_status_check: string
+      status_details?: ServiceStatusDetails
+      status_output?: string
+    }>(`/servers/${props.serverId}/services/${service.id}/status`, {
+      method: 'POST',
+    })
+
+    // Update the service with new status data
+    const serviceIndex = services.value.findIndex(s => s.id === service.id)
+    if (serviceIndex !== -1) {
+      services.value[serviceIndex] = {
+        ...services.value[serviceIndex],
+        status: response.status,
+        status_label: response.status_label,
+        last_status_check: response.last_status_check,
+        status_details: response.status_details,
+        status_output: response.status_output,
+      }
+    }
+
+    toast.success(`Status checked for ${service.name}`)
+
+    // Open the status dialog
+    selectedServiceForStatus.value = services.value[serviceIndex]
+    isStatusDialogOpen.value = true
+  } catch {
+    toast.error(`Failed to check status of ${service.name}`)
+  } finally {
+    loadingAction.value = null
+  }
+}
+
+const handleStatusRefresh = async () => {
+  if (selectedServiceForStatus.value) {
+    await checkStatus(selectedServiceForStatus.value)
+  }
+}
+
+const openStatusDialog = (service: Service) => {
+  selectedServiceForStatus.value = service
+  isStatusDialogOpen.value = true
+}
+
 const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
   switch (status.toLowerCase()) {
     case 'running':
@@ -114,7 +185,7 @@ const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructiv
 const canStart = (service: Service) => service.status === 'stopped'
 const canStop = (service: Service) => service.status === 'running'
 const canRestart = (service: Service) => service.status === 'running'
-const hasActions = (service: Service) => canStart(service) || canStop(service) || canRestart(service)
+const hasActions = (_service: Service) => true // Always show dropdown for Check Status
 
 const sortedServices = computed(() =>
   [...services.value].sort((a, b) => a.name.localeCompare(b.name))
@@ -132,6 +203,15 @@ onMounted(fetchServices)
       v-model:open="isInstallDialogOpen"
       :server-id="serverId"
       @installed="fetchServices"
+    />
+
+    <!-- Service Status Dialog -->
+    <ServerSettingsServiceStatusDialog
+      v-if="selectedServiceForStatus"
+      v-model:open="isStatusDialogOpen"
+      :service="selectedServiceForStatus"
+      :get-image-path="getServiceImagePath"
+      @refresh="handleStatusRefresh"
     />
 
     <Card>
@@ -178,10 +258,10 @@ onMounted(fetchServices)
           <div v-else class="overflow-hidden rounded-lg border">
             <!-- Table Header -->
             <div class="hidden border-b bg-muted/50 px-6 py-3 md:grid md:grid-cols-12 md:gap-4">
-              <div class="col-span-5 text-sm font-medium text-muted-foreground">Service</div>
+              <div class="col-span-4 text-sm font-medium text-muted-foreground">Service</div>
               <div class="col-span-2 text-sm font-medium text-muted-foreground">Version</div>
               <div class="col-span-2 text-sm font-medium text-muted-foreground">Status</div>
-              <div class="col-span-3 text-right text-sm font-medium text-muted-foreground">Actions</div>
+              <div class="col-span-4 text-right text-sm font-medium text-muted-foreground">Actions</div>
             </div>
 
             <!-- Table Body -->
@@ -197,7 +277,7 @@ onMounted(fetchServices)
                     <div class="flex items-center gap-3">
                       <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
                         <img
-                          :src="getServiceImagePath(service.type)"
+                          :src="getServiceImagePath(service)"
                           :alt="service.name"
                           class="h-6 w-6 object-contain"
                           @error="($event.target as HTMLImageElement).style.display = 'none'"
@@ -233,6 +313,10 @@ onMounted(fetchServices)
                             <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
                             Restart
                           </DropdownMenuItem>
+                          <DropdownMenuItem @click="checkStatus(service)">
+                            <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
+                            Check Status
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -241,15 +325,18 @@ onMounted(fetchServices)
                     <Badge :variant="getStatusVariant(service.status)">
                       {{ service.status_label }}
                     </Badge>
+                    <span v-if="service.last_status_check" class="text-xs text-muted-foreground">
+                      Checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
+                    </span>
                   </div>
                 </div>
 
                 <!-- Desktop Layout -->
                 <div class="hidden items-center gap-4 md:grid md:grid-cols-12">
-                  <div class="col-span-5 flex items-center gap-3">
+                  <div class="col-span-4 flex items-center gap-3">
                     <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
                       <img
-                        :src="getServiceImagePath(service.type)"
+                        :src="getServiceImagePath(service)"
                         :alt="service.name"
                         class="h-6 w-6 object-contain"
                         @error="($event.target as HTMLImageElement).style.display = 'none'"
@@ -257,7 +344,10 @@ onMounted(fetchServices)
                     </div>
                     <div class="min-w-0">
                       <div class="truncate font-medium">{{ service.name }}</div>
-                      <div class="text-xs text-muted-foreground">{{ service.type_label }}</div>
+                      <div v-if="service.last_status_check" class="text-xs text-muted-foreground">
+                        Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
+                      </div>
+                      <div v-else class="text-xs text-muted-foreground">{{ service.type_label }}</div>
                     </div>
                   </div>
 
@@ -271,7 +361,7 @@ onMounted(fetchServices)
                     </Badge>
                   </div>
 
-                  <div class="col-span-3 flex items-center justify-end gap-2">
+                  <div class="col-span-4 flex items-center justify-end gap-2">
                     <Icon
                       v-if="loadingAction?.software === service.software"
                       name="lucide:loader-2"
@@ -295,6 +385,11 @@ onMounted(fetchServices)
                         <DropdownMenuItem v-if="canRestart(service)" @click="serviceAction(service, 'restart')">
                           <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
                           Restart
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator v-if="canStart(service) || canStop(service) || canRestart(service)" />
+                        <DropdownMenuItem @click="checkStatus(service)">
+                          <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
+                          Check Status
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
