@@ -254,12 +254,12 @@
 
   /* Font for landing pages */
   .font-site {
-    font-family: 'Geist', system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
   }
 
   /* Site heading font */
   .font-site-heading {
-    font-family: 'Geist', sans-serif;
+    font-family: 'Manrope', sans-serif;
   }
 }
 
