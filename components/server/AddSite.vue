@@ -4,6 +4,7 @@ import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Settings } from 'lucide-vue-next'
+import { useDebounceFn } from '@vueuse/core'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -38,6 +39,19 @@ const isOpen = ref(false)
 const isAdvancedOpen = ref(false)
 const isLoading = ref(false)
 const hasSubmitted = ref(false)
+
+// Domain verification state
+interface DomainVerification {
+  verified: boolean
+  domain: string
+  base_domain: string
+  connected_domain_id?: string
+  can_create_record: boolean
+}
+
+const isVerifyingDomain = ref(false)
+const domainVerification = ref<DomainVerification | null>(null)
+const createDnsRecord = ref(false)
 
 interface PhpVersion {
   value: string
@@ -148,6 +162,39 @@ const fetchOptions = async () => {
   }
 }
 
+// Domain verification
+const verifyDomain = async (domain: string) => {
+  if (!domain || domain.length < 3) {
+    domainVerification.value = null
+    createDnsRecord.value = false
+    return
+  }
+
+  isVerifyingDomain.value = true
+  try {
+    const result = await $api<DomainVerification>('/sites/verify-domain', {
+      params: { domain },
+    })
+    domainVerification.value = result
+    // Auto-enable DNS record creation if domain is verified
+    if (result.verified && result.can_create_record) {
+      createDnsRecord.value = true
+    }
+  } catch {
+    domainVerification.value = null
+  } finally {
+    isVerifyingDomain.value = false
+  }
+}
+
+const debouncedVerifyDomain = useDebounceFn(verifyDomain, 500)
+
+const handleDomainChange = (value: unknown) => {
+  const domain = value != null ? String(value) : ''
+  setStringField('address', domain)
+  debouncedVerifyDomain(domain)
+}
+
 const submitHandler = handleSubmit(async (data) => {
   if (!confirmationDialog.value) return
 
@@ -165,10 +212,13 @@ const submitHandler = handleSubmit(async (data) => {
 
   isLoading.value = true
   try {
-    // Merge advanced options into payload
+    // Merge advanced options and DNS options into payload
     const payload = {
       ...data,
       ...advancedOptions.value,
+      // DNS record creation options
+      create_dns_record: createDnsRecord.value && domainVerification.value?.can_create_record,
+      connected_domain_id: domainVerification.value?.connected_domain_id || null,
     }
 
     await $api(`/servers/${props.serverId}/sites`, {
@@ -216,6 +266,9 @@ watch(isOpen, (open) => {
     resetForm()
     resetAdvancedOptions()
     hasSubmitted.value = false
+    // Reset DNS state
+    domainVerification.value = null
+    createDnsRecord.value = false
   }
 })
 </script>
@@ -241,13 +294,44 @@ watch(isOpen, (open) => {
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="address">Domain</Label>
-          <Input
-            id="address"
-            :model-value="values.address"
-            placeholder="example.com"
-            @update:model-value="setStringField('address', $event)"
-          />
+          <div class="relative">
+            <Input
+              id="address"
+              :model-value="values.address"
+              placeholder="example.com"
+              @update:model-value="handleDomainChange"
+            />
+            <div v-if="isVerifyingDomain" class="absolute right-3 top-1/2 -translate-y-1/2">
+              <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin text-muted-foreground" />
+            </div>
+          </div>
           <p v-if="hasSubmitted && errors.address" class="text-sm text-destructive">{{ errors.address }}</p>
+
+          <!-- Domain verification status -->
+          <div v-if="domainVerification && values.address" class="mt-2">
+            <div v-if="domainVerification.verified && domainVerification.can_create_record" class="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950">
+              <div class="flex items-center gap-2">
+                <Icon name="lucide:check-circle" class="h-4 w-4 text-green-600 dark:text-green-400" />
+                <span class="text-sm text-green-700 dark:text-green-300">
+                  Domain connected via <strong>{{ domainVerification.base_domain }}</strong>
+                </span>
+              </div>
+              <div class="flex items-center gap-2">
+                <Label for="create_dns" class="text-sm text-green-700 dark:text-green-300">Create DNS record</Label>
+                <Switch
+                  id="create_dns"
+                  :checked="createDnsRecord"
+                  @update:checked="createDnsRecord = $event"
+                />
+              </div>
+            </div>
+            <div v-else class="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950">
+              <Icon name="lucide:alert-circle" class="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <span class="text-sm text-amber-700 dark:text-amber-300">
+                Domain not connected. Add <strong>{{ domainVerification.base_domain }}</strong> to your DNS providers to auto-create records.
+              </span>
+            </div>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-4">

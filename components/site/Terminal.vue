@@ -22,6 +22,8 @@ const terminalInstance = ref<Terminal | null>(null)
 const wsRef = ref<WebSocket | null>(null)
 const connectionStatus = ref<'connecting' | 'connected' | 'disconnected'>('connecting')
 
+const { token } = useAuth()
+
 const sendResize = (cols: number, rows: number, ws: WebSocket) => {
   if (ws.readyState === WebSocket.OPEN) {
     const resizeMessage = JSON.stringify({
@@ -81,8 +83,9 @@ const initializeTerminal = () => {
   urlParams.set('serverId', props.serverId)
   urlParams.set('siteId', props.siteId)
   urlParams.set('username', 'launcher')
+  urlParams.set('token', token.value || '')
 
-  const wsBase = config.public.wsBase || config.public.apiBase.replace(/^http/, 'ws')
+  const wsBase = config.public.wsBase as string
   const wsUrl = `${wsBase}/terminal/ws?${urlParams}`
 
   const waitForContainer = () => {
