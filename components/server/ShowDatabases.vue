@@ -256,7 +256,6 @@ onMounted(fetchData)
                 label: 'Edit',
                 icon: 'lucide:pencil',
                 onClick: editUser,
-                show: (user: DatabaseUser) => user.name !== 'root',
               },
               {
                 label: 'Delete',

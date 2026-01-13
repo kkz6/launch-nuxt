@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Settings } from 'lucide-vue-next'
 import { toast } from 'vue-sonner'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
@@ -22,32 +23,76 @@ import {
   FormMessage,
 } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
-import { Switch } from '~/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
+
+interface QueueValues {
+  queue_connection: string
+  queue: string
+  user?: string
+  max_seconds_per_job: number
+  rest_seconds_on_empty: number
+  failed_job_delay_seconds: number
+  directory?: string
+  run_on_maintenance: boolean
+  run_with_listen: boolean
+  environment?: string
+  max_tries?: number
+  max_memory?: number
+  numprocs?: number
+  stop_wait_seconds?: number
+}
+
+interface Queue extends QueueValues {
+  id: string
+}
 
 interface Props {
   serverId: string
   siteId: string
-  directory?: string
-  redisInstalled?: boolean
+  queue?: Queue
+  open?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  directory: '',
-  redisInstalled: false,
+  open: undefined,
 })
 
 const emit = defineEmits<{
   created: []
+  updated: []
+  'update:open': [value: boolean]
 }>()
 
-const isOpen = ref(false)
+const internalOpen = ref(false)
+const isControlled = computed(() => props.open !== undefined)
+const isOpen = computed({
+  get: () => isControlled.value ? props.open! : internalOpen.value,
+  set: (value: boolean) => {
+    if (isControlled.value) {
+      emit('update:open', value)
+    } else {
+      internalOpen.value = value
+    }
+  },
+})
 const isLoading = ref(false)
+const isAdvancedOpen = ref(false)
+const availableUsers = ref<Record<string, string>>({})
+const directory = ref('')
+const redisInstalled = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const queueSchema = toTypedSchema(
   z.object({
-    queue_connection: z.string().max(10),
-    queue: z.string().max(10),
+    queue_connection: z.string().min(1).max(50),
+    queue: z.string().min(1).max(50),
+    user: z.string().optional(),
     max_seconds_per_job: z.coerce.number().min(1),
     rest_seconds_on_empty: z.coerce.number().min(0),
     failed_job_delay_seconds: z.coerce.number().min(0),
@@ -62,37 +107,100 @@ const queueSchema = toTypedSchema(
   })
 )
 
-const { handleSubmit, resetForm, setFieldError } = useForm({
-  validationSchema: queueSchema,
-  validateOnMount: false,
-  initialValues: {
-    queue_connection: props.redisInstalled ? 'redis' : 'database',
+const getInitialValues = () => {
+  if (props.queue) {
+    return {
+      queue_connection: props.queue.queue_connection,
+      queue: props.queue.queue,
+      user: props.queue.user || Object.keys(availableUsers.value)[0] || '',
+      max_seconds_per_job: props.queue.max_seconds_per_job,
+      rest_seconds_on_empty: props.queue.rest_seconds_on_empty,
+      failed_job_delay_seconds: props.queue.failed_job_delay_seconds,
+      directory: props.queue.directory || directory.value,
+      run_on_maintenance: props.queue.run_on_maintenance,
+      run_with_listen: props.queue.run_with_listen,
+      environment: props.queue.environment,
+      max_tries: props.queue.max_tries,
+      max_memory: props.queue.max_memory,
+      numprocs: props.queue.numprocs || 1,
+      stop_wait_seconds: props.queue.stop_wait_seconds || 10,
+    }
+  }
+  return {
+    queue_connection: redisInstalled.value ? 'redis' : 'database',
     queue: 'default',
+    user: Object.keys(availableUsers.value)[0] || '',
     max_seconds_per_job: 60,
     rest_seconds_on_empty: 10,
     failed_job_delay_seconds: 3,
+    directory: directory.value,
     run_on_maintenance: false,
     run_with_listen: false,
-    stop_wait_seconds: 10,
-    directory: props.directory,
     numprocs: 1,
-  },
+    stop_wait_seconds: 10,
+  }
+}
+
+const { handleSubmit, resetForm, setFieldError, values, setValues } = useForm({
+  validationSchema: queueSchema,
+  validateOnMount: false,
+  initialValues: getInitialValues(),
 })
+
+const fetchOptions = async () => {
+  try {
+    const response = await $api<{
+      data: {
+        directory: string
+        redis_installed: boolean
+        available_users: Record<string, string>
+      }
+    }>(`/servers/${props.serverId}/sites/${props.siteId}/queues/create`)
+    availableUsers.value = response.data.available_users || {}
+    directory.value = response.data.directory || ''
+    redisInstalled.value = response.data.redis_installed || false
+
+    // Update form with fetched defaults
+    if (!props.queue) {
+      setValues({
+        ...values,
+        queue_connection: redisInstalled.value ? 'redis' : 'database',
+        user: Object.keys(availableUsers.value)[0] || '',
+        directory: directory.value,
+      })
+    }
+  } catch {
+    // Silent fail
+  }
+}
 
 const handleClose = (open = false) => {
   isOpen.value = open
   if (!open) {
-    resetForm()
+    resetForm({ values: getInitialValues() })
   }
 }
 
-const onSubmit = handleSubmit(async (values) => {
+watch(() => isOpen.value, (open) => {
+  if (open) {
+    fetchOptions()
+    // Reset form with queue values when editing
+    if (props.queue) {
+      setValues(getInitialValues())
+    }
+  }
+})
+
+const onSubmit = handleSubmit(async (formValues) => {
   if (!confirmationDialog.value) return
 
+  const isEdit = !!props.queue
   const result = await confirmationDialog.value.show({
-    title: 'Create Queue Worker',
-    description: 'Are you sure you want to create this queue worker?',
-    confirmText: 'Create',
+    title: isEdit ? 'Update Queue Worker' : 'Create Queue Worker',
+    description: isEdit
+      ? 'Are you sure you want to update this queue worker?'
+      : 'Are you sure you want to create this queue worker?',
+    confirmText: isEdit ? 'Update' : 'Create',
     cancelText: 'Cancel',
   })
 
@@ -104,46 +212,61 @@ const onSubmit = handleSubmit(async (values) => {
   isLoading.value = true
 
   try {
-    await $api(`/servers/${props.serverId}/sites/${props.siteId}/queues`, {
-      method: 'POST',
-      body: values,
+    const url = isEdit
+      ? `/servers/${props.serverId}/sites/${props.siteId}/queues/${props.queue!.id}`
+      : `/servers/${props.serverId}/sites/${props.siteId}/queues`
+
+    await $api(url, {
+      method: isEdit ? 'PATCH' : 'POST',
+      body: formValues,
     })
-    toast.success('Queue worker created')
+    toast.success(isEdit ? 'Queue worker updated' : 'Queue worker created')
     handleClose(false)
-    emit('created')
+    if (isEdit) {
+      emit('updated')
+    } else {
+      emit('created')
+    }
   } catch (error: unknown) {
     const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        setFieldError(field as keyof typeof values, messages[0])
+        setFieldError(field as keyof typeof formValues, messages[0])
       }
     } else {
-      toast.error(err.data?.message || 'Failed to create queue worker')
+      toast.error(err.data?.message || `Failed to ${isEdit ? 'update' : 'create'} queue worker`)
     }
   } finally {
     isLoading.value = false
   }
 })
+
+const advancedValues = computed({
+  get: () => values as QueueValues,
+  set: (newValues: QueueValues) => setValues(newValues),
+})
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen" @update:open="handleClose">
-    <DialogTrigger as-child>
-      <Button>
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Queue Worker
-      </Button>
+  <Dialog :open="isOpen" @update:open="handleClose">
+    <DialogTrigger v-if="!isControlled" as-child>
+      <slot>
+        <Button>
+          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+          Add Queue Worker
+        </Button>
+      </slot>
     </DialogTrigger>
-    <DialogContent class="sm:max-w-3xl">
+    <DialogContent class="sm:max-w-xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
       <DialogHeader>
-        <DialogTitle>Create Queue Worker</DialogTitle>
+        <DialogTitle>{{ queue ? 'Update Queue Worker' : 'Create Queue Worker' }}</DialogTitle>
         <DialogDescription>
-          Configure a new Laravel queue worker for this site.
+          {{ queue ? 'Update the queue worker configuration.' : 'Configure a new Laravel queue worker for this site.' }}
         </DialogDescription>
       </DialogHeader>
 
-      <form class="space-y-6" @submit.prevent="onSubmit">
+      <form class="space-y-4" @submit.prevent="onSubmit">
         <div class="grid grid-cols-2 gap-4">
           <FormField v-slot="{ componentField }" name="queue_connection">
             <FormItem>
@@ -167,142 +290,47 @@ const onSubmit = handleSubmit(async (values) => {
           </FormField>
         </div>
 
-        <div class="w-full border-b">
-          <h3 class="pb-2 text-lg font-medium">Policies</h3>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-          <FormField v-slot="{ componentField }" name="max_seconds_per_job">
-            <FormItem>
-              <FormLabel>Max Seconds Per Job</FormLabel>
-              <FormControl>
-                <Input type="number" v-bind="componentField" />
-              </FormControl>
-              <FormDescription>Maximum time a job can run</FormDescription>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ componentField }" name="rest_seconds_on_empty">
-            <FormItem>
-              <FormLabel>Rest Seconds on Empty</FormLabel>
-              <FormControl>
-                <Input type="number" placeholder="3" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ componentField }" name="failed_job_delay_seconds">
-            <FormItem>
-              <FormLabel>Failed Job Delay Seconds</FormLabel>
-              <FormControl>
-                <Input type="number" placeholder="0" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ componentField }" name="max_tries">
-            <FormItem>
-              <FormLabel>Max Tries</FormLabel>
-              <FormControl>
-                <Input type="number" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
-
-        <div class="w-full border-b">
-          <h3 class="pb-2 text-lg font-medium">Configuration</h3>
-        </div>
-
-        <div class="grid grid-cols-2 gap-4">
-          <FormField v-slot="{ componentField }" name="environment">
-            <FormItem>
-              <FormLabel>Environment</FormLabel>
-              <FormControl>
-                <Input placeholder="production" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ componentField }" name="max_memory">
-            <FormItem>
-              <FormLabel>Max Memory (MB)</FormLabel>
-              <FormControl>
-                <Input type="number" placeholder="128" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
-
-        <FormField v-slot="{ componentField }" name="directory">
+        <FormField v-slot="{ componentField }" name="user">
           <FormItem>
-            <FormLabel>Working Directory</FormLabel>
-            <FormControl>
-              <Input placeholder="/home/user/site.com" v-bind="componentField" />
-            </FormControl>
+            <FormLabel>User</FormLabel>
+            <Select v-bind="componentField">
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select user" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem
+                  v-for="(label, value) in availableUsers"
+                  :key="value"
+                  :value="value"
+                >
+                  {{ label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <FormDescription>User to run the queue worker as</FormDescription>
             <FormMessage />
           </FormItem>
         </FormField>
 
-        <div class="grid grid-cols-2 gap-4">
-          <FormField v-slot="{ componentField }" name="numprocs">
-            <FormItem>
-              <FormLabel>Number of Processes</FormLabel>
-              <FormControl>
-                <Input type="number" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-
-          <FormField v-slot="{ componentField }" name="stop_wait_seconds">
-            <FormItem>
-              <FormLabel>Graceful Shutdown (seconds)</FormLabel>
-              <FormControl>
-                <Input type="number" placeholder="10" v-bind="componentField" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          </FormField>
-        </div>
-
-        <FormField v-slot="{ value, handleChange }" name="run_with_listen">
-          <FormItem class="flex flex-row items-center justify-between rounded-lg border p-4">
-            <div class="space-y-0.5">
-              <FormLabel>Run with Listen</FormLabel>
-              <FormDescription>Use queue:listen instead of queue:work</FormDescription>
-            </div>
-            <FormControl>
-              <Switch :checked="value" @update:checked="handleChange" />
-            </FormControl>
-          </FormItem>
-        </FormField>
-
-        <FormField v-slot="{ value, handleChange }" name="run_on_maintenance">
-          <FormItem class="flex flex-row items-center justify-between rounded-lg border p-4">
-            <div class="space-y-0.5">
-              <FormLabel>Run on Maintenance</FormLabel>
-              <FormDescription>Keep running when application is in maintenance mode</FormDescription>
-            </div>
-            <FormControl>
-              <Switch :checked="value" @update:checked="handleChange" />
-            </FormControl>
-          </FormItem>
-        </FormField>
-
-        <DialogFooter>
+        <DialogFooter class="sm:justify-between">
+          <Button type="button" variant="outline" @click="isAdvancedOpen = true">
+            <Settings class="mr-2 h-4 w-4" />
+            Advanced Options
+          </Button>
           <Button type="submit" :disabled="isLoading">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            Create
+            {{ queue ? 'Update' : 'Create' }}
           </Button>
         </DialogFooter>
       </form>
     </DialogContent>
   </Dialog>
+
+  <SiteQueueAdvancedOptions
+    v-model:open="isAdvancedOpen"
+    :values="advancedValues"
+    @update:values="setValues($event)"
+  />
 </template>

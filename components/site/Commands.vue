@@ -7,7 +7,7 @@ import { Badge } from '~/components/ui/badge'
 interface Command {
   id: string
   command: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'finished' | 'failed'
   output?: string
   user: {
     id: string
@@ -27,11 +27,11 @@ const commands = ref<Command[]>([])
 const isLoading = ref(true)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
-const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-500',
-  running: 'bg-blue-500 animate-pulse',
-  completed: 'bg-green-500',
-  failed: 'bg-red-500',
+const statusVariants: Record<string, 'default' | 'secondary' | 'success' | 'destructive' | 'warning'> = {
+  pending: 'warning',
+  running: 'default',
+  finished: 'success',
+  failed: 'destructive',
 }
 
 const fetchCommands = async () => {
@@ -44,6 +44,12 @@ const fetchCommands = async () => {
     isLoading.value = false
   }
 }
+
+// Subscribe to real-time command events
+useSiteCommandEvents(props.siteId, (data) => {
+  // Refresh commands when any command event is received
+  fetchCommands()
+})
 
 const deleteCommand = async (command: Command) => {
   if (!confirmationDialog.value) return
@@ -116,10 +122,6 @@ onMounted(fetchCommands)
             { key: 'created_at', label: 'Created', width: '20%' },
             { key: 'status', label: 'Status', width: '15%' },
           ]"
-          :actions="[
-            { label: 'Run Again', icon: 'lucide:rotate-ccw', onClick: runCommandAgain },
-            { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteCommand, destructive: true },
-          ]"
           empty-title="No commands found"
           empty-icon="lucide:terminal"
         >
@@ -136,10 +138,39 @@ onMounted(fetchCommands)
           </template>
 
           <template #cell-status="{ row }">
-            <div class="flex items-center gap-2">
-              <span :class="['h-2.5 w-2.5 rounded-full', statusColors[row.status] || 'bg-gray-500']" />
+            <Badge :variant="statusVariants[row.status] || 'secondary'" class="gap-1.5">
+              <Icon
+                v-if="row.status === 'running'"
+                name="lucide:loader-2"
+                class="h-3 w-3 animate-spin"
+              />
               <span class="capitalize">{{ row.status }}</span>
-            </div>
+            </Badge>
+          </template>
+
+          <template #actions="{ item }">
+            <SharedOutputViewer
+              v-if="item.output"
+              title="Command Output"
+              :description="item.command"
+              :output="item.output"
+            >
+              <Button variant="ghost" size="icon" title="View Output">
+                <Icon name="lucide:terminal-square" class="h-4 w-4" />
+              </Button>
+            </SharedOutputViewer>
+            <Button variant="ghost" size="icon" title="Run Again" @click="runCommandAgain(item)">
+              <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Delete"
+              class="hover:bg-destructive/90 hover:text-white"
+              @click="deleteCommand(item)"
+            >
+              <Icon name="lucide:trash-2" class="h-4 w-4" />
+            </Button>
           </template>
 
           <template #empty>
