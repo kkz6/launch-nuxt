@@ -140,6 +140,9 @@ watch(isEditDialogOpen, (open) => {
 
 const hasStatusInfo = computed(() => daemons.value.some((d) => d.last_status_check !== null))
 
+// Subscribe to real-time daemon events
+useServerModelEvents('daemon', props.serverId, fetchData)
+
 onMounted(fetchData)
 </script>
 
@@ -161,6 +164,7 @@ onMounted(fetchData)
             entity="daemon"
             :entity-id="selectedDaemonForLogs.id"
             type-switcher
+            no-timestamp
           />
         </div>
       </DialogContent>
