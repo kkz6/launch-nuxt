@@ -6,13 +6,20 @@ import { Badge } from '~/components/ui/badge'
 
 interface Queue {
   id: string
-  connection: string
+  queue_connection: string
   queue: string
-  processes: number
-  sleep: number
-  timeout: number
-  tries: number
-  status: string
+  user?: string
+  max_seconds_per_job: number
+  rest_seconds_on_empty: number
+  failed_job_delay_seconds: number
+  directory?: string
+  run_on_maintenance: boolean
+  run_with_listen: boolean
+  environment?: string
+  max_tries?: number
+  max_memory?: number
+  numprocs?: number
+  stop_wait_seconds?: number
   running: boolean
   installed_at: string | null
 }
@@ -26,7 +33,26 @@ const props = defineProps<Props>()
 
 const queues = ref<Queue[]>([])
 const isLoading = ref(true)
+const selectedQueue = ref<Queue | null>(null)
+const isEditDialogOpen = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+const editQueue = (queue: Queue) => {
+  selectedQueue.value = queue
+  isEditDialogOpen.value = true
+}
+
+const handleQueueUpdated = () => {
+  isEditDialogOpen.value = false
+  selectedQueue.value = null
+  fetchQueues()
+}
+
+watch(isEditDialogOpen, (open) => {
+  if (!open) {
+    selectedQueue.value = null
+  }
+})
 
 const fetchQueues = async () => {
   try {
@@ -38,6 +64,11 @@ const fetchQueues = async () => {
     isLoading.value = false
   }
 }
+
+// Subscribe to real-time queue events
+useSiteQueueEvents(props.siteId, () => {
+  fetchQueues()
+})
 
 const restartQueue = async (queue: Queue) => {
   if (!confirmationDialog.value) return
@@ -92,6 +123,17 @@ onMounted(fetchQueues)
 <template>
   <Card class="bg-background">
     <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!-- Edit Queue Dialog -->
+    <SiteCreateQueue
+      v-if="selectedQueue"
+      v-model:open="isEditDialogOpen"
+      :server-id="serverId"
+      :site-id="siteId"
+      :queue="selectedQueue"
+      @updated="handleQueueUpdated"
+    />
+
     <CardHeader class="flex flex-row items-center justify-between">
       <div>
         <CardTitle class="text-xl">Queue Workers</CardTitle>
@@ -108,28 +150,41 @@ onMounted(fetchQueues)
           :data="queues"
           :columns="[
             { key: 'queue', label: 'Queue', width: '20%' },
-            { key: 'connection', label: 'Connection', width: '15%' },
-            { key: 'processes', label: 'Processes', width: '10%' },
+            { key: 'queue_connection', label: 'Connection', width: '15%' },
+            { key: 'numprocs', label: 'Processes', width: '10%' },
             { key: 'running', label: 'Status', width: '15%' },
             { key: 'installed_at', label: 'Installed', width: '20%' },
-          ]"
-          :actions="[
-            { label: 'Restart', icon: 'lucide:rotate-ccw', onClick: restartQueue },
-            { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteQueue, destructive: true },
           ]"
           empty-title="No queue workers found"
           empty-icon="lucide:database"
         >
           <template #cell-running="{ row }">
-            <div class="flex items-center gap-2">
-              <span :class="['h-2.5 w-2.5 rounded-full', row.running ? 'bg-green-500' : 'bg-red-500']" />
-              <span>{{ row.running ? 'Running' : 'Stopped' }}</span>
-            </div>
+            <Badge :variant="row.running ? 'success' : 'secondary'">
+              {{ row.running ? 'Running' : 'Stopped' }}
+            </Badge>
           </template>
 
           <template #cell-installed_at="{ row }">
             <SharedDateTooltip v-if="row.installed_at" :date="row.installed_at" />
             <span v-else class="text-muted-foreground">Not installed</span>
+          </template>
+
+          <template #actions="{ item }">
+            <Button variant="ghost" size="icon" title="Restart" @click="restartQueue(item)">
+              <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title="Edit" @click="editQueue(item)">
+              <Icon name="lucide:pencil" class="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Delete"
+              class="hover:bg-destructive/90 hover:text-white"
+              @click="deleteQueue(item)"
+            >
+              <Icon name="lucide:trash-2" class="h-4 w-4" />
+            </Button>
           </template>
 
           <template #empty>
