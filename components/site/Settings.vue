@@ -40,7 +40,8 @@ const emit = defineEmits<{
 const isLoading = ref(false)
 const phpVersions = ref<Record<string, string>>({})
 const tlsOptions = ref<Record<string, string>>({})
-const sourceControl = ref<Record<string, string | { name: string; provider: string }>>({})
+const sourceControlData = ref<{ id: string; provider: string; login: string; name: string; type: string } | null>(null)
+const repositoryData = ref<{ id: number; name: string; full_name: string; default_branch: string; html_url: string } | null>(null)
 const deletionResources = ref<{ queues: number; crons: number }>({ queues: 0, crons: 0 })
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -64,35 +65,57 @@ const { handleSubmit, setFieldError } = useForm({
 
 const fetchSettings = async () => {
   try {
-    const data = await $api<{
-      phpVersions: Record<string, string>
-      tlsOptions: Record<string, string>
-      sourceControl: Record<string, string | { name: string; provider: string }>
-      deletionResources: { queues: number; crons: number }
+    const response = await $api<{
+      data: {
+        site: Site
+        php_versions: Array<{ version: string; is_default: boolean }>
+        tls_options: Array<{ value: string; label: string }>
+        source_control: { id: string; provider: string; login: string; name: string; type: string } | null
+        repository: { id: number; name: string; full_name: string; default_branch: string; html_url: string } | null
+      }
     }>(`/servers/${props.serverId}/sites/${props.site.id}/settings`)
-    phpVersions.value = data.phpVersions
-    tlsOptions.value = data.tlsOptions
-    sourceControl.value = data.sourceControl
-    deletionResources.value = data.deletionResources
+
+    // Transform php_versions array to Record
+    phpVersions.value = (response.data.php_versions || []).reduce((acc, v) => {
+      acc[`php${v.version.replace('.', '')}`] = `PHP ${v.version}${v.is_default ? ' (Default)' : ''}`
+      return acc
+    }, {} as Record<string, string>)
+
+    // Transform tls_options array to Record
+    tlsOptions.value = (response.data.tls_options || []).reduce((acc, opt) => {
+      acc[opt.value] = opt.label
+      return acc
+    }, {} as Record<string, string>)
+
+    // Store source control and repository data directly
+    sourceControlData.value = response.data.source_control || null
+    repositoryData.value = response.data.repository || null
   } catch {
     // Use defaults
   }
 }
 
-const getCurrentSourceControl = () => {
-  if (!props.site.source_control_id || !sourceControl.value[props.site.source_control_id]) {
-    return null
+const fetchDeletionResources = async () => {
+  try {
+    const response = await $api<{ data: { queues: number; crons: number } }>(
+      `/servers/${props.serverId}/sites/${props.site.id}/deletion-resources`
+    )
+    deletionResources.value = response.data
+  } catch {
+    // Default to 0 if endpoint doesn't exist
+    deletionResources.value = { queues: 0, crons: 0 }
   }
-
-  const controlData = sourceControl.value[props.site.source_control_id]
-  const isObject = typeof controlData === 'object'
-  const displayName = isObject ? (controlData as { name: string }).name : controlData
-  const provider = isObject ? (controlData as { provider: string }).provider : 'github'
-
-  return { displayName, provider }
 }
 
-const currentSourceControl = computed(() => getCurrentSourceControl())
+const currentSourceControl = computed(() => {
+  if (!sourceControlData.value) {
+    return null
+  }
+  return {
+    displayName: sourceControlData.value.name,
+    provider: sourceControlData.value.provider,
+  }
+})
 
 const getProviderIcon = (providerName: string) => {
   const name = providerName.toLowerCase()
@@ -149,12 +172,17 @@ const onSubmit = handleSubmit(async (values) => {
 const deleteSite = async () => {
   if (!confirmationDialog.value) return
 
+  // Fetch deletion resources before showing confirmation
+  await fetchDeletionResources()
+
   const result = await confirmationDialog.value.show({
     title: 'Delete Site',
-    description: `Are you sure you want to delete ${props.site.name}? This action cannot be undone and will remove all associated queues (${deletionResources.value.queues}) and cron jobs (${deletionResources.value.crons}).`,
+    description: `Are you sure you want to delete "${props.site.address}"? This action cannot be undone and will remove all associated queues (${deletionResources.value.queues}) and cron jobs (${deletionResources.value.crons}).`,
     confirmText: 'Delete Site',
     cancelText: 'Cancel',
     destructive: true,
+    helpText: 'Type the site address to confirm deletion:',
+    inputVerificationText: props.site.address,
   })
 
   if (result.ok) {
@@ -220,7 +248,7 @@ onMounted(fetchSettings)
           </FormField>
 
           <!-- Repository Info -->
-          <template v-if="site.repository_url">
+          <template v-if="repositoryData">
             <div class="space-y-2">
               <Label class="text-sm font-medium">Repository</Label>
               <div class="flex items-center gap-2 rounded-sm border border-border bg-muted/40 p-3">
@@ -231,19 +259,19 @@ onMounted(fetchSettings)
                 />
                 <div class="min-w-0 flex-1">
                   <p class="truncate text-sm font-medium">
-                    {{ (site as any).source_control_repository?.name || 'Repository' }}
+                    {{ repositoryData.name }}
                   </p>
                   <p class="truncate text-xs text-muted-foreground">
                     {{ currentSourceControl?.displayName }} • {{ currentSourceControl?.provider }}
                   </p>
                 </div>
                 <Button
-                  v-if="(site as any).source_control_repository?.html_url"
+                  v-if="repositoryData.html_url"
                   type="button"
                   variant="ghost"
                   size="sm"
                   class="h-8 px-2"
-                  @click="openExternalLink((site as any).source_control_repository.html_url)"
+                  @click="openExternalLink(repositoryData.html_url)"
                 >
                   <Icon name="lucide:external-link" class="h-3.5 w-3.5" />
                 </Button>
@@ -257,7 +285,7 @@ onMounted(fetchSettings)
                   Current: <code class="rounded bg-muted px-1 py-0.5 text-xs">{{ site.repository_branch }}</code>
                 </FormDescription>
                 <FormControl>
-                  <Input :placeholder="(site as any).source_control_repository?.default_branch || 'main'" v-bind="componentField" />
+                  <Input :placeholder="repositoryData.default_branch || 'main'" v-bind="componentField" />
                 </FormControl>
                 <FormMessage />
               </FormItem>

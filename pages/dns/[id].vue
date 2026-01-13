@@ -427,14 +427,12 @@ onMounted(fetchDomainData);
                   </TableCell>
                 </TableRow>
                 <TableRow v-if="filteredRecords.length === 0">
-                  <TableCell
-                    :colspan="isCloudflare ? 7 : 6"
-                    class="py-8 text-center text-muted-foreground"
-                  >
-                    <div class="flex flex-col items-center gap-2">
-                      <Icon name="lucide:inbox" class="h-8 w-8" />
-                      <span>No DNS records found</span>
-                    </div>
+                  <TableCell :colspan="isCloudflare ? 7 : 6" class="p-0">
+                    <SharedEmptyState
+                      icon="lucide:globe"
+                      title="No DNS records found"
+                      description="Add a record to get started"
+                    />
                   </TableCell>
                 </TableRow>
               </TableBody>

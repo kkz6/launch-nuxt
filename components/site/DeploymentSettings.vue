@@ -21,7 +21,8 @@ import {
   FormMessage,
 } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
-import { Textarea } from '~/components/ui/textarea'
+import { Label } from '~/components/ui/label'
+import { Switch } from '~/components/ui/switch'
 import type { Site } from '~/types'
 
 interface Props {
@@ -39,6 +40,19 @@ const isOpen = ref(false)
 const isLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
+interface SiteDeploymentFields {
+  shared_directories?: string[]
+  shared_files?: string[]
+  writeable_directories?: string[]
+  hook_before_updating_repository?: string
+  hook_after_updating_repository?: string
+  hook_before_making_current?: string
+  hook_after_making_current?: string
+  deploy_notification_email?: string
+  deployment_releases_retention?: number
+  queue_deployments?: boolean
+}
+
 const deploymentSchema = toTypedSchema(
   z.object({
     deployment_releases_retention: z.coerce.number().min(1).max(50).optional(),
@@ -49,33 +63,31 @@ const deploymentSchema = toTypedSchema(
     hook_after_updating_repository: z.string().optional(),
     hook_before_making_current: z.string().optional(),
     hook_after_making_current: z.string().optional(),
+    deploy_notification_email: z.string().email().optional().or(z.literal('')),
+    queue_deployments: z.boolean().optional(),
   })
 )
 
-const siteProp = props.site as Site & {
-  shared_directories?: string[]
-  shared_files?: string[]
-  writeable_directories?: string[]
-  deployment_releases_retention?: number
-  hook_before_updating_repository?: string
-  hook_after_updating_repository?: string
-  hook_before_making_current?: string
-  hook_after_making_current?: string
+const getInitialValues = () => {
+  const site = props.site as Site & SiteDeploymentFields
+  return {
+    shared_directories: site.shared_directories?.join('\n') || '',
+    shared_files: site.shared_files?.join('\n') || '',
+    writeable_directories: site.writeable_directories?.join('\n') || '',
+    deployment_releases_retention: site.deployment_releases_retention || 5,
+    hook_before_updating_repository: site.hook_before_updating_repository || '',
+    hook_before_making_current: site.hook_before_making_current || '',
+    hook_after_making_current: site.hook_after_making_current || '',
+    hook_after_updating_repository: site.hook_after_updating_repository || '',
+    deploy_notification_email: site.deploy_notification_email || '',
+    queue_deployments: site.queue_deployments || false,
+  }
 }
 
-const { handleSubmit, setFieldError, resetForm } = useForm({
+const { handleSubmit, setFieldError, resetForm, setValues, values } = useForm({
   validationSchema: deploymentSchema,
   validateOnMount: false,
-  initialValues: {
-    shared_directories: siteProp.shared_directories?.join('\n') || '',
-    shared_files: siteProp.shared_files?.join('\n') || '',
-    writeable_directories: siteProp.writeable_directories?.join('\n') || '',
-    deployment_releases_retention: siteProp.deployment_releases_retention || 5,
-    hook_before_updating_repository: siteProp.hook_before_updating_repository || '',
-    hook_before_making_current: siteProp.hook_before_making_current || '',
-    hook_after_making_current: siteProp.hook_after_making_current || '',
-    hook_after_updating_repository: siteProp.hook_after_updating_repository || '',
-  },
+  initialValues: getInitialValues(),
 })
 
 const handleClose = (open = false) => {
@@ -84,6 +96,13 @@ const handleClose = (open = false) => {
     resetForm()
   }
 }
+
+// Reset form with current site values when dialog opens
+watch(isOpen, (open) => {
+  if (open) {
+    setValues(getInitialValues())
+  }
+})
 
 const onSubmit = handleSubmit(async (values) => {
   if (!confirmationDialog.value) return
@@ -140,6 +159,33 @@ const onSubmit = handleSubmit(async (values) => {
       </DialogHeader>
 
       <form class="w-full space-y-4" @submit.prevent="onSubmit">
+        <!-- General Deployment Settings -->
+        <FormField v-slot="{ componentField }" name="deploy_notification_email">
+          <FormItem>
+            <FormLabel>Deployment Notification Email</FormLabel>
+            <FormControl>
+              <Input type="email" placeholder="notifications@example.com" v-bind="componentField" />
+            </FormControl>
+            <FormDescription>
+              Receive email notifications when deployments complete or fail
+            </FormDescription>
+            <FormMessage />
+          </FormItem>
+        </FormField>
+
+        <div class="flex items-center justify-between rounded-lg border p-4">
+          <div class="space-y-0.5">
+            <Label>Queue Deployments</Label>
+            <p class="text-sm text-muted-foreground">
+              Queue deployments instead of running them immediately when one is already in progress
+            </p>
+          </div>
+          <Switch
+            :checked="values.queue_deployments"
+            @update:checked="(val: boolean) => setValues({ queue_deployments: val })"
+          />
+        </div>
+
         <template v-if="(site as any).zero_downtime_deployment">
           <FormField v-slot="{ componentField }" name="deployment_releases_retention">
             <FormItem>
@@ -154,125 +200,111 @@ const onSubmit = handleSubmit(async (values) => {
             </FormItem>
           </FormField>
 
-          <FormField v-slot="{ componentField }" name="shared_directories">
-            <FormItem>
-              <FormLabel>Shared Directories</FormLabel>
-              <FormControl>
-                <Textarea
-                  class="h-36 font-mono text-sm"
-                  placeholder="storage&#10;bootstrap/cache"
-                  v-bind="componentField"
-                />
-              </FormControl>
-              <FormDescription>
-                Directories that should be shared between releases (one per line)
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+          <div class="space-y-2">
+            <Label>Shared Directories</Label>
+            <SharedCodeEditor
+              :model-value="values.shared_directories || ''"
+              class="h-36"
+              placeholder="storage"
+              :line-numbers="false"
+              :fold-gutter="false"
+              @update:model-value="(val: string) => setValues({ shared_directories: val })"
+            />
+            <p class="text-sm text-muted-foreground">
+              Directories that should be shared between releases (one per line)
+            </p>
+          </div>
 
-          <FormField v-slot="{ componentField }" name="shared_files">
-            <FormItem>
-              <FormLabel>Shared Files</FormLabel>
-              <FormControl>
-                <Textarea
-                  class="h-36 font-mono text-sm"
-                  placeholder=".env"
-                  v-bind="componentField"
-                />
-              </FormControl>
-              <FormDescription>
-                Files that should be shared between releases (one per line)
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+          <div class="space-y-2">
+            <Label>Shared Files</Label>
+            <SharedCodeEditor
+              :model-value="values.shared_files || ''"
+              class="h-36"
+              placeholder=".env"
+              :line-numbers="false"
+              :fold-gutter="false"
+              @update:model-value="(val: string) => setValues({ shared_files: val })"
+            />
+            <p class="text-sm text-muted-foreground">
+              Files that should be shared between releases (one per line)
+            </p>
+          </div>
 
-          <FormField v-slot="{ componentField }" name="writeable_directories">
-            <FormItem>
-              <FormLabel>Writeable Directories</FormLabel>
-              <FormControl>
-                <Textarea
-                  class="h-36 font-mono text-sm"
-                  placeholder="storage&#10;bootstrap/cache"
-                  v-bind="componentField"
-                />
-              </FormControl>
-              <FormDescription>
-                Directories that should be writable (one per line)
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          </FormField>
+          <div class="space-y-2">
+            <Label>Writeable Directories</Label>
+            <SharedCodeEditor
+              :model-value="values.writeable_directories || ''"
+              class="h-36"
+              placeholder="storage"
+              :line-numbers="false"
+              :fold-gutter="false"
+              @update:model-value="(val: string) => setValues({ writeable_directories: val })"
+            />
+            <p class="text-sm text-muted-foreground">
+              Directories that should be writable (one per line)
+            </p>
+          </div>
         </template>
 
-        <FormField v-slot="{ componentField }" name="hook_before_updating_repository">
-          <FormItem>
-            <FormLabel>Before Updating Repository</FormLabel>
-            <FormControl>
-              <Textarea
-                class="h-36 font-mono text-sm"
-                placeholder="# Commands to run before git pull"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormDescription>
-              Commands to run before updating the repository
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label>Before Updating Repository</Label>
+          <SharedCodeEditor
+            :model-value="values.hook_before_updating_repository || ''"
+            class="h-36"
+            placeholder="# Commands to run before git pull"
+            :line-numbers="false"
+            :fold-gutter="false"
+            @update:model-value="(val: string) => setValues({ hook_before_updating_repository: val })"
+          />
+          <p class="text-sm text-muted-foreground">
+            Commands to run before updating the repository
+          </p>
+        </div>
 
-        <FormField v-slot="{ componentField }" name="hook_after_updating_repository">
-          <FormItem>
-            <FormLabel>After Updating Repository</FormLabel>
-            <FormControl>
-              <Textarea
-                class="h-36 font-mono text-sm"
-                placeholder="composer install --no-dev&#10;npm install &amp;&amp; npm run build"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormDescription>
-              Commands to run after updating the repository
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label>After Updating Repository</Label>
+          <SharedCodeEditor
+            :model-value="values.hook_after_updating_repository || ''"
+            class="h-36"
+            placeholder="composer install --no-dev"
+            :line-numbers="false"
+            :fold-gutter="false"
+            @update:model-value="(val: string) => setValues({ hook_after_updating_repository: val })"
+          />
+          <p class="text-sm text-muted-foreground">
+            Commands to run after updating the repository
+          </p>
+        </div>
 
-        <FormField v-slot="{ componentField }" name="hook_before_making_current">
-          <FormItem>
-            <FormLabel>Before Making Current</FormLabel>
-            <FormControl>
-              <Textarea
-                class="h-36 font-mono text-sm"
-                placeholder="php artisan migrate --force"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormDescription>
-              Commands to run before activating the new release
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label>Before Making Current</Label>
+          <SharedCodeEditor
+            :model-value="values.hook_before_making_current || ''"
+            class="h-36"
+            placeholder="php artisan migrate --force"
+            :line-numbers="false"
+            :fold-gutter="false"
+            @update:model-value="(val: string) => setValues({ hook_before_making_current: val })"
+          />
+          <p class="text-sm text-muted-foreground">
+            Commands to run before activating the new release
+          </p>
+        </div>
 
-        <FormField v-slot="{ componentField }" name="hook_after_making_current">
-          <FormItem>
-            <FormLabel>After Making Current</FormLabel>
-            <FormControl>
-              <Textarea
-                class="h-36 font-mono text-sm"
-                placeholder="php artisan cache:clear&#10;php artisan queue:restart"
-                v-bind="componentField"
-              />
-            </FormControl>
-            <FormDescription>
-              Commands to run after activating the new release
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label>After Making Current</Label>
+          <SharedCodeEditor
+            :model-value="values.hook_after_making_current || ''"
+            class="h-36"
+            placeholder="php artisan cache:clear"
+            :line-numbers="false"
+            :fold-gutter="false"
+            @update:model-value="(val: string) => setValues({ hook_after_making_current: val })"
+          />
+          <p class="text-sm text-muted-foreground">
+            Commands to run after activating the new release
+          </p>
+        </div>
 
         <Button type="submit" :disabled="isLoading">
           <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />

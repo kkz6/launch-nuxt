@@ -118,23 +118,14 @@ const mobileClass = computed(() => {
     </div>
 
     <!-- Empty State -->
-    <div
+    <SharedEmptyState
       v-else-if="data.length === 0"
-      class="flex flex-col items-center gap-3 px-4 py-12"
+      :icon="emptyIcon"
+      :title="emptyTitle"
+      :description="emptyDescription"
     >
-      <div class="rounded-full bg-muted/50 p-3 text-muted-foreground">
-        <Icon :name="emptyIcon" class="h-6 w-6" />
-      </div>
-      <div class="max-w-md text-center">
-        <h3 class="text-lg font-semibold tracking-tight">{{ emptyTitle }}</h3>
-        <p v-if="emptyDescription" class="mt-1 text-sm leading-relaxed text-muted-foreground">
-          {{ emptyDescription }}
-        </p>
-      </div>
-      <div v-if="$slots.empty" class="mt-3">
-        <slot name="empty" />
-      </div>
-    </div>
+      <slot name="empty" />
+    </SharedEmptyState>
 
     <!-- Data Table -->
     <template v-else>
@@ -168,7 +159,7 @@ const mobileClass = computed(() => {
               <TableCell
                 v-for="column in columns"
                 :key="String(column.key)"
-                :class="['py-3', column.className]"
+                :class="['py-2', column.className]"
               >
                 <slot
                   :name="`cell-${String(column.key)}`"
@@ -193,7 +184,7 @@ const mobileClass = computed(() => {
                   </template>
                 </slot>
               </TableCell>
-              <TableCell v-if="actions.length > 0 || $slots.actions" class="py-3">
+              <TableCell v-if="actions.length > 0 || $slots.actions" class="py-2">
                 <div class="flex items-center justify-center gap-1">
                   <slot name="actions" :item="item">
                     <template v-for="(action, actionIndex) in actions" :key="actionIndex">
@@ -226,7 +217,7 @@ const mobileClass = computed(() => {
         <div
           v-for="(item, index) in data"
           :key="index"
-          class="space-y-2 rounded-lg border bg-card p-3 shadow-md transition-all duration-200 hover:border-primary/20 hover:shadow-lg"
+          class="space-y-2 rounded-lg border bg-card p-3 transition-all duration-200 hover:border-primary/20"
         >
           <div class="space-y-1.5">
             <div
