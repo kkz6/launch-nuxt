@@ -33,37 +33,41 @@ const theme = computed(() => {
   return colorMode.value === 'dark' ? githubDark : githubLight
 })
 
-const extensions = computed(() => {
-  const exts = []
+const basicSetup = computed(() => ({
+  lineNumbers: props.lineNumbers,
+  foldGutter: props.foldGutter,
+  highlightSelectionMatches: true,
+  highlightActiveLine: !props.disabled,
+  highlightActiveLineGutter: !props.disabled,
+  allowMultipleSelections: true,
+}))
 
-  // Add line wrapping if enabled
+const extensions = computed(() => {
+  const exts: any[] = []
+  exts.push(theme.value)
   if (props.lineWrapping) {
     exts.push(EditorView.lineWrapping)
   }
-
   return exts
 })
 
 const handleUpdate = (value: string) => {
   emit('update:modelValue', value)
 }
+
+// Generate a key to force re-mount when settings change
+const editorKey = computed(() => `${props.lineNumbers}-${props.foldGutter}-${colorMode.value}`)
 </script>
 
 <template>
-  <div :class="['relative overflow-hidden rounded-md border', props.class]">
+  <div :class="['relative overflow-hidden rounded-md border', props.class, { 'no-line-numbers': !lineNumbers }]">
     <Codemirror
+      :key="editorKey"
       :model-value="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
       :extensions="extensions"
-      :theme="theme"
-      :basic-setup="{
-        lineNumbers,
-        foldGutter,
-        highlightSelectionMatches: true,
-        highlightActiveLine: !disabled,
-        allowMultipleSelections: true,
-      }"
+      :basic-setup="basicSetup"
       :class="['h-full w-full text-sm leading-relaxed', { 'masked-content': masked }]"
       @update:model-value="handleUpdate"
     />
@@ -84,5 +88,13 @@ const handleUpdate = (value: string) => {
 .masked-content .cm-content {
   -webkit-text-security: disc;
   text-security: disc;
+}
+/* Hide line numbers when not needed */
+.no-line-numbers .cm-lineNumbers {
+  display: none !important;
+}
+.no-line-numbers .cm-gutters {
+  border-right: none !important;
+  background: transparent !important;
 }
 </style>
