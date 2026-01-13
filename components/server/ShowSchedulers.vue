@@ -90,6 +90,9 @@ watch(isEditDialogOpen, (open) => {
   }
 })
 
+// Subscribe to real-time cron events
+useServerModelEvents('cron', props.serverId, fetchData)
+
 onMounted(fetchData)
 </script>
 
@@ -111,6 +114,7 @@ onMounted(fetchData)
             entity="cron"
             :entity-id="selectedSchedulerForLogs.id"
             type-switcher
+            no-timestamp
           />
         </div>
       </DialogContent>

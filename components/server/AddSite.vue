@@ -3,6 +3,7 @@ import { toast } from 'vue-sonner'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
+import { Settings } from 'lucide-vue-next'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -34,6 +35,7 @@ const emit = defineEmits<{
 }>()
 
 const isOpen = ref(false)
+const isAdvancedOpen = ref(false)
 const isLoading = ref(false)
 const hasSubmitted = ref(false)
 
@@ -43,8 +45,23 @@ interface PhpVersion {
   is_default: boolean
 }
 
+interface Database {
+  id: string
+  name: string
+  status: string
+}
+
+interface DatabaseUser {
+  id: string
+  name: string
+  status: string
+}
+
 const phpVersions = ref<PhpVersion[]>([])
 const sourceControls = ref<Record<string, string>>({})
+const databases = ref<Record<string, string>>({})
+const databaseUsers = ref<Record<string, string>>({})
+const hasDatabase = ref(true)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const applicationTypes: Record<string, string> = {
@@ -52,6 +69,19 @@ const applicationTypes: Record<string, string> = {
   wordpress: 'WordPress',
   generic: 'Generic PHP',
 }
+
+const advancedOptions = ref({
+  create_database: false,
+  database_option: 'new' as 'new' | 'existing',
+  database_id: '',
+  database_name: '',
+  database_user_option: 'new' as 'new' | 'existing',
+  database_user_id: '',
+  database_user_name: '',
+  database_user_password: '',
+  create_scheduler: false,
+  create_queue: false,
+})
 
 const schema = toTypedSchema(z.object({
   address: z.string().min(1, 'Domain is required'),
@@ -97,6 +127,25 @@ const fetchOptions = async () => {
   } catch {
     // Silent fail - options will be empty
   }
+
+  // Fetch database info for advanced options (optional - don't fail if endpoints don't exist)
+  try {
+    const [dbData, dbUserData] = await Promise.all([
+      $api<{ data: Database[] }>(`/servers/${props.serverId}/databases`),
+      $api<{ data: DatabaseUser[] }>(`/servers/${props.serverId}/database-users`),
+    ])
+    // Transform arrays to Record<id, name> for dropdowns
+    databases.value = (dbData.data || []).reduce((acc, db) => {
+      acc[db.id] = db.name
+      return acc
+    }, {} as Record<string, string>)
+    databaseUsers.value = (dbUserData.data || []).reduce((acc, user) => {
+      acc[user.id] = user.name
+      return acc
+    }, {} as Record<string, string>)
+  } catch {
+    // Silent fail - existing databases/users will be empty but user can still create new ones
+  }
 }
 
 const submitHandler = handleSubmit(async (data) => {
@@ -116,14 +165,21 @@ const submitHandler = handleSubmit(async (data) => {
 
   isLoading.value = true
   try {
+    // Merge advanced options into payload
+    const payload = {
+      ...data,
+      ...advancedOptions.value,
+    }
+
     await $api(`/servers/${props.serverId}/sites`, {
       method: 'POST',
-      body: data,
+      body: payload,
     })
     toast.success('Site created successfully')
     emit('created')
     isOpen.value = false
     resetForm()
+    resetAdvancedOptions()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.error(err.data?.message || 'An error occurred')
@@ -137,12 +193,28 @@ const onSubmit = () => {
   submitHandler()
 }
 
+const resetAdvancedOptions = () => {
+  advancedOptions.value = {
+    create_database: false,
+    database_option: 'new',
+    database_id: '',
+    database_name: '',
+    database_user_option: 'new',
+    database_user_id: '',
+    database_user_name: '',
+    database_user_password: '',
+    create_scheduler: false,
+    create_queue: false,
+  }
+}
+
 watch(isOpen, (open) => {
   if (open) {
     fetchOptions()
     hasSubmitted.value = false
   } else {
     resetForm()
+    resetAdvancedOptions()
     hasSubmitted.value = false
   }
 })
@@ -233,7 +305,11 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter class="mt-4 sm:justify-between">
+          <Button type="button" variant="outline" @click="isAdvancedOpen = true">
+            <Settings class="mr-2 h-4 w-4" />
+            Advanced Options
+          </Button>
           <Button type="submit" :disabled="isLoading">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             Add Site
@@ -242,4 +318,13 @@ watch(isOpen, (open) => {
       </form>
     </DialogContent>
   </Dialog>
+
+  <ServerAddSiteAdvancedOptions
+    v-model="advancedOptions"
+    v-model:open="isAdvancedOpen"
+    :has-database="hasDatabase"
+    :databases="databases"
+    :database-users="databaseUsers"
+    :site-type="values.type ?? 'laravel'"
+  />
 </template>

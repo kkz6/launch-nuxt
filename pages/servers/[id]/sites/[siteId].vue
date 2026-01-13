@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Terminal } from 'lucide-vue-next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -9,6 +10,12 @@ import {
   BreadcrumbList,
   BreadcrumbSeparator,
 } from '~/components/ui/breadcrumb'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 import type { Server, Site, Deployment } from '~/types'
 
 definePageMeta({
@@ -24,6 +31,14 @@ const siteId = computed(() => route.params.siteId as string)
 const server = ref<Server | null>(null)
 const site = ref<Site | null>(null)
 const isLoading = ref(true)
+const isTerminalOpen = ref(false)
+
+const modifierKey = computed(() => {
+  if (import.meta.client) {
+    return navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'
+  }
+  return 'Ctrl'
+})
 
 // Valid tab values
 const validTabs = ['general', 'deployments', 'files', 'logs', 'queues', 'commands', 'settings']
@@ -164,7 +179,35 @@ onMounted(async () => {
             v-if="site.type !== 'wordpress'"
             :server-id="server.id"
             :site-id="site.id"
+            :is-deploying="site.latest_deployment?.status === 'pending'"
+            as-icon
           />
+          <TooltipProvider :delay-duration="0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  class="relative mb-3"
+                  variant="ghost"
+                  size="icon"
+                  @click="isTerminalOpen = true"
+                >
+                  <Terminal class="h-4 w-4" />
+                  <span
+                    v-if="isTerminalOpen"
+                    class="absolute -bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 animate-pulse rounded-full bg-green-500"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span class="flex items-center gap-2">
+                  Terminal
+                  <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 text-xs">
+                    {{ modifierKey }}+`
+                  </kbd>
+                </span>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
       </header>
     </div>
@@ -217,5 +260,13 @@ onMounted(async () => {
         <SiteSettings :server-id="server.id" :site="site" @updated="fetchSite" />
       </TabsContent>
     </Tabs>
+
+    <!-- Terminal Panel -->
+    <SiteTerminalPanel
+      :server="server"
+      :site="site"
+      :is-open="isTerminalOpen"
+      @close="isTerminalOpen = false"
+    />
   </div>
 </template>

@@ -1,97 +1,125 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import { CloudUpload } from 'lucide-vue-next'
 import { Button } from '~/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '~/components/ui/dialog'
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '~/components/ui/alert-dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 
 interface Props {
   serverId: string
   siteId: string
+  isDeploying?: boolean
   asIcon?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   asIcon: false,
+  isDeploying: false,
 })
 
+const emit = defineEmits<{
+  deployed: []
+}>()
+
 const isOpen = ref(false)
-const isLoading = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const isLoading = ref(props.isDeploying)
+
+// Watch for external isDeploying changes
+watch(() => props.isDeploying, (val) => {
+  isLoading.value = val
+})
 
 const deploy = async () => {
-  if (!confirmationDialog.value) return
-
-  const result = await confirmationDialog.value.show({
-    title: 'Deploy Application',
-    description: 'Are you sure you want to deploy this application? This will pull the latest changes and run your deployment script.',
-    confirmText: 'Deploy',
-    cancelText: 'Cancel',
-  })
-
-  if (!result.ok) {
-    return
-  }
-
   isLoading.value = true
   try {
     await $api(`/servers/${props.serverId}/sites/${props.siteId}/deploy`, {
       method: 'POST',
     })
-    toast.success('Deployment initiated')
+    toast.info('Deployment started')
+    emit('deployed')
     isOpen.value = false
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.error(err.data?.message || 'Failed to deploy')
-  } finally {
     isLoading.value = false
   }
 }
+
+const modifierKey = computed(() => {
+  if (import.meta.client) {
+    return navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'
+  }
+  return 'Ctrl'
+})
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen">
-    <DialogTrigger as-child>
-      <Button v-if="asIcon" variant="ghost" size="icon">
-        <Icon name="lucide:rocket" class="h-4 w-4" />
-      </Button>
-      <Button v-else>
-        <Icon name="lucide:rocket" class="mr-2 h-4 w-4" />
-        Deploy
-      </Button>
-    </DialogTrigger>
-    <DialogContent>
-      <SharedConfirmationDialog ref="confirmationDialog" />
-      <DialogHeader>
-        <DialogTitle>Deploy Application</DialogTitle>
-        <DialogDescription>
-          This will deploy the latest version of your application from the repository.
-        </DialogDescription>
-      </DialogHeader>
-      <div class="py-4">
-        <p class="text-sm text-muted-foreground">
-          The deployment will:
-        </p>
-        <ul class="mt-2 list-disc pl-4 text-sm text-muted-foreground">
-          <li>Pull latest changes from your repository</li>
-          <li>Install dependencies</li>
-          <li>Run your deployment script</li>
-          <li>Restart services if needed</li>
-        </ul>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" @click="isOpen = false">Cancel</Button>
-        <Button :disabled="isLoading" @click="deploy">
+  <AlertDialog v-model:open="isOpen">
+    <template v-if="asIcon">
+      <TooltipProvider :delay-duration="0">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <AlertDialogTrigger as-child>
+              <Button
+                class="mb-3"
+                :disabled="isLoading"
+                variant="ghost"
+                size="icon"
+                aria-label="Deploy application"
+              >
+                <Icon v-if="isLoading" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+                <CloudUpload v-else class="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div class="flex items-center gap-2">
+              <span>Deploy</span>
+              <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 text-xs">
+                {{ modifierKey }}+Shift+D
+              </kbd>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </template>
+    <template v-else>
+      <AlertDialogTrigger as-child>
+        <Button :disabled="isLoading" aria-label="Deploy application">
           <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          Deploy Now
+          {{ isLoading ? 'Deploying...' : 'Deploy' }}
         </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+      </AlertDialogTrigger>
+    </template>
+
+    <AlertDialogContent>
+      <AlertDialogHeader>
+        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+        <AlertDialogDescription>
+          This will deploy the application
+        </AlertDialogDescription>
+      </AlertDialogHeader>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction @click="deploy">
+          Confirm
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </AlertDialogContent>
+  </AlertDialog>
 </template>

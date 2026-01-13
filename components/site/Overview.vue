@@ -30,53 +30,42 @@ const phpVersions: Record<string, string> = {
       <CardHeader class="pb-0">
         <CardTitle>Site Overview</CardTitle>
       </CardHeader>
-      <CardContent class="divide-y divide-border">
-        <div class="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-sm font-medium text-muted-foreground">Address</span>
-          <div class="flex items-center gap-1">
-            <span>{{ site.url }}</span>
-            <a :href="site.url" target="_blank" rel="noreferrer" class="ml-1">
-              <Icon name="lucide:arrow-right-circle" class="h-5 w-5 text-gray-700 dark:text-gray-100" />
-            </a>
-          </div>
-        </div>
+      <CardContent class="sm:divide-y sm:divide-gray-200">
+        <SharedDefinitionListItem label="Address">
+          <span>{{ site.url }}</span>
+          <a :href="site.url" target="_blank" rel="noreferrer" class="ml-1">
+            <Icon name="lucide:arrow-right-circle" class="h-5 w-5 text-gray-700 dark:text-gray-100" />
+          </a>
+        </SharedDefinitionListItem>
 
-        <div class="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-sm font-medium text-muted-foreground">Server</span>
+        <SharedDefinitionListItem label="Server">
           <NuxtLink :to="`/servers/${server.id}`" class="underline">
             {{ server.name }}
           </NuxtLink>
-        </div>
+        </SharedDefinitionListItem>
 
-        <div class="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-sm font-medium text-muted-foreground">Path</span>
+        <SharedDefinitionListItem label="Path">
           <span class="break-all pr-4">{{ site.path }}</span>
-        </div>
+        </SharedDefinitionListItem>
 
-        <div v-if="site.php_version" class="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-sm font-medium text-muted-foreground">PHP Version</span>
-          <span>{{ phpVersions[site.php_version] || site.php_version }}</span>
-        </div>
+        <SharedDefinitionListItem v-if="site.php_version" label="PHP Version">
+          {{ phpVersions[site.php_version] || site.php_version }}
+        </SharedDefinitionListItem>
 
-        <div class="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-sm font-medium text-muted-foreground">Type</span>
-          <span>{{ applicationTypes[site.type] }}</span>
-        </div>
+        <SharedDefinitionListItem label="Type">
+          {{ applicationTypes[site.type] }}
+        </SharedDefinitionListItem>
 
-        <div class="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-sm font-medium text-muted-foreground">SSL</span>
-          <span>{{ site.tls_setting }}</span>
-        </div>
+        <SharedDefinitionListItem label="SSL">
+          {{ site.tls_setting }}
+        </SharedDefinitionListItem>
 
-        <div v-if="site.source_control_repository?.html_url" class="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <span class="text-sm font-medium text-muted-foreground">Repository</span>
-          <div class="flex items-center gap-1">
-            <span class="break-all">{{ site.source_control_repository.html_url }}</span>
-            <a :href="site.source_control_repository.html_url" target="_blank" rel="noreferrer" class="ml-1">
-              <Icon name="lucide:arrow-right-circle" class="h-5 w-5 text-gray-700 dark:text-gray-100" />
-            </a>
-          </div>
-        </div>
+        <SharedDefinitionListItem v-if="site.source_control_repository?.html_url" label="Repository">
+          {{ site.source_control_repository.html_url }}
+          <a :href="site.source_control_repository.html_url" target="_blank" rel="noreferrer" class="ml-1">
+            <Icon name="lucide:arrow-right-circle" class="h-5 w-5 text-gray-700 dark:text-gray-100" />
+          </a>
+        </SharedDefinitionListItem>
       </CardContent>
     </Card>
   </div>
