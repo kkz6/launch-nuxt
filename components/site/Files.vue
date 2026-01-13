@@ -4,7 +4,6 @@ import { Eye, EyeOff } from 'lucide-vue-next'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Label } from '~/components/ui/label'
-import { Textarea } from '~/components/ui/textarea'
 import { Toggle } from '~/components/ui/toggle'
 import {
   Select,
@@ -59,8 +58,8 @@ const fetchFileContents = async () => {
 
   isFetching.value = true
   try {
-    const data = await $api<{ contents: string }>(selectedFile.value.show_route)
-    contents.value = data.contents
+    const response = await $api<{ data: { content: string, path: string } }>(`/servers/${props.serverId}/sites/${props.siteId}/files/${selectedFile.value.show_route}`)
+    contents.value = response.data.content || ''
   } catch {
     toast.error('Failed to load file contents')
   } finally {
@@ -85,9 +84,9 @@ const saveFile = async () => {
 
   isUpdating.value = true
   try {
-    const response = await $api<{ message: string }>(selectedFile.value.update_route, {
+    const response = await $api<{ message: string }>(`/servers/${props.serverId}/sites/${props.siteId}/files/${selectedFile.value.update_route}`, {
       method: 'PATCH',
-      body: { contents: contents.value },
+      body: { content: contents.value },
     })
     toast.success(response.message || 'File updated successfully')
   } catch (error: unknown) {
@@ -164,30 +163,21 @@ onMounted(fetchFiles)
               <Toggle
                 :pressed="!isVisible"
                 aria-label="Toggle visibility"
-                @update:pressed="isVisible = !$event"
+                @click="isVisible = !isVisible"
               >
-                <EyeOff v-if="!isVisible" class="h-4 w-4 text-muted-foreground" />
+                <EyeOff v-if="isVisible" class="h-4 w-4 text-muted-foreground" />
                 <Eye v-else class="h-4 w-4 text-muted-foreground" />
               </Toggle>
             </CardHeader>
 
             <CardContent class="w-full space-y-4">
-              <div class="relative">
-                <Textarea
-                  v-model="contents"
-                  :disabled="isVisible"
-                  class="h-96 resize-none font-mono text-sm"
-                  :class="{ 'blur-sm select-none': isVisible }"
-                  placeholder="File contents will appear here..."
-                />
-                <div
-                  v-if="isVisible"
-                  class="absolute inset-0 flex cursor-pointer items-center justify-center rounded-md bg-background/50"
-                  @click="isVisible = false"
-                >
-                  <span class="text-sm text-muted-foreground">Click to reveal and edit</span>
-                </div>
-              </div>
+              <SharedCodeEditor
+                :model-value="contents ?? ''"
+                :disabled="isVisible"
+                :masked="isVisible"
+                class="h-96"
+                @update:model-value="contents = $event"
+              />
 
               <div class="flex justify-end">
                 <Button :disabled="isVisible || isUpdating" @click="saveFile">

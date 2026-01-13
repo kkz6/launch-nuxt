@@ -398,8 +398,14 @@ export interface Backup {
 
 export interface LogInfo {
   name: string;
+  description?: string;
+  path?: string;
+  context?: string;
+  type?: string;
+  file_type?: string;
   software: string;
   show_route: string;
+  update_route?: string;
 }
 
 export interface FirewallRule {
