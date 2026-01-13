@@ -148,7 +148,7 @@ watch(isOpen, (open) => {
           Configure automatic backups for your databases or files
         </DialogDescription>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label>Backup Type</Label>
           <RadioGroup

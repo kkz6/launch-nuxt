@@ -191,7 +191,7 @@ watch(isOpen, (open) => {
           {{ isUpdate ? 'Update an existing database user on this server' : 'Create a new database user on this server' }}
         </DialogDescription>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="name">Username</Label>
           <Input

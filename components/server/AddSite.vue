@@ -238,7 +238,7 @@ watch(isOpen, (open) => {
           Create a new website on this server
         </DialogDescription>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="address">Domain</Label>
           <Input

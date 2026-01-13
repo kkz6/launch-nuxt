@@ -143,7 +143,7 @@ const onSubmit = handleSubmit(async (values) => {
         </DialogDescription>
       </DialogHeader>
 
-      <form class="space-y-6" @submit="onSubmit">
+      <form class="space-y-6" @submit.prevent="onSubmit">
         <div class="grid grid-cols-2 gap-4">
           <FormField v-slot="{ componentField }" name="queue_connection">
             <FormItem>

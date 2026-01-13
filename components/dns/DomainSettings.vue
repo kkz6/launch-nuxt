@@ -123,7 +123,7 @@ const deleteDomain = async () => {
       </CardDescription>
     </CardHeader>
     <CardContent class="space-y-6">
-      <form class="space-y-4" @submit="onSubmit">
+      <form class="space-y-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="label">
           <FormItem>
             <FormLabel>Domain Label</FormLabel>

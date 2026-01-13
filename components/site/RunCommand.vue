@@ -115,7 +115,7 @@ const onSubmit = handleSubmit(async (values) => {
         </DialogDescription>
       </DialogHeader>
 
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="command">
           <FormItem>
             <FormLabel>Command</FormLabel>

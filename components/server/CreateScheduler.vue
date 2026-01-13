@@ -43,6 +43,7 @@ const isOpen = computed({
   },
 })
 const isLoading = ref(false)
+const isControlled = computed(() => props.open !== undefined)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const frequencies: Record<string, string> = {
@@ -150,7 +151,7 @@ watch(isOpen, (open) => {
 
 <template>
   <Dialog v-model:open="isOpen">
-    <DialogTrigger as-child>
+    <DialogTrigger v-if="!isControlled" as-child>
       <slot>
         <Button>
           <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
@@ -166,7 +167,7 @@ watch(isOpen, (open) => {
           {{ cron ? 'Update the scheduled task configuration' : 'Create a new cron job' }}
         </DialogDescription>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="command">Command</Label>
           <Input

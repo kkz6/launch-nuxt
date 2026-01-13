@@ -126,7 +126,7 @@ watch(isOpen, (open) => {
       <DialogHeader>
         <DialogTitle>{{ firewallRule ? 'Update' : 'Create' }} Network Rule</DialogTitle>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="name">Name</Label>
           <Input

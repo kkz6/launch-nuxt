@@ -141,7 +141,7 @@ const onSubmit = handleSubmit(async (formValues) => {
         <DialogTitle>SSL Certificate Settings</DialogTitle>
       </DialogHeader>
 
-      <form class="space-y-4" @submit="onSubmit">
+      <form class="space-y-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="tls_setting">
           <FormItem class="space-y-3">
             <FormLabel>Certificate Settings</FormLabel>
