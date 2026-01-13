@@ -43,7 +43,6 @@ const isOpen = computed({
   },
 })
 const isLoading = ref(false)
-const isControlled = computed(() => props.open !== undefined)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const frequencies: Record<string, string> = {
@@ -151,7 +150,7 @@ watch(isOpen, (open) => {
 
 <template>
   <Dialog v-model:open="isOpen">
-    <DialogTrigger v-if="!isControlled" as-child>
+    <DialogTrigger as-child>
       <slot>
         <Button>
           <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
