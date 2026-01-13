@@ -185,7 +185,7 @@ watch(createUser, (val) => {
           Create a new MySQL/MariaDB database on this server
         </DialogDescription>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="name">Database Name</Label>
           <Input

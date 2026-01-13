@@ -239,7 +239,7 @@ watch(isOpen, (open) => {
         v-else
         id="hook-form-add-server"
         class="grid w-full gap-4"
-        @submit="onSubmit"
+        @submit.prevent="onSubmit"
       >
         <!-- Provider Tabs -->
         <Tabs

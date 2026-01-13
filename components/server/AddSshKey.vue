@@ -94,7 +94,7 @@ watch(isOpen, (open) => {
           Add a new SSH public key to access this server
         </DialogDescription>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="name">Name</Label>
           <Input

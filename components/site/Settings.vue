@@ -184,7 +184,7 @@ onMounted(fetchSettings)
     </CardHeader>
     <CardContent class="space-y-6">
       <!-- General Settings -->
-      <form class="space-y-6" @submit="onSubmit">
+      <form class="space-y-6" @submit.prevent="onSubmit">
         <div class="grid grid-cols-2 gap-6">
           <FormField v-slot="{ componentField }" name="php_version">
             <FormItem>

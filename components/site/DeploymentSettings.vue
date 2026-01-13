@@ -139,7 +139,7 @@ const onSubmit = handleSubmit(async (values) => {
         </DialogDescription>
       </DialogHeader>
 
-      <form class="w-full space-y-4" @submit="onSubmit">
+      <form class="w-full space-y-4" @submit.prevent="onSubmit">
         <template v-if="(site as any).zero_downtime_deployment">
           <FormField v-slot="{ componentField }" name="deployment_releases_retention">
             <FormItem>

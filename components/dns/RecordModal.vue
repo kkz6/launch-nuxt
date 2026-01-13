@@ -204,7 +204,7 @@ const onSubmit = handleSubmit(async (formValues) => {
         </DialogDescription>
       </DialogHeader>
 
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <!-- Record Type Selector (only for new records) -->
         <div v-if="!record && availableRecordTypes.length > 0">
           <FormItem>

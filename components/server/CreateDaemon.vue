@@ -49,6 +49,7 @@ const isOpen = computed({
   },
 })
 const isLoading = ref(false)
+const isControlled = computed(() => props.open !== undefined)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const signals: Record<string, string> = {
@@ -150,7 +151,7 @@ watch(isOpen, (open) => {
 
 <template>
   <Dialog v-model:open="isOpen">
-    <DialogTrigger as-child>
+    <DialogTrigger v-if="!isControlled" as-child>
       <slot>
         <Button>
           <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
@@ -166,7 +167,7 @@ watch(isOpen, (open) => {
           {{ daemon ? 'Update the daemon configuration' : 'Create a new background daemon process' }}
         </DialogDescription>
       </DialogHeader>
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="command">Command</Label>
           <Input

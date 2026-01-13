@@ -121,7 +121,7 @@ const providerOptions = computed(() =>
         </DialogDescription>
       </DialogHeader>
 
-      <form class="grid w-full gap-4" @submit="onSubmit">
+      <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="label">
           <FormItem>
             <FormLabel>Label</FormLabel>
