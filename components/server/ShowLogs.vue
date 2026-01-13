@@ -78,12 +78,15 @@ onMounted(fetchLogs)
           </Select>
         </div>
 
-        <ServerLogViewer
+        <LogsServerLogs
           v-if="selectedLog"
+          :key="`${selectedLogIndex}-${selectedLog.show_route}`"
           :server-id="serverId"
           :entity="type"
           :entity-id="type === 'site' ? (siteId || '') : serverId"
-          :software="selectedLog.software"
+          :show-route="selectedLog.show_route"
+          no-timestamp
+          hide-log-type-filter
         />
       </template>
     </CardContent>
