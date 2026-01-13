@@ -27,15 +27,27 @@ import type { QueueDaemon } from '~/types'
 interface Props {
   serverId: string
   daemon?: QueueDaemon
+  open?: boolean
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   created: []
   updated: []
+  'update:open': [value: boolean]
 }>()
 
-const isOpen = ref(false)
+const internalOpen = ref(false)
+const isOpen = computed({
+  get: () => props.open !== undefined ? props.open : internalOpen.value,
+  set: (value) => {
+    if (props.open !== undefined) {
+      emit('update:open', value)
+    } else {
+      internalOpen.value = value
+    }
+  },
+})
 const isLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -118,7 +130,19 @@ const onSubmit = handleSubmit(async (data) => {
 })
 
 watch(isOpen, (open) => {
-  if (!open) {
+  if (open && props.daemon) {
+    // Reset form with daemon values when opening for edit
+    resetForm({
+      values: {
+        command: props.daemon.command || '',
+        directory: props.daemon.directory || '',
+        user: props.daemon.user || 'launch',
+        processes: props.daemon.processes || 1,
+        stop_wait_seconds: props.daemon.stop_wait_seconds || 5,
+        stop_signal: props.daemon.stop_signal || 'SIGTERM',
+      },
+    })
+  } else if (!open) {
     resetForm()
   }
 })

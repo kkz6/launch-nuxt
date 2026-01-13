@@ -3,6 +3,13 @@ import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import type { QueueDaemon } from '~/types'
 
 interface Props {
@@ -14,6 +21,24 @@ const props = defineProps<Props>()
 const daemons = ref<QueueDaemon[]>([])
 const isLoading = ref(true)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Log viewer state
+const selectedDaemonForLogs = ref<QueueDaemon | null>(null)
+const isLogDialogOpen = ref(false)
+
+// Edit dialog state
+const selectedDaemonForEdit = ref<QueueDaemon | null>(null)
+const isEditDialogOpen = ref(false)
+
+const viewLogs = (daemon: QueueDaemon) => {
+  selectedDaemonForLogs.value = daemon
+  isLogDialogOpen.value = true
+}
+
+const editDaemon = (daemon: QueueDaemon) => {
+  selectedDaemonForEdit.value = daemon
+  isEditDialogOpen.value = true
+}
 
 const fetchData = async () => {
   try {
@@ -31,10 +56,12 @@ const deleteDaemon = async (daemon: QueueDaemon) => {
 
   const result = await confirmationDialog.value.show({
     title: 'Delete Daemon',
-    description: 'Are you sure you want to delete this daemon? This action cannot be undone.',
+    description: 'This action cannot be undone. This will permanently delete the daemon from your server.',
     confirmText: 'Delete',
     cancelText: 'Cancel',
     destructive: true,
+    helpText: 'Type the command to confirm deletion:',
+    inputVerificationText: daemon.command,
   })
 
   if (result.ok) {
@@ -47,6 +74,8 @@ const deleteDaemon = async (daemon: QueueDaemon) => {
     } catch {
       toast.error('Failed to delete daemon')
     }
+  } else {
+    toast.info('Cancelled')
   }
 }
 
@@ -96,6 +125,19 @@ const syncStatus = async () => {
   }
 }
 
+const handleDaemonUpdated = () => {
+  isEditDialogOpen.value = false
+  selectedDaemonForEdit.value = null
+  fetchData()
+}
+
+// Clean up selected daemon when dialog closes
+watch(isEditDialogOpen, (open) => {
+  if (!open) {
+    selectedDaemonForEdit.value = null
+  }
+})
+
 const hasStatusInfo = computed(() => daemons.value.some((d) => d.last_status_check !== null))
 
 onMounted(fetchData)
@@ -104,6 +146,35 @@ onMounted(fetchData)
 <template>
   <Card class="bg-background">
     <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!-- Log Viewer Dialog -->
+    <Dialog v-model:open="isLogDialogOpen">
+      <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-7xl">
+        <DialogHeader>
+          <DialogTitle class="text-xl">Daemon Logs</DialogTitle>
+          <DialogDescription>{{ selectedDaemonForLogs?.command }}</DialogDescription>
+        </DialogHeader>
+        <div class="flex flex-col gap-4 pt-2.5">
+          <LogsServerLogs
+            v-if="isLogDialogOpen && selectedDaemonForLogs"
+            :server-id="serverId"
+            entity="daemon"
+            :entity-id="selectedDaemonForLogs.id"
+            type-switcher
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Edit Daemon Dialog -->
+    <ServerCreateDaemon
+      v-if="selectedDaemonForEdit"
+      v-model:open="isEditDialogOpen"
+      :server-id="serverId"
+      :daemon="selectedDaemonForEdit"
+      @updated="handleDaemonUpdated"
+    />
+
     <CardHeader class="flex flex-row items-center justify-between">
       <div>
         <CardTitle class="text-xl">Daemons</CardTitle>
@@ -136,9 +207,9 @@ onMounted(fetchData)
               { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' as const },
             ]"
             :actions="[
-              { label: 'View Logs', icon: 'lucide:scroll-text' },
+              { label: 'View Logs', icon: 'lucide:scroll-text', onClick: viewLogs },
               { label: 'Restart', icon: 'lucide:rotate-ccw', onClick: restartDaemon },
-              { label: 'Edit', icon: 'lucide:pencil' },
+              { label: 'Edit', icon: 'lucide:pencil', onClick: editDaemon },
               { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteDaemon, destructive: true },
             ]"
             empty-title="No daemons found"

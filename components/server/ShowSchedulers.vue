@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
-import { Button } from '~/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 import type { Cron } from '~/types'
 
 interface Props {
@@ -13,6 +19,24 @@ const props = defineProps<Props>()
 const schedulers = ref<Cron[]>([])
 const isLoading = ref(true)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Log viewer state
+const selectedSchedulerForLogs = ref<Cron | null>(null)
+const isLogDialogOpen = ref(false)
+
+// Edit dialog state
+const selectedSchedulerForEdit = ref<Cron | null>(null)
+const isEditDialogOpen = ref(false)
+
+const viewLogs = (cron: Cron) => {
+  selectedSchedulerForLogs.value = cron
+  isLogDialogOpen.value = true
+}
+
+const editScheduler = (cron: Cron) => {
+  selectedSchedulerForEdit.value = cron
+  isEditDialogOpen.value = true
+}
 
 const fetchData = async () => {
   try {
@@ -30,10 +54,12 @@ const deleteScheduler = async (cron: Cron) => {
 
   const result = await confirmationDialog.value.show({
     title: 'Delete Scheduler',
-    description: 'Are you sure you want to delete this scheduled task?',
+    description: 'This action cannot be undone. This will permanently delete the scheduled task from your server.',
     confirmText: 'Delete',
     cancelText: 'Cancel',
     destructive: true,
+    helpText: 'Type the command to confirm deletion:',
+    inputVerificationText: cron.command,
   })
 
   if (result.ok) {
@@ -46,8 +72,23 @@ const deleteScheduler = async (cron: Cron) => {
     } catch {
       toast.error('Failed to delete scheduler')
     }
+  } else {
+    toast.info('Cancelled')
   }
 }
+
+const handleSchedulerUpdated = () => {
+  isEditDialogOpen.value = false
+  selectedSchedulerForEdit.value = null
+  fetchData()
+}
+
+// Clean up selected scheduler when dialog closes
+watch(isEditDialogOpen, (open) => {
+  if (!open) {
+    selectedSchedulerForEdit.value = null
+  }
+})
 
 onMounted(fetchData)
 </script>
@@ -55,6 +96,35 @@ onMounted(fetchData)
 <template>
   <Card class="bg-background">
     <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!-- Log Viewer Dialog -->
+    <Dialog v-model:open="isLogDialogOpen">
+      <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-7xl">
+        <DialogHeader>
+          <DialogTitle class="text-xl">Scheduler Logs</DialogTitle>
+          <DialogDescription>{{ selectedSchedulerForLogs?.command }}</DialogDescription>
+        </DialogHeader>
+        <div class="flex flex-col gap-4 pt-2.5">
+          <LogsServerLogs
+            v-if="isLogDialogOpen && selectedSchedulerForLogs"
+            :server-id="serverId"
+            entity="cron"
+            :entity-id="selectedSchedulerForLogs.id"
+            type-switcher
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
+
+    <!-- Edit Scheduler Dialog -->
+    <ServerCreateScheduler
+      v-if="selectedSchedulerForEdit"
+      v-model:open="isEditDialogOpen"
+      :server-id="serverId"
+      :cron="selectedSchedulerForEdit"
+      @updated="handleSchedulerUpdated"
+    />
+
     <CardHeader>
       <CardTitle class="text-xl">Schedulers</CardTitle>
       <CardDescription>Manage cron jobs on this server</CardDescription>
@@ -77,8 +147,8 @@ onMounted(fetchData)
               { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' },
             ]"
             :actions="[
-              { label: 'View Logs', icon: 'lucide:scroll-text' },
-              { label: 'Edit', icon: 'lucide:pencil' },
+              { label: 'View Logs', icon: 'lucide:scroll-text', onClick: viewLogs },
+              { label: 'Edit', icon: 'lucide:pencil', onClick: editScheduler },
               { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteScheduler, destructive: true },
             ]"
             empty-title="No scheduled tasks found"

@@ -21,15 +21,27 @@ import type { Cron } from '~/types'
 interface Props {
   serverId: string
   cron?: Cron
+  open?: boolean
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   created: []
   updated: []
+  'update:open': [value: boolean]
 }>()
 
-const isOpen = ref(false)
+const internalOpen = ref(false)
+const isOpen = computed({
+  get: () => props.open !== undefined ? props.open : internalOpen.value,
+  set: (value) => {
+    if (props.open !== undefined) {
+      emit('update:open', value)
+    } else {
+      internalOpen.value = value
+    }
+  },
+})
 const isLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -120,7 +132,17 @@ const onSubmit = handleSubmit(async (data) => {
 })
 
 watch(isOpen, (open) => {
-  if (!open) {
+  if (open && props.cron) {
+    // Reset form with cron values when opening for edit
+    resetForm({
+      values: {
+        command: props.cron.command || '',
+        user: props.cron.user || 'launch',
+        frequency: props.cron.frequency === 'custom' ? 'custom' : (props.cron.expression || '* * * * *'),
+        custom_expression: props.cron.frequency === 'custom' ? props.cron.expression : '',
+      },
+    })
+  } else if (!open) {
     resetForm()
   }
 })
