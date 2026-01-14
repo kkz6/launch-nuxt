@@ -31,8 +31,8 @@ const description = ref(props.server.description || '')
 const autoUpdate = ref(props.server.auto_update === 'true' || props.server.auto_update === '1')
 const isLoading = ref(false)
 const deleteLoading = ref(false)
-const showDeleteConfirm = ref(false)
 const archiveLoading = ref(false)
+const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 const showArchiveConfirm = ref(false)
 const auditLoading = ref(false)
 const auditEmail = ref('')
@@ -109,13 +109,26 @@ const deleteServer = async () => {
     return
   }
 
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Delete Server',
+    description: `Are you sure you want to delete "${props.server.name}"? This action cannot be undone and will permanently remove the server from your account.`,
+    confirmText: 'Delete Server',
+    cancelText: 'Cancel',
+    destructive: true,
+    helpText: 'Type the server name to confirm deletion:',
+    inputVerificationText: props.server.name,
+  })
+
+  if (!result.ok) return
+
   deleteLoading.value = true
   try {
     await $api(`/servers/${props.server.id}`, {
       method: 'DELETE',
     })
     toast.success('Server deleted successfully')
-    showDeleteConfirm.value = false
     navigateTo('/servers')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
@@ -128,6 +141,8 @@ const deleteServer = async () => {
 
 <template>
   <div class="space-y-6">
+    <SharedConfirmationDialog ref="confirmationDialog" />
+
     <!-- Server Information Card -->
     <Card>
       <CardHeader>
@@ -319,45 +334,15 @@ const deleteServer = async () => {
         </div>
 
         <div>
-          <template v-if="!showDeleteConfirm">
-            <Button
-              variant="destructive"
-              :disabled="!canDelete"
-              class="w-full sm:w-auto"
-              @click="showDeleteConfirm = true"
-            >
-              Delete Server
-            </Button>
-          </template>
-          <template v-else>
-            <div class="space-y-3 rounded-lg border border-destructive/20 p-4">
-              <p class="text-sm font-medium">
-                Are you absolutely sure you want to delete "{{ server.name }}"?
-              </p>
-              <p class="text-sm text-muted-foreground">
-                This action cannot be undone. The server will be permanently
-                removed from your account.
-              </p>
-              <div class="flex gap-2">
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  :disabled="deleteLoading"
-                  @click="deleteServer"
-                >
-                  <Icon v-if="deleteLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                  Yes, delete server
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  @click="showDeleteConfirm = false"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </template>
+          <Button
+            variant="destructive"
+            :disabled="!canDelete || deleteLoading"
+            class="w-full sm:w-auto"
+            @click="deleteServer"
+          >
+            <Icon v-if="deleteLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+            Delete Server
+          </Button>
         </div>
       </CardContent>
     </Card>
