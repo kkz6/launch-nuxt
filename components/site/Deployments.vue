@@ -2,6 +2,7 @@
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
+import { Badge } from '~/components/ui/badge'
 import type { Site, Deployment } from '~/types'
 
 interface Props {
@@ -14,12 +15,32 @@ const props = defineProps<Props>()
 
 const deployments = ref<Deployment[]>([])
 const isLoading = ref(true)
+const rollingBackId = ref<string | null>(null)
+const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-500',
+  installing: 'bg-yellow-500 animate-pulse',
   running: 'bg-blue-500 animate-pulse',
+  finished: 'bg-green-500',
   completed: 'bg-green-500',
   failed: 'bg-red-500',
+}
+
+const hasActiveDeployment = computed(() => {
+  return deployments.value.some(d => d.status === 'pending' || d.status === 'installing')
+})
+
+const firstFinishedIndex = computed(() => {
+  return deployments.value.findIndex(d => d.status === 'finished')
+})
+
+const canRollback = (deployment: Deployment, index: number) => {
+  if (!props.site.zero_downtime_deployment) return false
+  if (deployment.status !== 'finished') return false
+  // Can't rollback to the most recent finished deployment
+  if (index === firstFinishedIndex.value) return false
+  return true
 }
 
 const fetchDeployments = async () => {
@@ -30,6 +51,32 @@ const fetchDeployments = async () => {
     toast.error('Failed to load deployments')
   } finally {
     isLoading.value = false
+  }
+}
+
+const handleRollback = async (deployment: Deployment) => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Rollback to this deployment?',
+    description: 'This will switch the current release to the selected deployment. The site will immediately serve the code from this previous release.',
+    confirmText: 'Confirm Rollback',
+    cancelText: 'Cancel',
+  })
+
+  if (!result.ok) return
+
+  rollingBackId.value = deployment.id
+  try {
+    await $api(`/servers/${props.serverId}/sites/${props.siteId}/deployments/${deployment.id}/rollback`, {
+      method: 'POST',
+    })
+    toast.success('Rollback initiated')
+    await fetchDeployments()
+  } catch {
+    toast.error('Failed to initiate rollback')
+  } finally {
+    rollingBackId.value = null
   }
 }
 
@@ -55,6 +102,7 @@ onMounted(fetchDeployments)
 
 <template>
   <Card class="bg-background">
+    <SharedConfirmationDialog ref="confirmationDialog" />
     <CardHeader class="flex flex-row flex-wrap items-center justify-between gap-2">
       <div class="flex flex-col gap-2">
         <CardTitle class="text-xl">Deployments</CardTitle>
@@ -77,7 +125,7 @@ onMounted(fetchDeployments)
               {{ deployWebhookUrl }}
             </code>
             <Button variant="ghost" size="sm" @click="copyToClipboard(deployWebhookUrl)">
-              <Icon name="lucide:copy" class="h-4 w-4" />
+              <Icon name="lucide:copy" class="block size-4" />
             </Button>
           </div>
         </div>
@@ -89,12 +137,20 @@ onMounted(fetchDeployments)
 
         <div v-else class="flex flex-col gap-4">
           <div
-            v-for="deployment in deployments"
+            v-for="(deployment, index) in deployments"
             :key="deployment.id"
             class="flex items-center justify-between gap-2 rounded-md border p-4"
           >
             <div class="flex flex-col">
-              <span class="flex items-center gap-4 font-medium capitalize text-foreground">
+              <span class="flex items-center gap-2 font-medium capitalize text-foreground">
+                <Badge
+                  v-if="deployment.commit_data?.rollback_to"
+                  variant="outline"
+                  class="gap-1 border-amber-600 text-amber-600"
+                >
+                  <Icon name="lucide:history" class="block size-3" />
+                  Rollback
+                </Badge>
                 {{ deployment.status }}
                 <span :class="['size-2.5 rounded-full', statusColors[deployment.status] || 'bg-gray-500']" />
               </span>
@@ -107,7 +163,10 @@ onMounted(fetchDeployments)
                 </span>
               </div>
 
-              <span v-if="deployment.commit_data?.message" class="text-sm text-muted-foreground">
+              <span v-if="deployment.commit_data?.rollback_to" class="text-sm text-muted-foreground">
+                Rolled back to previous release
+              </span>
+              <span v-else-if="deployment.commit_data?.message" class="text-sm text-muted-foreground">
                 {{ getCommitHeading(deployment.commit_data.message) }}
               </span>
             </div>
@@ -115,13 +174,30 @@ onMounted(fetchDeployments)
               <div class="text-sm capitalize text-muted-foreground">
                 <SharedDateTooltip :date="deployment.created_at" />
               </div>
-              <SiteDeploymentLogs
-                v-if="deployment.task_id"
-                :server-id="serverId"
-                :task-id="deployment.task_id"
-                :commit-message="getCommitHeading(deployment.commit_data?.message)"
-                :commit-sha="deployment.commit_data?.sha?.substring(0, 6)"
-              />
+              <div class="flex flex-row items-center gap-2">
+                <Button
+                  v-if="canRollback(deployment, index)"
+                  variant="outline"
+                  size="sm"
+                  :disabled="hasActiveDeployment || rollingBackId === deployment.id"
+                  @click="handleRollback(deployment)"
+                >
+                  <Icon
+                    v-if="rollingBackId === deployment.id"
+                    name="lucide:loader-2"
+                    class="mr-1 block size-4 animate-spin"
+                  />
+                  <Icon v-else name="lucide:rotate-ccw" class="mr-1 block size-4" />
+                  Rollback
+                </Button>
+                <SiteDeploymentLogs
+                  v-if="deployment.task_id"
+                  :server-id="serverId"
+                  :task-id="deployment.task_id"
+                  :commit-message="getCommitHeading(deployment.commit_data?.message)"
+                  :commit-sha="deployment.commit_data?.sha?.substring(0, 6)"
+                />
+              </div>
             </div>
           </div>
         </div>

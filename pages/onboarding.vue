@@ -23,6 +23,7 @@ useHead({
 
 const { fetchUser } = useAuth();
 const router = useRouter();
+const { open: openSettings } = useSettingsSheet();
 
 interface OnboardingData {
   serverProviders: number;
@@ -38,7 +39,8 @@ interface OnboardingStep {
   description: string;
   icon: typeof Server;
   completedKey: keyof OnboardingData;
-  href: string;
+  href?: string;
+  settingsTab?: string;
 }
 
 const onboardingData = ref<OnboardingData>({
@@ -58,7 +60,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     description: "Connect your cloud provider to deploy servers",
     icon: Server,
     completedKey: "serverProviders",
-    href: "/settings/server-providers",
+    settingsTab: "connections",
   },
   {
     id: "git-provider",
@@ -66,7 +68,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     description: "Link your GitHub, GitLab or Bitbucket account",
     icon: GitBranch,
     completedKey: "sourceControls",
-    href: "/settings/source-control",
+    settingsTab: "connections",
   },
   {
     id: "domain-provider",
@@ -82,7 +84,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     description: "Set up backup and file storage solutions",
     icon: Database,
     completedKey: "storageProviders",
-    href: "/settings/storage-providers",
+    settingsTab: "connections",
   },
   {
     id: "notifications",
@@ -90,7 +92,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     description: "Configure alerts and notification preferences",
     icon: Bell,
     completedKey: "notificationChannels",
-    href: "/settings/notifications",
+    settingsTab: "notifications",
   },
 ];
 
@@ -100,6 +102,14 @@ const steps = computed(() =>
     completed: onboardingData.value[step.completedKey] > 0,
   }))
 );
+
+const handleStepClick = (step: OnboardingStep & { completed: boolean }) => {
+  if (step.settingsTab) {
+    openSettings(step.settingsTab);
+  } else if (step.href) {
+    router.push(step.href);
+  }
+};
 
 const isLoading = ref(false);
 
@@ -219,15 +229,14 @@ onMounted(() => {
             </p>
           </div>
         </div>
-        <NuxtLink :to="step.href">
-          <Button
-            :variant="step.completed ? 'outline' : 'default'"
-            size="sm"
-            class="shrink-0"
-          >
-            {{ step.completed ? "Review" : "Start" }}
-          </Button>
-        </NuxtLink>
+        <Button
+          :variant="step.completed ? 'outline' : 'default'"
+          size="sm"
+          class="shrink-0"
+          @click="handleStepClick(step)"
+        >
+          {{ step.completed ? "Review" : "Start" }}
+        </Button>
       </div>
     </div>
   </div>

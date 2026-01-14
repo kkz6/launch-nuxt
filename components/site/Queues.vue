@@ -3,6 +3,13 @@ import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '~/components/ui/dialog'
 
 interface Queue {
   id: string
@@ -36,6 +43,15 @@ const isLoading = ref(true)
 const selectedQueue = ref<Queue | null>(null)
 const isEditDialogOpen = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Log viewer state
+const selectedQueueForLogs = ref<Queue | null>(null)
+const isLogDialogOpen = ref(false)
+
+const viewLogs = (queue: Queue) => {
+  selectedQueueForLogs.value = queue
+  isLogDialogOpen.value = true
+}
 
 const editQueue = (queue: Queue) => {
   selectedQueue.value = queue
@@ -117,12 +133,55 @@ const deleteQueue = async (queue: Queue) => {
   }
 }
 
+const syncStatus = async () => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Sync Queue Status',
+    description: 'This will check the status of all queue workers on the server.',
+    confirmText: 'Sync',
+    cancelText: 'Cancel',
+  })
+
+  if (result.ok) {
+    try {
+      await $api(`/servers/${props.serverId}/sites/${props.siteId}/queues/sync`, {
+        method: 'POST',
+      })
+      toast.success('Queue sync initiated')
+      fetchQueues()
+    } catch {
+      toast.error('Failed to sync queue status')
+    }
+  }
+}
+
 onMounted(fetchQueues)
 </script>
 
 <template>
   <Card class="bg-background">
     <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!-- Log Viewer Dialog -->
+    <Dialog v-model:open="isLogDialogOpen">
+      <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-7xl">
+        <DialogHeader>
+          <DialogTitle class="text-xl">Queue Worker Logs</DialogTitle>
+          <DialogDescription>{{ selectedQueueForLogs?.queue }} ({{ selectedQueueForLogs?.queue_connection }})</DialogDescription>
+        </DialogHeader>
+        <div class="flex flex-col gap-4 pt-2.5">
+          <ServerLogViewer
+            v-if="isLogDialogOpen && selectedQueueForLogs"
+            :server-id="serverId"
+            entity="queue"
+            :entity-id="selectedQueueForLogs.id"
+            type-switcher
+            no-timestamp
+          />
+        </div>
+      </DialogContent>
+    </Dialog>
 
     <!-- Edit Queue Dialog -->
     <SiteCreateQueue
@@ -139,6 +198,10 @@ onMounted(fetchQueues)
         <CardTitle class="text-xl">Queue Workers</CardTitle>
         <CardDescription>Manage Laravel queue workers for this site</CardDescription>
       </div>
+      <Button v-if="queues.length > 0" variant="outline" @click="syncStatus">
+        <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+        Sync Status
+      </Button>
     </CardHeader>
     <CardContent>
       <div v-if="isLoading" class="flex items-center justify-center py-8">
@@ -170,6 +233,9 @@ onMounted(fetchQueues)
           </template>
 
           <template #actions="{ item }">
+            <Button variant="ghost" size="icon" title="View Logs" @click="viewLogs(item)">
+              <Icon name="lucide:scroll-text" class="h-4 w-4" />
+            </Button>
             <Button variant="ghost" size="icon" title="Restart" @click="restartQueue(item)">
               <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
             </Button>

@@ -243,13 +243,13 @@ const copyIp = () => {
                 v-for="tab in tabs"
                 :key="tab.value"
                 :value="tab.value"
-                class="relative w-[120px] whitespace-nowrap rounded-none border border-border py-2 shadow-sm shadow-black/5 first:rounded-s last:rounded-e after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 data-[state=active]:bg-muted data-[state=active]:after:bg-primary"
+                class="relative w-[140px] whitespace-nowrap rounded-none border border-border py-2 shadow-sm shadow-black/5 first:rounded-s last:rounded-e after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 data-[state=active]:bg-muted data-[state=active]:after:bg-primary"
               >
                 <Icon
                   :name="tab.icon"
                   class="-ms-0.5 me-1.5 h-4 w-4 shrink-0 opacity-60"
                 />
-                <span class="truncate">{{ tab.label }}</span>
+                {{ tab.label }}
               </TabsTrigger>
             </TabsList>
           </div>
