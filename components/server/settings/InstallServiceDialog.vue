@@ -31,16 +31,16 @@ interface AvailableService {
 }
 
 interface Props {
-  open: boolean
   serverId: string
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  'update:open': [value: boolean]
   'installed': []
 }>()
+
+const open = defineModel<boolean>('open', { required: true })
 
 const availableServices = ref<Record<string, AvailableService>>({})
 const installedServices = ref<Record<string, AvailableService>>({})
@@ -77,7 +77,7 @@ watch(() => props.open, (open) => {
 })
 
 const handleCloseDialog = () => {
-  emit('update:open', false)
+  open.value = false
   selectedService.value = null
   selectedVersion.value = null
 }
@@ -158,7 +158,7 @@ const getServiceImagePath = (type: string) => {
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <SharedConfirmationDialog ref="confirmationDialog" />
     <DialogContent class="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[480px]">
       <DialogHeader class="border-b px-6 pb-4 pt-6">

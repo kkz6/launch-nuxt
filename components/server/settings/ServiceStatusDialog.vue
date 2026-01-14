@@ -42,7 +42,6 @@ interface Service {
 }
 
 interface Props {
-  open: boolean
   service: Service
   getImagePath: (service: Service) => string
 }
@@ -50,9 +49,10 @@ interface Props {
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  'update:open': [value: boolean]
   'refresh': []
 }>()
+
+const open = defineModel<boolean>('open', { required: true })
 
 const isRefreshing = ref(false)
 
@@ -122,7 +122,7 @@ const statusDetails = computed(() => props.service.status_details)
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <DialogContent class="flex max-h-[85vh] w-full max-w-3xl flex-col gap-0 overflow-hidden p-0">
       <DialogHeader class="border-b border-gray-200 p-4 pb-3 dark:border-gray-800">
         <div class="flex w-full items-center justify-between">

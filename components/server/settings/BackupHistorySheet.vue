@@ -30,15 +30,12 @@ interface Backup {
 }
 
 interface Props {
-  open: boolean
   backup: Backup
 }
 
 const props = defineProps<Props>()
 
-const emit = defineEmits<{
-  'update:open': [value: boolean]
-}>()
+const open = defineModel<boolean>('open', { required: true })
 
 const statusConfig: Record<string, { icon: string; label: string; class: string }> = {
   pending: {
@@ -86,7 +83,7 @@ const getBackupName = computed(() => {
 </script>
 
 <template>
-  <Sheet :open="open" @update:open="emit('update:open', $event)">
+  <Sheet v-model:open="open">
     <SheetContent class="sm:max-w-lg">
       <SheetHeader>
         <SheetTitle>Backup History</SheetTitle>

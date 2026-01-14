@@ -29,25 +29,16 @@ interface QueueValues {
   stop_wait_seconds?: number
 }
 
-interface Props {
-  open: boolean
-  values: QueueValues
-}
-
-const props = defineProps<Props>()
-
-const emit = defineEmits<{
-  'update:open': [value: boolean]
-  'update:values': [values: QueueValues]
-}>()
+const open = defineModel<boolean>('open', { required: true })
+const values = defineModel<QueueValues>('values', { required: true })
 
 const updateValue = <K extends keyof QueueValues>(key: K, value: QueueValues[K]) => {
-  emit('update:values', { ...props.values, [key]: value })
+  values.value = { ...values.value, [key]: value }
 }
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-2xl" @interact-outside.prevent>
       <DialogHeader>
         <DialogTitle>Advanced Options</DialogTitle>
@@ -181,7 +172,7 @@ const updateValue = <K extends keyof QueueValues>(key: K, value: QueueValues[K])
       </div>
 
       <DialogFooter>
-        <Button variant="outline" @click="emit('update:open', false)">
+        <Button variant="outline" @click="open = false">
           Close
         </Button>
       </DialogFooter>

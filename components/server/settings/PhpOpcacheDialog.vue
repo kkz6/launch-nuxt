@@ -78,7 +78,6 @@ interface PhpVersionData {
 }
 
 interface Props {
-  open: boolean
   serverId: string
   service: PhpVersionData
 }
@@ -86,9 +85,10 @@ interface Props {
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  'update:open': [value: boolean]
   'updated': []
 }>()
+
+const open = defineModel<boolean>('open', { required: true })
 
 const activeTab = ref('status')
 const status = ref<OpcacheStatus | null>(null)
@@ -194,7 +194,7 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
@@ -432,7 +432,7 @@ const handleSubmit = async () => {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" @click="emit('update:open', false)">
+              <Button type="button" variant="outline" @click="open = false">
                 Cancel
               </Button>
               <Button type="submit" :disabled="submitting">

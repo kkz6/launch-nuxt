@@ -4,7 +4,6 @@ import { EditorView } from '@codemirror/view'
 import { githubDark, githubLight } from '@uiw/codemirror-theme-github'
 
 interface Props {
-  modelValue: string
   disabled?: boolean
   masked?: boolean
   placeholder?: string
@@ -23,9 +22,7 @@ const props = withDefaults(defineProps<Props>(), {
   lineWrapping: true,
 })
 
-const emit = defineEmits<{
-  'update:modelValue': [value: string]
-}>()
+const modelValue = defineModel<string>({ default: '' })
 
 const colorMode = useColorMode()
 
@@ -51,10 +48,6 @@ const extensions = computed(() => {
   return exts
 })
 
-const handleUpdate = (value: string) => {
-  emit('update:modelValue', value)
-}
-
 // Generate a key to force re-mount when settings change
 const editorKey = computed(() => `${props.lineNumbers}-${props.foldGutter}-${colorMode.value}`)
 </script>
@@ -63,13 +56,12 @@ const editorKey = computed(() => `${props.lineNumbers}-${props.foldGutter}-${col
   <div :class="['relative overflow-hidden rounded-md border', props.class, { 'no-line-numbers': !lineNumbers }]">
     <Codemirror
       :key="editorKey"
-      :model-value="modelValue"
+      v-model="modelValue"
       :placeholder="placeholder"
       :disabled="disabled"
       :extensions="extensions"
       :basic-setup="basicSetup"
       :class="['h-full w-full text-sm leading-relaxed', { 'masked-content': masked }]"
-      @update:model-value="handleUpdate"
     />
     <div
       v-if="disabled"
