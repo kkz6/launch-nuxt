@@ -108,7 +108,7 @@ onMounted(fetchData)
           <DialogDescription>{{ selectedSchedulerForLogs?.command }}</DialogDescription>
         </DialogHeader>
         <div class="flex flex-col gap-4 pt-2.5">
-          <LogsServerLogs
+          <ServerLogViewer
             v-if="isLogDialogOpen && selectedSchedulerForLogs"
             :server-id="serverId"
             entity="cron"

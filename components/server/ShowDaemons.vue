@@ -158,7 +158,7 @@ onMounted(fetchData)
           <DialogDescription>{{ selectedDaemonForLogs?.command }}</DialogDescription>
         </DialogHeader>
         <div class="flex flex-col gap-4 pt-2.5">
-          <LogsServerLogs
+          <ServerLogViewer
             v-if="isLogDialogOpen && selectedDaemonForLogs"
             :server-id="serverId"
             entity="daemon"
