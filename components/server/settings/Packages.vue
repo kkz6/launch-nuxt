@@ -201,7 +201,7 @@ onMounted(fetchComposerConfig)
                   :model-value="credential.url"
                   placeholder="e.g., repo.packagist.org"
                   :class="{ 'border-destructive': errors[index]?.url }"
-                  @update:model-value="updateCredential(index, 'url', $event)"
+                  @update:model-value="updateCredential(index, 'url', String($event))"
                 />
                 <p v-if="errors[index]?.url" class="text-sm text-destructive">
                   {{ errors[index].url }}
@@ -225,7 +225,7 @@ onMounted(fetchComposerConfig)
                   :model-value="credential.username"
                   placeholder="Username"
                   :class="{ 'border-destructive': errors[index]?.username }"
-                  @update:model-value="updateCredential(index, 'username', $event)"
+                  @update:model-value="updateCredential(index, 'username', String($event))"
                 />
                 <p v-if="errors[index]?.username" class="text-sm text-destructive">
                   {{ errors[index].username }}
@@ -239,7 +239,7 @@ onMounted(fetchComposerConfig)
                   :model-value="credential.password"
                   placeholder="Password"
                   :class="{ 'border-destructive': errors[index]?.password }"
-                  @update:model-value="updateCredential(index, 'password', $event)"
+                  @update:model-value="updateCredential(index, 'password', String($event))"
                 />
                 <p v-if="errors[index]?.password" class="text-sm text-destructive">
                   {{ errors[index].password }}
