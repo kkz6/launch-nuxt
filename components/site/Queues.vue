@@ -230,7 +230,7 @@ onMounted(fetchQueues)
           empty-icon="lucide:database"
         >
           <template #cell-running="{ row }">
-            <TooltipProvider v-if="row.last_status_check">
+            <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger as-child>
                   <Badge :variant="row.running ? 'success' : 'secondary'" class="cursor-help">
@@ -254,16 +254,13 @@ onMounted(fetchQueues)
                       <span v-if="row.max_memory" class="text-muted-foreground">Max Memory:</span>
                       <span v-if="row.max_memory">{{ row.max_memory }}MB</span>
                     </div>
-                    <p class="border-t pt-1.5 text-xs text-muted-foreground">
+                    <p v-if="row.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                       Last checked: <SharedDateTooltip :date="row.last_status_check" />
                     </p>
                   </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-            <Badge v-else :variant="row.running ? 'success' : 'secondary'">
-              {{ row.running ? 'Running' : 'Stopped' }}
-            </Badge>
           </template>
 
           <template #cell-installed_at="{ row }">
