@@ -124,13 +124,13 @@ defineExpose({ show })
               </span>
               <button
                 type="button"
-                class="flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                class="flex flex-shrink-0 items-center justify-center rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
                 @click="copyVerificationText"
               >
                 <Icon
                   :name="isCopied ? 'lucide:check' : 'lucide:copy'"
                   :class="[
-                    'h-4 w-4 transition-all duration-200',
+                    'block h-4 w-4 transition-all duration-200',
                     isCopied && 'text-green-500'
                   ]"
                 />
