@@ -248,12 +248,12 @@ onMounted(fetchComposerConfig)
           </div>
         </div>
 
-        <div class="mt-6 flex items-stretch gap-3">
-          <Button variant="outline" @click="addCredential">
+        <div class="mt-6 flex gap-3">
+          <Button variant="outline" size="default" @click="addCredential">
             <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
             Add Credential
           </Button>
-          <Button :disabled="isSaving" @click="saveConfig">
+          <Button size="default" :disabled="isSaving" @click="saveConfig">
             <Icon v-if="isSaving" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
             Save Configuration
