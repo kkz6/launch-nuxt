@@ -45,7 +45,6 @@ interface PhpVersionData {
 }
 
 interface Props {
-  open: boolean
   serverId: string
   service: PhpVersionData
 }
@@ -53,9 +52,10 @@ interface Props {
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  'update:open': [value: boolean]
   'updated': []
 }>()
+
+const open = defineModel<boolean>('open', { required: true })
 
 const loadingStates = ref<Record<string, boolean>>({})
 const confirmDialog = ref<{
@@ -122,7 +122,7 @@ const pendingCount = computed(() => props.service.extensions?.filter(e => e.is_p
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-lg">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">

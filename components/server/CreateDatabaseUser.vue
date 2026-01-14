@@ -28,28 +28,15 @@ interface Props {
   serverId: string
   databases: Record<string, string>
   user?: DatabaseUser
-  open?: boolean
 }
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
   created: []
   updated: []
-  'update:open': [value: boolean]
 }>()
 
-const isOpen = ref(props.open ?? false)
-
-// Sync with external v-model:open
-watch(() => props.open, (value) => {
-  if (value !== undefined) {
-    isOpen.value = value
-  }
-})
-
-watch(isOpen, (value) => {
-  emit('update:open', value)
-})
+const isOpen = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
 const showPassword = ref(false)
 const hasSubmitted = ref(false)

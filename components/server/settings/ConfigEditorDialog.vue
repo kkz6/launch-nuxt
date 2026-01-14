@@ -17,7 +17,6 @@ interface FileInfo {
 }
 
 interface Props {
-  open: boolean
   serverId: string
   file: FileInfo
   title?: string
@@ -28,16 +27,17 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<{
-  'update:open': [value: boolean]
   'saved': []
 }>()
+
+const open = defineModel<boolean>('open', { required: true })
 
 const content = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
 
-watch(() => props.open, async (open) => {
-  if (open) {
+watch(open, async (isOpen) => {
+  if (isOpen) {
     await fetchContent()
   }
 })
@@ -49,7 +49,7 @@ const fetchContent = async () => {
     content.value = data.content || ''
   } catch {
     toast.error('Failed to load file content')
-    emit('update:open', false)
+    open.value = false
   } finally {
     isLoading.value = false
   }
@@ -64,7 +64,7 @@ const handleSave = async () => {
     })
     toast.success('Configuration saved successfully')
     emit('saved')
-    emit('update:open', false)
+    open.value = false
   } catch {
     toast.error('Failed to save configuration')
   } finally {
@@ -74,7 +74,7 @@ const handleSave = async () => {
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="emit('update:open', $event)">
+  <Dialog v-model:open="open">
     <DialogContent class="flex h-[80vh] max-h-[700px] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
       <DialogHeader class="border-b px-6 pb-4 pt-6">
         <DialogTitle class="flex items-center gap-2">
@@ -101,7 +101,7 @@ const handleSave = async () => {
       </div>
 
       <DialogFooter class="border-t px-6 py-4">
-        <Button variant="outline" :disabled="isSaving" @click="emit('update:open', false)">
+        <Button variant="outline" :disabled="isSaving" @click="open.value = false">
           Cancel
         </Button>
         <Button :disabled="isLoading || isSaving" @click="handleSave">

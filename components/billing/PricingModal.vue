@@ -21,16 +21,16 @@ interface PlanOption {
 
 interface Props {
   plans: PlanOption[]
-  isOpen: boolean
   currentPlanId?: number
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  'update:isOpen': [boolean]
   selectPlan: [planId: number, isAnnual: boolean]
 }>()
+
+const isOpen = defineModel<boolean>('isOpen', { required: true })
 
 const availablePlans = computed(() =>
   props.plans.filter((plan) => plan.id !== props.currentPlanId)
@@ -44,10 +44,6 @@ watch(availablePlans, (plans) => {
   }
 })
 
-const onOpenChange = (open: boolean) => {
-  emit('update:isOpen', open)
-}
-
 const handleSelectPlan = (isAnnual: boolean) => {
   if (selectedPlan.value) {
     emit('selectPlan', Number(selectedPlan.value), isAnnual)
@@ -56,7 +52,7 @@ const handleSelectPlan = (isAnnual: boolean) => {
 </script>
 
 <template>
-  <Dialog :open="isOpen" @update:open="onOpenChange">
+  <Dialog v-model:open="isOpen">
     <DialogContent class="bg-background sm:max-w-[600px]">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2 text-xl font-semibold">
@@ -129,7 +125,7 @@ const handleSelectPlan = (isAnnual: boolean) => {
         <Button variant="outline" class="w-full" @click="handleSelectPlan(true)">
           Subscribe Yearly (Save 20%)
         </Button>
-        <Button variant="ghost" class="w-full" @click="onOpenChange(false)">
+        <Button variant="ghost" class="w-full" @click="isOpen = false">
           Cancel
         </Button>
       </DialogFooter>
