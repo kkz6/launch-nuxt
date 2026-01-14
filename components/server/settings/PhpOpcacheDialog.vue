@@ -136,8 +136,8 @@ const formatBytes = (bytes: number): string => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
 
-watch(() => props.open, (open) => {
-  if (open) {
+watch(open, (isOpen) => {
+  if (isOpen) {
     const currentSettings = props.service.details?.type_data?.opcache
     form.value = { ...defaultSettings, ...currentSettings }
     // Reset status when dialog opens - user needs to click refresh
