@@ -374,6 +374,7 @@ export interface QueueDaemon extends InstallationStatus {
   stop_signal: string;
   running: boolean;
   info?: string;
+  uptime?: string;
   last_status_check: string | null;
 }
 

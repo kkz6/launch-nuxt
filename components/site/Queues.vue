@@ -36,6 +36,7 @@ interface Queue {
   running: boolean
   installed_at: string | null
   info?: string
+  uptime?: string
   last_status_check: string | null
 }
 
@@ -245,14 +246,22 @@ onMounted(fetchQueues)
                       <span :class="row.running ? 'text-green-500' : 'text-red-500'">
                         {{ row.running ? 'Running' : 'Stopped' }}
                       </span>
+                      <template v-if="row.uptime">
+                        <span class="text-muted-foreground">Uptime:</span>
+                        <span>{{ row.uptime }}</span>
+                      </template>
                       <span class="text-muted-foreground">Processes:</span>
                       <span>{{ row.numprocs || 1 }}</span>
                       <span class="text-muted-foreground">Connection:</span>
                       <span>{{ row.queue_connection }}</span>
-                      <span v-if="row.max_tries" class="text-muted-foreground">Max Tries:</span>
-                      <span v-if="row.max_tries">{{ row.max_tries }}</span>
-                      <span v-if="row.max_memory" class="text-muted-foreground">Max Memory:</span>
-                      <span v-if="row.max_memory">{{ row.max_memory }}MB</span>
+                      <template v-if="row.max_tries">
+                        <span class="text-muted-foreground">Max Tries:</span>
+                        <span>{{ row.max_tries }}</span>
+                      </template>
+                      <template v-if="row.max_memory">
+                        <span class="text-muted-foreground">Max Memory:</span>
+                        <span>{{ row.max_memory }}MB</span>
+                      </template>
                     </div>
                     <p v-if="row.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                       Last checked: <SharedDateTooltip :date="row.last_status_check" />
