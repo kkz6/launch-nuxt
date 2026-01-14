@@ -10,6 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 import type { QueueDaemon } from '~/types'
 
 interface Props {
@@ -223,8 +229,23 @@ onMounted(fetchData)
               <ServerCreateDaemon :server-id="serverId" @created="fetchData" />
             </template>
 
-            <template #cell-running="{ value }">
-              <Badge :variant="value ? 'success' : 'secondary'">
+            <template #cell-running="{ value, row }">
+              <TooltipProvider v-if="row.last_status_check">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Badge :variant="value ? 'success' : 'secondary'" class="cursor-help">
+                      {{ value ? 'Running' : 'Stopped' }}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p v-if="row.info" class="mb-1">{{ row.info }}</p>
+                    <p class="text-xs text-muted-foreground">
+                      Last checked: <SharedDateTooltip :date="row.last_status_check" />
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <Badge v-else :variant="value ? 'success' : 'secondary'">
                 {{ value ? 'Running' : 'Stopped' }}
               </Badge>
             </template>

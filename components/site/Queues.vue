@@ -10,6 +10,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 
 interface Queue {
   id: string
@@ -29,6 +35,8 @@ interface Queue {
   stop_wait_seconds?: number
   running: boolean
   installed_at: string | null
+  info?: string
+  last_status_check: string | null
 }
 
 interface Props {
@@ -222,7 +230,22 @@ onMounted(fetchQueues)
           empty-icon="lucide:database"
         >
           <template #cell-running="{ row }">
-            <Badge :variant="row.running ? 'success' : 'secondary'">
+            <TooltipProvider v-if="row.last_status_check">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Badge :variant="row.running ? 'success' : 'secondary'" class="cursor-help">
+                    {{ row.running ? 'Running' : 'Stopped' }}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p v-if="row.info" class="mb-1">{{ row.info }}</p>
+                  <p class="text-xs text-muted-foreground">
+                    Last checked: <SharedDateTooltip :date="row.last_status_check" />
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            <Badge v-else :variant="row.running ? 'success' : 'secondary'">
               {{ row.running ? 'Running' : 'Stopped' }}
             </Badge>
           </template>
