@@ -213,7 +213,7 @@ const deleteServer = async () => {
             <AlertDialogTrigger as-child>
               <Button
                 variant="outline"
-                class="w-full border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-950 sm:w-auto"
+                class="w-full border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300 sm:w-auto"
               >
                 Archive Server
               </Button>
@@ -239,7 +239,7 @@ const deleteServer = async () => {
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction
                   :disabled="archiveLoading"
-                  class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-950"
+                  class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
                   @click="archiveServer"
                 >
                   <Icon v-if="archiveLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
