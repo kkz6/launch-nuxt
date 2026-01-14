@@ -87,6 +87,17 @@ const archiveServer = async () => {
 }
 
 const runVulnerabilityAudit = async () => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Start Security Audit',
+    description: 'This will run a comprehensive security audit on your server. The results will be sent to your email when completed.',
+    confirmText: 'Start Audit',
+    cancelText: 'Cancel',
+  })
+
+  if (!result.ok) return
+
   auditLoading.value = true
   try {
     const response = await $api<{ message: string }>(`/servers/${props.server.id}/vulnerability-audit`, {
