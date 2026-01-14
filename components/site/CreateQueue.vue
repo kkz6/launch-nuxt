@@ -56,31 +56,16 @@ interface Props {
   serverId: string
   siteId: string
   queue?: Queue
-  open?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
-  open: undefined,
-})
+const props = defineProps<Props>()
 
 const emit = defineEmits<{
   created: []
   updated: []
-  'update:open': [value: boolean]
 }>()
 
-const internalOpen = ref(false)
-const isControlled = computed(() => props.open !== undefined)
-const isOpen = computed({
-  get: () => isControlled.value ? props.open! : internalOpen.value,
-  set: (value: boolean) => {
-    if (isControlled.value) {
-      emit('update:open', value)
-    } else {
-      internalOpen.value = value
-    }
-  },
-})
+const open = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
 const isAdvancedOpen = ref(false)
 const availableUsers = ref<Record<string, string>>({})
@@ -174,15 +159,15 @@ const fetchOptions = async () => {
   }
 }
 
-const handleClose = (open = false) => {
-  isOpen.value = open
-  if (!open) {
+const handleClose = (isOpen = false) => {
+  open.value = isOpen
+  if (!isOpen) {
     resetForm({ values: getInitialValues() })
   }
 }
 
-watch(() => isOpen.value, (open) => {
-  if (open) {
+watch(open, (isOpen) => {
+  if (isOpen) {
     fetchOptions()
     // Reset form with queue values when editing
     if (props.queue) {
@@ -248,14 +233,12 @@ const advancedValues = computed({
 </script>
 
 <template>
-  <Dialog :open="isOpen" @update:open="handleClose">
-    <DialogTrigger v-if="!isControlled" as-child>
-      <slot>
-        <Button>
-          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-          Add Queue Worker
-        </Button>
-      </slot>
+  <Dialog v-model:open="open" @update:open="handleClose">
+    <DialogTrigger as-child>
+      <Button>
+        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+        Add Queue Worker
+      </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
