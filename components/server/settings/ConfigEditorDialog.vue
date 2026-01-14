@@ -101,7 +101,7 @@ const handleSave = async () => {
       </div>
 
       <DialogFooter class="border-t px-6 py-4">
-        <Button variant="outline" :disabled="isSaving" @click="open.value = false">
+        <Button variant="outline" :disabled="isSaving" @click="open = false">
           Cancel
         </Button>
         <Button :disabled="isLoading || isSaving" @click="handleSave">

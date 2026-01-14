@@ -68,8 +68,8 @@ const fetchAvailableServices = async () => {
   }
 }
 
-watch(() => props.open, (open) => {
-  if (open) {
+watch(open, (isOpen) => {
+  if (isOpen) {
     fetchAvailableServices()
     selectedService.value = null
     selectedVersion.value = null
