@@ -55,6 +55,7 @@ const show = (opts: ConfirmationOptions): Promise<ConfirmationResult> => {
     ...opts,
   }
   verifiedText.value = ''
+  isCopied.value = false
   checkboxState.value = opts.checkbox ? { ...opts.checkbox } : undefined
   isOpen.value = true
   return new Promise((resolve) => {
@@ -89,6 +90,17 @@ const handleKeyUp = (e: KeyboardEvent) => {
   }
 }
 
+const isCopied = ref(false)
+const copyVerificationText = async () => {
+  if (options.value.inputVerificationText) {
+    await navigator.clipboard.writeText(options.value.inputVerificationText)
+    isCopied.value = true
+    setTimeout(() => {
+      isCopied.value = false
+    }, 2000)
+  }
+}
+
 defineExpose({ show })
 </script>
 
@@ -105,9 +117,24 @@ defineExpose({ show })
 
             <div
               v-if="options.inputVerificationText"
-              class="select-all rounded-md border bg-muted px-3 py-2 font-mono text-sm font-medium text-foreground"
+              class="flex items-center justify-between gap-2 rounded-md border bg-muted px-3 py-2"
             >
-              {{ options.inputVerificationText }}
+              <span class="select-all font-mono text-sm text-foreground">
+                {{ options.inputVerificationText }}
+              </span>
+              <button
+                type="button"
+                class="flex-shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                @click="copyVerificationText"
+              >
+                <Icon
+                  :name="isCopied ? 'lucide:check' : 'lucide:copy'"
+                  :class="[
+                    'h-4 w-4 transition-all duration-200',
+                    isCopied && 'text-green-500'
+                  ]"
+                />
+              </button>
             </div>
 
             <Input
