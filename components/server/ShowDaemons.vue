@@ -230,7 +230,7 @@ onMounted(fetchData)
             </template>
 
             <template #cell-running="{ value, row }">
-              <TooltipProvider v-if="row.last_status_check">
+              <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Badge :variant="value ? 'success' : 'secondary'" class="cursor-help">
@@ -252,16 +252,13 @@ onMounted(fetchData)
                         <span v-if="row.directory" class="text-muted-foreground">Directory:</span>
                         <span v-if="row.directory" class="truncate">{{ row.directory }}</span>
                       </div>
-                      <p class="border-t pt-1.5 text-xs text-muted-foreground">
+                      <p v-if="row.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                         Last checked: <SharedDateTooltip :date="row.last_status_check" />
                       </p>
                     </div>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <Badge v-else :variant="value ? 'success' : 'secondary'">
-                {{ value ? 'Running' : 'Stopped' }}
-              </Badge>
             </template>
           </SharedDataTable>
 
