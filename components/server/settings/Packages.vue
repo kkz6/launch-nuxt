@@ -2,13 +2,25 @@
 import { toast } from 'vue-sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
-import { Badge } from '~/components/ui/badge'
+import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
+import { Separator } from '~/components/ui/separator'
+import { Alert, AlertDescription } from '~/components/ui/alert'
 
-interface Package {
-  name: string
-  version: string
-  installed: boolean
-  upgradeable: boolean
+interface Credential {
+  url: string
+  username: string
+  password: string
+}
+
+interface CredentialErrors {
+  url?: string
+  username?: string
+  password?: string
+}
+
+interface ComposerConfig {
+  'http-basic': Record<string, { username: string; password: string }>
 }
 
 interface Props {
@@ -17,88 +29,148 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const packages = ref<Package[]>([])
+const credentials = ref<Credential[]>([])
+const errors = ref<CredentialErrors[]>([])
 const isLoading = ref(true)
+const isSaving = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
-const fetchPackages = async () => {
+const fetchComposerConfig = async () => {
+  isLoading.value = true
   try {
-    const data = await $api<{ data: Package[] }>(`/servers/${props.serverId}/packages`)
-    packages.value = data.data
+    const data = await $api<{ data: { composer: ComposerConfig } }>(`/servers/${props.serverId}/packages`)
+    const composer = data.data?.composer || { 'http-basic': {} }
+    credentials.value = Object.entries(composer['http-basic'] || {}).map(([url, { username, password }]) => ({
+      url,
+      username,
+      password,
+    }))
+    errors.value = credentials.value.map(() => ({}))
   } catch {
-    toast.error('Failed to load packages')
+    toast.error('Failed to load composer configuration')
   } finally {
     isLoading.value = false
   }
 }
 
-const upgradePackage = async (pkg: Package) => {
-  if (!confirmationDialog.value) return
+const validateUrl = (url: string): boolean => {
+  if (!url) return false
+  const validPatterns = [
+    /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&/=]*)$/,
+    /^packagist\.org$/,
+    /^repo\.packagist\.org$/,
+    /^gitlab\.com$/,
+    /^github\.com$/,
+  ]
+  return validPatterns.some(pattern => pattern.test(url))
+}
 
-  const result = await confirmationDialog.value.show({
-    title: 'Upgrade Package',
-    description: `Are you sure you want to upgrade "${pkg.name}"?`,
-    confirmText: 'Upgrade',
-    cancelText: 'Cancel',
-  })
+const validateCredential = (credential: Credential): CredentialErrors => {
+  const credentialErrors: CredentialErrors = {}
 
-  if (result.ok) {
-    try {
-      await $api(`/servers/${props.serverId}/packages/${pkg.name}/upgrade`, {
-        method: 'POST',
-      })
-      toast.success('Package upgrade initiated')
-      fetchPackages()
-    } catch {
-      toast.error('Failed to upgrade package')
+  if (!credential.url) {
+    credentialErrors.url = 'Repository URL is required'
+  } else if (!validateUrl(credential.url)) {
+    credentialErrors.url = 'Please enter a valid repository URL'
+  }
+
+  if (!credential.username) {
+    credentialErrors.username = 'Username is required'
+  }
+
+  if (!credential.password) {
+    credentialErrors.password = 'Password is required'
+  }
+
+  return credentialErrors
+}
+
+const addCredential = () => {
+  credentials.value.push({ url: '', username: '', password: '' })
+  errors.value.push({})
+}
+
+const removeCredential = (index: number) => {
+  credentials.value.splice(index, 1)
+  errors.value.splice(index, 1)
+}
+
+const buildComposerJson = () => {
+  const httpBasic = credentials.value.reduce((acc, { url, username, password }) => {
+    if (url) {
+      acc[url] = { username, password }
     }
+    return acc
+  }, {} as Record<string, { username: string; password: string }>)
+
+  return JSON.stringify({ 'http-basic': httpBasic }, null, 2)
+}
+
+const updateCredential = (index: number, field: keyof Credential, value: string) => {
+  credentials.value[index][field] = value
+  if (errors.value[index]?.[field]) {
+    delete errors.value[index][field]
   }
 }
 
-const upgradeAll = async () => {
-  if (!confirmationDialog.value) return
+const saveConfig = async () => {
+  // Validate all credentials
+  const newErrors: CredentialErrors[] = []
+  let hasErrors = false
 
-  const upgradeableCount = packages.value.filter((p) => p.upgradeable).length
-  if (upgradeableCount === 0) {
-    toast.info('All packages are up to date')
+  credentials.value.forEach((credential, index) => {
+    const credentialErrors = validateCredential(credential)
+    newErrors[index] = credentialErrors
+    if (Object.keys(credentialErrors).length > 0) {
+      hasErrors = true
+    }
+  })
+
+  errors.value = newErrors
+
+  if (hasErrors) {
+    toast.error('Please fix the validation errors before saving')
     return
   }
 
+  if (!confirmationDialog.value) return
+
   const result = await confirmationDialog.value.show({
-    title: 'Upgrade All Packages',
-    description: `Are you sure you want to upgrade ${upgradeableCount} packages?`,
-    confirmText: 'Upgrade All',
+    title: 'Update Composer Configuration',
+    description: 'Are you sure you want to update the composer authentication configuration?',
+    confirmText: 'Update',
     cancelText: 'Cancel',
   })
 
-  if (result.ok) {
-    try {
-      await $api(`/servers/${props.serverId}/packages/upgrade-all`, {
-        method: 'POST',
-      })
-      toast.success('Package upgrades initiated')
-      fetchPackages()
-    } catch {
-      toast.error('Failed to upgrade packages')
-    }
+  if (!result.ok) return
+
+  isSaving.value = true
+  try {
+    await $api(`/servers/${props.serverId}/packages`, {
+      method: 'PATCH',
+      body: { contents: buildComposerJson() },
+    })
+    toast.success('Composer configuration updated successfully')
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || 'Failed to update composer configuration')
+  } finally {
+    isSaving.value = false
   }
 }
 
-onMounted(fetchPackages)
+onMounted(fetchComposerConfig)
 </script>
 
 <template>
   <Card>
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <CardHeader class="flex flex-row items-center justify-between">
-      <div>
-        <CardTitle>Packages</CardTitle>
-        <CardDescription>Installed system packages and updates</CardDescription>
-      </div>
-      <Button variant="outline" @click="upgradeAll">
-        <Icon name="lucide:arrow-up-circle" class="mr-2 h-4 w-4" />
-        Upgrade All
-      </Button>
+    <CardHeader>
+      <CardTitle>Composer Package Authentication</CardTitle>
+      <CardDescription>
+        Manage your server's auth.json Composer configuration. This file is loaded
+        on demand from server and no credential data is stored.
+      </CardDescription>
     </CardHeader>
     <CardContent>
       <div v-if="isLoading" class="flex items-center justify-center py-8">
@@ -106,19 +178,88 @@ onMounted(fetchPackages)
       </div>
 
       <template v-else>
-        <SharedDataTable
-          :data="packages"
-          :columns="[
-            { key: 'name', label: 'Package', width: '40%' },
-            { key: 'version', label: 'Version', width: '30%' },
-            { key: 'upgradeable', label: 'Status', width: '20%' },
-          ]"
-          :actions="[
-            { label: 'Upgrade', icon: 'lucide:arrow-up-circle', onClick: upgradePackage },
-          ]"
-          empty-title="No packages found"
-          empty-icon="lucide:package"
-        />
+        <Alert v-if="credentials.length === 0" class="mb-4">
+          <Icon name="lucide:info" class="h-4 w-4" />
+          <AlertDescription>
+            Composer configurations are yet to be added
+          </AlertDescription>
+        </Alert>
+
+        <div class="space-y-6">
+          <div
+            v-for="(credential, index) in credentials"
+            :key="index"
+            class="space-y-4"
+          >
+            <Separator v-if="index > 0" />
+
+            <div class="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
+              <div class="space-y-2 sm:col-span-2">
+                <Label :for="`url-${index}`">Repository URL</Label>
+                <Input
+                  :id="`url-${index}`"
+                  :model-value="credential.url"
+                  placeholder="e.g., repo.packagist.org"
+                  :class="{ 'border-destructive': errors[index]?.url }"
+                  @update:model-value="updateCredential(index, 'url', $event)"
+                />
+                <p v-if="errors[index]?.url" class="text-sm text-destructive">
+                  {{ errors[index].url }}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                class="w-full sm:w-auto sm:justify-self-end"
+                @click="removeCredential(index)"
+              >
+                <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+                Remove
+              </Button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div class="space-y-2">
+                <Label :for="`username-${index}`">Username</Label>
+                <Input
+                  :id="`username-${index}`"
+                  :model-value="credential.username"
+                  placeholder="Username"
+                  :class="{ 'border-destructive': errors[index]?.username }"
+                  @update:model-value="updateCredential(index, 'username', $event)"
+                />
+                <p v-if="errors[index]?.username" class="text-sm text-destructive">
+                  {{ errors[index].username }}
+                </p>
+              </div>
+              <div class="space-y-2">
+                <Label :for="`password-${index}`">Password</Label>
+                <Input
+                  :id="`password-${index}`"
+                  type="password"
+                  :model-value="credential.password"
+                  placeholder="Password"
+                  :class="{ 'border-destructive': errors[index]?.password }"
+                  @update:model-value="updateCredential(index, 'password', $event)"
+                />
+                <p v-if="errors[index]?.password" class="text-sm text-destructive">
+                  {{ errors[index].password }}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 flex flex-wrap gap-2">
+          <Button variant="outline" @click="addCredential">
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            Add Credential
+          </Button>
+          <Button :disabled="isSaving" @click="saveConfig">
+            <Icon v-if="isSaving" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+            <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
+            Save Configuration
+          </Button>
+        </div>
       </template>
     </CardContent>
   </Card>
