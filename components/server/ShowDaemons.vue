@@ -245,12 +245,18 @@ onMounted(fetchData)
                         <span :class="value ? 'text-green-500' : 'text-red-500'">
                           {{ value ? 'Running' : 'Stopped' }}
                         </span>
+                        <template v-if="row.uptime">
+                          <span class="text-muted-foreground">Uptime:</span>
+                          <span>{{ row.uptime }}</span>
+                        </template>
                         <span class="text-muted-foreground">Processes:</span>
                         <span>{{ row.processes || 1 }}</span>
                         <span class="text-muted-foreground">User:</span>
                         <span>{{ row.user }}</span>
-                        <span v-if="row.directory" class="text-muted-foreground">Directory:</span>
-                        <span v-if="row.directory" class="truncate">{{ row.directory }}</span>
+                        <template v-if="row.directory">
+                          <span class="text-muted-foreground">Directory:</span>
+                          <span class="truncate">{{ row.directory }}</span>
+                        </template>
                       </div>
                       <p v-if="row.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                         Last checked: <SharedDateTooltip :date="row.last_status_check" />
