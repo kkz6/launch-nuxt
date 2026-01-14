@@ -292,7 +292,7 @@ onUnmounted(() => {
               <span v-if="!noTimestamp && log.timestamp" class="shrink-0 text-muted-foreground">
                 {{ log.timestamp.toLocaleTimeString() }}
               </span>
-              <span :class="typeColorMap[log.type]">{{ log.message }}</span>
+              <span :class="typeColorMap[log.type]" class="whitespace-pre-wrap break-all">{{ log.message }}</span>
             </div>
           </div>
         </div>

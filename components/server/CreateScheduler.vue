@@ -21,7 +21,6 @@ import type { Cron } from '~/types'
 interface Props {
   serverId: string
   cron?: Cron
-  open?: boolean
 }
 
 const props = defineProps<Props>()
@@ -31,17 +30,7 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
-const internalOpen = ref(false)
-const isOpen = computed({
-  get: () => props.open !== undefined ? props.open : internalOpen.value,
-  set: (value) => {
-    if (props.open !== undefined) {
-      emit('update:open', value)
-    } else {
-      internalOpen.value = value
-    }
-  },
-})
+const open = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -121,7 +110,7 @@ const onSubmit = handleSubmit(async (data) => {
       toast.success('Scheduler created successfully')
       emit('created')
     }
-    isOpen.value = false
+    open.value = false
     resetForm()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
@@ -131,8 +120,8 @@ const onSubmit = handleSubmit(async (data) => {
   }
 })
 
-watch(isOpen, (open) => {
-  if (open && props.cron) {
+watch(open, (isOpen) => {
+  if (isOpen && props.cron) {
     // Reset form with cron values when opening for edit
     resetForm({
       values: {
@@ -142,21 +131,19 @@ watch(isOpen, (open) => {
         custom_expression: props.cron.frequency === 'custom' ? props.cron.expression : '',
       },
     })
-  } else if (!open) {
+  } else if (!isOpen) {
     resetForm()
   }
 })
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen">
+  <Dialog v-model:open="open">
     <DialogTrigger as-child>
-      <slot>
-        <Button>
-          <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
-          {{ cron ? 'Edit Scheduler' : 'Create Scheduler' }}
-        </Button>
-      </slot>
+      <Button>
+        <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
+        {{ cron ? 'Edit Scheduler' : 'Create Scheduler' }}
+      </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-3xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
