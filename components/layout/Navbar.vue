@@ -1,12 +1,10 @@
 <script setup lang="ts">
 import {
   ChevronsUpDown,
-  CreditCard,
   LogOut,
   Rocket,
   Settings,
 } from "lucide-vue-next";
-import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,8 +17,14 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 
 const { user, logout } = useAuth();
+const { open: openSettingsSheet } = useSettingsSheet();
 
 const isOpen = ref(false);
+
+const openSettings = () => {
+  isOpen.value = false;
+  openSettingsSheet();
+};
 
 const userInitials = computed(() => {
   if (!user.value?.name) return "U";
@@ -109,17 +113,10 @@ const navigateTo = (path: string) => {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   class="cursor-pointer gap-2 px-2 py-2.5 sm:py-2"
-                  @click="navigateTo('/settings/profile')"
+                  @click="openSettings"
                 >
                   <Settings class="h-4 w-4 text-muted-foreground" />
                   <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  class="cursor-pointer gap-2 px-2 py-2.5 sm:py-2"
-                  @click="navigateTo('/settings/billing')"
-                >
-                  <CreditCard class="h-4 w-4 text-muted-foreground" />
-                  <span>Billing</span>
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
@@ -145,5 +142,7 @@ const navigateTo = (path: string) => {
         </ClientOnly>
       </div>
     </div>
+
+    <SettingsSheet />
   </nav>
 </template>

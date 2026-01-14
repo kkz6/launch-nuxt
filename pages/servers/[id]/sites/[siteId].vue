@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Terminal } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, Terminal } from 'lucide-vue-next'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -57,6 +57,22 @@ watch(activeTab, (newTab) => {
     query: { ...route.query, tab: newTab },
   })
 })
+
+// Scroll state for tabs
+const scrollRef = ref<HTMLDivElement | null>(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+
+const checkScroll = () => {
+  const el = scrollRef.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 0
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth
+}
+
+const scrollBy = (amount: number) => {
+  scrollRef.value?.scrollBy({ left: amount, behavior: 'smooth' })
+}
 
 const applicationTypes: Record<string, string> = {
   laravel: 'Laravel',
@@ -119,11 +135,23 @@ onMounted(async () => {
     server.value = serverData.data
     site.value = siteData.data
     useHead({ title: site.value?.address || 'Site' })
+
+    // Initialize scroll check
+    nextTick(() => {
+      checkScroll()
+      scrollRef.value?.addEventListener('scroll', checkScroll)
+      window.addEventListener('resize', checkScroll)
+    })
   } catch {
     navigateTo(`/servers/${serverId.value}`)
   } finally {
     isLoading.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  scrollRef.value?.removeEventListener('scroll', checkScroll)
+  window.removeEventListener('resize', checkScroll)
 })
 </script>
 
@@ -174,14 +202,69 @@ onMounted(async () => {
             </Badge>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <SiteDeployApplication
-            v-if="site.type !== 'wordpress'"
-            :server-id="server.id"
-            :site-id="site.id"
-            :is-deploying="site.latest_deployment?.status === 'pending'"
-            as-icon
-          />
+        <SiteDeployApplication
+          v-if="site.type !== 'wordpress'"
+          :server-id="server.id"
+          :site-id="site.id"
+          :is-deploying="site.latest_deployment?.status === 'pending'"
+          as-icon
+        />
+      </header>
+    </div>
+
+    <Tabs v-model="activeTab" class="w-full">
+      <div class="flex w-full items-center gap-4">
+        <!-- Tabs with scroll -->
+        <div class="relative min-w-0 flex-1">
+          <!-- Left scroll button -->
+          <div class="absolute inset-y-0 left-0 z-10 flex items-center">
+            <button
+              v-if="canScrollLeft"
+              class="mb-3 rounded-full bg-background p-1 shadow"
+              aria-label="Scroll left"
+              @click="scrollBy(-100)"
+            >
+              <ChevronLeft class="h-4 w-4" />
+            </button>
+          </div>
+
+          <!-- Right scroll button -->
+          <div class="absolute inset-y-0 right-0 z-10 flex items-center">
+            <button
+              v-if="canScrollRight"
+              class="mb-3 rounded-full bg-background p-1 shadow"
+              aria-label="Scroll right"
+              @click="scrollBy(100)"
+            >
+              <ChevronRight class="h-4 w-4" />
+            </button>
+          </div>
+
+          <div
+            ref="scrollRef"
+            class="scrollbar-none w-full overflow-x-auto whitespace-nowrap"
+            :style="{
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }"
+          >
+            <TabsList class="mb-3 flex h-auto min-w-max justify-start -space-x-px bg-background p-0">
+              <TabsTrigger
+                v-for="tab in availableTabs"
+                :key="tab.value"
+                :value="tab.value"
+                class="relative w-[140px] whitespace-nowrap rounded-none border border-border py-2 shadow-sm shadow-black/5 first:rounded-s last:rounded-e after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 data-[state=active]:bg-muted data-[state=active]:after:bg-primary"
+              >
+                <Icon :name="tab.icon" class="-ms-0.5 me-1.5 h-4 w-4 shrink-0 opacity-60" />
+                {{ tab.label }}
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
+
+        <!-- Terminal Button -->
+        <div v-if="server.connected" class="flex-shrink-0">
           <TooltipProvider :delay-duration="0">
             <Tooltip>
               <TooltipTrigger as-child>
@@ -209,21 +292,7 @@ onMounted(async () => {
             </Tooltip>
           </TooltipProvider>
         </div>
-      </header>
-    </div>
-
-    <Tabs v-model="activeTab" class="w-full">
-      <TabsList class="mb-3 flex h-auto flex-wrap justify-start gap-0 bg-background p-0">
-        <TabsTrigger
-          v-for="tab in availableTabs"
-          :key="tab.value"
-          :value="tab.value"
-          class="relative w-[120px] overflow-hidden whitespace-nowrap rounded-none border border-border py-2 shadow-sm shadow-black/5 first:rounded-s last:rounded-e data-[state=active]:bg-muted data-[state=active]:after:bg-primary after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-0.5"
-        >
-          <Icon :name="tab.icon" class="-ms-0.5 me-1.5 h-4 w-4 opacity-60" />
-          {{ tab.label }}
-        </TabsTrigger>
-      </TabsList>
+      </div>
 
       <TabsContent value="general" class="space-y-4 pt-2.5">
         <SiteDeployBlock v-if="site.type !== 'wordpress'" :server="server" :site="site" />

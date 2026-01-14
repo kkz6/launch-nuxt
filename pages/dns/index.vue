@@ -57,7 +57,6 @@ const activeTab = ref("domains");
 const tabs = [
   { value: "servers", label: "Servers", route: "/servers" },
   { value: "domains", label: "Domains", route: "/dns" },
-  { value: "settings", label: "Settings", route: "/settings" },
 ];
 
 const handleTabChange = (value: string | number) => {

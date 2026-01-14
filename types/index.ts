@@ -33,6 +33,7 @@ export interface CommitData {
   name: string;
   email: string;
   message: string;
+  rollback_to?: string;
 }
 
 export interface InstallationStatus {

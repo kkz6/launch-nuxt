@@ -56,6 +56,8 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const { open: openSettings } = useSettingsSheet()
+
 const backups = ref<Backup[]>([])
 const storageProviders = ref<Record<string, string>>({})
 const isLoading = ref(true)
@@ -256,9 +258,13 @@ onMounted(fetchBackups)
           <Icon name="lucide:database-backup" class="h-8 w-8 text-muted-foreground" />
           <p class="text-center text-muted-foreground">
             No storage providers configured.
-            <NuxtLink to="/settings/storage-providers" class="text-foreground underline">
+            <button
+              type="button"
+              class="text-foreground underline"
+              @click="openSettings('connections')"
+            >
               Add a storage provider
-            </NuxtLink>
+            </button>
             to create backups.
           </p>
         </div>

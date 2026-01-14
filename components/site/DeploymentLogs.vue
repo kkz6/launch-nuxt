@@ -1,5 +1,13 @@
 <script setup lang="ts">
 import { Button } from '~/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '~/components/ui/sheet'
 
 interface Props {
   serverId: string
@@ -10,13 +18,14 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const isOpen = ref(false)
+
 const description = computed(() => {
   const parts: string[] = []
   if (props.commitSha) {
     parts.push(props.commitSha.substring(0, 6))
   }
   if (props.commitMessage) {
-    // Get first line of commit message
     const heading = props.commitMessage.split('\n')[0]
     parts.push(heading)
   }
@@ -25,18 +34,31 @@ const description = computed(() => {
 </script>
 
 <template>
-  <LogsEntityLogger
-    :server-id="serverId"
-    entity="task"
-    :entity-id="taskId"
-    title="Deployment Logs"
-    :description="description"
-    no-timestamp
-    hide-log-type-filter
-  >
-    <Button variant="outline" size="sm">
-      <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
-      View Logs
-    </Button>
-  </LogsEntityLogger>
+  <Sheet v-model:open="isOpen">
+    <SheetTrigger as-child>
+      <Button variant="outline" size="sm">
+        <Icon name="lucide:scroll-text" class="mr-2 block size-4" />
+        View Logs
+      </Button>
+    </SheetTrigger>
+    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-2xl">
+      <SheetHeader>
+        <SheetTitle>Deployment Logs</SheetTitle>
+        <SheetDescription v-if="description">
+          {{ description }}
+        </SheetDescription>
+      </SheetHeader>
+      <div class="mt-4">
+        <ServerLogViewer
+          v-if="isOpen"
+          :server-id="serverId"
+          entity="task"
+          :entity-id="taskId"
+          :no-timestamp="true"
+          hide-options
+          container-class-name="h-[calc(100vh-16rem)]"
+        />
+      </div>
+    </SheetContent>
+  </Sheet>
 </template>

@@ -47,6 +47,8 @@ useHead({
   title: "Create Server",
 });
 
+const { open: openSettings } = useSettingsSheet();
+
 interface Plan {
   value: string;
   title: string;
@@ -294,12 +296,13 @@ onMounted(fetchOptions);
             class="mt-2 text-sm text-muted-foreground"
           >
             No provider accounts connected.
-            <NuxtLink
-              to="/settings/server-providers"
+            <button
+              type="button"
               class="text-primary hover:underline"
+              @click="openSettings('connections')"
             >
               Connect a provider
-            </NuxtLink>
+            </button>
           </p>
         </CardContent>
       </Card>
