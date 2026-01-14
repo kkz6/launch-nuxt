@@ -237,11 +237,27 @@ onMounted(fetchQueues)
                     {{ row.running ? 'Running' : 'Stopped' }}
                   </Badge>
                 </TooltipTrigger>
-                <TooltipContent>
-                  <p v-if="row.info" class="mb-1">{{ row.info }}</p>
-                  <p class="text-xs text-muted-foreground">
-                    Last checked: <SharedDateTooltip :date="row.last_status_check" />
-                  </p>
+                <TooltipContent class="max-w-xs">
+                  <div class="space-y-1.5 text-sm">
+                    <p v-if="row.info" class="font-medium">{{ row.info }}</p>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span class="text-muted-foreground">Status:</span>
+                      <span :class="row.running ? 'text-green-500' : 'text-red-500'">
+                        {{ row.running ? 'Running' : 'Stopped' }}
+                      </span>
+                      <span class="text-muted-foreground">Processes:</span>
+                      <span>{{ row.numprocs || 1 }}</span>
+                      <span class="text-muted-foreground">Connection:</span>
+                      <span>{{ row.queue_connection }}</span>
+                      <span v-if="row.max_tries" class="text-muted-foreground">Max Tries:</span>
+                      <span v-if="row.max_tries">{{ row.max_tries }}</span>
+                      <span v-if="row.max_memory" class="text-muted-foreground">Max Memory:</span>
+                      <span v-if="row.max_memory">{{ row.max_memory }}MB</span>
+                    </div>
+                    <p class="border-t pt-1.5 text-xs text-muted-foreground">
+                      Last checked: <SharedDateTooltip :date="row.last_status_check" />
+                    </p>
+                  </div>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

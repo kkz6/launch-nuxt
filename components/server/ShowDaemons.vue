@@ -237,11 +237,25 @@ onMounted(fetchData)
                       {{ value ? 'Running' : 'Stopped' }}
                     </Badge>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    <p v-if="row.info" class="mb-1">{{ row.info }}</p>
-                    <p class="text-xs text-muted-foreground">
-                      Last checked: <SharedDateTooltip :date="row.last_status_check" />
-                    </p>
+                  <TooltipContent class="max-w-xs">
+                    <div class="space-y-1.5 text-sm">
+                      <p v-if="row.info" class="font-medium">{{ row.info }}</p>
+                      <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <span class="text-muted-foreground">Status:</span>
+                        <span :class="value ? 'text-green-500' : 'text-red-500'">
+                          {{ value ? 'Running' : 'Stopped' }}
+                        </span>
+                        <span class="text-muted-foreground">Processes:</span>
+                        <span>{{ row.processes || 1 }}</span>
+                        <span class="text-muted-foreground">User:</span>
+                        <span>{{ row.user }}</span>
+                        <span v-if="row.directory" class="text-muted-foreground">Directory:</span>
+                        <span v-if="row.directory" class="truncate">{{ row.directory }}</span>
+                      </div>
+                      <p class="border-t pt-1.5 text-xs text-muted-foreground">
+                        Last checked: <SharedDateTooltip :date="row.last_status_check" />
+                      </p>
+                    </div>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
