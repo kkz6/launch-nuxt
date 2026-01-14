@@ -48,31 +48,17 @@ interface Backup {
 interface Props {
   serverId: string
   backup?: Backup
-  open?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   backup: undefined,
-  open: undefined,
 })
 
 const emit = defineEmits<{
   created: []
-  'update:open': [value: boolean]
 }>()
 
-const isControlled = computed(() => props.open !== undefined)
-const internalOpen = ref(false)
-const isOpen = computed({
-  get: () => isControlled.value ? (props.open ?? false) : internalOpen.value,
-  set: (val: boolean) => {
-    if (isControlled.value) {
-      emit('update:open', val)
-    } else {
-      internalOpen.value = val
-    }
-  },
-})
+const open = defineModel<boolean>('open', { default: false })
 
 const isEditing = computed(() => !!props.backup)
 const isLoading = ref(false)
@@ -168,10 +154,8 @@ const onSubmit = handleSubmit(async (data) => {
       toast.success('Backup configuration created')
     }
     emit('created')
-    isOpen.value = false
-    if (!isControlled.value) {
-      resetForm()
-    }
+    open.value = false
+    resetForm()
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.error(err.data?.message || `Failed to ${actionText.toLowerCase()} backup`)
@@ -180,8 +164,8 @@ const onSubmit = handleSubmit(async (data) => {
   }
 })
 
-watch(isOpen, (open) => {
-  if (open) {
+watch(open, (isOpen) => {
+  if (isOpen) {
     fetchOptions()
     if (props.backup) {
       // Populate form with backup data
@@ -203,14 +187,12 @@ watch(isOpen, (open) => {
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen">
-    <DialogTrigger v-if="!isControlled" as-child>
-      <slot>
-        <Button>
-          <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
-          Create Backup
-        </Button>
-      </slot>
+  <Dialog v-model:open="open">
+    <DialogTrigger as-child>
+      <Button>
+        <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
+        Create Backup
+      </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-2xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
@@ -338,7 +320,7 @@ watch(isOpen, (open) => {
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" @click="isOpen = false">
+          <Button type="button" variant="outline" @click="open = false">
             Cancel
           </Button>
           <Button type="submit" :disabled="isLoading">
