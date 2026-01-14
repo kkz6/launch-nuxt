@@ -99,23 +99,22 @@ defineExpose({ show })
         <AlertDialogTitle>{{ options.title }}</AlertDialogTitle>
         <AlertDialogDescription>{{ options.description }}</AlertDialogDescription>
 
-        <section v-if="options.inputVerificationText || options.hasInput || options.checkbox" class="text-sm text-muted-foreground">
-          <div class="grid w-full items-center gap-2.5 py-2">
-            <Label v-if="options.helpText" for="verification">{{ options.helpText }}</Label>
+        <section v-if="options.inputVerificationText || options.hasInput || options.checkbox" class="pt-4 text-sm">
+          <div class="grid w-full items-center gap-3">
+            <Label v-if="options.helpText" for="verification" class="text-foreground">{{ options.helpText }}</Label>
 
-            <Input
+            <div
               v-if="options.inputVerificationText"
-              id="verification-display"
-              class="w-full"
-              disabled
-              :value="options.inputVerificationText"
-            />
+              class="select-all rounded-md border bg-muted px-3 py-2 font-mono text-sm font-medium text-foreground"
+            >
+              {{ options.inputVerificationText }}
+            </div>
 
             <Input
               v-if="options.inputVerificationText || options.hasInput"
               id="verification"
               v-model="verifiedText"
-              :placeholder="options.inputVerificationText || ''"
+              :placeholder="options.inputVerificationText ? 'Type to confirm...' : ''"
               class="w-full"
               @keyup="handleKeyUp"
             />
