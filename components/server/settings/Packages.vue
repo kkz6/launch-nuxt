@@ -5,7 +5,6 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Separator } from '~/components/ui/separator'
-import { Alert, AlertDescription } from '~/components/ui/alert'
 
 interface Credential {
   url: string
@@ -178,12 +177,12 @@ onMounted(fetchComposerConfig)
       </div>
 
       <template v-else>
-        <Alert v-if="credentials.length === 0" class="mb-4">
-          <Icon name="lucide:info" class="h-4 w-4" />
-          <AlertDescription>
+        <div v-if="credentials.length === 0" class="mb-4 flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
+          <Icon name="lucide:info" class="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+          <p class="text-sm text-muted-foreground">
             Composer configurations are yet to be added
-          </AlertDescription>
-        </Alert>
+          </p>
+        </div>
 
         <div class="space-y-6">
           <div
@@ -249,12 +248,12 @@ onMounted(fetchComposerConfig)
           </div>
         </div>
 
-        <div class="mt-6 flex flex-wrap gap-2">
-          <Button variant="outline" @click="addCredential">
+        <div class="mt-6 flex items-center gap-3">
+          <Button variant="outline" class="h-10" @click="addCredential">
             <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
             Add Credential
           </Button>
-          <Button :disabled="isSaving" @click="saveConfig">
+          <Button class="h-10" :disabled="isSaving" @click="saveConfig">
             <Icon v-if="isSaving" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
             Save Configuration
