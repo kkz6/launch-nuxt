@@ -13,11 +13,13 @@ const props = defineProps<Props>()
 
 const showLogs = ref(false)
 
-const statusConfig: Record<string, { variant: 'success' | 'destructive' | 'secondary' | 'warning'; label: string }> = {
-  pending: { variant: 'warning', label: 'Deploying' },
-  running: { variant: 'warning', label: 'Running' },
-  completed: { variant: 'success', label: 'Success' },
-  failed: { variant: 'destructive', label: 'Failed' },
+const statusConfig: Record<string, { variant: 'success' | 'destructive' | 'secondary' | 'warning'; label: string; icon: string }> = {
+  pending: { variant: 'warning', label: 'Deploying', icon: 'lucide:loader-2' },
+  installing: { variant: 'warning', label: 'Installing', icon: 'lucide:loader-2' },
+  running: { variant: 'warning', label: 'Running', icon: 'lucide:loader-2' },
+  finished: { variant: 'success', label: 'Success', icon: 'lucide:check' },
+  completed: { variant: 'success', label: 'Success', icon: 'lucide:check' },
+  failed: { variant: 'destructive', label: 'Failed', icon: 'lucide:x' },
 }
 
 const getCommitHeading = (message: string): string => {
@@ -52,21 +54,11 @@ const getCommitUrl = (sha: string): string | null => {
               class="gap-1"
             >
               <Icon
-                v-if="site.latest_deployment.status === 'pending'"
-                name="lucide:loader-2"
-                class="size-3 animate-spin"
+                v-if="statusConfig[site.latest_deployment.status]?.icon"
+                :name="statusConfig[site.latest_deployment.status].icon"
+                :class="['size-3', ['pending', 'installing', 'running'].includes(site.latest_deployment.status) && 'animate-spin']"
               />
-              <Icon
-                v-else-if="site.latest_deployment.status === 'completed'"
-                name="lucide:check"
-                class="size-3"
-              />
-              <Icon
-                v-else-if="site.latest_deployment.status === 'failed'"
-                name="lucide:x"
-                class="size-3"
-              />
-              {{ statusConfig[site.latest_deployment.status]?.label || 'Unknown' }}
+              {{ statusConfig[site.latest_deployment.status]?.label || site.latest_deployment.status }}
             </Badge>
             <span class="text-sm text-muted-foreground">Latest deployment</span>
           </div>
