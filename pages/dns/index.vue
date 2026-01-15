@@ -90,6 +90,27 @@ const formatCreatedDate = (date: string): string => {
   }
 };
 
+const getProviderLabel = (domain: Domain): string => {
+  // If provider_label is available on the domain's provider object
+  if (domain.provider?.provider_label) {
+    return domain.provider.provider_label;
+  }
+
+  // Look up from providers list using provider ID or provider key
+  const providerId = typeof domain.provider === 'string'
+    ? domain.provider
+    : domain.provider?.provider;
+
+  if (providerId) {
+    const found = providers.value.find(
+      (p) => p.id === providerId || p.provider === providerId
+    );
+    if (found) return found.label;
+  }
+
+  return "Unknown Provider";
+};
+
 onMounted(fetchDomains);
 </script>
 
@@ -172,7 +193,7 @@ onMounted(fetchDomains);
                         </span>
                       </div>
                       <span class="text-sm font-medium text-muted-foreground">
-                        {{ domain.provider?.provider_label || "Provider" }}
+                        {{ getProviderLabel(domain) }}
                       </span>
                       <span class="text-sm font-medium text-muted-foreground">
                         {{ domain.address }}
