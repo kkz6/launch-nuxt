@@ -27,7 +27,7 @@ const navLinks = computed<NavLink[]>(() => [
 </script>
 
 <template>
-  <div class="my-8 flex w-full flex-row flex-wrap gap-4 md:flex-nowrap">
+  <div class="flex w-full flex-row flex-wrap gap-6 md:flex-nowrap">
     <div class="w-full md:max-w-[18rem]">
       <nav class="flex flex-col space-y-1">
         <button

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Label } from '~/components/ui/label'
 import {
   Select,
@@ -48,22 +47,24 @@ onMounted(fetchLogs)
 </script>
 
 <template>
-  <Card class="bg-background">
-    <CardHeader>
-      <CardTitle class="text-xl">Logs</CardTitle>
-      <CardDescription>View server and service logs</CardDescription>
-    </CardHeader>
-
-    <CardContent class="flex flex-col gap-4">
-      <div v-if="isLoading" class="flex items-center justify-center py-8">
-        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+  <div>
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <h3 class="text-lg font-semibold">Logs</h3>
+        <p class="text-sm text-muted-foreground">View server and service logs</p>
       </div>
+    </div>
 
-      <template v-else>
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+
+    <template v-else>
+      <div class="space-y-4">
         <div class="space-y-2">
           <Label>Select Service</Label>
           <Select v-model="selectedLogIndex">
-            <SelectTrigger class="w-full">
+            <SelectTrigger class="w-full max-w-sm">
               <SelectValue placeholder="Select a service to view logs" />
             </SelectTrigger>
             <SelectContent>
@@ -88,7 +89,7 @@ onMounted(fetchLogs)
           no-timestamp
           hide-options
         />
-      </template>
-    </CardContent>
-  </Card>
+      </div>
+    </template>
+  </div>
 </template>

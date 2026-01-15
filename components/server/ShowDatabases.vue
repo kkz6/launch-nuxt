@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import type { Database, DatabaseUser } from '~/types'
 
@@ -149,7 +148,7 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-8">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!-- Edit Database User Dialog -->
@@ -163,14 +162,14 @@ onMounted(fetchData)
       @updated="onUserUpdated"
     />
 
-    <!-- Databases Card -->
-    <Card class="bg-background">
-      <CardHeader>
-        <div class="flex items-start justify-between">
-          <div>
-            <CardTitle class="text-xl">Databases</CardTitle>
-            <CardDescription>Manage your databases and database users</CardDescription>
-          </div>
+    <!-- Databases Section -->
+    <div>
+      <div class="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold">Databases</h3>
+          <p class="text-sm text-muted-foreground">Manage your databases</p>
+        </div>
+        <div class="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -182,112 +181,104 @@ onMounted(fetchData)
               class="mr-2 h-4 w-4"
               :class="{ 'animate-spin': isSyncing }"
             />
-            Sync Databases
+            Sync
           </Button>
+          <ServerCreateDatabase v-if="databases.length > 0" :server-id="serverId" @created="fetchData" />
         </div>
-      </CardHeader>
+      </div>
 
-      <CardContent>
-        <div v-if="isLoading" class="flex items-center justify-center py-8">
-          <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+      <div v-if="isLoading" class="flex items-center justify-center py-8">
+        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
 
-        <template v-else>
-          <SharedDataTable
-            :data="databases"
-            :columns="databaseColumns"
-            :actions="[
-              {
-                label: 'Run Backup',
-                icon: 'lucide:rotate-ccw',
-                onClick: () => {},
-                show: (db: Database) => Boolean((db as any).backups?.length),
-              },
-              {
-                label: 'Delete',
-                icon: 'lucide:trash-2',
-                onClick: deleteDatabase,
-                className: 'hover:text-white hover:bg-destructive/90',
-              },
-            ]"
-            empty-icon="lucide:database"
-            empty-title="No databases found"
-            empty-description="Create your first database to get started."
-          >
-            <template #empty>
-              <ServerCreateDatabase :server-id="serverId" @created="fetchData" />
-            </template>
-
-            <template #cell-status="{ row }">
-              <SharedInstallationStatus v-bind="row" />
-            </template>
-
-            <template #cell-installed_at="{ value }">
-              <SharedDateTooltip v-if="value" :date="String(value)" />
-              <span v-else class="text-muted-foreground">-</span>
-            </template>
-          </SharedDataTable>
-
-          <div v-if="databases.length > 0" class="mt-6">
+      <template v-else>
+        <SharedDataTable
+          :data="databases"
+          :columns="databaseColumns"
+          :actions="[
+            {
+              label: 'Run Backup',
+              icon: 'lucide:rotate-ccw',
+              onClick: () => {},
+              show: (db: Database) => Boolean((db as any).backups?.length),
+            },
+            {
+              label: 'Delete',
+              icon: 'lucide:trash-2',
+              onClick: deleteDatabase,
+              className: 'hover:text-white hover:bg-destructive/90',
+            },
+          ]"
+          empty-icon="lucide:database"
+          empty-title="No databases found"
+          empty-description="Create your first database to get started."
+        >
+          <template #empty>
             <ServerCreateDatabase :server-id="serverId" @created="fetchData" />
-          </div>
-        </template>
-      </CardContent>
-    </Card>
+          </template>
 
-    <!-- Database Users Card -->
-    <Card class="bg-background">
-      <CardHeader>
-        <CardTitle class="text-xl">Database Users</CardTitle>
-        <CardDescription>Manage database users and their permissions</CardDescription>
-      </CardHeader>
+          <template #cell-status="{ row }">
+            <SharedInstallationStatus v-bind="row" />
+          </template>
 
-      <CardContent>
-        <div v-if="isLoading" class="flex items-center justify-center py-8">
-          <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+          <template #cell-installed_at="{ value }">
+            <SharedDateTooltip v-if="value" :date="String(value)" />
+            <span v-else class="text-muted-foreground">-</span>
+          </template>
+        </SharedDataTable>
+      </template>
+    </div>
+
+    <!-- Database Users Section -->
+    <div>
+      <div class="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h3 class="text-lg font-semibold">Database Users</h3>
+          <p class="text-sm text-muted-foreground">Manage database users and their permissions</p>
         </div>
+        <ServerCreateDatabaseUser v-if="databaseUsers.length > 0" :server-id="serverId" :databases="databasesMap" @created="fetchData" />
+      </div>
 
-        <template v-else>
-          <SharedDataTable
-            :data="databaseUsers"
-            :columns="userColumns"
-            :actions="[
-              {
-                label: 'Edit',
-                icon: 'lucide:pencil',
-                onClick: editUser,
-              },
-              {
-                label: 'Delete',
-                icon: 'lucide:trash-2',
-                onClick: deleteUser,
-                className: 'hover:text-white hover:bg-destructive/90',
-                show: (user: DatabaseUser) => user.name !== 'root',
-              },
-            ]"
-            empty-icon="lucide:user"
-            empty-title="No database users found"
-            empty-description="Create your first database user to get started."
-          >
-            <template #empty>
-              <ServerCreateDatabaseUser :server-id="serverId" :databases="databasesMap" @created="fetchData" />
-            </template>
+      <div v-if="isLoading" class="flex items-center justify-center py-8">
+        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
 
-            <template #cell-status="{ row }">
-              <SharedInstallationStatus v-bind="row" />
-            </template>
-
-            <template #cell-installed_at="{ value }">
-              <SharedDateTooltip v-if="value" :date="String(value)" />
-              <span v-else class="text-muted-foreground">-</span>
-            </template>
-          </SharedDataTable>
-
-          <div v-if="databaseUsers.length > 0" class="mt-6">
+      <template v-else>
+        <SharedDataTable
+          :data="databaseUsers"
+          :columns="userColumns"
+          :actions="[
+            {
+              label: 'Edit',
+              icon: 'lucide:pencil',
+              onClick: editUser,
+            },
+            {
+              label: 'Delete',
+              icon: 'lucide:trash-2',
+              onClick: deleteUser,
+              className: 'hover:text-white hover:bg-destructive/90',
+              show: (user: DatabaseUser) => user.name !== 'root',
+            },
+          ]"
+          empty-icon="lucide:user"
+          empty-title="No database users found"
+          empty-description="Create your first database user to get started."
+        >
+          <template #empty>
             <ServerCreateDatabaseUser :server-id="serverId" :databases="databasesMap" @created="fetchData" />
-          </div>
-        </template>
-      </CardContent>
-    </Card>
+          </template>
+
+          <template #cell-status="{ row }">
+            <SharedInstallationStatus v-bind="row" />
+          </template>
+
+          <template #cell-installed_at="{ value }">
+            <SharedDateTooltip v-if="value" :date="String(value)" />
+            <span v-else class="text-muted-foreground">-</span>
+          </template>
+        </SharedDataTable>
+      </template>
+    </div>
   </div>
 </template>

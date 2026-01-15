@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -97,7 +96,7 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <Card class="bg-background">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!-- Log Viewer Dialog -->
@@ -129,49 +128,44 @@ onMounted(fetchData)
       @updated="handleSchedulerUpdated"
     />
 
-    <CardHeader>
-      <CardTitle class="text-xl">Schedulers</CardTitle>
-      <CardDescription>Manage cron jobs on this server</CardDescription>
-    </CardHeader>
-
-    <CardContent class="flex flex-col gap-4">
-      <div v-if="isLoading" class="flex items-center justify-center py-8">
-        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <h3 class="text-lg font-semibold">Schedulers</h3>
+        <p class="text-sm text-muted-foreground">Manage cron jobs on this server</p>
       </div>
+      <ServerCreateScheduler v-if="schedulers.length > 0" :server-id="serverId" @created="fetchData" />
+    </div>
 
-      <template v-else>
-        <div class="mt-4">
-          <SharedDataTable
-            :data="schedulers"
-            :columns="[
-              { key: 'command', label: 'Command', width: '25%' },
-              { key: 'user', label: 'User', width: '15%' },
-              { key: 'frequency', label: 'Frequency', width: '20%' },
-              { key: 'status', label: 'Status', width: '15%' },
-              { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' },
-            ]"
-            :actions="[
-              { label: 'View Logs', icon: 'lucide:scroll-text', onClick: viewLogs },
-              { label: 'Edit', icon: 'lucide:pencil', onClick: editScheduler },
-              { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteScheduler, destructive: true },
-            ]"
-            empty-title="No scheduled tasks found"
-            empty-icon="lucide:clock"
-          >
-            <template #empty>
-              <ServerCreateScheduler :server-id="serverId" @created="fetchData" />
-            </template>
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
 
-            <template #cell-status="{ row }">
-              <SharedInstallationStatus v-bind="row" />
-            </template>
-          </SharedDataTable>
+    <template v-else>
+      <SharedDataTable
+        :data="schedulers"
+        :columns="[
+          { key: 'command', label: 'Command', width: '25%' },
+          { key: 'user', label: 'User', width: '15%' },
+          { key: 'frequency', label: 'Frequency', width: '20%' },
+          { key: 'status', label: 'Status', width: '15%' },
+          { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' },
+        ]"
+        :actions="[
+          { label: 'View Logs', icon: 'lucide:scroll-text', onClick: viewLogs },
+          { label: 'Edit', icon: 'lucide:pencil', onClick: editScheduler },
+          { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteScheduler, destructive: true },
+        ]"
+        empty-title="No scheduled tasks found"
+        empty-icon="lucide:clock"
+      >
+        <template #empty>
+          <ServerCreateScheduler :server-id="serverId" @created="fetchData" />
+        </template>
 
-          <div v-if="schedulers.length > 0" class="mt-6">
-            <ServerCreateScheduler :server-id="serverId" @created="fetchData" />
-          </div>
-        </div>
-      </template>
-    </CardContent>
-  </Card>
+        <template #cell-status="{ row }">
+          <SharedInstallationStatus v-bind="row" />
+        </template>
+      </SharedDataTable>
+    </template>
+  </div>
 </template>

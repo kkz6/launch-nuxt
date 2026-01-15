@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
-import { Button } from '~/components/ui/button'
 import type { FirewallRule } from '~/types'
 
 interface Props {
@@ -58,46 +56,41 @@ onMounted(fetchData)
 </script>
 
 <template>
-  <div class="w-full">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <Card class="h-full bg-transparent">
-      <CardHeader>
-        <CardTitle class="text-xl">Network / Firewall</CardTitle>
-        <CardDescription>Manage firewall rules for this server</CardDescription>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-4">
-        <div v-if="isLoading" class="flex items-center justify-center py-8">
-          <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
 
-        <template v-else>
-          <div class="mt-4">
-            <SharedDataTable
-              :data="firewallRules"
-              :columns="[
-                { key: 'name', label: 'Name', width: '25%' },
-                { key: 'port', label: 'Port', width: '20%' },
-                { key: 'action', label: 'Action', width: '20%' },
-                { key: 'from_ipv4', label: 'From IP', width: '25%', hideOnMobile: true },
-              ]"
-              :actions="[
-                { label: 'Edit', icon: 'lucide:pencil', onClick: (rule: FirewallRule) => {} },
-                { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteRule, destructive: true },
-              ]"
-              empty-title="No firewall rules found"
-              empty-icon="lucide:network"
-            >
-              <template #empty>
-                <ServerCreateNetwork :server-id="serverId" @created="fetchData" />
-              </template>
-            </SharedDataTable>
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <h3 class="text-lg font-semibold">Network / Firewall</h3>
+        <p class="text-sm text-muted-foreground">Manage firewall rules for this server</p>
+      </div>
+      <ServerCreateNetwork v-if="firewallRules.length > 0" :server-id="serverId" @created="fetchData" />
+    </div>
 
-            <div v-if="firewallRules.length > 0" class="mt-6">
-              <ServerCreateNetwork :server-id="serverId" @created="fetchData" />
-            </div>
-          </div>
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+
+    <template v-else>
+      <SharedDataTable
+        :data="firewallRules"
+        :columns="[
+          { key: 'name', label: 'Name', width: '25%' },
+          { key: 'port', label: 'Port', width: '20%' },
+          { key: 'action', label: 'Action', width: '20%' },
+          { key: 'from_ipv4', label: 'From IP', width: '25%', hideOnMobile: true },
+        ]"
+        :actions="[
+          { label: 'Edit', icon: 'lucide:pencil', onClick: (rule: FirewallRule) => {} },
+          { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteRule, destructive: true },
+        ]"
+        empty-title="No firewall rules found"
+        empty-icon="lucide:network"
+      >
+        <template #empty>
+          <ServerCreateNetwork :server-id="serverId" @created="fetchData" />
         </template>
-      </CardContent>
-    </Card>
+      </SharedDataTable>
+    </template>
   </div>
 </template>
