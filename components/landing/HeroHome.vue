@@ -154,9 +154,9 @@ const providers = [
                   </div>
                 </div>
 
-                <div class="hidden rounded-lg border border-dashed bg-card/50 p-4 lg:flex lg:items-center lg:justify-center">
-                  <div class="text-center">
-                    <Icon name="lucide:plus" class="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+                <div class="hidden rounded-lg border border-dashed bg-card/50 p-4 lg:block">
+                  <div class="flex h-full flex-col items-center justify-center">
+                    <Icon name="lucide:plus" class="mb-2 h-6 w-6 text-muted-foreground" />
                     <span class="text-sm text-muted-foreground">Add Server</span>
                   </div>
                 </div>
