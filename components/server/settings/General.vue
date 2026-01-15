@@ -42,8 +42,8 @@ const canDelete = computed(() => siteCount.value === 0)
 
 onMounted(async () => {
   try {
-    const data = await $api<{ data: { site_count: number } }>(`/servers/${props.server.id}/site-count`)
-    siteCount.value = data.data?.site_count || 0
+    const data = await $api<{ data: { count: number } }>(`/servers/${props.server.id}/site-count`)
+    siteCount.value = data.data?.count || 0
   } catch {
     siteCount.value = 0
   }
