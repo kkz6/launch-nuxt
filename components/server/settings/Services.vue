@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import {
@@ -240,66 +239,66 @@ onMounted(fetchServices)
       :last-updated="wsLastUpdated"
     />
 
-    <Card>
-      <CardHeader class="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle class="flex items-center gap-2">
-            Services
-            <!-- Connection Status Indicator -->
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <button
-                    class="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="flex items-center gap-2 text-lg font-medium">
+          Services
+          <!-- Connection Status Indicator -->
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  class="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+                  :class="[
+                    wsConnected
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                      : wsConnecting
+                        ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+                  ]"
+                  @click="!wsConnected && !wsConnecting && wsReconnect()"
+                >
+                  <span
+                    class="h-1.5 w-1.5 rounded-full"
                     :class="[
                       wsConnected
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                        ? 'bg-emerald-500 animate-pulse'
                         : wsConnecting
-                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
-                          : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+                          ? 'bg-amber-500 animate-pulse'
+                          : 'bg-red-500',
                     ]"
-                    @click="!wsConnected && !wsConnecting && wsReconnect()"
-                  >
-                    <span
-                      class="h-1.5 w-1.5 rounded-full"
-                      :class="[
-                        wsConnected
-                          ? 'bg-emerald-500 animate-pulse'
-                          : wsConnecting
-                            ? 'bg-amber-500 animate-pulse'
-                            : 'bg-red-500',
-                      ]"
-                    />
-                    {{ wsConnected ? 'Live' : wsConnecting ? 'Connecting' : 'Disconnected' }}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p v-if="wsConnected && wsLastUpdated">
-                    Last updated: {{ wsLastUpdated.toLocaleTimeString() }}
-                  </p>
-                  <p v-else-if="wsConnecting">Connecting to status stream...</p>
-                  <p v-else-if="wsError">{{ wsError }}</p>
-                  <p v-else>Click to reconnect</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </CardTitle>
-          <CardDescription>
-            {{ services.length }} service{{ services.length !== 1 ? 's' : '' }} installed
-          </CardDescription>
-        </div>
-        <div class="flex gap-2">
-          <Button variant="outline" @click="fetchServices">
-            <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-          <Button @click="isInstallDialogOpen = true">
-            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-            Install Service
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
+                  />
+                  {{ wsConnected ? 'Live' : wsConnecting ? 'Connecting' : 'Disconnected' }}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p v-if="wsConnected && wsLastUpdated">
+                  Last updated: {{ wsLastUpdated.toLocaleTimeString() }}
+                </p>
+                <p v-else-if="wsConnecting">Connecting to status stream...</p>
+                <p v-else-if="wsError">{{ wsError }}</p>
+                <p v-else>Click to reconnect</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </h3>
+        <p class="text-sm text-muted-foreground">
+          {{ services.length }} service{{ services.length !== 1 ? 's' : '' }} installed
+        </p>
+      </div>
+      <div class="flex gap-2">
+        <Button variant="outline" @click="fetchServices">
+          <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+          Refresh
+        </Button>
+        <Button @click="isInstallDialogOpen = true">
+          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+          Install Service
+        </Button>
+      </div>
+    </div>
+
+    <div>
         <div v-if="isLoading" class="flex items-center justify-center py-8">
           <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
@@ -489,7 +488,6 @@ onMounted(fetchServices)
             </div>
           </div>
         </template>
-      </CardContent>
-    </Card>
+      </div>
   </div>
 </template>

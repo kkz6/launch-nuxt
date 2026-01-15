@@ -14,6 +14,23 @@ import {
   Server,
   Globe,
   Terminal,
+  Layout,
+  Database,
+  Network,
+  Bot,
+  Clock,
+  SlidersHorizontal,
+  Info,
+  HardDrive,
+  Key,
+  Package,
+  Code,
+  Cog,
+  LayoutDashboard,
+  GitBranch,
+  FolderOpen,
+  ListTodo,
+  TerminalSquare,
 } from "lucide-vue-next";
 import { Button } from "~/components/ui/button";
 import {
@@ -47,32 +64,32 @@ const globalTabs = [
 
 // Server detail tabs
 const serverDetailTabs = [
-  { value: "sites", label: "Sites", query: "sites" },
-  { value: "databases", label: "Databases", query: "databases" },
-  { value: "networks", label: "Networks", query: "networks" },
-  { value: "daemons", label: "Daemons", query: "daemons" },
-  { value: "schedulers", label: "Schedulers", query: "schedulers" },
-  { value: "advanced", label: "Advanced", query: "advanced" },
+  { value: "sites", label: "Sites", query: "sites", icon: Layout },
+  { value: "databases", label: "Databases", query: "databases", icon: Database },
+  { value: "networks", label: "Networks", query: "networks", icon: Network },
+  { value: "daemons", label: "Daemons", query: "daemons", icon: Bot },
+  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: Clock },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: SlidersHorizontal },
 ];
 
 // Advanced sub-tabs (second level)
 const advancedSubTabs = [
-  { value: "general", label: "General", query: "general" },
-  { value: "backups", label: "Backups", query: "backups" },
-  { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys" },
-  { value: "packages", label: "Packages", query: "packages" },
-  { value: "php", label: "PHP", query: "php" },
-  { value: "services", label: "Services", query: "services" },
+  { value: "general", label: "General", query: "general", icon: Info },
+  { value: "backups", label: "Backups", query: "backups", icon: HardDrive },
+  { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: Key },
+  { value: "packages", label: "Packages", query: "packages", icon: Package },
+  { value: "php", label: "PHP", query: "php", icon: Code },
+  { value: "services", label: "Services", query: "services", icon: Cog },
 ];
 
 // Site detail tabs (base - filtered based on site type)
 const allSiteDetailTabs = [
-  { value: "general", label: "Overview", query: "general" },
-  { value: "deployments", label: "Deployments", query: "deployments" },
-  { value: "files", label: "Files", query: "files" },
-  { value: "queues", label: "Queues", query: "queues" },
-  { value: "commands", label: "Commands", query: "commands" },
-  { value: "settings", label: "Settings", query: "settings" },
+  { value: "general", label: "Overview", query: "general", icon: LayoutDashboard },
+  { value: "deployments", label: "Deployments", query: "deployments", icon: GitBranch },
+  { value: "files", label: "Files", query: "files", icon: FolderOpen },
+  { value: "queues", label: "Queues", query: "queues", icon: ListTodo },
+  { value: "commands", label: "Commands", query: "commands", icon: TerminalSquare },
+  { value: "settings", label: "Settings", query: "settings", icon: Settings },
 ];
 
 // DNS domain detail tabs
@@ -692,34 +709,39 @@ onMounted(fetchTeams);
           <ServerAddSite v-if="serverId" :server-id="serverId" />
         </div>
       </div>
-      <nav class="-mb-px flex gap-1 overflow-x-auto" :class="{ 'border-b border-border': isAdvancedTabActive }">
+      <nav
+        class="-mb-px flex gap-1 overflow-x-auto"
+        :class="{ '-mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-border mb-0': isAdvancedTabActive }"
+      >
         <NuxtLink
           v-for="tab in serverDetailTabs"
           :key="tab.value"
           :to="{ path: `/servers/${serverId}`, query: tab.query === 'advanced' ? { tab: tab.query, subtab: 'general' } : { tab: tab.query } }"
-          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          class="relative flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isServerTabActive(tab.query)
               ? 'border-foreground text-foreground'
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
         >
+          <component :is="tab.icon" class="h-4 w-4" />
           {{ tab.label }}
         </NuxtLink>
       </nav>
       <!-- Advanced Sub-tabs -->
-      <nav v-if="isAdvancedTabActive" class="-mb-px flex gap-1 overflow-x-auto pt-1">
+      <nav v-if="isAdvancedTabActive" class="-mb-px flex gap-1 overflow-x-auto">
         <NuxtLink
           v-for="subtab in advancedSubTabs"
           :key="subtab.value"
           :to="{ path: `/servers/${serverId}`, query: { tab: 'advanced', subtab: subtab.query } }"
-          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          class="relative flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isAdvancedSubTabActive(subtab.query)
-              ? 'border-primary text-primary'
+              ? 'border-rose-300 text-rose-500 dark:border-rose-400 dark:text-rose-300'
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
         >
+          <component :is="subtab.icon" class="h-4 w-4" />
           {{ subtab.label }}
         </NuxtLink>
       </nav>
@@ -783,13 +805,14 @@ onMounted(fetchTeams);
           v-for="tab in siteDetailTabs"
           :key="tab.value"
           :to="{ path: `/servers/${serverId}/sites/${siteId}`, query: { tab: tab.query } }"
-          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          class="relative flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isSiteTabActive(tab.query)
               ? 'border-foreground text-foreground'
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
         >
+          <component :is="tab.icon" class="h-4 w-4" />
           {{ tab.label }}
         </NuxtLink>
       </nav>
