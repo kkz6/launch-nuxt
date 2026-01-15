@@ -79,22 +79,20 @@ const toc = computed(() => page.value?.body?.toc?.links || [])
       <ContentRenderer v-if="page" :value="page" />
     </article>
 
-    <!-- Table of Contents for sidebar -->
-    <template #toc>
-      <div v-if="toc.length > 0">
-        <h4 class="mb-3 text-sm font-semibold text-foreground">On this page</h4>
-        <nav class="space-y-1">
-          <a
-            v-for="link in toc"
-            :key="link.id"
-            :href="`#${link.id}`"
-            class="block text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {{ link.text }}
-          </a>
-        </nav>
-      </div>
-    </template>
+    <!-- Table of Contents (inline for now) -->
+    <div v-if="toc.length > 0" class="mt-12 border-t pt-8 xl:hidden">
+      <h4 class="mb-3 text-sm font-semibold text-foreground">On this page</h4>
+      <nav class="space-y-1">
+        <a
+          v-for="link in toc"
+          :key="link.id"
+          :href="`#${link.id}`"
+          class="block text-sm text-muted-foreground transition-colors hover:text-foreground"
+        >
+          {{ link.text }}
+        </a>
+      </nav>
+    </div>
   </div>
 </template>
 
