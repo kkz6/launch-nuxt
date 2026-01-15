@@ -134,15 +134,32 @@ const formatBytes = (bytes: number): string => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
 
-watch(open, (isOpen) => {
-  if (isOpen) {
-    const currentSettings = props.service.details?.opcache
-    form.value = { ...defaultSettings, ...currentSettings }
-    // Reset status when dialog opens - user needs to click refresh
-    status.value = null
-    hasLoadedStatus.value = false
-  }
-})
+// Watch both open state and opcache data to handle timing issues
+watch(
+  [open, () => props.service?.details?.opcache],
+  ([isOpen, opcache]) => {
+    if (isOpen) {
+      // Explicitly set each property to ensure reactivity
+      form.value = {
+        enabled: opcache?.enabled ?? defaultSettings.enabled,
+        enable_cli: opcache?.enable_cli ?? defaultSettings.enable_cli,
+        memory_consumption: opcache?.memory_consumption ?? defaultSettings.memory_consumption,
+        interned_strings_buffer: opcache?.interned_strings_buffer ?? defaultSettings.interned_strings_buffer,
+        max_accelerated_files: opcache?.max_accelerated_files ?? defaultSettings.max_accelerated_files,
+        validate_timestamps: opcache?.validate_timestamps ?? defaultSettings.validate_timestamps,
+        revalidate_freq: opcache?.revalidate_freq ?? defaultSettings.revalidate_freq,
+        save_comments: opcache?.save_comments ?? defaultSettings.save_comments,
+        jit_enabled: opcache?.jit_enabled ?? defaultSettings.jit_enabled,
+        jit_buffer_size: opcache?.jit_buffer_size ?? defaultSettings.jit_buffer_size,
+        jit_mode: opcache?.jit_mode ?? defaultSettings.jit_mode,
+      }
+      // Reset status when dialog opens - user needs to click refresh
+      status.value = null
+      hasLoadedStatus.value = false
+    }
+  },
+  { immediate: true },
+)
 
 const fetchStatus = async () => {
   statusLoading.value = true
