@@ -179,8 +179,8 @@ const onSubmit = handleSubmit(async (formValues) => {
 </script>
 
 <template>
+  <SharedConfirmationDialog ref="confirmationDialog" />
   <Dialog v-model:open="isOpen" @update:open="handleClose">
-    <SharedConfirmationDialog ref="confirmationDialog" />
     <DialogTrigger as-child>
       <slot>
         <slot name="trigger">
