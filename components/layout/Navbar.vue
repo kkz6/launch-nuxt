@@ -445,7 +445,7 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Global Navigation Tabs (Servers / Domains) -->
-    <div v-if="showGlobalTabs" class="mx-auto max-w-8xl px-4 sm:px-6">
+    <div v-if="showGlobalTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
       <div class="-mb-px flex items-center justify-between">
         <nav class="flex gap-6">
           <NuxtLink
@@ -469,7 +469,7 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Server Detail Navigation -->
-    <div v-if="showServerTabs" class="mx-auto max-w-8xl px-4 sm:px-6">
+    <div v-if="showServerTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
       <div class="-mb-px flex items-center gap-6">
         <!-- Back to servers + Server name -->
         <NuxtLink
