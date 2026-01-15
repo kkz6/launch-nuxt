@@ -161,8 +161,8 @@ const formatBytes = (bytes: number): string => {
 const fetchStatus = async () => {
   statusLoading.value = true
   try {
-    const data = await $api<OpcacheStatus>(`/servers/${props.serverId}/php/${props.service.details?.id}/opcache/status`)
-    status.value = data
+    const response = await $api<{ data: OpcacheStatus }>(`/servers/${props.serverId}/php/${props.service.details?.id}/opcache/status`)
+    status.value = response.data
     hasLoadedStatus.value = true
   } catch {
     status.value = { enabled: false, error: 'Failed to fetch status' }
