@@ -110,8 +110,11 @@ const handleDownload = () => {
     <SheetTrigger as-child>
       <slot />
     </SheetTrigger>
-    <SheetContent side="right" class="flex w-full flex-col sm:max-w-2xl">
-      <SheetHeader>
+    <SheetContent
+      class="!inset-x-2 !inset-y-2 !h-auto w-auto rounded-lg border sm:!inset-y-auto sm:!left-auto sm:!top-16 sm:!right-3 sm:!bottom-4 sm:w-full sm:max-w-3xl"
+      :show-close="true"
+    >
+      <SheetHeader class="pb-2">
         <SheetTitle>{{ title }}</SheetTitle>
         <SheetDescription v-if="description">
           <code class="rounded bg-muted px-2 py-1 text-xs">{{ description }}</code>
@@ -129,7 +132,7 @@ const handleDownload = () => {
         </Button>
       </div>
 
-      <div class="flex-1 overflow-auto rounded-lg bg-zinc-950 p-4">
+      <div class="h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-zinc-950 p-4 sm:h-[calc(100vh-18rem)]">
         <pre class="whitespace-pre-wrap break-words font-mono text-sm text-zinc-100"><template
           v-for="(part, index) in parsedOutput"
           :key="index"
