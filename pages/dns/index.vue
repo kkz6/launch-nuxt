@@ -100,23 +100,15 @@ onMounted(fetchDomains);
 </script>
 
 <template>
-  <div class="gap-12">
-    <header
-      class="mb-6 flex w-full flex-wrap items-center justify-between gap-2"
-    >
-      <div class="flex flex-col gap-2">
-        <h1 class="text-xl font-bold lg:text-3xl">Domains</h1>
-        <p class="text-muted-foreground lg:text-medium">
-          Manage your domains and DNS settings
-        </p>
-      </div>
+  <div>
+    <div class="mb-6 flex justify-end">
       <DnsAddDomain :providers="providers" @created="fetchDomains">
         <Button>
           <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
           Add Domain
         </Button>
       </DnsAddDomain>
-    </header>
+    </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
