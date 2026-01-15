@@ -67,20 +67,14 @@ const hasSubscription = computed(() => subscriptions.value.length > 0)
 const isEnding = computed(() => Boolean(currentSubscription.value?.ends_at))
 const isAtMaxServers = computed(() => serverCount.value === maxServers.value)
 
-interface BillingData {
-  subscription_plans: SubscriptionPlan[]
-  subscriptions: Subscription[]
-  server_count: number
-  receipts: Receipt[]
-}
-
 const fetchBillingData = async () => {
   try {
-    const response = await $api<{ data: BillingData } | BillingData>('/billing')
-    // Handle both { data: {...} } and direct response formats
-    const data = 'data' in response && response.data && typeof response.data === 'object' && 'subscription_plans' in response.data
-      ? response.data
-      : response as BillingData
+    const data = await $api<{
+      subscription_plans: SubscriptionPlan[]
+      subscriptions: Subscription[]
+      server_count: number
+      receipts: Receipt[]
+    }>('/billing')
     subscriptionPlans.value = data.subscription_plans || []
     subscriptions.value = data.subscriptions || []
     serverCount.value = data.server_count || 0
@@ -300,7 +294,7 @@ declare global {
             <div class="space-y-0.5">
               <p class="text-sm font-medium"># {{ receipt.order_number }}</p>
               <p class="text-xs text-muted-foreground">
-                ${{ receipt.total.toFixed(2) }} - {{ receipt.ordered_at }}
+                ${{ receipt.total }} - {{ receipt.ordered_at }}
               </p>
             </div>
             <a :href="receipt.receipt_url" target="_blank" rel="noreferrer">
