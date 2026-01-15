@@ -32,31 +32,31 @@ const databases = [
           <div class="h-full overflow-hidden rounded-xl border bg-card">
             <div class="flex h-full flex-col p-6">
               <!-- Terminal Window -->
-              <div class="flex-1 overflow-hidden rounded-lg border bg-zinc-950">
-                <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+              <div class="flex-1 overflow-hidden rounded-lg border bg-muted/50">
+                <div class="flex items-center gap-2 border-b px-4 py-3">
                   <div class="flex gap-1.5">
-                    <div class="h-2.5 w-2.5 rounded-full bg-red-500/80" />
-                    <div class="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
-                    <div class="h-2.5 w-2.5 rounded-full bg-green-500/80" />
+                    <div class="h-2.5 w-2.5 rounded-full bg-red-400" />
+                    <div class="h-2.5 w-2.5 rounded-full bg-yellow-400" />
+                    <div class="h-2.5 w-2.5 rounded-full bg-green-400" />
                   </div>
-                  <span class="ml-2 font-mono text-[10px] text-zinc-500">terminal</span>
+                  <span class="ml-2 font-mono text-[10px] text-muted-foreground">terminal</span>
                 </div>
 
                 <div class="space-y-3 p-4 font-mono text-xs">
                   <div class="flex items-center gap-2">
-                    <span class="text-emerald-400">$</span>
-                    <span class="text-zinc-300">git add .</span>
+                    <span class="text-primary">$</span>
+                    <span class="text-foreground">git add .</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="text-emerald-400">$</span>
-                    <span class="text-zinc-300">git commit -m "deploy"</span>
+                    <span class="text-primary">$</span>
+                    <span class="text-foreground">git commit -m "deploy"</span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <span class="text-emerald-400">$</span>
-                    <span class="text-zinc-300">git push</span>
+                    <span class="text-primary">$</span>
+                    <span class="text-foreground">git push</span>
                   </div>
-                  <div class="mt-4 border-t border-zinc-800 pt-3">
-                    <div class="flex items-center gap-2 text-cyan-400">
+                  <div class="mt-4 border-t pt-3">
+                    <div class="flex items-center gap-2 text-primary">
                       <Icon name="lucide:sparkles" class="h-4 w-4" />
                       <span>your site is live</span>
                     </div>
@@ -93,35 +93,35 @@ const databases = [
               </div>
               <div class="lg:w-1/2">
                 <!-- Dashboard Preview -->
-                <div class="h-full rounded-lg border bg-zinc-950 p-4">
+                <div class="h-full rounded-lg border bg-muted/50 p-4">
                   <div class="space-y-3">
                     <!-- Stats Row -->
                     <div class="grid grid-cols-3 gap-2">
-                      <div class="rounded-md bg-zinc-900 p-2">
-                        <div class="font-mono text-[10px] text-zinc-500">Deployments</div>
-                        <div class="text-sm font-semibold text-zinc-100">247</div>
+                      <div class="rounded-md border bg-background p-2">
+                        <div class="font-mono text-[10px] text-muted-foreground">Deployments</div>
+                        <div class="text-sm font-semibold text-foreground">247</div>
                       </div>
-                      <div class="rounded-md bg-zinc-900 p-2">
-                        <div class="font-mono text-[10px] text-zinc-500">Uptime</div>
-                        <div class="text-sm font-semibold text-emerald-400">99.9%</div>
+                      <div class="rounded-md border bg-background p-2">
+                        <div class="font-mono text-[10px] text-muted-foreground">Uptime</div>
+                        <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">99.9%</div>
                       </div>
-                      <div class="rounded-md bg-zinc-900 p-2">
-                        <div class="font-mono text-[10px] text-zinc-500">Servers</div>
-                        <div class="text-sm font-semibold text-zinc-100">12</div>
+                      <div class="rounded-md border bg-background p-2">
+                        <div class="font-mono text-[10px] text-muted-foreground">Servers</div>
+                        <div class="text-sm font-semibold text-foreground">12</div>
                       </div>
                     </div>
 
                     <!-- Mini Chart -->
-                    <div class="rounded-md bg-zinc-900 p-3">
+                    <div class="rounded-md border bg-background p-3">
                       <div class="flex h-12 items-end gap-1">
                         <div
                           v-for="(height, i) in chartHeights"
                           :key="i"
-                          class="flex-1 rounded-t bg-emerald-500/50"
+                          class="flex-1 rounded-t bg-primary/60"
                           :style="{ height: `${height}%` }"
                         />
                       </div>
-                      <div class="mt-2 font-mono text-[10px] text-zinc-500">Deployments this week</div>
+                      <div class="mt-2 font-mono text-[10px] text-muted-foreground">Deployments this week</div>
                     </div>
                   </div>
                 </div>
@@ -135,13 +135,13 @@ const databases = [
           <div class="flex h-full flex-col p-6">
             <!-- SSL Visualization -->
             <div class="flex-1">
-              <div class="h-full rounded-lg border bg-zinc-950 p-4">
+              <div class="h-full rounded-lg border bg-muted/50 p-4">
                 <div class="space-y-4">
                   <!-- Header -->
                   <div class="flex items-center justify-between">
-                    <span class="font-mono text-[10px] text-zinc-500">SSL Certificates</span>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400">
-                      <Icon name="lucide:zap" class="h-3 w-3" />
+                    <span class="font-mono text-[10px] text-muted-foreground">SSL Certificates</span>
+                    <span class="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 font-mono text-[10px] text-foreground">
+                      <Icon name="lucide:zap" class="h-3 w-3 text-primary" />
                       Auto-renew
                     </span>
                   </div>
@@ -149,28 +149,28 @@ const databases = [
                   <!-- Lock Icon -->
                   <div class="flex items-center justify-center py-6">
                     <div class="relative">
-                      <div class="absolute -inset-4 rounded-full bg-emerald-500/20 blur-xl" />
-                      <div class="relative flex h-20 w-20 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10">
-                        <Icon name="lucide:shield-check" class="h-10 w-10 text-emerald-400" />
+                      <div class="absolute -inset-4 rounded-full bg-primary/10 blur-xl" />
+                      <div class="relative flex h-20 w-20 items-center justify-center rounded-full border bg-primary/5">
+                        <Icon name="lucide:shield-check" class="h-10 w-10 text-primary" />
                       </div>
                     </div>
                   </div>
 
                   <!-- Certificate Info -->
                   <div class="space-y-2">
-                    <div class="flex items-center justify-between rounded-md bg-zinc-900 p-2">
+                    <div class="flex items-center justify-between rounded-md border bg-background p-2">
                       <div class="flex items-center gap-2">
-                        <Icon name="lucide:lock" class="h-3.5 w-3.5 text-emerald-400" />
-                        <span class="font-mono text-[10px] text-zinc-300">myapp.com</span>
+                        <Icon name="lucide:lock" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span class="font-mono text-[10px] text-foreground">myapp.com</span>
                       </div>
-                      <span class="font-mono text-[10px] text-emerald-400">Active</span>
+                      <span class="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">Active</span>
                     </div>
-                    <div class="flex items-center justify-between rounded-md bg-zinc-900 p-2">
+                    <div class="flex items-center justify-between rounded-md border bg-background p-2">
                       <div class="flex items-center gap-2">
-                        <Icon name="lucide:lock" class="h-3.5 w-3.5 text-emerald-400" />
-                        <span class="font-mono text-[10px] text-zinc-300">api.myapp.com</span>
+                        <Icon name="lucide:lock" class="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                        <span class="font-mono text-[10px] text-foreground">api.myapp.com</span>
                       </div>
-                      <span class="font-mono text-[10px] text-emerald-400">Active</span>
+                      <span class="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">Active</span>
                     </div>
                   </div>
                 </div>
@@ -194,12 +194,12 @@ const databases = [
           <div class="flex h-full flex-col p-6">
             <!-- Database Visualization -->
             <div class="flex-1">
-              <div class="h-full rounded-lg border bg-zinc-950 p-4">
+              <div class="h-full rounded-lg border bg-muted/50 p-4">
                 <div class="space-y-3">
                   <!-- Database Header -->
                   <div class="flex items-center justify-between">
-                    <span class="font-mono text-[10px] text-zinc-500">Databases</span>
-                    <span class="font-mono text-xs text-emerald-400">Managed</span>
+                    <span class="font-mono text-[10px] text-muted-foreground">Databases</span>
+                    <span class="font-mono text-xs text-primary">Managed</span>
                   </div>
 
                   <!-- Database Types -->
@@ -210,16 +210,16 @@ const databases = [
                       :class="[
                         'flex items-center gap-2 rounded-md border p-2',
                         db.active
-                          ? 'border-emerald-500/20 bg-emerald-500/10'
-                          : 'border-dashed border-zinc-700 bg-zinc-900',
+                          ? 'border-primary/20 bg-primary/5'
+                          : 'border-dashed bg-background',
                       ]"
                     >
                       <Icon
                         name="lucide:database"
-                        :class="['h-3.5 w-3.5', db.active ? 'text-emerald-400' : 'text-zinc-600']"
+                        :class="['h-3.5 w-3.5', db.active ? 'text-primary' : 'text-muted-foreground']"
                       />
                       <span
-                        :class="['font-mono text-[10px]', db.active ? 'text-zinc-300' : 'text-zinc-600']"
+                        :class="['font-mono text-[10px]', db.active ? 'text-foreground' : 'text-muted-foreground']"
                       >
                         {{ db.name }}
                       </span>
@@ -229,12 +229,12 @@ const databases = [
                   <!-- Storage Indicator -->
                   <div class="space-y-1">
                     <div class="flex justify-between font-mono text-[10px]">
-                      <span class="text-zinc-500">Storage</span>
-                      <span class="text-zinc-400">2.4 GB</span>
+                      <span class="text-muted-foreground">Storage</span>
+                      <span class="text-foreground">2.4 GB</span>
                     </div>
-                    <div class="h-1.5 overflow-hidden rounded-full bg-zinc-800">
+                    <div class="h-1.5 overflow-hidden rounded-full bg-muted">
                       <div
-                        class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500"
+                        class="h-full rounded-full bg-primary"
                         style="width: 24%"
                       />
                     </div>
