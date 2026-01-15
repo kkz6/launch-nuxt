@@ -104,6 +104,7 @@ const statusLoading = ref(false)
 const resetLoading = ref(false)
 const submitting = ref(false)
 const hasLoadedStatus = ref(false)
+const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const defaultSettings: OpcacheSettings = {
   enabled: true,
@@ -194,6 +195,17 @@ const fetchStatus = async () => {
 }
 
 const handleReset = async () => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Reset OPcache',
+    description: 'Are you sure you want to reset the OPcache? This will clear all cached scripts and may temporarily impact performance.',
+    confirmText: 'Reset',
+    cancelText: 'Cancel',
+  })
+
+  if (!result.ok) return
+
   resetLoading.value = true
   try {
     await $api(`/servers/${props.serverId}/php/${props.service.details?.id}/opcache/reset`, {
@@ -209,6 +221,27 @@ const handleReset = async () => {
 }
 
 const handleSubmit = async () => {
+  if (!confirmationDialog.value) return
+
+  const isEnabling = form.value.enabled && !props.service?.details?.opcache?.enabled
+  const isDisabling = !form.value.enabled && props.service?.details?.opcache?.enabled
+
+  let description = 'Are you sure you want to apply these OPcache configuration changes? This will restart PHP-FPM.'
+  if (isDisabling) {
+    description = 'Are you sure you want to disable OPcache? This may significantly impact PHP performance. PHP-FPM will be restarted.'
+  } else if (isEnabling) {
+    description = 'Are you sure you want to enable OPcache? PHP-FPM will be restarted to apply the changes.'
+  }
+
+  const result = await confirmationDialog.value.show({
+    title: 'Apply OPcache Configuration',
+    description,
+    confirmText: 'Apply',
+    cancelText: 'Cancel',
+  })
+
+  if (!result.ok) return
+
   submitting.value = true
   try {
     await $api(`/servers/${props.serverId}/php/${props.service.details?.id}/opcache/configure`, {
@@ -227,6 +260,7 @@ const handleSubmit = async () => {
 </script>
 
 <template>
+  <SharedConfirmationDialog ref="confirmationDialog" />
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
