@@ -13,13 +13,6 @@ import {
 } from "~/components/ui/table";
 import { Checkbox } from "~/components/ui/checkbox";
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbSeparator,
-} from "~/components/ui/breadcrumb";
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -184,58 +177,33 @@ onMounted(fetchDomainData);
     </div>
 
     <template v-else-if="domain">
-      <div class="flex flex-col gap-4">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink as-child>
-                <NuxtLink to="/dns">Domains</NuxtLink>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink>{{ domain.address }}</BreadcrumbLink>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
+      <!-- Search and Add Record Bar -->
+      <div class="mb-4 flex items-center gap-3">
+        <div class="relative flex-1">
+          <Icon
+            name="lucide:search"
+            class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            v-model="searchQuery"
+            placeholder="Search records..."
+            class="pl-9"
+          />
+        </div>
+        <DnsRecordModal
+          :domain="domain"
+          :available-record-types="recordTypes.filter((t) => t !== 'NS')"
+          :is-cloudflare="isCloudflare"
+          @created="fetchDomainData"
+        >
+          <Button>
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            Add Record
+          </Button>
+        </DnsRecordModal>
       </div>
 
       <!-- DNS Records Section -->
-      <div class="mt-6">
-        <div class="mb-4 flex items-start justify-between gap-4">
-          <div>
-            <h3 class="text-lg font-semibold">DNS Records</h3>
-            <p class="text-sm text-muted-foreground">
-              Review, add, and edit DNS records for {{ domain.address }}
-            </p>
-          </div>
-          <DnsRecordModal
-            :domain="domain"
-            :available-record-types="recordTypes.filter((t) => t !== 'NS')"
-            :is-cloudflare="isCloudflare"
-            @created="fetchDomainData"
-          >
-            <Button>
-              <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-              Add Record
-            </Button>
-          </DnsRecordModal>
-        </div>
-
-        <!-- Search Bar -->
-        <div class="mb-4 flex flex-wrap items-center gap-3">
-          <div class="relative flex-1">
-            <Icon
-              name="lucide:search"
-              class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              v-model="searchQuery"
-              placeholder="Search records..."
-              class="pl-9"
-            />
-          </div>
-        </div>
 
           <!-- DNS Records Table -->
           <Table>
@@ -420,7 +388,6 @@ onMounted(fetchDomainData);
                 </TableRow>
               </TableBody>
             </Table>
-      </div>
 
       <!-- Nameservers Section -->
       <div v-if="nsRecords.length > 0 || domain.nameservers?.length" class="mt-8">
@@ -466,24 +433,6 @@ onMounted(fetchDomainData);
             </template>
           </TableBody>
         </Table>
-      </div>
-
-      <!-- Domain Settings Section -->
-      <div class="mt-8">
-        <div class="flex items-center justify-between rounded-lg border bg-card p-4">
-          <div>
-            <h3 class="font-semibold">Domain Settings</h3>
-            <p class="text-sm text-muted-foreground">
-              Manage domain configuration and danger zone options
-            </p>
-          </div>
-          <NuxtLink :to="`/dns/${domain.id}/settings`">
-            <Button variant="outline">
-              <Icon name="lucide:settings" class="mr-2 h-4 w-4" />
-              Settings
-            </Button>
-          </NuxtLink>
-        </div>
       </div>
     </template>
   </div>

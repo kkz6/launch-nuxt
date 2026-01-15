@@ -112,11 +112,6 @@ onMounted(fetchDomains);
 
 <template>
   <div class="pb-10">
-    <div class="mb-6">
-      <h1 class="text-2xl font-bold">Domains</h1>
-      <p class="text-sm text-muted-foreground">Manage your DNS domains and records</p>
-    </div>
-
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
         name="lucide:loader-2"
