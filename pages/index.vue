@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'Launch - Deploy at Light Speed' })
+useHead({ title: 'launchctl - Server Management Made Simple' })
 </script>
 
 <template>
@@ -11,8 +11,6 @@ useHead({ title: 'Launch - Deploy at Light Speed' })
     <LandingHeroHome />
     <LandingBentoGrid />
     <LandingFeaturesHome />
-    <LandingBusinessCategories />
-    <LandingLargeTestimonial />
     <LandingCta />
   </div>
 </template>

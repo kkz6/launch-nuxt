@@ -19,46 +19,44 @@ const steps = [
 </script>
 
 <template>
-  <section class="site-section bg-[hsl(var(--site-bg))] py-20">
-    <div class="site-grid-pattern absolute inset-0" />
-    <div
-      class="site-glow bottom-0 right-0 h-[400px] w-[400px] translate-x-1/2 translate-y-1/2 bg-violet-500 opacity-15"
-    />
+  <section class="relative bg-background py-24">
+    <div class="absolute inset-0 bg-gradient-to-t from-muted/30 to-background" />
 
-    <div class="site-container relative">
+    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div class="grid items-center gap-12 lg:grid-cols-2">
-        <div data-aos="fade-right">
+        <div>
           <div
-            class="mb-5 inline-flex items-center gap-2 rounded border border-[hsl(var(--site-border))] bg-[hsl(var(--site-text))]/5 px-3 py-1 font-mono text-xs text-[hsl(var(--site-text-muted))]"
+            class="mb-5 inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-sm"
           >
-            <span class="h-1.5 w-1.5 rounded-full bg-cyan-400" />
-            how it works
+            <span class="relative flex h-2 w-2">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+              <span class="relative inline-flex h-2 w-2 rounded-full bg-cyan-500" />
+            </span>
+            <span class="text-muted-foreground">How it works</span>
           </div>
-          <h2 class="font-site mb-4 text-2xl font-bold text-[hsl(var(--site-text))] md:text-3xl">
-            Deploy in <span class="text-emerald-400">Three Steps</span>
+          <h2 class="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Deploy in <span class="text-emerald-500">three steps</span>
           </h2>
-          <p class="mb-8 text-sm text-[hsl(var(--site-text-muted))]">
+          <p class="mb-8 text-muted-foreground">
             No complex configurations. No DevOps expertise required. Just connect, configure, and deploy.
           </p>
 
           <div class="space-y-6">
             <div
-              v-for="(item, index) in steps"
+              v-for="item in steps"
               :key="item.step"
               class="group flex gap-4"
-              data-aos="fade-up"
-              :data-aos-delay="index * 100"
             >
               <div
-                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-[hsl(var(--site-border))] bg-emerald-500/10 font-mono text-xs font-bold text-emerald-400 transition-colors group-hover:border-emerald-500/30"
+                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border bg-emerald-500/10 font-mono text-sm font-bold text-emerald-500 transition-colors group-hover:border-emerald-500/30"
               >
                 {{ item.step }}
               </div>
               <div>
-                <h3 class="font-site mb-1 text-sm font-semibold text-[hsl(var(--site-text))]">
+                <h3 class="mb-1 font-semibold text-foreground">
                   {{ item.title }}
                 </h3>
-                <p class="text-xs text-[hsl(var(--site-text-muted))]">
+                <p class="text-sm text-muted-foreground">
                   {{ item.description }}
                 </p>
               </div>
@@ -66,87 +64,63 @@ const steps = [
           </div>
         </div>
 
-        <div class="relative" data-aos="fade-left">
-          <div class="absolute inset-0 rounded-lg bg-emerald-500/5 blur-3xl" />
+        <div class="relative">
+          <div class="absolute -inset-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 via-transparent to-cyan-500/10 blur-2xl" />
 
-          <div class="site-card relative overflow-hidden rounded-lg">
+          <div class="relative overflow-hidden rounded-xl border bg-card shadow-xl">
             <div class="space-y-4 p-5">
               <div class="flex items-center gap-3">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20">
-                  <svg
-                    class="h-5 w-5 text-emerald-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      :stroke-width="1.5"
-                      d="M5 12h14M12 5l7 7-7 7"
-                    />
-                  </svg>
+                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <Icon name="lucide:rocket" class="h-5 w-5 text-emerald-500" />
                 </div>
                 <div>
-                  <div class="font-mono text-sm font-medium text-[hsl(var(--site-text))]">my-app</div>
-                  <div class="font-mono text-xs text-[hsl(var(--site-text-muted))]">production</div>
+                  <div class="font-mono text-sm font-medium text-foreground">my-app</div>
+                  <div class="font-mono text-xs text-muted-foreground">production</div>
                 </div>
                 <div class="ml-auto">
                   <span
-                    class="inline-flex items-center gap-1.5 rounded bg-emerald-500/20 px-2 py-0.5 font-mono text-[10px] text-emerald-400"
+                    class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 font-mono text-xs text-emerald-500"
                   >
-                    <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                    <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                     live
                   </span>
                 </div>
               </div>
 
-              <div class="h-px bg-[hsl(var(--site-border))]" />
+              <div class="h-px bg-border" />
 
               <div class="space-y-3">
                 <div class="flex items-center gap-2">
-                  <span class="font-mono text-xs text-emerald-400">$</span>
-                  <span class="font-mono text-xs text-[hsl(var(--site-text-muted))]">
+                  <span class="font-mono text-xs text-emerald-500">$</span>
+                  <span class="font-mono text-xs text-muted-foreground">
                     git push origin main
                   </span>
                 </div>
                 <div class="space-y-1.5 pl-4">
                   <div class="flex items-center gap-2 text-xs">
-                    <span class="text-emerald-400">✓</span>
-                    <span class="font-mono text-[hsl(var(--site-text-muted))]"> Building... </span>
+                    <Icon name="lucide:check" class="h-3.5 w-3.5 text-emerald-500" />
+                    <span class="font-mono text-muted-foreground">Building...</span>
                   </div>
                   <div class="flex items-center gap-2 text-xs">
-                    <span class="text-emerald-400">✓</span>
-                    <span class="font-mono text-[hsl(var(--site-text-muted))]"> Deploying... </span>
+                    <Icon name="lucide:check" class="h-3.5 w-3.5 text-emerald-500" />
+                    <span class="font-mono text-muted-foreground">Deploying...</span>
                   </div>
                   <div class="flex items-center gap-2 text-xs">
-                    <span class="text-cyan-400">✨</span>
-                    <span class="font-mono text-[hsl(var(--site-text))]"> Deployed! </span>
+                    <Icon name="lucide:sparkles" class="h-3.5 w-3.5 text-cyan-500" />
+                    <span class="font-mono text-foreground">Deployed!</span>
                   </div>
                 </div>
               </div>
 
-              <div class="h-px bg-[hsl(var(--site-border))]" />
+              <div class="h-px bg-border" />
 
               <div class="flex items-center gap-3">
-                <div class="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/20">
-                  <svg
-                    class="h-3.5 w-3.5 text-emerald-400"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      :stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+                <div class="flex h-7 w-7 items-center justify-center rounded-md bg-emerald-500/10">
+                  <Icon name="lucide:git-commit-horizontal" class="h-3.5 w-3.5 text-emerald-500" />
                 </div>
                 <div class="flex-1">
-                  <div class="font-mono text-xs text-[hsl(var(--site-text))]">feat: add dashboard</div>
-                  <div class="font-mono text-[10px] text-[hsl(var(--site-text-muted))]">
+                  <div class="font-mono text-xs text-foreground">feat: add dashboard</div>
+                  <div class="font-mono text-[10px] text-muted-foreground">
                     commit a3f2b1c
                   </div>
                 </div>
