@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import {
@@ -169,7 +168,7 @@ onMounted(fetchQueues)
 </script>
 
 <template>
-  <Card class="bg-background">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!-- Log Viewer Dialog -->
@@ -193,117 +192,113 @@ onMounted(fetchQueues)
       @updated="handleQueueUpdated"
     />
 
-    <CardHeader class="flex flex-row items-center justify-between">
+    <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <CardTitle class="text-xl">Queue Workers</CardTitle>
-        <CardDescription>Manage Laravel queue workers for this site</CardDescription>
+        <h3 class="text-lg font-semibold">Queue Workers</h3>
+        <p class="text-sm text-muted-foreground">Manage Laravel queue workers for this site</p>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2">
         <SiteAutoRestartQueue :server-id="serverId" :site-id="siteId" :auto-restart-queue="autoRestartQueue" />
-        <Button v-if="queues.length > 0" variant="outline" @click="syncStatus">
+        <Button v-if="queues.length > 0" variant="outline" size="sm" @click="syncStatus">
           <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-          Sync Status
+          Sync
         </Button>
+        <SiteCreateQueue v-if="queues.length > 0" :server-id="serverId" :site-id="siteId" @created="fetchQueues" />
       </div>
-    </CardHeader>
-    <CardContent>
-      <div v-if="isLoading" class="flex items-center justify-center py-8">
-        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+    </div>
 
-      <template v-else>
-        <SharedDataTable
-          :data="queues"
-          :columns="[
-            { key: 'queue', label: 'Queue', width: '20%' },
-            { key: 'queue_connection', label: 'Connection', width: '15%' },
-            { key: 'numprocs', label: 'Processes', width: '10%' },
-            { key: 'running', label: 'Status', width: '15%' },
-            { key: 'installed_at', label: 'Installed', width: '20%' },
-          ]"
-          empty-title="No queue workers found"
-          empty-icon="lucide:database"
-        >
-          <template #cell-running="{ row }">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Badge :variant="row.running ? 'success' : 'secondary'" class="cursor-help">
-                    {{ row.running ? 'Running' : 'Stopped' }}
-                  </Badge>
-                </TooltipTrigger>
-                <TooltipContent class="max-w-xs">
-                  <div class="space-y-1.5 text-sm">
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                      <span class="text-muted-foreground">Status:</span>
-                      <span :class="row.running ? 'text-green-500' : 'text-red-500'">
-                        {{ row.info?.state || (row.running ? 'Running' : 'Stopped') }}
-                      </span>
-                      <template v-if="row.info?.uptime">
-                        <span class="text-muted-foreground">Uptime:</span>
-                        <span>{{ row.info.uptime }}</span>
-                      </template>
-                      <template v-if="row.info?.pid">
-                        <span class="text-muted-foreground">PID:</span>
-                        <span>{{ row.info.pid }}</span>
-                      </template>
-                      <span class="text-muted-foreground">Processes:</span>
-                      <span>{{ row.numprocs || 1 }}</span>
-                      <span class="text-muted-foreground">Connection:</span>
-                      <span>{{ row.queue_connection }}</span>
-                      <template v-if="row.max_tries">
-                        <span class="text-muted-foreground">Max Tries:</span>
-                        <span>{{ row.max_tries }}</span>
-                      </template>
-                      <template v-if="row.max_memory">
-                        <span class="text-muted-foreground">Max Memory:</span>
-                        <span>{{ row.max_memory }}MB</span>
-                      </template>
-                    </div>
-                    <p v-if="row.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
-                      Last checked: <SharedDateTooltip :date="row.last_status_check" />
-                    </p>
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+
+    <template v-else>
+      <SharedDataTable
+        :data="queues"
+        :columns="[
+          { key: 'queue', label: 'Queue', width: '20%' },
+          { key: 'queue_connection', label: 'Connection', width: '15%' },
+          { key: 'numprocs', label: 'Processes', width: '10%' },
+          { key: 'running', label: 'Status', width: '15%' },
+          { key: 'installed_at', label: 'Installed', width: '20%' },
+        ]"
+        empty-title="No queue workers found"
+        empty-icon="lucide:database"
+      >
+        <template #cell-running="{ row }">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Badge :variant="row.running ? 'success' : 'secondary'" class="cursor-help">
+                  {{ row.running ? 'Running' : 'Stopped' }}
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-xs">
+                <div class="space-y-1.5 text-sm">
+                  <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                    <span class="text-muted-foreground">Status:</span>
+                    <span :class="row.running ? 'text-green-500' : 'text-red-500'">
+                      {{ row.info?.state || (row.running ? 'Running' : 'Stopped') }}
+                    </span>
+                    <template v-if="row.info?.uptime">
+                      <span class="text-muted-foreground">Uptime:</span>
+                      <span>{{ row.info.uptime }}</span>
+                    </template>
+                    <template v-if="row.info?.pid">
+                      <span class="text-muted-foreground">PID:</span>
+                      <span>{{ row.info.pid }}</span>
+                    </template>
+                    <span class="text-muted-foreground">Processes:</span>
+                    <span>{{ row.numprocs || 1 }}</span>
+                    <span class="text-muted-foreground">Connection:</span>
+                    <span>{{ row.queue_connection }}</span>
+                    <template v-if="row.max_tries">
+                      <span class="text-muted-foreground">Max Tries:</span>
+                      <span>{{ row.max_tries }}</span>
+                    </template>
+                    <template v-if="row.max_memory">
+                      <span class="text-muted-foreground">Max Memory:</span>
+                      <span>{{ row.max_memory }}MB</span>
+                    </template>
                   </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </template>
+                  <p v-if="row.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
+                    Last checked: <SharedDateTooltip :date="row.last_status_check" />
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </template>
 
-          <template #cell-installed_at="{ row }">
-            <SharedDateTooltip v-if="row.installed_at" :date="row.installed_at" />
-            <span v-else class="text-muted-foreground">Not installed</span>
-          </template>
+        <template #cell-installed_at="{ row }">
+          <SharedDateTooltip v-if="row.installed_at" :date="row.installed_at" />
+          <span v-else class="text-muted-foreground">Not installed</span>
+        </template>
 
-          <template #actions="{ item }">
-            <Button variant="ghost" size="icon" title="View Logs" @click="viewLogs(item)">
-              <Icon name="lucide:scroll-text" class="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title="Restart" @click="restartQueue(item)">
-              <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title="Edit" @click="editQueue(item)">
-              <Icon name="lucide:pencil" class="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Delete"
-              class="hover:bg-destructive/90 hover:text-white"
-              @click="deleteQueue(item)"
-            >
-              <Icon name="lucide:trash-2" class="h-4 w-4" />
-            </Button>
-          </template>
+        <template #actions="{ item }">
+          <Button variant="ghost" size="icon" title="View Logs" @click="viewLogs(item)">
+            <Icon name="lucide:scroll-text" class="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Restart" @click="restartQueue(item)">
+            <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Edit" @click="editQueue(item)">
+            <Icon name="lucide:pencil" class="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Delete"
+            class="hover:bg-destructive/90 hover:text-white"
+            @click="deleteQueue(item)"
+          >
+            <Icon name="lucide:trash-2" class="h-4 w-4" />
+          </Button>
+        </template>
 
-          <template #empty>
-            <SiteCreateQueue :server-id="serverId" :site-id="siteId" @created="fetchQueues" />
-          </template>
-        </SharedDataTable>
-
-        <div v-if="queues.length > 0" class="mt-6">
+        <template #empty>
           <SiteCreateQueue :server-id="serverId" :site-id="siteId" @created="fetchQueues" />
-        </div>
-      </template>
-    </CardContent>
-  </Card>
+        </template>
+      </SharedDataTable>
+    </template>
+  </div>
 </template>

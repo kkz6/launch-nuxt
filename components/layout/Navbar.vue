@@ -656,15 +656,22 @@ onMounted(fetchTeams);
             </a>
           </div>
         </div>
-        <Button
-          v-if="serverConnected"
-          variant="outline"
-          size="sm"
-          @click="openTerminal"
-        >
-          <Terminal class="mr-2 h-4 w-4" />
-          Terminal
-        </Button>
+        <div class="flex items-center gap-2">
+          <Button
+            v-if="serverConnected"
+            variant="outline"
+            size="sm"
+            @click="openTerminal"
+          >
+            <Terminal class="mr-2 h-4 w-4" />
+            Terminal
+          </Button>
+          <SiteDeployApplication
+            v-if="serverId && siteId && siteType !== 'wordpress'"
+            :server-id="serverId"
+            :site-id="siteId"
+          />
+        </div>
       </div>
       <nav class="-mb-px flex gap-1 overflow-x-auto">
         <NuxtLink

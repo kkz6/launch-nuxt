@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
 import type { Server, Site } from '~/types'
 
 interface Props {
@@ -22,51 +21,99 @@ const phpVersions: Record<string, string> = {
   php82: 'PHP 8.2',
   php83: 'PHP 8.3',
 }
+
+const applicationIcons: Record<string, string> = {
+  laravel: 'logos:laravel',
+  wordpress: 'logos:wordpress-icon',
+  generic: 'logos:php',
+}
 </script>
 
 <template>
-  <div class="space-y-4">
-    <Card class="space-y-2 bg-background">
-      <CardHeader class="pb-0">
-        <CardTitle>Site Overview</CardTitle>
-      </CardHeader>
-      <CardContent class="sm:divide-y sm:divide-border">
-        <SharedDefinitionListItem label="Address">
-          <span class="text-foreground">{{ site.url }}</span>
-          <a :href="site.url" target="_blank" rel="noreferrer" class="ml-1">
-            <Icon name="lucide:arrow-right-circle" class="h-5 w-5 text-muted-foreground" />
+  <div>
+    <h3 class="mb-4 text-lg font-semibold">Site Details</h3>
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <!-- Address -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <Icon name="lucide:globe" class="h-5 w-5 text-primary" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Address</p>
+          <a
+            :href="site.url"
+            target="_blank"
+            rel="noreferrer"
+            class="flex items-center gap-1 text-sm font-medium text-foreground hover:underline"
+          >
+            <span class="truncate">{{ site.address }}</span>
+            <Icon name="lucide:external-link" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           </a>
-        </SharedDefinitionListItem>
+        </div>
+      </div>
 
-        <SharedDefinitionListItem label="Server">
-          <NuxtLink :to="`/servers/${server.id}`" class="text-foreground underline hover:text-foreground/80">
-            {{ server.name }}
-          </NuxtLink>
-        </SharedDefinitionListItem>
+      <!-- Application Type -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-500/10">
+          <Icon :name="applicationIcons[site.type] || 'lucide:code'" class="h-5 w-5" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Application</p>
+          <p class="text-sm font-medium text-foreground">{{ applicationTypes[site.type] }}</p>
+        </div>
+      </div>
 
-        <SharedDefinitionListItem label="Path">
-          <span class="break-all pr-4 text-foreground">{{ site.path }}</span>
-        </SharedDefinitionListItem>
+      <!-- PHP Version -->
+      <div v-if="site.php_version" class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10">
+          <Icon name="logos:php" class="h-5 w-5" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">PHP Version</p>
+          <p class="text-sm font-medium text-foreground">{{ phpVersions[site.php_version] || site.php_version }}</p>
+        </div>
+      </div>
 
-        <SharedDefinitionListItem v-if="site.php_version" label="PHP Version">
-          <span class="text-foreground">{{ phpVersions[site.php_version] || site.php_version }}</span>
-        </SharedDefinitionListItem>
+      <!-- SSL -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500/10">
+          <Icon name="lucide:shield-check" class="h-5 w-5 text-green-500" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">SSL</p>
+          <p class="text-sm font-medium capitalize text-foreground">{{ site.tls_setting || 'None' }}</p>
+        </div>
+      </div>
 
-        <SharedDefinitionListItem label="Type">
-          <span class="text-foreground">{{ applicationTypes[site.type] }}</span>
-        </SharedDefinitionListItem>
+      <!-- Path -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10">
+          <Icon name="lucide:folder" class="h-5 w-5 text-amber-500" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Path</p>
+          <p class="truncate text-sm font-medium text-foreground" :title="site.path">{{ site.path }}</p>
+        </div>
+      </div>
 
-        <SharedDefinitionListItem label="SSL">
-          <span class="text-foreground">{{ site.tls_setting }}</span>
-        </SharedDefinitionListItem>
-
-        <SharedDefinitionListItem v-if="site.source_control_repository?.html_url" label="Repository">
-          <span class="text-foreground">{{ site.source_control_repository.html_url }}</span>
-          <a :href="site.source_control_repository.html_url" target="_blank" rel="noreferrer" class="ml-1">
-            <Icon name="lucide:arrow-right-circle" class="h-5 w-5 text-muted-foreground" />
+      <!-- Repository -->
+      <div v-if="site.source_control_repository?.html_url" class="flex items-start gap-3 rounded-lg border bg-card p-4 sm:col-span-2 lg:col-span-3">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-500/10">
+          <Icon name="lucide:git-branch" class="h-5 w-5 text-gray-500" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Repository</p>
+          <a
+            :href="site.source_control_repository.html_url"
+            target="_blank"
+            rel="noreferrer"
+            class="flex items-center gap-1 text-sm font-medium text-foreground hover:underline"
+          >
+            <span class="truncate">{{ site.source_control_repository.html_url }}</span>
+            <Icon name="lucide:external-link" class="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           </a>
-        </SharedDefinitionListItem>
-      </CardContent>
-    </Card>
+        </div>
+      </div>
+    </div>
   </div>
 </template>

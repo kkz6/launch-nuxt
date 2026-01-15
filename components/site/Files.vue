@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Eye, EyeOff } from 'lucide-vue-next'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Label } from '~/components/ui/label'
 import { Toggle } from '~/components/ui/toggle'
@@ -109,23 +108,26 @@ onMounted(fetchFiles)
 </script>
 
 <template>
-  <Card class="bg-background">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <CardHeader>
-      <CardTitle class="text-xl">Files</CardTitle>
-      <CardDescription>View and edit site configuration files</CardDescription>
-    </CardHeader>
 
-    <CardContent class="flex flex-col gap-4">
-      <div v-if="isLoading" class="flex items-center justify-center py-8">
-        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <h3 class="text-lg font-semibold">Files</h3>
+        <p class="text-sm text-muted-foreground">View and edit site configuration files</p>
       </div>
+    </div>
 
-      <template v-else>
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+
+    <template v-else>
+      <div class="space-y-4">
         <div class="space-y-2">
           <Label>Select File</Label>
           <Select v-model="selectedFileIndex">
-            <SelectTrigger class="w-full">
+            <SelectTrigger class="w-full max-w-sm">
               <SelectValue placeholder="Select a file to edit" />
             </SelectTrigger>
             <SelectContent>
@@ -140,7 +142,7 @@ onMounted(fetchFiles)
           </Select>
         </div>
 
-        <Card v-if="selectedFile" class="bg-background">
+        <div v-if="selectedFile" class="rounded-lg border bg-card">
           <div v-if="isFetching" class="flex items-center justify-center py-8">
             <Icon name="lucide:loader-2" class="mr-2 h-5 w-5 animate-spin" />
             <span>Loading file contents...</span>
@@ -152,12 +154,12 @@ onMounted(fetchFiles)
           </div>
 
           <template v-else>
-            <CardHeader class="flex flex-row items-center justify-between">
+            <div class="flex items-center justify-between border-b px-4 py-3">
               <div>
-                <CardTitle class="text-xl">{{ selectedFile.name }}</CardTitle>
-                <CardDescription v-if="selectedFile.description">
+                <h4 class="font-medium">{{ selectedFile.name }}</h4>
+                <p v-if="selectedFile.description" class="text-sm text-muted-foreground">
                   {{ selectedFile.description }}
-                </CardDescription>
+                </p>
               </div>
 
               <Toggle
@@ -168,9 +170,9 @@ onMounted(fetchFiles)
                 <EyeOff v-if="isVisible" class="h-4 w-4 text-muted-foreground" />
                 <Eye v-else class="h-4 w-4 text-muted-foreground" />
               </Toggle>
-            </CardHeader>
+            </div>
 
-            <CardContent class="w-full space-y-4">
+            <div class="space-y-4 p-4">
               <SharedCodeEditor
                 :model-value="contents ?? ''"
                 :disabled="isVisible"
@@ -185,10 +187,10 @@ onMounted(fetchFiles)
                   Save Changes
                 </Button>
               </div>
-            </CardContent>
+            </div>
           </template>
-        </Card>
-      </template>
-    </CardContent>
-  </Card>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>

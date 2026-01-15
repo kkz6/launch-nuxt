@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 
@@ -102,86 +101,85 @@ onMounted(fetchCommands)
 </script>
 
 <template>
-  <Card class="bg-background">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <CardHeader>
-      <CardTitle class="text-xl">SSH Commands</CardTitle>
-      <CardDescription>Run and manage SSH commands on your site</CardDescription>
-    </CardHeader>
-    <CardContent>
-      <div v-if="isLoading" class="flex items-center justify-center py-8">
-        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+
+    <div class="mb-4 flex items-start justify-between gap-4">
+      <div>
+        <h3 class="text-lg font-semibold">SSH Commands</h3>
+        <p class="text-sm text-muted-foreground">Run and manage SSH commands on your site</p>
       </div>
+      <SiteRunCommand v-if="commands.length > 0" :server-id="serverId" :site-id="siteId" @executed="fetchCommands" />
+    </div>
 
-      <template v-else>
-        <SharedDataTable
-          :data="commands"
-          :columns="[
-            { key: 'user', label: 'User', width: '15%' },
-            { key: 'command', label: 'Command', width: '35%' },
-            { key: 'created_at', label: 'Created', width: '20%' },
-            { key: 'status', label: 'Status', width: '15%' },
-          ]"
-          empty-title="No commands found"
-          empty-icon="lucide:terminal"
-        >
-          <template #cell-user="{ row }">
-            {{ row.user?.name || 'Unknown' }}
-          </template>
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
 
-          <template #cell-command="{ row }">
-            <code class="rounded bg-muted px-2 py-1 text-sm">{{ row.command }}</code>
-          </template>
+    <template v-else>
+      <SharedDataTable
+        :data="commands"
+        :columns="[
+          { key: 'user', label: 'User', width: '15%' },
+          { key: 'command', label: 'Command', width: '35%' },
+          { key: 'created_at', label: 'Created', width: '20%' },
+          { key: 'status', label: 'Status', width: '15%' },
+        ]"
+        empty-title="No commands found"
+        empty-icon="lucide:terminal"
+      >
+        <template #cell-user="{ row }">
+          {{ row.user?.name || 'Unknown' }}
+        </template>
 
-          <template #cell-created_at="{ row }">
-            <SharedDateTooltip :date="row.created_at" />
-          </template>
+        <template #cell-command="{ row }">
+          <code class="rounded bg-muted px-2 py-1 text-sm">{{ row.command }}</code>
+        </template>
 
-          <template #cell-status="{ row }">
-            <Badge :variant="statusVariants[row.status] || 'secondary'" class="gap-1.5">
-              <Icon
-                v-if="row.status === 'running'"
-                name="lucide:loader-2"
-                class="h-3 w-3 animate-spin"
-              />
-              <span class="capitalize">{{ row.status }}</span>
-            </Badge>
-          </template>
+        <template #cell-created_at="{ row }">
+          <SharedDateTooltip :date="row.created_at" />
+        </template>
 
-          <template #actions="{ item }">
-            <SharedOutputViewer
-              v-if="item.output"
-              title="Command Output"
-              :description="item.command"
-              :output="item.output"
-            >
-              <Button variant="ghost" size="icon" title="View Output">
-                <Icon name="lucide:terminal-square" class="h-4 w-4" />
-              </Button>
-            </SharedOutputViewer>
-            <Button variant="ghost" size="icon" title="Run Again" @click="runCommandAgain(item)">
-              <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
+        <template #cell-status="{ row }">
+          <Badge :variant="statusVariants[row.status] || 'secondary'" class="gap-1.5">
+            <Icon
+              v-if="row.status === 'running'"
+              name="lucide:loader-2"
+              class="h-3 w-3 animate-spin"
+            />
+            <span class="capitalize">{{ row.status }}</span>
+          </Badge>
+        </template>
+
+        <template #actions="{ item }">
+          <SharedOutputViewer
+            v-if="item.output"
+            title="Command Output"
+            :description="item.command"
+            :output="item.output"
+          >
+            <Button variant="ghost" size="icon" title="View Output">
+              <Icon name="lucide:terminal-square" class="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              title="Delete"
-              class="hover:bg-destructive/90 hover:text-white"
-              @click="deleteCommand(item)"
-            >
-              <Icon name="lucide:trash-2" class="h-4 w-4" />
-            </Button>
-          </template>
+          </SharedOutputViewer>
+          <Button variant="ghost" size="icon" title="Run Again" @click="runCommandAgain(item)">
+            <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Delete"
+            class="hover:bg-destructive/90 hover:text-white"
+            @click="deleteCommand(item)"
+          >
+            <Icon name="lucide:trash-2" class="h-4 w-4" />
+          </Button>
+        </template>
 
-          <template #empty>
-            <SiteRunCommand :server-id="serverId" :site-id="siteId" @executed="fetchCommands" />
-          </template>
-        </SharedDataTable>
-
-        <div v-if="commands.length > 0" class="mt-6">
+        <template #empty>
           <SiteRunCommand :server-id="serverId" :site-id="siteId" @executed="fetchCommands" />
-        </div>
-      </template>
-    </CardContent>
-  </Card>
+        </template>
+      </SharedDataTable>
+    </template>
+  </div>
 </template>
