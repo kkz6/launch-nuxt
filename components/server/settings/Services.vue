@@ -174,7 +174,8 @@ const openStatusDialog = (service: Service) => {
   isStatusDialogOpen.value = true
 }
 
-const getStatusVariant = (status: string): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
+const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
+  if (!status) return 'secondary'
   switch (status.toLowerCase()) {
     case 'running':
       return 'success'
