@@ -91,9 +91,9 @@ const getCommitUrl = (sha: string): string | null => {
             </div>
 
             <!-- Branch -->
-            <div v-if="site.branch" class="flex items-center gap-1.5">
+            <div v-if="site.repository_branch" class="flex items-center gap-1.5">
               <Icon name="lucide:git-branch" class="size-3.5" />
-              <span>{{ site.branch }}</span>
+              <span>{{ site.repository_branch }}</span>
             </div>
 
             <!-- Commit SHA -->
