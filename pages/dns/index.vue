@@ -4,7 +4,6 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 
 definePageMeta({
   layout: "default",
@@ -55,16 +54,9 @@ const isLoading = ref(true);
 const activeTab = ref("domains");
 
 const tabs = [
-  { value: "servers", label: "Servers", route: "/servers" },
-  { value: "domains", label: "Domains", route: "/dns" },
+  { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
+  { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
 ];
-
-const handleTabChange = (value: string | number) => {
-  const tab = tabs.find((t) => t.value === String(value));
-  if (tab && tab.route !== "/dns") {
-    router.push(tab.route);
-  }
-};
 
 const fetchDomains = async () => {
   try {
@@ -133,45 +125,27 @@ onMounted(fetchDomains);
       </DnsAddDomain>
     </header>
 
-    <div class="flex w-full justify-between gap-8">
-      <Tabs
-        v-model="activeTab"
-        class="w-full"
-        @update:model-value="handleTabChange"
-      >
-        <div class="border-b border-border">
-          <TabsList class="h-auto gap-0 bg-transparent p-0">
-            <TabsTrigger
-              v-for="tab in tabs"
-              :key="tab.value"
-              :value="tab.value"
-              class="relative -mb-px rounded-none border-b border-transparent px-4 pb-3 pt-2 text-muted-foreground hover:text-foreground data-[state=active]:border-foreground data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-            >
-              {{ tab.label }}
-            </TabsTrigger>
-          </TabsList>
-        </div>
+    <SharedPageTabs v-model:active-tab="activeTab" :tabs="tabs" />
 
-        <TabsContent value="domains" class="w-full">
-          <div v-if="isLoading" class="flex items-center justify-center py-12">
-            <Icon
-              name="lucide:loader-2"
-              class="h-8 w-8 animate-spin text-muted-foreground"
-            />
-          </div>
+    <div v-if="isLoading" class="flex items-center justify-center py-12">
+      <Icon
+        name="lucide:loader-2"
+        class="h-8 w-8 animate-spin text-muted-foreground"
+      />
+    </div>
 
-          <div
-            v-else-if="domains.length === 0"
-            class="mt-6 flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
-          >
-            <Globe class="size-10 text-muted-foreground md:size-28" />
-            <span>No domains configured yet. Click on Add Domain.</span>
-          </div>
+    <div
+      v-else-if="domains.length === 0"
+      class="mt-6 flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
+    >
+      <Globe class="size-10 text-muted-foreground md:size-28" />
+      <span>No domains configured yet. Click on Add Domain.</span>
+    </div>
 
-          <div
-            v-else
-            class="mt-6 grid w-full gap-5 pb-10 sm:grid-cols-2 lg:grid-cols-3"
-          >
+    <div
+      v-else
+      class="mt-6 grid w-full gap-5 pb-10 sm:grid-cols-2 lg:grid-cols-3"
+    >
             <NuxtLink
               v-for="domain in domains"
               :key="domain.id"
@@ -217,9 +191,6 @@ onMounted(fetchDomains);
                 </CardContent>
               </Card>
             </NuxtLink>
-          </div>
-        </TabsContent>
-      </Tabs>
     </div>
   </div>
 </template>
