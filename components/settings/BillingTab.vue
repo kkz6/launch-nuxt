@@ -183,7 +183,7 @@ declare global {
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -191,151 +191,161 @@ declare global {
     </div>
 
     <template v-else>
-      <!-- Subscription Section -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-semibold">Subscription</h3>
-
-        <!-- Active Subscription Card -->
-        <div v-if="hasSubscription" class="rounded-xl border bg-card p-5">
-          <div class="flex items-start justify-between">
-            <div class="space-y-1">
-              <div class="flex items-center gap-2">
-                <h4 class="text-lg font-semibold">{{ currentSubscription?.plan?.name }}</h4>
-                <Badge v-if="isEnding" variant="destructive" class="text-xs">
-                  Ending
-                </Badge>
-                <Badge v-else variant="secondary" class="text-xs">
-                  {{ currentSubscription?.yearly ? 'Annual' : 'Monthly' }}
-                </Badge>
-              </div>
-              <p class="text-sm text-muted-foreground">
-                ${{ formatPrice(currentSubscription?.yearly ? currentSubscription?.plan?.yearly_pricing || 0 : currentSubscription?.plan?.monthly_pricing || 0) }}/{{ currentSubscription?.yearly ? 'year' : 'mo' }}
+      <!-- Subscription Card -->
+      <div class="overflow-hidden rounded-xl border bg-card">
+        <!-- Active Subscription -->
+        <template v-if="hasSubscription">
+          <!-- Top Section -->
+          <div class="flex items-start justify-between border-b p-5">
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your Plan</p>
+              <h4 class="mt-1 text-lg font-semibold">{{ currentSubscription?.plan?.name }}</h4>
+              <p class="mt-0.5 text-sm text-muted-foreground">
                 <span v-if="currentSubscription?.plan?.options?.max_servers">
-                  - includes {{ currentSubscription.plan.options.max_servers === 999999 ? 'unlimited' : currentSubscription.plan.options.max_servers }} servers
+                  {{ currentSubscription.plan.options.max_servers === 999999 ? 'Unlimited' : currentSubscription.plan.options.max_servers }} servers
                 </span>
-              </p>
-              <p v-if="isEnding" class="text-sm text-destructive">
-                Your subscription will end on {{ currentSubscription?.ends_at }}
+                <span v-if="currentSubscription?.plan?.options?.max_servers"> · </span>
+                {{ currentSubscription?.yearly ? 'Annual' : 'Monthly' }} billing
               </p>
             </div>
-            <div class="flex items-center gap-2">
-              <Button v-if="isEnding" size="sm" @click="resumeSubscription">
-                Resume
-              </Button>
-              <button
-                class="text-sm font-medium text-primary hover:underline"
-                @click="isModalOpen = true"
-              >
-                Change plan
-              </button>
+            <div class="text-right">
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Price</p>
+              <p class="mt-1 text-lg font-semibold">
+                ${{ formatPrice(currentSubscription?.yearly ? currentSubscription?.plan?.yearly_pricing || 0 : currentSubscription?.plan?.monthly_pricing || 0) }}
+                <span class="text-sm font-normal text-muted-foreground">USD</span>
+              </p>
+              <p class="text-xs text-muted-foreground">
+                per {{ currentSubscription?.yearly ? 'year' : 'month' }}
+              </p>
             </div>
           </div>
-        </div>
 
-        <!-- No Subscription Card -->
-        <div v-else class="rounded-xl border bg-card p-5">
-          <div class="flex items-center justify-between">
-            <div class="space-y-1">
-              <h4 class="font-medium text-muted-foreground">No active subscription</h4>
-              <p class="text-sm text-muted-foreground">
+          <!-- Bottom Section -->
+          <div class="flex items-center justify-between p-5">
+            <div class="flex items-center gap-3">
+              <Badge
+                v-if="isEnding"
+                variant="outline"
+                class="border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+              >
+                Ending
+              </Badge>
+              <Badge
+                v-else
+                variant="outline"
+                class="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+              >
+                Active
+              </Badge>
+              <span v-if="isEnding" class="text-sm text-muted-foreground">
+                Ends on {{ currentSubscription?.ends_at }}
+              </span>
+              <span v-else class="text-sm text-muted-foreground">
+                Renews {{ currentSubscription?.yearly ? 'annually' : 'monthly' }}
+              </span>
+            </div>
+            <div class="flex items-center gap-2">
+              <Button v-if="isEnding" variant="outline" size="sm" @click="resumeSubscription">
+                <Icon name="lucide:rotate-ccw" class="mr-1.5 h-3.5 w-3.5" />
+                Resume
+              </Button>
+              <Button variant="outline" size="sm" @click="isModalOpen = true">
+                <Icon name="lucide:arrow-right-left" class="mr-1.5 h-3.5 w-3.5" />
+                Change Plan
+              </Button>
+              <Button
+                v-if="currentSubscription?.payment_method_url"
+                variant="outline"
+                size="sm"
+                @click="updatePaymentMethod"
+              >
+                <Icon name="lucide:credit-card" class="mr-1.5 h-3.5 w-3.5" />
+                Payment Method
+              </Button>
+              <Button
+                v-if="!isEnding"
+                variant="ghost"
+                size="sm"
+                class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                @click="cancelSubscription"
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </template>
+
+        <!-- No Subscription -->
+        <template v-else>
+          <div class="flex items-center justify-between p-5">
+            <div>
+              <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your Plan</p>
+              <h4 class="mt-1 text-lg font-semibold text-muted-foreground">No active subscription</h4>
+              <p class="mt-0.5 text-sm text-muted-foreground">
                 Subscribe to unlock all features
               </p>
             </div>
             <Button @click="isModalOpen = true">
+              <Icon name="lucide:sparkles" class="mr-1.5 h-4 w-4" />
               Subscribe Now
             </Button>
           </div>
-        </div>
+        </template>
       </div>
 
-      <!-- Payment Method Section -->
-      <div v-if="hasSubscription" class="space-y-4">
-        <h3 class="text-lg font-semibold">Payment Method</h3>
+      <!-- Invoices Section -->
+      <div v-if="receipts.length > 0" class="overflow-hidden rounded-xl border bg-card">
+        <div class="border-b px-5 py-4">
+          <h3 class="font-semibold">Invoices</h3>
+        </div>
 
-        <div class="rounded-xl border bg-card p-5">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                <Icon name="lucide:credit-card" class="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="font-medium">
-                    {{ currentSubscription?.card_brand || 'Card' }}
-                  </span>
-                  <Badge v-if="currentSubscription?.card_last_four" variant="outline" class="text-xs">
-                    Default
-                  </Badge>
-                </div>
-                <p v-if="currentSubscription?.card_last_four" class="text-sm text-muted-foreground">
-                  **** **** **** {{ currentSubscription.card_last_four }}
-                </p>
-              </div>
+        <!-- Table Header -->
+        <div class="grid grid-cols-12 gap-4 border-b bg-muted/30 px-5 py-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div class="col-span-4">Invoice</div>
+          <div class="col-span-2 text-center">Status</div>
+          <div class="col-span-3">Date</div>
+          <div class="col-span-2 text-right">Amount</div>
+          <div class="col-span-1" />
+        </div>
+
+        <!-- Table Rows -->
+        <div class="divide-y">
+          <div
+            v-for="receipt in receipts"
+            :key="receipt.order_number"
+            class="grid grid-cols-12 items-center gap-4 px-5 py-4 transition-colors hover:bg-muted/30"
+          >
+            <div class="col-span-4">
+              <p class="font-medium">#{{ receipt.order_number }}</p>
             </div>
-            <Button
-              v-if="currentSubscription?.payment_method_url"
-              variant="default"
-              @click="updatePaymentMethod"
-            >
-              Update payment method
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Billing History Section -->
-      <div v-if="receipts.length > 0" class="space-y-4">
-        <h3 class="text-lg font-semibold">Billing History</h3>
-
-        <div class="rounded-xl border bg-card">
-          <div class="divide-y">
-            <div
-              v-for="receipt in receipts"
-              :key="receipt.order_number"
-              class="flex items-center justify-between p-4"
-            >
-              <div class="flex items-center gap-4">
-                <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                  <Icon name="lucide:receipt" class="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <p class="font-medium">Invoice #{{ receipt.order_number }}</p>
-                  <p class="text-sm text-muted-foreground">{{ receipt.ordered_at }}</p>
-                </div>
-              </div>
-              <div class="flex items-center gap-4">
-                <div class="text-right">
-                  <p class="font-medium">${{ receipt.total }}</p>
-                  <p v-if="receipt.discount > 0" class="text-xs text-emerald-600">
-                    Saved ${{ receipt.discount }}
-                  </p>
-                </div>
-                <a :href="receipt.receipt_url" target="_blank" rel="noreferrer">
-                  <Button variant="ghost" size="icon">
-                    <Icon name="lucide:external-link" class="h-4 w-4" />
-                  </Button>
-                </a>
-              </div>
+            <div class="col-span-2 flex justify-center">
+              <Badge
+                variant="outline"
+                class="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400"
+              >
+                <Icon name="lucide:check" class="mr-1 h-3 w-3" />
+                Paid
+              </Badge>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Danger Zone -->
-      <div v-if="hasSubscription && !isEnding" class="space-y-4">
-        <h3 class="text-lg font-semibold text-destructive">Danger Zone</h3>
-
-        <div class="rounded-xl border border-destructive/20 bg-destructive/5 p-5">
-          <div class="flex items-center justify-between">
-            <div class="space-y-1">
-              <h4 class="font-medium">Cancel Subscription</h4>
-              <p class="text-sm text-muted-foreground">
-                Cancel your subscription. You'll retain access until the end of your billing period.
+            <div class="col-span-3">
+              <p class="text-sm text-muted-foreground">{{ receipt.ordered_at }}</p>
+            </div>
+            <div class="col-span-2 text-right">
+              <p class="font-medium">
+                <span v-if="receipt.discount > 0" class="mr-1.5 text-sm text-muted-foreground line-through">
+                  ${{ (receipt.total + receipt.discount).toFixed(2) }}
+                </span>
+                ${{ receipt.total }}
+                <span class="text-sm font-normal text-muted-foreground">USD</span>
               </p>
             </div>
-            <Button variant="destructive" @click="cancelSubscription">
-              Cancel Subscription
-            </Button>
+            <div class="col-span-1 flex justify-end">
+              <a :href="receipt.receipt_url" target="_blank" rel="noreferrer">
+                <Button variant="ghost" size="icon" class="h-8 w-8 text-muted-foreground hover:text-foreground">
+                  <Icon name="lucide:download" class="h-4 w-4" />
+                </Button>
+              </a>
+            </div>
           </div>
         </div>
       </div>
