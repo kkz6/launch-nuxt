@@ -318,7 +318,7 @@ onBeforeUnmount(() => {
       </TabsContent>
 
       <TabsContent value="queues" class="pt-2.5">
-        <SiteQueues :server-id="server.id" :site-id="site.id" />
+        <SiteQueues :server-id="server.id" :site-id="site.id" :auto-restart-queue="site.auto_restart_queue" />
       </TabsContent>
 
       <TabsContent value="commands" class="pt-2.5">
