@@ -13,7 +13,9 @@ import {
   Monitor,
   Server,
   Globe,
+  Terminal,
 } from "lucide-vue-next";
+import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -69,20 +71,32 @@ const serverId = computed(() => {
 const serverName = ref<string | null>(null);
 const serverIp = ref<string | null>(null);
 const serverConnected = ref(false);
+const serverProvider = ref<string | null>(null);
+
+const providerLabels: Record<string, string> = {
+  digitalocean: "DigitalOcean",
+  hetzner: "Hetzner",
+  linode: "Linode",
+  vultr: "Vultr",
+  aws: "AWS",
+  custom_server: "Custom Server",
+};
 
 // Fetch server info when on detail page
 watch(serverId, async (id) => {
   if (id) {
     try {
-      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean } }>(`/servers/${id}`);
+      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string } }>(`/servers/${id}`);
       serverName.value = response.data.name;
       serverIp.value = response.data.public_ipv4;
       serverConnected.value = response.data.connected;
+      serverProvider.value = response.data.provider;
     } catch {
       serverName.value = null;
     }
   } else {
     serverName.value = null;
+    serverProvider.value = null;
   }
 }, { immediate: true });
 
@@ -109,6 +123,12 @@ const showServerTabs = computed(() => {
 const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
 const onDnsCreated = () => {
   dnsRefreshKey.value++;
+};
+
+// Terminal state (shared with server detail page)
+const isTerminalOpen = useState('serverTerminalOpen', () => false);
+const openTerminal = () => {
+  isTerminalOpen.value = true;
 };
 
 const setColorMode = (mode: "light" | "dark" | "system") => {
@@ -239,7 +259,7 @@ onMounted(fetchTeams);
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <div
-      class="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 sm:px-6"
+      class="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 lg:px-8"
     >
       <NuxtLink to="/servers" class="flex items-center gap-2">
         <span class="text-xl font-bold">Launch</span>
@@ -470,42 +490,57 @@ onMounted(fetchTeams);
 
     <!-- Server Detail Navigation -->
     <div v-if="showServerTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
-      <div class="-mb-px flex items-center gap-6">
-        <!-- Back to servers + Server name -->
-        <NuxtLink
-          to="/servers"
-          class="flex items-center gap-2 border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <Server class="h-4 w-4" />
-          Servers
-        </NuxtLink>
-        <span class="text-muted-foreground">/</span>
-        <div class="flex items-center gap-2 py-3">
-          <span class="relative flex items-center gap-1.5 text-sm font-medium">
-            <span
-              class="h-2 w-2 rounded-full"
-              :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
-            />
-            {{ serverName || 'Loading...' }}
-          </span>
-          <span v-if="serverIp" class="text-xs text-muted-foreground">({{ serverIp }})</span>
+      <div class="flex items-center justify-between py-2">
+        <!-- Breadcrumb + Server info -->
+        <div class="flex items-center gap-3">
+          <NuxtLink
+            to="/servers"
+            class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Server class="h-4 w-4" />
+            Servers
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <div class="flex items-center gap-2">
+            <span class="relative flex items-center gap-1.5 text-sm font-medium">
+              <span
+                class="h-2 w-2 rounded-full"
+                :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
+              />
+              {{ serverName || 'Loading...' }}
+            </span>
+            <span v-if="serverProvider" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+              {{ providerLabels[serverProvider] || serverProvider }}
+            </span>
+          </div>
         </div>
       </div>
-      <nav class="-mb-px flex gap-1 overflow-x-auto">
-        <NuxtLink
-          v-for="tab in serverDetailTabs"
-          :key="tab.value"
-          :to="{ path: `/servers/${serverId}`, query: { tab: tab.query } }"
-          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
-          :class="[
-            isServerTabActive(tab.query)
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
-          ]"
+      <div class="-mb-px flex items-center justify-between">
+        <nav class="flex gap-1 overflow-x-auto">
+          <NuxtLink
+            v-for="tab in serverDetailTabs"
+            :key="tab.value"
+            :to="{ path: `/servers/${serverId}`, query: { tab: tab.query } }"
+            class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+            :class="[
+              isServerTabActive(tab.query)
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+            ]"
+          >
+            {{ tab.label }}
+          </NuxtLink>
+        </nav>
+        <Button
+          v-if="serverConnected"
+          variant="outline"
+          size="sm"
+          @click="openTerminal"
         >
-          {{ tab.label }}
-        </NuxtLink>
-      </nav>
+          <Terminal class="mr-2 h-4 w-4" />
+          Terminal
+        </Button>
+      </div>
     </div>
 
     <!-- Create Team Dialog -->
