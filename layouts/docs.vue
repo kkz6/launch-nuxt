@@ -84,13 +84,6 @@ const isActive = (path: string) => route.path === path
         <main class="min-w-0 flex-1">
           <slot />
         </main>
-
-        <!-- Table of contents -->
-        <aside class="hidden w-56 shrink-0 xl:block">
-          <div class="sticky top-24">
-            <slot name="toc" />
-          </div>
-        </aside>
       </div>
     </div>
   </div>
