@@ -86,17 +86,17 @@ onMounted(fetchSettings)
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div>
-      <h3 class="font-medium">Notification Settings</h3>
-      <p class="text-sm text-muted-foreground">Configure how you want to be notified about events</p>
+  <div class="px-6">
+    <h3 class="mb-1 text-base font-semibold">Email Notifications</h3>
+    <p class="mb-4 text-sm text-muted-foreground">
+      Configure how you want to be notified about events.
+    </p>
+
+    <div v-if="isLoading" class="flex items-center justify-center py-4">
+      <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
     </div>
 
-    <div v-if="isLoading" class="flex items-center justify-center py-8">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
-    </div>
-
-    <div v-else class="space-y-4">
+    <div v-else class="space-y-3">
       <div
         v-for="option in notificationOptions"
         :key="option.key"
