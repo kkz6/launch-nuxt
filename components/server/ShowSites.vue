@@ -33,10 +33,6 @@ const getStatusDate = (site: Site) => {
 
 <template>
   <div>
-    <div class="mb-4 flex items-center justify-between">
-      <ServerAddSite :server-id="server.id" />
-    </div>
-
     <div
       v-if="sites?.length === 0"
       class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
