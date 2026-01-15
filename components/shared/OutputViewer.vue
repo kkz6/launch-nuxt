@@ -112,17 +112,17 @@ const handleDownload = () => {
       <slot />
     </SheetTrigger>
     <SheetContent
-      class="!inset-x-2 !inset-y-2 !h-auto w-auto rounded-lg border sm:!inset-y-auto sm:!left-auto sm:!top-16 sm:!right-3 sm:!bottom-4 sm:w-full sm:max-w-3xl"
+      class="!inset-x-2 !inset-y-2 flex !h-auto w-auto flex-col overflow-hidden rounded-lg border sm:!inset-y-auto sm:!left-auto sm:!top-16 sm:!right-3 sm:!bottom-4 sm:w-full sm:max-w-3xl"
       :show-close="true"
     >
-      <SheetHeader class="pb-2">
+      <SheetHeader class="flex-shrink-0 pb-2">
         <SheetTitle>{{ title }}</SheetTitle>
         <SheetDescription v-if="description">
           <code class="rounded bg-muted px-2 py-1 text-xs">{{ description }}</code>
         </SheetDescription>
       </SheetHeader>
 
-      <div class="flex items-center justify-end gap-2 py-2">
+      <div class="flex flex-shrink-0 items-center justify-end gap-2 py-2">
         <Button variant="outline" size="sm" @click="handleCopy">
           <Icon name="lucide:copy" class="mr-2 h-4 w-4" />
           Copy
@@ -133,14 +133,14 @@ const handleDownload = () => {
         </Button>
       </div>
 
-      <ScrollArea class="h-[calc(100vh-10rem)] sm:h-[calc(100vh-16rem)]">
-        <div class="rounded-lg bg-zinc-950 p-4">
+      <div class="min-h-0 flex-1 overflow-hidden rounded-lg bg-zinc-950">
+        <ScrollArea class="h-full p-4">
           <pre class="whitespace-pre-wrap break-words font-mono text-sm text-zinc-100"><template
             v-for="(part, index) in parsedOutput"
             :key="index"
           ><span :style="part.style">{{ part.text }}</span></template></pre>
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </SheetContent>
   </Sheet>
 </template>
