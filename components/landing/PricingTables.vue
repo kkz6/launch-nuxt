@@ -57,47 +57,44 @@ const annual = ref(true)
 </script>
 
 <template>
-  <section class="site-section min-h-screen bg-[hsl(var(--site-bg))] py-32">
-    <div class="site-grid-pattern absolute inset-0" />
-    <div
-      class="site-glow left-1/2 top-0 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 bg-emerald-500"
-    />
-    <div class="site-glow bottom-0 right-0 h-[400px] w-[400px] translate-x-1/2 bg-cyan-500" />
+  <section class="relative min-h-screen bg-background py-32">
+    <div class="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
 
-    <div class="site-container relative pt-16">
-      <div class="mx-auto mb-12 max-w-3xl text-center" data-aos="fade-up">
+    <div class="relative mx-auto max-w-7xl px-4 pt-16 sm:px-6 lg:px-8">
+      <div class="mx-auto mb-12 max-w-3xl text-center">
         <div
-          class="mb-5 inline-flex items-center gap-2 rounded border border-[hsl(var(--site-border))] bg-[hsl(var(--site-text))]/5 px-3 py-1 font-mono text-xs text-[hsl(var(--site-text-muted))]"
+          class="mb-5 inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1 text-sm"
         >
-          <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          pricing
+          <span class="relative flex h-2 w-2">
+            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+            <span class="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+          </span>
+          <span class="text-muted-foreground">Pricing</span>
         </div>
-        <h1 class="font-site mb-4 text-3xl font-bold text-[hsl(var(--site-text))] md:text-4xl">
-          Plans That <span class="text-emerald-400">Scale With You</span>
+        <h1 class="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          Plans that <span class="text-primary">scale with you</span>
         </h1>
-        <p class="text-base text-[hsl(var(--site-text-muted))]">
+        <p class="text-lg text-muted-foreground">
           Start free, upgrade when you're ready. No hidden fees.
         </p>
       </div>
 
-      <div class="mb-12 flex justify-center" data-aos="fade-up" data-aos-delay="100">
-        <div
-          class="inline-flex rounded border border-[hsl(var(--site-border))] bg-[hsl(var(--site-text))]/5 p-0.5"
-        >
+      <div class="mb-12 flex justify-center">
+        <div class="inline-flex rounded-lg border bg-muted/50 p-1">
           <button
             :class="[
-              'rounded px-5 py-2 font-mono text-xs transition-all duration-300',
+              'rounded-md px-5 py-2 text-sm font-medium transition-all duration-300',
               annual
-                ? 'bg-emerald-500 text-gray-900'
-                : 'text-[hsl(var(--site-text-muted))] hover:text-[hsl(var(--site-text))]',
+                ? 'bg-foreground text-background shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
             ]"
             @click="annual = true"
           >
             Yearly
             <span
               :class="[
-                'ml-2 rounded px-1.5 py-0.5 text-[10px]',
-                annual ? 'bg-gray-900/20 text-gray-900' : 'bg-emerald-500/20 text-emerald-400',
+                'ml-2 rounded px-1.5 py-0.5 text-xs',
+                annual ? 'bg-background/20 text-background' : 'bg-primary/10 text-primary',
               ]"
             >
               -20%
@@ -105,10 +102,10 @@ const annual = ref(true)
           </button>
           <button
             :class="[
-              'rounded px-5 py-2 font-mono text-xs transition-all duration-300',
+              'rounded-md px-5 py-2 text-sm font-medium transition-all duration-300',
               !annual
-                ? 'bg-emerald-500 text-gray-900'
-                : 'text-[hsl(var(--site-text-muted))] hover:text-[hsl(var(--site-text))]',
+                ? 'bg-foreground text-background shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
             ]"
             @click="annual = false"
           >
@@ -117,66 +114,55 @@ const annual = ref(true)
         </div>
       </div>
 
-      <div class="mx-auto grid max-w-5xl gap-5 lg:grid-cols-3">
+      <div class="mx-auto grid max-w-5xl gap-6 lg:grid-cols-3">
         <div
-          v-for="(plan, index) in plans"
+          v-for="plan in plans"
           :key="plan.name"
           :class="[
-            'site-card relative rounded-lg p-6',
-            plan.popular ? 'border-emerald-500/50 bg-emerald-500/5' : '',
+            'relative rounded-xl border bg-card p-6',
+            plan.popular ? 'border-primary shadow-lg' : '',
           ]"
-          data-aos="fade-up"
-          :data-aos-delay="index * 100"
         >
           <div v-if="plan.popular" class="absolute -top-3 left-1/2 -translate-x-1/2">
-            <span class="rounded bg-emerald-500 px-3 py-1 font-mono text-[10px] font-medium text-gray-900">
+            <span class="rounded-full bg-foreground px-3 py-1 text-xs font-medium text-background">
               Popular
             </span>
           </div>
 
           <div class="mb-6">
-            <h3 class="font-site mb-1 text-base font-semibold text-[hsl(var(--site-text))]">
+            <h3 class="mb-1 text-lg font-semibold text-foreground">
               {{ plan.name }}
             </h3>
-            <p class="text-xs text-[hsl(var(--site-text-muted))]">
+            <p class="text-sm text-muted-foreground">
               {{ plan.description }}
             </p>
           </div>
 
           <div class="mb-6">
             <div class="flex items-baseline gap-0.5">
-              <span class="font-mono text-xl text-[hsl(var(--site-text))]">$</span>
-              <span class="font-mono text-4xl font-bold tabular-nums text-[hsl(var(--site-text))]">
+              <span class="text-xl text-foreground">$</span>
+              <span class="text-4xl font-bold tabular-nums text-foreground">
                 {{ annual ? Math.floor(plan.yearlyPrice) : plan.monthlyPrice }}
               </span>
               <span
                 v-if="annual && plan.yearlyPrice % 1 !== 0"
-                class="font-mono text-lg text-[hsl(var(--site-text-muted))]"
+                class="text-lg text-muted-foreground"
               >
                 .{{ ((plan.yearlyPrice % 1) * 100).toFixed(0).padStart(2, '0') }}
               </span>
             </div>
-            <span class="font-mono text-xs text-[hsl(var(--site-text-muted))]">
+            <span class="text-sm text-muted-foreground">
               /{{ annual ? 'year' : 'month' }}
             </span>
           </div>
 
           <ul class="mb-6 space-y-3">
             <li v-for="feature in plan.features" :key="feature" class="flex items-start gap-2">
-              <svg
-                class="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  :stroke-width="2"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-              <span class="text-sm text-[hsl(var(--site-text-muted))]">
+              <Icon
+                name="lucide:check"
+                class="mt-0.5 h-4 w-4 flex-shrink-0 text-primary"
+              />
+              <span class="text-sm text-muted-foreground">
                 {{ feature }}
               </span>
             </li>
@@ -184,16 +170,21 @@ const annual = ref(true)
 
           <NuxtLink
             to="/register"
-            :class="['btn w-full justify-center', plan.popular ? 'btn-site-primary' : 'btn-site-secondary']"
+            :class="[
+              'inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
+              plan.popular
+                ? 'bg-foreground text-background hover:bg-foreground/90'
+                : 'border bg-background text-foreground hover:bg-muted',
+            ]"
           >
             {{ plan.cta }}
           </NuxtLink>
         </div>
       </div>
 
-      <div class="mt-12 text-center" data-aos="fade-up">
-        <p class="font-mono text-xs text-[hsl(var(--site-text-muted))]">
-          14-day free trial • No credit card required
+      <div class="mt-12 text-center">
+        <p class="text-sm text-muted-foreground">
+          14-day free trial &bull; No credit card required
         </p>
       </div>
     </div>

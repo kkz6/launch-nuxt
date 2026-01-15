@@ -3,16 +3,16 @@ import { categorizedFaqs } from '~/constants/faqs'
 </script>
 
 <template>
-  <section class="site-section bg-[hsl(var(--site-bg))] py-16">
-    <div class="site-grid-pattern absolute inset-0" />
+  <section class="relative bg-background py-24">
+    <div class="absolute inset-0 bg-gradient-to-t from-muted/30 to-background" />
 
-    <div class="site-container relative">
-      <div class="mx-auto mb-10 max-w-2xl text-center" data-aos="fade-up">
-        <h2 class="font-site mb-3 text-2xl font-bold text-[hsl(var(--site-text))]">
-          Frequently Asked <span class="text-emerald-400">Questions</span>
+    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto mb-12 max-w-2xl text-center">
+        <h2 class="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          Frequently asked <span class="text-primary">questions</span>
         </h2>
-        <p class="text-sm text-[hsl(var(--site-text-muted))]">
-          Everything you need to know about Launch
+        <p class="text-muted-foreground">
+          Everything you need to know about launchctl
         </p>
       </div>
 
@@ -20,11 +20,9 @@ import { categorizedFaqs } from '~/constants/faqs'
         <div
           v-for="(category, categoryIndex) in categorizedFaqs"
           :key="categoryIndex"
-          data-aos="fade-up"
-          :data-aos-delay="(categoryIndex + 1) * 100"
         >
-          <h3 class="mb-3 flex items-center gap-2 font-mono text-sm font-medium text-[hsl(var(--site-text))]">
-            <span :class="['h-1.5 w-1.5 rounded-full', category.color]" />
+          <h3 class="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
+            <span :class="['h-2 w-2 rounded-full', category.color]" />
             {{ category.title }}
           </h3>
           <div class="space-y-3">

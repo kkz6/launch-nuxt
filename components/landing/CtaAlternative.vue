@@ -13,48 +13,28 @@ const props = withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-  <section :class="['site-section bg-[hsl(var(--site-bg))] py-16', props.className]">
-    <div class="site-grid-pattern absolute inset-0" />
-    <div
-      class="site-glow bottom-0 left-1/2 h-[300px] w-[300px] -translate-x-1/2 translate-y-1/2 bg-emerald-500 opacity-20"
-    />
+  <section :class="['relative bg-background py-24', props.className]">
+    <div class="absolute inset-0 bg-gradient-to-t from-muted/50 to-background" />
 
-    <div class="site-container relative">
-      <div class="text-center" data-aos="fade-up">
-        <h2 class="font-site mb-5 text-xl font-bold text-[hsl(var(--site-text))] md:text-2xl">
+    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="text-center">
+        <h2 class="mb-6 text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
           {{ heading }}
         </h2>
-        <NuxtLink v-if="buttonLink" :to="buttonLink" class="btn btn-site-primary group">
+        <NuxtLink
+          v-if="buttonLink"
+          :to="buttonLink"
+          class="inline-flex items-center justify-center gap-2 rounded-lg bg-foreground px-6 py-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+        >
           {{ buttonText }}
-          <svg
-            class="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              :stroke-width="2"
-              d="M13 7l5 5m0 0l-5 5m5-5H6"
-            />
-          </svg>
+          <Icon name="lucide:arrow-right" class="h-4 w-4" />
         </NuxtLink>
-        <button v-else class="btn btn-site-primary group">
+        <button
+          v-else
+          class="inline-flex items-center justify-center gap-2 rounded-lg bg-foreground px-6 py-3 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+        >
           {{ buttonText }}
-          <svg
-            class="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              :stroke-width="2"
-              d="M13 7l5 5m0 0l-5 5m5-5H6"
-            />
-          </svg>
+          <Icon name="lucide:arrow-right" class="h-4 w-4" />
         </button>
       </div>
     </div>
