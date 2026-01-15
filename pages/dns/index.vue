@@ -3,7 +3,6 @@ import { Globe } from "lucide-vue-next";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Button } from "~/components/ui/button";
 
 definePageMeta({
   layout: "default",
@@ -50,6 +49,12 @@ interface DomainsResponse {
 const domains = ref<Domain[]>([]);
 const providers = ref<DnsProvider[]>([]);
 const isLoading = ref(true);
+
+// Watch for refresh trigger from navbar
+const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
+watch(dnsRefreshKey, () => {
+  fetchDomains();
+});
 
 const fetchDomains = async () => {
   try {
@@ -101,15 +106,6 @@ onMounted(fetchDomains);
 
 <template>
   <div>
-    <div class="mb-6 flex justify-end">
-      <DnsAddDomain :providers="providers" @created="fetchDomains">
-        <Button>
-          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-          Add Domain
-        </Button>
-      </DnsAddDomain>
-    </div>
-
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
         name="lucide:loader-2"

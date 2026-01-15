@@ -36,10 +36,12 @@ interface DnsProvider {
 }
 
 interface Props {
-  providers: DnsProvider[];
+  providers?: DnsProvider[];
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), {
+  providers: () => [],
+});
 
 const emit = defineEmits<{
   created: []
@@ -47,6 +49,23 @@ const emit = defineEmits<{
 
 const isOpen = ref(false)
 const isLoading = ref(false)
+const localProviders = ref<DnsProvider[]>([])
+const isProvidersLoading = ref(false)
+
+// Fetch providers when dialog opens if not provided
+watch(isOpen, async (open) => {
+  if (open && props.providers.length === 0 && localProviders.value.length === 0) {
+    isProvidersLoading.value = true
+    try {
+      const response = await $api<{ data: { providers: DnsProvider[] } }>('/dns/domains')
+      localProviders.value = response.data.providers
+    } catch {
+      // Silent fail
+    } finally {
+      isProvidersLoading.value = false
+    }
+  }
+})
 
 const domainSchema = toTypedSchema(
   z.object({
@@ -98,8 +117,12 @@ const onSubmit = handleSubmit(async (values) => {
   }
 })
 
+const availableProviders = computed(() =>
+  props.providers.length > 0 ? props.providers : localProviders.value
+)
+
 const providerOptions = computed(() =>
-  props.providers.map((p) => ({ value: p.id, label: p.label }))
+  availableProviders.value.map((p) => ({ value: p.id, label: p.label }))
 );
 </script>
 
