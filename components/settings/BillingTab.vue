@@ -220,6 +220,33 @@ declare global {
             </div>
           </div>
 
+          <!-- Payment Method Section -->
+          <div v-if="currentSubscription?.card_brand && currentSubscription?.card_last_four" class="flex items-center justify-between border-b p-5">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-14 items-center justify-center rounded-md border bg-white dark:bg-muted">
+                <Icon v-if="currentSubscription.card_brand.toLowerCase() === 'visa'" name="simple-icons:visa" class="h-6 w-10 text-[#1A1F71]" />
+                <Icon v-else-if="currentSubscription.card_brand.toLowerCase() === 'mastercard'" name="simple-icons:mastercard" class="h-6 w-6" />
+                <Icon v-else-if="currentSubscription.card_brand.toLowerCase() === 'amex' || currentSubscription.card_brand.toLowerCase() === 'american express'" name="simple-icons:americanexpress" class="h-6 w-6 text-[#006FCF]" />
+                <Icon v-else-if="currentSubscription.card_brand.toLowerCase() === 'discover'" name="simple-icons:discover" class="h-6 w-6" />
+                <Icon v-else name="lucide:credit-card" class="h-5 w-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p class="font-medium">
+                  {{ currentSubscription.card_brand.charAt(0).toUpperCase() + currentSubscription.card_brand.slice(1) }} ending in {{ currentSubscription.card_last_four }}
+                </p>
+                <p class="text-xs text-muted-foreground">Default payment method</p>
+              </div>
+            </div>
+            <Button
+              v-if="currentSubscription?.payment_method_url"
+              variant="outline"
+              size="sm"
+              @click="updatePaymentMethod"
+            >
+              Update
+            </Button>
+          </div>
+
           <!-- Bottom Section -->
           <div class="flex items-center justify-between p-5">
             <div class="flex items-center gap-3">
@@ -252,15 +279,6 @@ declare global {
               <Button variant="outline" size="sm" @click="isModalOpen = true">
                 <Icon name="lucide:arrow-right-left" class="mr-1.5 h-3.5 w-3.5" />
                 Change Plan
-              </Button>
-              <Button
-                v-if="currentSubscription?.payment_method_url"
-                variant="outline"
-                size="sm"
-                @click="updatePaymentMethod"
-              >
-                <Icon name="lucide:credit-card" class="mr-1.5 h-3.5 w-3.5" />
-                Payment Method
               </Button>
               <Button
                 v-if="!isEnding"

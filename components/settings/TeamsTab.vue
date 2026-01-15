@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import {
   Select,
@@ -23,7 +24,7 @@ interface Team {
   id: string
   name: string
   personal_team: boolean
-  owner_id: string
+  user_id: string
 }
 
 const { user } = useAuth()
@@ -57,7 +58,7 @@ const roles = [
 ]
 
 const isOwner = computed(() => {
-  return currentTeam.value?.owner_id === String(user.value?.id)
+  return currentTeam.value?.user_id === String(user.value?.id)
 })
 
 const fetchTeamMembers = async () => {
@@ -117,12 +118,23 @@ onMounted(fetchTeamMembers)
     <template v-else>
       <!-- Members Section -->
       <div class="px-6 pb-6">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-semibold">Team Members</h3>
+            <p class="text-sm text-muted-foreground">Manage who has access to this team.</p>
+          </div>
+          <Button variant="outline" size="sm" @click="isInviteOpen = true">
+            <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
+            Invite
+          </Button>
+        </div>
+
         <!-- Members List -->
         <div class="space-y-1">
           <div
             v-for="member in members"
             :key="member.id"
-            class="flex items-center justify-between py-2.5"
+            class="flex items-center justify-between rounded-lg border p-3"
           >
             <div class="flex items-center gap-3">
               <Avatar class="h-8 w-8">
@@ -134,7 +146,7 @@ onMounted(fetchTeamMembers)
               <div>
                 <div class="flex items-center gap-1.5">
                   <span class="text-sm font-medium">{{ member.name }}</span>
-                  <span v-if="isCurrentUser(member.id)" class="text-sm text-muted-foreground">(you)</span>
+                  <span v-if="isCurrentUser(member.id)" class="text-xs text-muted-foreground">(you)</span>
                 </div>
                 <span class="text-xs text-muted-foreground">{{ member.email }}</span>
               </div>
@@ -156,16 +168,6 @@ onMounted(fetchTeamMembers)
             </Select>
           </div>
         </div>
-
-        <!-- Invite Member -->
-        <button
-          v-if="isOwner"
-          class="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-          @click="isInviteOpen = true"
-        >
-          <Icon name="lucide:plus" class="h-4 w-4" />
-          Invite member
-        </button>
       </div>
 
       <!-- Role Descriptions -->

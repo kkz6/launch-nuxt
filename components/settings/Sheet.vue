@@ -90,7 +90,7 @@ watch(isOpen, (open) => {
         <!-- Tab Content -->
         <div
           ref="contentContainer"
-          class="min-h-0 flex-1 overflow-y-auto"
+          class="min-h-0 flex-1 overflow-y-auto rounded-b-lg"
           @scroll="handleScroll"
         >
           <div class="py-6">
