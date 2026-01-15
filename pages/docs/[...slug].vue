@@ -36,7 +36,8 @@ useHead({
     <!-- Mobile navigation -->
     <div class="mb-6 lg:hidden">
       <details class="rounded-lg border bg-card">
-        <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+        <summary class="flex cursor-pointer items-center gap-2 px-4 py-3 text-sm font-medium text-foreground">
+          <Icon name="lucide:menu" class="h-4 w-4" />
           Navigation
         </summary>
         <nav class="border-t px-4 py-3">
@@ -44,16 +45,18 @@ useHead({
             <li>
               <NuxtLink
                 to="/docs/overview"
-                class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
+                <Icon name="lucide:book-open" class="h-4 w-4" />
                 Overview
               </NuxtLink>
             </li>
             <li>
               <NuxtLink
                 to="/docs/servers"
-                class="block rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                class="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
               >
+                <Icon name="lucide:server" class="h-4 w-4" />
                 Servers
               </NuxtLink>
             </li>
@@ -63,92 +66,118 @@ useHead({
     </div>
 
     <!-- Page header -->
-    <div v-if="page" class="mb-8">
+    <div v-if="page" class="mb-8 border-b pb-8">
       <h1 class="text-3xl font-bold tracking-tight text-foreground">
         {{ page.title }}
       </h1>
-      <p v-if="page.description" class="mt-2 text-lg text-muted-foreground">
+      <p v-if="page.description" class="mt-3 text-lg text-muted-foreground">
         {{ page.description }}
       </p>
     </div>
 
     <!-- Content -->
-    <article v-if="page" class="prose-content">
+    <article v-if="page" class="docs-content">
       <ContentRenderer :value="page" />
     </article>
   </div>
 </template>
 
 <style>
-.prose-content {
-  @apply max-w-none;
+.docs-content {
+  @apply text-foreground;
 }
 
-.prose-content :deep(h2) {
-  @apply mt-10 scroll-mt-20 border-b pb-2 text-2xl font-semibold tracking-tight text-foreground first:mt-0;
+/* Headings */
+.docs-content h1 {
+  @apply mb-4 mt-8 text-3xl font-bold tracking-tight text-foreground first:mt-0;
 }
 
-.prose-content :deep(h3) {
-  @apply mt-8 scroll-mt-20 text-xl font-semibold tracking-tight text-foreground;
+.docs-content h2 {
+  @apply mb-4 mt-10 border-b pb-2 text-2xl font-semibold tracking-tight text-foreground first:mt-0;
 }
 
-.prose-content :deep(h4) {
-  @apply mt-6 scroll-mt-20 text-lg font-semibold tracking-tight text-foreground;
+.docs-content h3 {
+  @apply mb-3 mt-8 text-xl font-semibold tracking-tight text-foreground;
 }
 
-.prose-content :deep(p) {
-  @apply leading-7 text-muted-foreground [&:not(:first-child)]:mt-4;
+.docs-content h4 {
+  @apply mb-2 mt-6 text-lg font-semibold tracking-tight text-foreground;
 }
 
-.prose-content :deep(ul) {
-  @apply my-4 ml-6 list-disc [&>li]:mt-2;
+/* Paragraphs */
+.docs-content p {
+  @apply mb-4 leading-7 text-muted-foreground;
 }
 
-.prose-content :deep(ol) {
-  @apply my-4 ml-6 list-decimal [&>li]:mt-2;
+/* Lists */
+.docs-content ul {
+  @apply mb-4 ml-6 list-disc space-y-2;
 }
 
-.prose-content :deep(li) {
+.docs-content ol {
+  @apply mb-4 ml-6 list-decimal space-y-2;
+}
+
+.docs-content li {
   @apply text-muted-foreground;
 }
 
-.prose-content :deep(a) {
+.docs-content li > ul,
+.docs-content li > ol {
+  @apply mt-2;
+}
+
+/* Links */
+.docs-content a {
   @apply font-medium text-primary underline underline-offset-4 hover:text-primary/80;
 }
 
-.prose-content :deep(code) {
-  @apply relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm;
+/* Code */
+.docs-content code {
+  @apply rounded bg-muted px-1.5 py-0.5 font-mono text-sm text-foreground;
 }
 
-.prose-content :deep(pre) {
-  @apply my-4 overflow-x-auto rounded-lg border bg-muted p-4;
+.docs-content pre {
+  @apply mb-4 overflow-x-auto rounded-lg border bg-muted p-4;
 }
 
-.prose-content :deep(pre code) {
+.docs-content pre code {
   @apply bg-transparent p-0;
 }
 
-.prose-content :deep(blockquote) {
-  @apply mt-4 border-l-4 border-primary/30 pl-4 italic text-muted-foreground;
+/* Blockquotes */
+.docs-content blockquote {
+  @apply mb-4 border-l-4 border-border pl-4 italic text-muted-foreground;
 }
 
-.prose-content :deep(table) {
-  @apply my-4 w-full border-collapse;
+/* Tables */
+.docs-content table {
+  @apply mb-4 w-full border-collapse overflow-hidden rounded-lg border;
 }
 
-.prose-content :deep(th) {
-  @apply border-b bg-muted px-4 py-2 text-left text-sm font-semibold text-foreground;
+.docs-content th {
+  @apply bg-muted px-4 py-3 text-left text-sm font-semibold text-foreground;
 }
 
-.prose-content :deep(td) {
-  @apply border-b px-4 py-2 text-sm text-muted-foreground;
+.docs-content td {
+  @apply border-t px-4 py-3 text-sm text-muted-foreground;
 }
 
-.prose-content :deep(hr) {
-  @apply my-8 border-t;
+.docs-content tr:hover td {
+  @apply bg-muted/50;
 }
 
-.prose-content :deep(strong) {
+/* Horizontal rules */
+.docs-content hr {
+  @apply my-8 border-t border-border;
+}
+
+/* Strong and emphasis */
+.docs-content strong {
   @apply font-semibold text-foreground;
+}
+
+.docs-content em {
+  @apply italic;
 }
 </style>
