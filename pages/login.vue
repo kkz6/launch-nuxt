@@ -214,7 +214,7 @@ const handlePasskeyLogin = async () => {
               </div>
 
               <div class="flex items-center space-x-2">
-                <Checkbox id="remember" v-model:checked="remember" />
+                <Checkbox id="remember" v-model="remember" />
                 <Label for="remember" class="text-sm font-normal">Remember me</Label>
               </div>
 
