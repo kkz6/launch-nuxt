@@ -239,15 +239,18 @@ onMounted(fetchData)
                   </TooltipTrigger>
                   <TooltipContent class="max-w-xs">
                     <div class="space-y-1.5 text-sm">
-                      <p v-if="row.info" class="font-medium">{{ row.info }}</p>
                       <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                         <span class="text-muted-foreground">Status:</span>
                         <span :class="value ? 'text-green-500' : 'text-red-500'">
-                          {{ value ? 'Running' : 'Stopped' }}
+                          {{ row.info?.state || (value ? 'Running' : 'Stopped') }}
                         </span>
-                        <template v-if="row.uptime">
+                        <template v-if="row.info?.uptime">
                           <span class="text-muted-foreground">Uptime:</span>
-                          <span>{{ row.uptime }}</span>
+                          <span>{{ row.info.uptime }}</span>
+                        </template>
+                        <template v-if="row.info?.pid">
+                          <span class="text-muted-foreground">PID:</span>
+                          <span>{{ row.info.pid }}</span>
                         </template>
                         <span class="text-muted-foreground">Processes:</span>
                         <span>{{ row.processes || 1 }}</span>
