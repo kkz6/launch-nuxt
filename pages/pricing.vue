@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'Pricing - Launch' })
+useHead({ title: 'Pricing - launchctl' })
 </script>
 
 <template>
@@ -12,7 +12,7 @@ useHead({ title: 'Pricing - Launch' })
     <LandingFaqs />
     <LandingCtaAlternative
       class="overflow-hidden"
-      heading="Deploy your apps and sites with Launch"
+      heading="Deploy your apps and sites with launchctl"
       button-text="Register Now"
       button-link="/register"
     />
