@@ -11,26 +11,6 @@ const slug = computed(() => {
   }
   return parts || 'overview'
 })
-
-const { data: page } = await useAsyncData(`docs-${slug.value}`, () => {
-  return queryContent('docs', slug.value).findOne()
-})
-
-if (!page.value) {
-  throw createError({
-    statusCode: 404,
-    statusMessage: 'Page not found',
-  })
-}
-
-useHead({
-  title: page.value?.title ? `${page.value.title} - launchctl Docs` : 'Documentation - launchctl',
-  meta: [
-    { name: 'description', content: page.value?.description || 'launchctl documentation' },
-  ],
-})
-
-const toc = computed(() => page.value?.body?.toc?.links || [])
 </script>
 
 <template>
@@ -64,35 +44,35 @@ const toc = computed(() => page.value?.body?.toc?.links || [])
       </details>
     </div>
 
-    <!-- Page header -->
-    <div class="mb-8">
-      <h1 class="text-3xl font-bold tracking-tight text-foreground">
-        {{ page?.title }}
-      </h1>
-      <p v-if="page?.description" class="mt-2 text-lg text-muted-foreground">
-        {{ page?.description }}
-      </p>
-    </div>
-
     <!-- Content -->
-    <article class="prose prose-neutral dark:prose-invert max-w-none">
-      <ContentRenderer v-if="page" :value="page" />
-    </article>
+    <ContentDoc :path="`/docs/${slug}`">
+      <template #default="{ doc }">
+        <!-- Page header -->
+        <div class="mb-8">
+          <h1 class="text-3xl font-bold tracking-tight text-foreground">
+            {{ doc.title }}
+          </h1>
+          <p v-if="doc.description" class="mt-2 text-lg text-muted-foreground">
+            {{ doc.description }}
+          </p>
+        </div>
 
-    <!-- Table of Contents (inline for now) -->
-    <div v-if="toc.length > 0" class="mt-12 border-t pt-8 xl:hidden">
-      <h4 class="mb-3 text-sm font-semibold text-foreground">On this page</h4>
-      <nav class="space-y-1">
-        <a
-          v-for="link in toc"
-          :key="link.id"
-          :href="`#${link.id}`"
-          class="block text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          {{ link.text }}
-        </a>
-      </nav>
-    </div>
+        <!-- Rendered content -->
+        <article class="prose prose-neutral dark:prose-invert max-w-none">
+          <ContentRenderer :value="doc" />
+        </article>
+      </template>
+
+      <template #not-found>
+        <div class="text-center py-12">
+          <h1 class="text-2xl font-bold text-foreground mb-4">Page not found</h1>
+          <p class="text-muted-foreground mb-6">The documentation page you're looking for doesn't exist.</p>
+          <NuxtLink to="/docs/overview" class="text-primary hover:underline">
+            Go to Overview
+          </NuxtLink>
+        </div>
+      </template>
+    </ContentDoc>
   </div>
 </template>
 
