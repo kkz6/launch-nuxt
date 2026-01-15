@@ -26,7 +26,7 @@ const emit = defineEmits<{
   created: [];
 }>();
 
-const isOpen = ref(false);
+const open = defineModel<boolean>("open", { default: false });
 const isLoading = ref(false);
 
 const formSchema = toTypedSchema(
@@ -43,8 +43,8 @@ const form = useForm({
   validateOnMount: false,
 });
 
-const handleClose = (open: boolean) => {
-  if (!open) {
+const handleClose = (isOpen: boolean) => {
+  if (!isOpen) {
     form.resetForm();
   }
 };
@@ -57,7 +57,7 @@ const onSubmit = form.handleSubmit(async (values) => {
       body: values,
     });
     toast.success("Team created successfully");
-    isOpen.value = false;
+    open.value = false;
     form.resetForm();
     emit("created");
   } catch (error: unknown) {
@@ -74,14 +74,9 @@ const onSubmit = form.handleSubmit(async (values) => {
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen" @update:open="handleClose">
-    <DialogTrigger as-child>
-      <slot>
-        <Button>
-          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-          Create Team
-        </Button>
-      </slot>
+  <Dialog v-model:open="open" @update:open="handleClose">
+    <DialogTrigger v-if="$slots.default" as-child>
+      <slot />
     </DialogTrigger>
     <DialogContent class="sm:max-w-md">
       <DialogHeader>

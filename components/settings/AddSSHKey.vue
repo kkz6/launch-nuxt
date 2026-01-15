@@ -14,11 +14,23 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { Textarea } from '~/components/ui/textarea'
 
-const emit = defineEmits<{
-  created: []
+const props = defineProps<{
+  open?: boolean
 }>()
 
-const isOpen = ref(false)
+const emit = defineEmits<{
+  created: []
+  'update:open': [value: boolean]
+}>()
+
+const isOpen = computed({
+  get: () => props.open ?? internalOpen.value,
+  set: (value) => {
+    internalOpen.value = value
+    emit('update:open', value)
+  },
+})
+const internalOpen = ref(false)
 const isLoading = ref(false)
 const isGenerating = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
@@ -150,13 +162,8 @@ watch(isOpen, (open) => {
 <template>
   <Dialog v-model:open="isOpen">
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <DialogTrigger as-child>
-      <slot>
-        <Button>
-          <Icon name="lucide:key-round" class="mr-2 block size-4" />
-          Add SSH Key
-        </Button>
-      </slot>
+    <DialogTrigger v-if="$slots.default" as-child>
+      <slot />
     </DialogTrigger>
     <DialogContent class="max-h-screen overflow-y-auto sm:max-w-2xl">
       <DialogHeader>
