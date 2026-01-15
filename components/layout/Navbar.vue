@@ -50,7 +50,6 @@ const serverDetailTabs = [
   { value: "sites", label: "Sites", query: "sites" },
   { value: "databases", label: "Databases", query: "databases" },
   { value: "networks", label: "Networks", query: "networks" },
-  { value: "logs", label: "Logs", query: "logs" },
   { value: "daemons", label: "Daemons", query: "daemons" },
   { value: "schedulers", label: "Schedulers", query: "schedulers" },
   { value: "advanced", label: "Advanced", query: "advanced" },
@@ -61,7 +60,6 @@ const allSiteDetailTabs = [
   { value: "general", label: "Overview", query: "general" },
   { value: "deployments", label: "Deployments", query: "deployments" },
   { value: "files", label: "Files", query: "files" },
-  { value: "logs", label: "Logs", query: "logs" },
   { value: "queues", label: "Queues", query: "queues" },
   { value: "commands", label: "Commands", query: "commands" },
   { value: "settings", label: "Settings", query: "settings" },
@@ -339,7 +337,7 @@ onMounted(fetchTeams);
       class="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 lg:px-8"
     >
       <NuxtLink to="/servers" class="flex items-center gap-2">
-        <span class="text-xl font-bold">Launch</span>
+        <span class="text-xl font-bold">launchctl</span>
       </NuxtLink>
 
       <div class="flex items-center space-x-2">
@@ -592,6 +590,7 @@ onMounted(fetchTeams);
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <SharedLogsSheet v-if="serverId" :server-id="serverId" type="server" />
           <Button
             v-if="serverConnected"
             variant="outline"
@@ -657,6 +656,7 @@ onMounted(fetchTeams);
           </div>
         </div>
         <div class="flex items-center gap-2">
+          <SharedLogsSheet v-if="serverId && siteId" :server-id="serverId" type="site" :site-id="siteId" />
           <Button
             v-if="serverConnected"
             variant="outline"

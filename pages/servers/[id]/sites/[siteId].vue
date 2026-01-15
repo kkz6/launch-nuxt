@@ -19,7 +19,7 @@ const isLoading = ref(true)
 const isTerminalOpen = useState('serverTerminalOpen', () => false)
 
 // Valid tab values
-const validTabs = ['general', 'deployments', 'files', 'logs', 'queues', 'commands', 'settings']
+const validTabs = ['general', 'deployments', 'files', 'queues', 'commands', 'settings']
 
 // Get initial tab from query params or default to "general"
 const getInitialTab = () => {
@@ -86,10 +86,6 @@ onMounted(async () => {
 
     <div v-else-if="activeTab === 'files'">
       <SiteFiles :server-id="server.id" :site-id="site.id" />
-    </div>
-
-    <div v-else-if="activeTab === 'logs'">
-      <ServerShowLogs :server-id="server.id" type="site" :site-id="site.id" />
     </div>
 
     <div v-else-if="activeTab === 'queues'">
