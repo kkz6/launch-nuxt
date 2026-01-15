@@ -56,15 +56,38 @@ const serverDetailTabs = [
   { value: "advanced", label: "Advanced", query: "advanced" },
 ];
 
+// Site detail tabs (base - filtered based on site type)
+const allSiteDetailTabs = [
+  { value: "general", label: "Overview", query: "general" },
+  { value: "deployments", label: "Deployments", query: "deployments" },
+  { value: "files", label: "Files", query: "files" },
+  { value: "logs", label: "Logs", query: "logs" },
+  { value: "queues", label: "Queues", query: "queues" },
+  { value: "commands", label: "Commands", query: "commands" },
+  { value: "settings", label: "Settings", query: "settings" },
+];
+
 // Check if we're on a server detail page
 const isServerDetailPage = computed(() => {
   const match = route.path.match(/^\/servers\/([^/]+)$/);
   return match && match[1] !== 'create';
 });
 
+// Check if we're on a site detail page
+const isSiteDetailPage = computed(() => {
+  const match = route.path.match(/^\/servers\/([^/]+)\/sites\/([^/]+)$/);
+  return match !== null;
+});
+
 const serverId = computed(() => {
-  const match = route.path.match(/^\/servers\/([^/]+)$/);
-  return match ? match[1] : null;
+  // Match both /servers/:id and /servers/:id/sites/:siteId
+  const serverMatch = route.path.match(/^\/servers\/([^/]+)(?:\/|$)/);
+  return serverMatch ? serverMatch[1] : null;
+});
+
+const siteId = computed(() => {
+  const match = route.path.match(/^\/servers\/([^/]+)\/sites\/([^/]+)$/);
+  return match ? match[2] : null;
 });
 
 // Server data for detail page
@@ -72,6 +95,11 @@ const serverName = ref<string | null>(null);
 const serverIp = ref<string | null>(null);
 const serverConnected = ref(false);
 const serverProvider = ref<string | null>(null);
+
+// Site data for detail page
+const siteAddress = ref<string | null>(null);
+const siteType = ref<string | null>(null);
+const siteUrl = ref<string | null>(null);
 
 const providerLabels: Record<string, string> = {
   digitalocean: "DigitalOcean",
@@ -82,11 +110,30 @@ const providerLabels: Record<string, string> = {
   custom_server: "Custom Server",
 };
 
-// Fetch server info when on detail page
-watch(serverId, async (id) => {
-  if (id) {
+const siteTypeLabels: Record<string, string> = {
+  laravel: "Laravel",
+  wordpress: "WordPress",
+  generic: "Generic PHP",
+};
+
+// Computed site tabs based on site type
+const siteDetailTabs = computed(() => {
+  if (!siteType.value) return allSiteDetailTabs;
+  if (siteType.value === 'wordpress') {
+    return allSiteDetailTabs.filter((t) => !['deployments', 'queues'].includes(t.value));
+  }
+  if (siteType.value === 'generic') {
+    return allSiteDetailTabs.filter((t) => t.value !== 'queues');
+  }
+  return allSiteDetailTabs;
+});
+
+// Fetch server info when on server or site detail page
+watch([serverId, siteId], async ([sId, stId]) => {
+  if (sId && !stId) {
+    // Server detail page only
     try {
-      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string } }>(`/servers/${id}`);
+      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string } }>(`/servers/${sId}`);
       serverName.value = response.data.name;
       serverIp.value = response.data.public_ipv4;
       serverConnected.value = response.data.connected;
@@ -94,9 +141,32 @@ watch(serverId, async (id) => {
     } catch {
       serverName.value = null;
     }
+    // Clear site data
+    siteAddress.value = null;
+    siteType.value = null;
+  } else if (sId && stId) {
+    // Site detail page - fetch both server and site
+    try {
+      const [serverRes, siteRes] = await Promise.all([
+        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string } }>(`/servers/${sId}`),
+        $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`),
+      ]);
+      serverName.value = serverRes.data.name;
+      serverIp.value = serverRes.data.public_ipv4;
+      serverConnected.value = serverRes.data.connected;
+      serverProvider.value = serverRes.data.provider;
+      siteAddress.value = siteRes.data.address;
+      siteType.value = siteRes.data.type;
+      siteUrl.value = siteRes.data.url;
+    } catch {
+      serverName.value = null;
+      siteAddress.value = null;
+    }
   } else {
     serverName.value = null;
     serverProvider.value = null;
+    siteAddress.value = null;
+    siteType.value = null;
   }
 }, { immediate: true });
 
@@ -109,14 +179,21 @@ const isServerTabActive = (query: string) => {
   return currentTab === query;
 };
 
+const isSiteTabActive = (query: string) => {
+  const currentTab = route.query.tab as string || 'general';
+  return currentTab === query;
+};
+
 const showGlobalTabs = computed(() => {
-  return (route.path === '/servers' || route.path === '/dns') ||
-         (route.path.startsWith('/servers/') && route.path.includes('/sites/')) ||
-         route.path.startsWith('/dns/');
+  return (route.path === '/servers' || route.path === '/dns') || route.path.startsWith('/dns/');
 });
 
 const showServerTabs = computed(() => {
   return isServerDetailPage.value;
+});
+
+const showSiteTabs = computed(() => {
+  return isSiteDetailPage.value;
 });
 
 // DNS refresh trigger
@@ -532,6 +609,68 @@ onMounted(fetchTeams);
           class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isServerTabActive(tab.query)
+              ? 'border-foreground text-foreground'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+          ]"
+        >
+          {{ tab.label }}
+        </NuxtLink>
+      </nav>
+    </div>
+
+    <!-- Site Detail Navigation -->
+    <div v-if="showSiteTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
+      <div class="flex items-center justify-between py-2">
+        <!-- Breadcrumb: Servers / ServerName / SiteAddress -->
+        <div class="flex items-center gap-3">
+          <NuxtLink
+            to="/servers"
+            class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Server class="h-4 w-4" />
+            Servers
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <NuxtLink
+            :to="`/servers/${serverId}`"
+            class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span
+              class="h-2 w-2 rounded-full"
+              :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
+            />
+            {{ serverName || 'Loading...' }}
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <div class="flex items-center gap-2">
+            <Globe class="h-4 w-4 text-muted-foreground" />
+            <span class="text-sm font-medium">{{ siteAddress || 'Loading...' }}</span>
+            <span v-if="siteType" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+              {{ siteTypeLabels[siteType] || siteType }}
+            </span>
+            <a v-if="siteUrl" :href="siteUrl" target="_blank" rel="noreferrer" class="text-muted-foreground hover:text-foreground">
+              <Icon name="lucide:external-link" class="h-4 w-4" />
+            </a>
+          </div>
+        </div>
+        <Button
+          v-if="serverConnected"
+          variant="outline"
+          size="sm"
+          @click="openTerminal"
+        >
+          <Terminal class="mr-2 h-4 w-4" />
+          Terminal
+        </Button>
+      </div>
+      <nav class="-mb-px flex gap-1 overflow-x-auto">
+        <NuxtLink
+          v-for="tab in siteDetailTabs"
+          :key="tab.value"
+          :to="{ path: `/servers/${serverId}/sites/${siteId}`, query: { tab: tab.query } }"
+          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            isSiteTabActive(tab.query)
               ? 'border-foreground text-foreground'
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
