@@ -8,6 +8,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '~/components/ui/sheet'
+import { ScrollArea } from '~/components/ui/scroll-area'
 
 interface Props {
   title: string
@@ -132,12 +133,14 @@ const handleDownload = () => {
         </Button>
       </div>
 
-      <div class="h-[calc(100vh-14rem)] overflow-auto rounded-lg bg-zinc-950 p-4 sm:h-[calc(100vh-18rem)]">
-        <pre class="whitespace-pre-wrap break-words font-mono text-sm text-zinc-100"><template
-          v-for="(part, index) in parsedOutput"
-          :key="index"
-        ><span :style="part.style">{{ part.text }}</span></template></pre>
-      </div>
+      <ScrollArea class="h-[calc(100vh-10rem)] sm:h-[calc(100vh-16rem)]">
+        <div class="rounded-lg bg-zinc-950 p-4">
+          <pre class="whitespace-pre-wrap break-words font-mono text-sm text-zinc-100"><template
+            v-for="(part, index) in parsedOutput"
+            :key="index"
+          ><span :style="part.style">{{ part.text }}</span></template></pre>
+        </div>
+      </ScrollArea>
     </SheetContent>
   </Sheet>
 </template>
