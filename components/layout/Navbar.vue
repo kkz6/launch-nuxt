@@ -37,17 +37,72 @@ const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
 
-const navTabs = [
+// Global navigation tabs
+const globalTabs = [
   { value: "servers", label: "Servers", route: "/servers", icon: Server },
   { value: "domains", label: "Domains", route: "/dns", icon: Globe },
 ];
 
-const isTabActive = (tabRoute: string) => {
+// Server detail tabs
+const serverDetailTabs = [
+  { value: "sites", label: "Sites", query: "sites" },
+  { value: "databases", label: "Databases", query: "databases" },
+  { value: "networks", label: "Networks", query: "networks" },
+  { value: "logs", label: "Logs", query: "logs" },
+  { value: "daemons", label: "Daemons", query: "daemons" },
+  { value: "schedulers", label: "Schedulers", query: "schedulers" },
+  { value: "advanced", label: "Advanced", query: "advanced" },
+];
+
+// Check if we're on a server detail page
+const isServerDetailPage = computed(() => {
+  const match = route.path.match(/^\/servers\/([^/]+)$/);
+  return match && match[1] !== 'create';
+});
+
+const serverId = computed(() => {
+  const match = route.path.match(/^\/servers\/([^/]+)$/);
+  return match ? match[1] : null;
+});
+
+// Server data for detail page
+const serverName = ref<string | null>(null);
+const serverIp = ref<string | null>(null);
+const serverConnected = ref(false);
+
+// Fetch server info when on detail page
+watch(serverId, async (id) => {
+  if (id) {
+    try {
+      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean } }>(`/servers/${id}`);
+      serverName.value = response.data.name;
+      serverIp.value = response.data.public_ipv4;
+      serverConnected.value = response.data.connected;
+    } catch {
+      serverName.value = null;
+    }
+  } else {
+    serverName.value = null;
+  }
+}, { immediate: true });
+
+const isGlobalTabActive = (tabRoute: string) => {
   return route.path === tabRoute || route.path.startsWith(`${tabRoute}/`);
 };
 
-const showTabs = computed(() => {
-  return route.path.startsWith('/servers') || route.path.startsWith('/dns');
+const isServerTabActive = (query: string) => {
+  const currentTab = route.query.tab as string || 'sites';
+  return currentTab === query;
+};
+
+const showGlobalTabs = computed(() => {
+  return (route.path === '/servers' || route.path === '/dns') ||
+         (route.path.startsWith('/servers/') && route.path.includes('/sites/')) ||
+         route.path.startsWith('/dns/');
+});
+
+const showServerTabs = computed(() => {
+  return isServerDetailPage.value;
 });
 
 const setColorMode = (mode: "light" | "dark" | "system") => {
@@ -383,21 +438,55 @@ onMounted(fetchTeams);
       </div>
     </div>
 
-    <!-- Navigation Tabs -->
-    <div v-if="showTabs" class="mx-auto max-w-8xl px-4 sm:px-6">
+    <!-- Global Navigation Tabs (Servers / Domains) -->
+    <div v-if="showGlobalTabs" class="mx-auto max-w-8xl px-4 sm:px-6">
       <nav class="-mb-px flex gap-6">
         <NuxtLink
-          v-for="tab in navTabs"
+          v-for="tab in globalTabs"
           :key="tab.value"
           :to="tab.route"
           class="relative flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors"
           :class="[
-            isTabActive(tab.route)
+            isGlobalTabActive(tab.route)
               ? 'border-foreground text-foreground'
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
         >
           <component :is="tab.icon" class="h-4 w-4" />
+          {{ tab.label }}
+        </NuxtLink>
+      </nav>
+    </div>
+
+    <!-- Server Detail Navigation -->
+    <div v-if="showServerTabs" class="mx-auto max-w-8xl px-4 sm:px-6">
+      <div class="-mb-px flex items-center gap-6">
+        <!-- Back to servers + Server name -->
+        <NuxtLink
+          to="/servers"
+          class="flex items-center gap-2 border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Server class="h-4 w-4" />
+          Servers
+        </NuxtLink>
+        <span class="text-muted-foreground">/</span>
+        <div class="flex items-center gap-2 py-3">
+          <span class="text-sm font-medium">{{ serverName || 'Loading...' }}</span>
+          <span v-if="serverIp" class="text-xs text-muted-foreground">({{ serverIp }})</span>
+        </div>
+      </div>
+      <nav class="-mb-px flex gap-1 overflow-x-auto">
+        <NuxtLink
+          v-for="tab in serverDetailTabs"
+          :key="tab.value"
+          :to="{ path: `/servers/${serverId}`, query: { tab: tab.query } }"
+          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            isServerTabActive(tab.query)
+              ? 'border-foreground text-foreground'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+          ]"
+        >
           {{ tab.label }}
         </NuxtLink>
       </nav>
