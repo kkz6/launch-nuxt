@@ -66,18 +66,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="gap-12">
-    <header
-      class="mb-6 flex w-full flex-wrap items-center justify-between gap-2"
-    >
-      <div class="flex flex-col gap-2">
-        <h1 class="text-xl font-bold lg:text-3xl">Servers</h1>
-        <p class="text-muted-foreground lg:text-medium">
-          Manage your servers
-        </p>
-      </div>
+  <div>
+    <div class="mb-6 flex justify-end">
       <ServerCreateServerDialog />
-    </header>
+    </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
