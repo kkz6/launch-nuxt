@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import { Globe2 } from "lucide-vue-next";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { formatDistanceToNow } from "date-fns";
 import type { Server, Site } from "~/types";
 
 interface Props {
@@ -15,19 +9,70 @@ interface Props {
 
 defineProps<Props>();
 
-const applicationTypes: Record<string, string> = {
-  laravel: "Laravel",
-  wordpress: "WordPress",
-  generic: "Generic PHP",
+const getSiteTypeIcon = (type: string): string => {
+  const t = type?.toLowerCase() || "";
+  if (t.includes("laravel")) return "simple-icons:laravel";
+  if (t.includes("wordpress")) return "simple-icons:wordpress";
+  if (t.includes("nuxt")) return "simple-icons:nuxtdotjs";
+  if (t.includes("next")) return "simple-icons:nextdotjs";
+  if (t.includes("node")) return "simple-icons:nodedotjs";
+  if (t.includes("python") || t.includes("django")) return "simple-icons:python";
+  if (t.includes("ruby") || t.includes("rails")) return "simple-icons:ruby";
+  return "simple-icons:php";
+};
+
+const getSiteTypeLabel = (type: string): string => {
+  const types: Record<string, string> = {
+    laravel: "Laravel",
+    wordpress: "WordPress",
+    generic: "Generic PHP",
+    nuxt: "Nuxt",
+    nextjs: "Next.js",
+    nodejs: "Node.js",
+    python: "Python",
+    django: "Django",
+    ruby: "Ruby",
+    rails: "Ruby on Rails",
+  };
+  return types[type] || type;
+};
+
+const getStatusColor = (site: Site): string => {
+  if (site.installation_failed_at || site.uninstallation_failed_at) {
+    return "bg-red-500";
+  }
+  if (site.uninstallation_requested_at || !site.installed_at) {
+    return "bg-yellow-500";
+  }
+  return "bg-green-500";
+};
+
+const getStatusLabel = (site: Site): { text: string; loading: boolean } => {
+  if (site.installation_failed_at) {
+    return { text: "Installation failed", loading: false };
+  }
+  if (site.uninstallation_failed_at) {
+    return { text: "Uninstallation failed", loading: false };
+  }
+  if (site.uninstallation_requested_at) {
+    return { text: "Uninstalling", loading: true };
+  }
+  if (site.installed_at) {
+    return { text: "Installed", loading: false };
+  }
+  return { text: "Installing", loading: true };
 };
 
 const isAccessible = (site: Site) => {
   return Boolean(site.installed_at) && !site.uninstallation_requested_at;
 };
 
-const getStatusDate = (site: Site) => {
-  // Use installed_at for installed sites, otherwise use created_at
-  return site.installed_at || site.created_at;
+const formatDate = (date: string): string => {
+  try {
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
+  } catch {
+    return "";
+  }
 };
 </script>
 
@@ -35,97 +80,72 @@ const getStatusDate = (site: Site) => {
   <div>
     <div
       v-if="sites?.length === 0"
-      class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
+      class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4 rounded-lg border bg-card"
     >
-      <Globe2 class="size-10 text-muted-foreground md:size-28" />
-      <span>No sites found. Click on Add Site.</span>
+      <Icon name="lucide:globe" class="h-16 w-16 text-muted-foreground" />
+      <div class="text-center">
+        <p class="font-medium">No sites found</p>
+        <p class="text-sm text-muted-foreground">Click on Add Site to get started</p>
+      </div>
     </div>
 
-    <div v-else class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-      <template v-for="site in sites" :key="site.id">
-        <NuxtLink
-          v-if="isAccessible(site)"
-          :to="`/servers/${server.id}/sites/${site.id}`"
-          class="block"
+    <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <NuxtLink
+        v-for="site in sites"
+        :key="site.id"
+        :to="isAccessible(site) ? `/servers/${server.id}/sites/${site.id}` : '#'"
+        class="group"
+        :class="{ 'pointer-events-none': !isAccessible(site) }"
+      >
+        <div
+          class="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+          :class="{
+            'opacity-60': !isAccessible(site),
+          }"
         >
-          <Card
-            class="group relative w-full bg-transparent transition-colors hover:bg-card"
-          >
-            <CardHeader>
-              <CardTitle class="flex items-center justify-between gap-2">
-                <span class="flex flex-col gap-1.5">
-                  <div class="flex items-center gap-2">
-                    <Icon
-                      name="lucide:globe"
-                      class="h-4 w-4 text-muted-foreground"
-                    />
-                    <span class="text-base font-medium leading-none">
-                      {{ site.address }}
-                    </span>
-                  </div>
-                  <span class="text-sm font-medium text-muted-foreground">
-                    {{ applicationTypes[site.type] || site.type }}
-                  </span>
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="pt-4">
-              <div
-                class="flex w-full flex-row justify-between gap-2 text-sm sm:gap-4"
-              >
-                <SharedDateTooltip :date="getStatusDate(site)">
-                  <SharedInstallationStatus
-                    :installed_at="site.installed_at"
-                    :installation_failed_at="site.installation_failed_at"
-                    :uninstallation_requested_at="site.uninstallation_requested_at"
-                    :uninstallation_failed_at="site.uninstallation_failed_at"
-                  />
-                </SharedDateTooltip>
+          <div class="flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Icon
+                :name="getSiteTypeIcon(site.type)"
+                class="h-5 w-5 text-muted-foreground"
+              />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-semibold truncate">{{ site.address }}</h3>
+                <span
+                  class="h-2 w-2 shrink-0 rounded-full"
+                  :class="getStatusColor(site)"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </NuxtLink>
+              <p class="text-sm text-muted-foreground truncate">
+                {{ getSiteTypeLabel(site.type) }}
+              </p>
+            </div>
+          </div>
 
-        <!-- Non-accessible site (installing or uninstalling) -->
-        <div v-else class="block">
-          <Card
-            class="group relative w-full cursor-not-allowed bg-transparent opacity-60"
-          >
-            <CardHeader>
-              <CardTitle class="flex items-center justify-between gap-2">
-                <span class="flex flex-col gap-1.5">
-                  <div class="flex items-center gap-2">
-                    <Icon
-                      name="lucide:globe"
-                      class="h-4 w-4 text-muted-foreground"
-                    />
-                    <span class="text-base font-medium leading-none">
-                      {{ site.address }}
-                    </span>
-                  </div>
-                  <span class="text-sm font-medium text-muted-foreground">
-                    {{ applicationTypes[site.type] || site.type }}
-                  </span>
-                </span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent class="pt-4">
-              <div
-                class="flex w-full flex-row justify-between gap-2 text-sm sm:gap-4"
+          <div class="mt-4 flex items-center justify-between text-sm">
+            <div class="flex items-center gap-1.5">
+              <Icon
+                v-if="getStatusLabel(site).loading"
+                name="lucide:loader-2"
+                class="h-3.5 w-3.5 animate-spin text-muted-foreground"
+              />
+              <span
+                :class="[
+                  getStatusLabel(site).loading ? 'text-muted-foreground' : '',
+                  site.installation_failed_at || site.uninstallation_failed_at ? 'text-destructive' : ''
+                ]"
               >
-                <SharedDateTooltip :date="getStatusDate(site)">
-                  <SharedInstallationStatus
-                    :installed_at="site.installed_at"
-                    :installation_failed_at="site.installation_failed_at"
-                    :uninstallation_requested_at="site.uninstallation_requested_at"
-                    :uninstallation_failed_at="site.uninstallation_failed_at"
-                  />
-                </SharedDateTooltip>
-              </div>
-            </CardContent>
-          </Card>
+                {{ getStatusLabel(site).text }}
+              </span>
+            </div>
+            <span class="text-muted-foreground">
+              {{ formatDate(site.installed_at || site.created_at) }}
+            </span>
+          </div>
         </div>
-      </template>
+      </NuxtLink>
     </div>
   </div>
 </template>

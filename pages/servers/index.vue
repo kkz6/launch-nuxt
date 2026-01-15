@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { Server as ServerIcon, LoaderCircle } from "lucide-vue-next";
-import { Card, CardFooter, CardHeader, CardTitle } from "~/components/ui/card";
+import { formatDistanceToNow } from "date-fns";
 import type { Server } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -16,41 +15,56 @@ useHead({
 const servers = ref<Server[]>([]);
 const isLoading = ref(true);
 
-const serviceProviders: Record<string, string> = {
-  digitalocean: "DigitalOcean",
-  hetzner: "Hetzner",
-  linode: "Linode",
-  vultr: "Vultr",
-  aws: "AWS",
-  custom_server: "Custom",
+const getProviderIcon = (provider: string): string => {
+  const name = provider?.toLowerCase() || "";
+  if (name.includes("digitalocean")) return "simple-icons:digitalocean";
+  if (name.includes("hetzner")) return "simple-icons:hetzner";
+  if (name.includes("linode")) return "simple-icons:linode";
+  if (name.includes("vultr")) return "simple-icons:vultr";
+  if (name.includes("aws")) return "simple-icons:amazonwebservices";
+  if (name.includes("google") || name.includes("gcp")) return "simple-icons:googlecloud";
+  if (name.includes("azure")) return "simple-icons:microsoftazure";
+  return "lucide:server";
 };
 
-const serverStatus: Record<string, string> = {
-  running: "Running",
-  provisioning: "Provisioning",
-  new: "Creating",
-  starting: "Starting",
-  failed: "Failed",
-  deleting: "Deleting",
-  unknown: "Unknown",
-};
-
-const formatDate = (dateString: string) => {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "today";
-  if (diffDays === 1) return "yesterday";
-  if (diffDays < 30) return `${diffDays} days ago`;
-  if (diffDays < 365) {
-    const months = Math.floor(diffDays / 30);
-    return `${months} ${months === 1 ? "month" : "months"} ago`;
+const getStatusColor = (status: string): string => {
+  switch (status) {
+    case "running":
+      return "bg-green-500";
+    case "provisioning":
+    case "new":
+    case "starting":
+      return "bg-yellow-500";
+    case "failed":
+    case "unknown":
+      return "bg-red-500";
+    case "deleting":
+      return "bg-orange-500";
+    default:
+      return "bg-gray-500";
   }
-  const years = Math.floor(diffDays / 365);
-  return `${years} ${years === 1 ? "year" : "years"} ago`;
+};
+
+const getStatusLabel = (server: Server): string => {
+  if (server.status_label) return server.status_label;
+  const labels: Record<string, string> = {
+    running: "Running",
+    provisioning: "Provisioning",
+    new: "Creating",
+    starting: "Starting",
+    failed: "Failed",
+    deleting: "Deleting",
+    unknown: "Unknown",
+  };
+  return labels[server.status] || server.status;
+};
+
+const formatDate = (date: string): string => {
+  try {
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
+  } catch {
+    return "";
+  }
 };
 
 onMounted(async () => {
@@ -66,7 +80,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div>
+  <div class="pb-10">
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
         name="lucide:loader-2"
@@ -76,122 +90,88 @@ onMounted(async () => {
 
     <div
       v-else-if="servers.length === 0"
-      class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
+      class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4 rounded-lg border bg-card"
     >
-      <ServerIcon class="size-10 text-muted-foreground md:size-28" />
-      <span>No servers added yet. Click on Create server.</span>
+      <Icon name="lucide:server" class="h-16 w-16 text-muted-foreground" />
+      <div class="text-center">
+        <p class="font-medium">No servers added yet</p>
+        <p class="text-sm text-muted-foreground">Click on Create Server to get started</p>
+      </div>
     </div>
 
-    <div
-      v-else
-      class="grid w-full flex-wrap gap-5 sm:grid-cols-2 lg:grid-cols-3"
-    >
-            <NuxtLink
-              v-for="server in servers"
-              :key="server.id"
-              :to="server.status === 'running' ? `/servers/${server.id}` : '#'"
-              class="w-full lg:max-w-md"
-              :class="{ 'pointer-events-none': server.status !== 'running' }"
-            >
-              <Card
-                class="group relative w-full transition-colors"
-                :class="[
-                  server.status === 'failed' || server.status === 'unknown'
-                    ? 'bg-gray-700/10'
-                    : 'bg-transparent hover:bg-card',
-                ]"
-              >
-                <!-- Provisioning progress bar -->
-                <div
-                  v-if="server.status === 'provisioning'"
-                  class="pointer-events-none absolute inset-0 animate-pulse rounded-lg bg-green-500/20 opacity-20 transition-all ease-in-out"
-                  :style="{ width: `${server.progress || 0}%` }"
+    <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <NuxtLink
+        v-for="server in servers"
+        :key="server.id"
+        :to="server.status === 'running' ? `/servers/${server.id}` : '#'"
+        class="group"
+        :class="{ 'pointer-events-none': server.status !== 'running' }"
+      >
+        <div
+          class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+          :class="{
+            'opacity-60': server.status === 'failed' || server.status === 'unknown',
+          }"
+        >
+          <!-- Provisioning progress bar -->
+          <div
+            v-if="server.status === 'provisioning'"
+            class="pointer-events-none absolute inset-0 animate-pulse rounded-lg bg-green-500/20"
+            :style="{ width: `${server.progress || 0}%` }"
+          />
+
+          <div class="relative flex items-start gap-3">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Icon
+                :name="getProviderIcon(server.provider)"
+                class="h-5 w-5 text-muted-foreground"
+              />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2">
+                <h3 class="font-semibold truncate">{{ server.name }}</h3>
+                <span
+                  class="h-2 w-2 shrink-0 rounded-full"
+                  :class="getStatusColor(server.status)"
                 />
+              </div>
+              <p class="text-sm text-muted-foreground truncate">
+                {{ server.provider_label || server.provider }}
+              </p>
+              <p v-if="server.public_ipv4" class="text-sm text-muted-foreground truncate">
+                {{ server.public_ipv4 }}
+              </p>
+            </div>
+          </div>
 
-                <CardHeader>
-                  <CardTitle
-                    class="relative flex items-center justify-between gap-2"
-                  >
-                    <span class="flex flex-col gap-1.5">
-                      <div class="flex items-center gap-2">
-                        <ServerIcon class="size-4 text-muted-foreground" />
-                        <span class="text-base font-medium leading-none">
-                          {{ server.name }}
-                        </span>
-                      </div>
-                      <span class="text-sm font-medium text-muted-foreground">
-                        {{ server.provider_label || serviceProviders[server.provider] || server.provider }}
-                      </span>
-                      <span class="text-sm font-medium text-muted-foreground">
-                        {{ server.public_ipv4 }}
-                      </span>
-                    </span>
-                  </CardTitle>
-                </CardHeader>
-
-                <CardFooter class="relative pt-4">
-                  <div
-                    class="flex w-full flex-row justify-between gap-2 text-sm max-sm:flex-wrap sm:gap-4"
-                  >
-                    <!-- Provisioning/Creating/Failed status -->
-                    <template
-                      v-if="
-                        server.status === 'provisioning' ||
-                        server.status === 'new' ||
-                        server.status === 'failed' ||
-                        server.status === 'deleting'
-                      "
-                    >
-                      <div
-                        class="flex w-full flex-col justify-between gap-1 text-sm max-sm:flex-wrap"
-                      >
-                        <div class="flex items-center space-x-2">
-                          <LoaderCircle
-                            v-if="server.status !== 'failed'"
-                            class="h-4 w-4 animate-spin"
-                          />
-                          <span>{{
-                            serverStatus[server.status] || server.status
-                          }}</span>
-                        </div>
-                        <span class="text-muted-foreground">
-                          Created {{ formatDate(server.created_at) }}
-                        </span>
-                      </div>
-                    </template>
-
-                    <!-- Running status -->
-                    <template v-else-if="server.status === 'running'">
-                      <div
-                        class="flex w-full flex-row justify-between gap-2 text-sm max-sm:flex-wrap sm:gap-4"
-                      >
-                        <div class="flex flex-col">
-                          <span>{{ server.status_label || serverStatus[server.status] }}</span>
-                          <span class="text-muted-foreground">
-                            Provisioned {{ formatDate(server.provisioned_at) }}
-                          </span>
-                        </div>
-                        <span>
-                          {{ server.services_count ?? server.sites_count ?? 0 }}
-                          {{ (server.services_count ?? server.sites_count ?? 0) === 1 ? "site" : "sites" }}
-                        </span>
-                      </div>
-                    </template>
-
-                    <!-- Other status -->
-                    <template v-else>
-                      <div class="flex flex-col">
-                        <span>{{ server.status_label || serverStatus[server.status] || server.status }}</span>
-                      </div>
-                      <span>
-                        {{ server.services_count ?? server.sites_count ?? 0 }}
-                        {{ (server.services_count ?? server.sites_count ?? 0) === 1 ? "site" : "sites" }}
-                      </span>
-                    </template>
-                  </div>
-                </CardFooter>
-              </Card>
-            </NuxtLink>
+          <div class="relative mt-4 flex items-center justify-between text-sm">
+            <div class="flex items-center gap-4">
+              <div class="flex items-center gap-1.5 text-muted-foreground">
+                <Icon name="lucide:globe" class="h-3.5 w-3.5" />
+                <span>{{ server.services_count ?? server.sites_count ?? 0 }} sites</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <span
+                  v-if="server.status === 'provisioning' || server.status === 'new' || server.status === 'deleting'"
+                  class="flex items-center gap-1.5 text-muted-foreground"
+                >
+                  <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
+                  {{ getStatusLabel(server) }}
+                </span>
+                <span
+                  v-else-if="server.status === 'failed'"
+                  class="text-destructive"
+                >
+                  {{ getStatusLabel(server) }}
+                </span>
+              </div>
+            </div>
+            <span class="text-muted-foreground">
+              {{ formatDate(server.provisioned_at || server.created_at) }}
+            </span>
+          </div>
+        </div>
+      </NuxtLink>
     </div>
   </div>
 </template>
