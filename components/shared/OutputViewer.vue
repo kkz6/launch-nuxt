@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { Button } from '~/components/ui/button'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '~/components/ui/dialog'
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '~/components/ui/sheet'
 
 interface Props {
   title: string
@@ -106,19 +106,19 @@ const handleDownload = () => {
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen">
-    <DialogTrigger as-child>
+  <Sheet v-model:open="isOpen">
+    <SheetTrigger as-child>
       <slot />
-    </DialogTrigger>
-    <DialogContent class="max-h-[85vh] sm:max-w-4xl">
-      <DialogHeader>
-        <DialogTitle>{{ title }}</DialogTitle>
-        <DialogDescription v-if="description">
+    </SheetTrigger>
+    <SheetContent side="right" class="flex w-full flex-col sm:max-w-2xl">
+      <SheetHeader>
+        <SheetTitle>{{ title }}</SheetTitle>
+        <SheetDescription v-if="description">
           <code class="rounded bg-muted px-2 py-1 text-xs">{{ description }}</code>
-        </DialogDescription>
-      </DialogHeader>
+        </SheetDescription>
+      </SheetHeader>
 
-      <div class="flex items-center justify-end gap-2">
+      <div class="flex items-center justify-end gap-2 py-2">
         <Button variant="outline" size="sm" @click="handleCopy">
           <Icon name="lucide:copy" class="mr-2 h-4 w-4" />
           Copy
@@ -129,12 +129,12 @@ const handleDownload = () => {
         </Button>
       </div>
 
-      <div class="max-h-[60vh] overflow-auto rounded-lg bg-zinc-950 p-4">
+      <div class="flex-1 overflow-auto rounded-lg bg-zinc-950 p-4">
         <pre class="whitespace-pre-wrap break-words font-mono text-sm text-zinc-100"><template
           v-for="(part, index) in parsedOutput"
           :key="index"
         ><span :style="part.style">{{ part.text }}</span></template></pre>
       </div>
-    </DialogContent>
-  </Dialog>
+    </SheetContent>
+  </Sheet>
 </template>
