@@ -234,12 +234,12 @@ const getServiceImagePath = (type: string, apiPath?: string) => {
         <Transition
           enter-active-class="transition-all duration-200"
           enter-from-class="opacity-0 max-h-0"
-          enter-to-class="opacity-100 max-h-40"
+          enter-to-class="opacity-100 max-h-60"
           leave-active-class="transition-all duration-200"
-          leave-from-class="opacity-100 max-h-40"
+          leave-from-class="opacity-100 max-h-60"
           leave-to-class="opacity-0 max-h-0"
         >
-          <div v-if="selectedGroup && availableVersions.length > 0" class="overflow-hidden border-t bg-muted/30">
+          <div v-if="selectedGroup && availableVersions.length > 0" class="border-t bg-muted/30">
             <div class="px-6 py-4">
               <label class="mb-3 block text-sm font-medium">Select Version</label>
               <div class="flex flex-wrap gap-2">
