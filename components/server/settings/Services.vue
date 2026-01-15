@@ -10,6 +10,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 
 interface ServiceStatusDetails {
   pid?: string
@@ -56,6 +62,47 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 const isStatusDialogOpen = ref(false)
 const selectedServiceForStatus = ref<Service | null>(null)
 
+// WebSocket for real-time status updates
+const {
+  services: liveStatuses,
+  isConnected: wsConnected,
+  isConnecting: wsConnecting,
+  error: wsError,
+  lastUpdated: wsLastUpdated,
+  reconnect: wsReconnect,
+} = useServiceStatus({
+  serverId: props.serverId,
+  interval: 5,
+})
+
+// Get live status for a service
+const getLiveStatus = (serviceId: string) => {
+  return liveStatuses.value.find(s => s.id === serviceId)
+}
+
+// Get display status (prefer live status over API status)
+const getDisplayStatus = (service: Service) => {
+  const live = getLiveStatus(service.id)
+  if (live) {
+    return {
+      status: live.status,
+      label: live.status.charAt(0).toUpperCase() + live.status.slice(1),
+      memory: live.memory,
+      uptime: live.uptime,
+      pid: live.pid,
+      isLive: true,
+    }
+  }
+  return {
+    status: service.status,
+    label: service.status_label,
+    memory: service.status_details?.memory_usage,
+    uptime: undefined,
+    pid: service.status_details?.pid ? Number(service.status_details.pid) : undefined,
+    isLive: false,
+  }
+}
+
 // Map service types to image paths
 const getServiceImagePath = (service: Service) => {
   const imageMap: Record<string, string> = {
@@ -71,12 +118,10 @@ const getServiceImagePath = (service: Service) => {
     launch_agent: '/images/services/launch_agent.svg',
   }
 
-  // First check if we have a local mapping for this type
   if (imageMap[service.type]) {
     return imageMap[service.type]
   }
 
-  // Transform API path from /images/software/ to /images/services/
   if (service.image_path) {
     return service.image_path.replace('/images/software/', '/images/services/')
   }
@@ -123,52 +168,6 @@ const serviceAction = async (service: Service, action: 'start' | 'stop' | 'resta
   }
 }
 
-const checkStatus = async (service: Service) => {
-  loadingAction.value = { software: service.software, action: 'status' }
-
-  try {
-    toast.info(`Checking status of ${service.name}...`)
-    const response = await $api<{
-      status: string
-      status_label: string
-      last_status_check: string
-      status_details?: ServiceStatusDetails
-      status_output?: string
-    }>(`/servers/${props.serverId}/services/${service.id}/status`, {
-      method: 'POST',
-    })
-
-    // Update the service with new status data
-    const serviceIndex = services.value.findIndex(s => s.id === service.id)
-    if (serviceIndex !== -1) {
-      services.value[serviceIndex] = {
-        ...services.value[serviceIndex],
-        status: response.status,
-        status_label: response.status_label,
-        last_status_check: response.last_status_check,
-        status_details: response.status_details,
-        status_output: response.status_output,
-      }
-    }
-
-    toast.success(`Status checked for ${service.name}`)
-
-    // Open the status dialog
-    selectedServiceForStatus.value = services.value[serviceIndex]
-    isStatusDialogOpen.value = true
-  } catch {
-    toast.error(`Failed to check status of ${service.name}`)
-  } finally {
-    loadingAction.value = null
-  }
-}
-
-const handleStatusRefresh = async () => {
-  if (selectedServiceForStatus.value) {
-    await checkStatus(selectedServiceForStatus.value)
-  }
-}
-
 const openStatusDialog = (service: Service) => {
   selectedServiceForStatus.value = service
   isStatusDialogOpen.value = true
@@ -180,8 +179,11 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
     case 'running':
       return 'success'
     case 'stopped':
+      return 'secondary'
     case 'failed':
       return 'destructive'
+    case 'unknown':
+      return 'warning'
     case 'pending':
       return 'warning'
     case 'installed':
@@ -191,11 +193,24 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
   }
 }
 
-// Check if a service can be started/stopped/restarted based on status
-const canStart = (service: Service) => service.status === 'stopped'
-const canStop = (service: Service) => service.status === 'running'
-const canRestart = (service: Service) => service.status === 'running'
-const hasActions = (_service: Service) => true // Always show dropdown for Check Status
+// Check if a service can be started/stopped/restarted based on live status
+const canStart = (service: Service) => {
+  const live = getLiveStatus(service.id)
+  const status = live?.status || service.status
+  return status === 'stopped' || status === 'failed'
+}
+
+const canStop = (service: Service) => {
+  const live = getLiveStatus(service.id)
+  const status = live?.status || service.status
+  return status === 'running'
+}
+
+const canRestart = (service: Service) => {
+  const live = getLiveStatus(service.id)
+  const status = live?.status || service.status
+  return status === 'running'
+}
 
 const sortedServices = computed(() =>
   [...services.value].sort((a, b) => a.name.localeCompare(b.name))
@@ -221,13 +236,54 @@ onMounted(fetchServices)
       v-model:open="isStatusDialogOpen"
       :service="selectedServiceForStatus"
       :get-image-path="getServiceImagePath"
-      @refresh="handleStatusRefresh"
+      :live-status="getLiveStatus(selectedServiceForStatus.id)"
+      :last-updated="wsLastUpdated"
     />
 
     <Card>
       <CardHeader class="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Services</CardTitle>
+          <CardTitle class="flex items-center gap-2">
+            Services
+            <!-- Connection Status Indicator -->
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    class="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium transition-colors"
+                    :class="[
+                      wsConnected
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                        : wsConnecting
+                          ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400',
+                    ]"
+                    @click="!wsConnected && !wsConnecting && wsReconnect()"
+                  >
+                    <span
+                      class="h-1.5 w-1.5 rounded-full"
+                      :class="[
+                        wsConnected
+                          ? 'bg-emerald-500 animate-pulse'
+                          : wsConnecting
+                            ? 'bg-amber-500 animate-pulse'
+                            : 'bg-red-500',
+                      ]"
+                    />
+                    {{ wsConnected ? 'Live' : wsConnecting ? 'Connecting' : 'Disconnected' }}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p v-if="wsConnected && wsLastUpdated">
+                    Last updated: {{ wsLastUpdated.toLocaleTimeString() }}
+                  </p>
+                  <p v-else-if="wsConnecting">Connecting to status stream...</p>
+                  <p v-else-if="wsError">{{ wsError }}</p>
+                  <p v-else>Click to reconnect</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </CardTitle>
           <CardDescription>
             {{ services.length }} service{{ services.length !== 1 ? 's' : '' }} installed
           </CardDescription>
@@ -268,10 +324,11 @@ onMounted(fetchServices)
           <div v-else class="overflow-hidden rounded-lg border">
             <!-- Table Header -->
             <div class="hidden border-b bg-muted/50 px-6 py-3 md:grid md:grid-cols-12 md:gap-4">
-              <div class="col-span-4 text-sm font-medium text-muted-foreground">Service</div>
-              <div class="col-span-2 text-sm font-medium text-muted-foreground">Version</div>
+              <div class="col-span-3 text-sm font-medium text-muted-foreground">Service</div>
               <div class="col-span-2 text-sm font-medium text-muted-foreground">Status</div>
-              <div class="col-span-4 text-right text-sm font-medium text-muted-foreground">Actions</div>
+              <div class="col-span-2 text-sm font-medium text-muted-foreground">Memory</div>
+              <div class="col-span-2 text-sm font-medium text-muted-foreground">Uptime</div>
+              <div class="col-span-3 text-right text-sm font-medium text-muted-foreground">Actions</div>
             </div>
 
             <!-- Table Body -->
@@ -304,7 +361,7 @@ onMounted(fetchServices)
                         name="lucide:loader-2"
                         class="h-4 w-4 animate-spin text-muted-foreground"
                       />
-                      <DropdownMenu v-if="hasActions(service)">
+                      <DropdownMenu>
                         <DropdownMenuTrigger as-child>
                           <Button variant="ghost" size="sm">
                             <Icon name="lucide:more-horizontal" class="h-4 w-4" />
@@ -323,27 +380,31 @@ onMounted(fetchServices)
                             <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
                             Restart
                           </DropdownMenuItem>
-                          <DropdownMenuItem @click="checkStatus(service)">
+                          <DropdownMenuSeparator v-if="canStart(service) || canStop(service) || canRestart(service)" />
+                          <DropdownMenuItem @click="openStatusDialog(service)">
                             <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
-                            Check Status
+                            View Details
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                   </div>
-                  <div class="flex items-center justify-between">
-                    <Badge :variant="getStatusVariant(service.status)">
-                      {{ service.status_label }}
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Badge :variant="getStatusVariant(getDisplayStatus(service).status)">
+                      {{ getDisplayStatus(service).label }}
                     </Badge>
-                    <span v-if="service.last_status_check" class="text-xs text-muted-foreground">
-                      Checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
+                    <span v-if="getDisplayStatus(service).memory" class="text-xs text-muted-foreground">
+                      {{ getDisplayStatus(service).memory }}
+                    </span>
+                    <span v-if="getDisplayStatus(service).uptime" class="text-xs text-muted-foreground">
+                      {{ getDisplayStatus(service).uptime }}
                     </span>
                   </div>
                 </div>
 
                 <!-- Desktop Layout -->
                 <div class="hidden items-center gap-4 md:grid md:grid-cols-12">
-                  <div class="col-span-4 flex items-center gap-3">
+                  <div class="col-span-3 flex items-center gap-3">
                     <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
                       <img
                         :src="getServiceImagePath(service)"
@@ -354,30 +415,49 @@ onMounted(fetchServices)
                     </div>
                     <div class="min-w-0">
                       <div class="truncate font-medium">{{ service.name }}</div>
-                      <div v-if="service.last_status_check" class="text-xs text-muted-foreground">
-                        Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
-                      </div>
-                      <div v-else class="text-xs text-muted-foreground">{{ service.type_label }}</div>
+                      <div class="text-xs text-muted-foreground">v{{ service.version }}</div>
                     </div>
                   </div>
 
                   <div class="col-span-2">
-                    <span class="font-mono text-sm">{{ service.version }}</span>
+                    <div class="flex items-center gap-2">
+                      <Badge :variant="getStatusVariant(getDisplayStatus(service).status)">
+                        {{ getDisplayStatus(service).label }}
+                      </Badge>
+                      <TooltipProvider v-if="getDisplayStatus(service).pid">
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <span class="text-xs text-muted-foreground">
+                              PID {{ getDisplayStatus(service).pid }}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Process ID</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
                   </div>
 
                   <div class="col-span-2">
-                    <Badge :variant="getStatusVariant(service.status)">
-                      {{ service.status_label }}
-                    </Badge>
+                    <span v-if="getDisplayStatus(service).memory" class="text-sm">
+                      {{ getDisplayStatus(service).memory }}
+                    </span>
+                    <span v-else class="text-sm text-muted-foreground">—</span>
                   </div>
 
-                  <div class="col-span-4 flex items-center justify-end gap-2">
+                  <div class="col-span-2">
+                    <span v-if="getDisplayStatus(service).uptime" class="text-sm">
+                      {{ getDisplayStatus(service).uptime }}
+                    </span>
+                    <span v-else class="text-sm text-muted-foreground">—</span>
+                  </div>
+
+                  <div class="col-span-3 flex items-center justify-end gap-2">
                     <Icon
                       v-if="loadingAction?.software === service.software"
                       name="lucide:loader-2"
                       class="h-4 w-4 animate-spin text-muted-foreground"
                     />
-                    <DropdownMenu v-if="hasActions(service)">
+                    <DropdownMenu>
                       <DropdownMenuTrigger as-child>
                         <Button variant="ghost" size="sm">
                           <Icon name="lucide:more-horizontal" class="h-4 w-4" />
@@ -397,9 +477,9 @@ onMounted(fetchServices)
                           Restart
                         </DropdownMenuItem>
                         <DropdownMenuSeparator v-if="canStart(service) || canStop(service) || canRestart(service)" />
-                        <DropdownMenuItem @click="checkStatus(service)">
+                        <DropdownMenuItem @click="openStatusDialog(service)">
                           <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
-                          Check Status
+                          View Details
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
