@@ -338,10 +338,18 @@ onMounted(fetchDomainData);
                   </TableCell>
                   <TableCell>
                     <div class="flex items-center gap-2">
-                      <MessageSquare
-                        v-if="record.comment"
-                        class="h-4 w-4 text-muted-foreground"
-                      />
+                      <TooltipProvider v-if="record.comment">
+                        <Tooltip>
+                          <TooltipTrigger as-child>
+                            <MessageSquare
+                              class="h-4 w-4 text-muted-foreground cursor-help"
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p class="max-w-xs">{{ record.comment }}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                       <span class="max-w-[200px] truncate">{{
                         record.name
                       }}</span>
