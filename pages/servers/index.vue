@@ -76,7 +76,7 @@ onMounted(async () => {
 
     <div
       v-else-if="servers.length === 0"
-      class="mt-6 flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
+      class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
     >
       <ServerIcon class="size-10 text-muted-foreground md:size-28" />
       <span>No servers added yet. Click on Create server.</span>
@@ -84,7 +84,7 @@ onMounted(async () => {
 
     <div
       v-else
-      class="mt-6 grid w-full flex-wrap gap-5 sm:grid-cols-2 lg:grid-cols-3"
+      class="grid w-full flex-wrap gap-5 sm:grid-cols-2 lg:grid-cols-3"
     >
             <NuxtLink
               v-for="server in servers"

@@ -23,7 +23,7 @@ onMounted(() => {
     class="relative flex min-h-screen w-full flex-col bg-background"
   >
     <LayoutNavbar />
-    <main class="flex w-full flex-1 flex-col items-center pt-6 pb-10">
+    <main class="flex w-full flex-1 flex-col items-center pt-4 pb-10">
       <div class="w-full max-w-8xl px-4 lg:px-8">
         <slot />
       </div>

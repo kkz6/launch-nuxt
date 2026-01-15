@@ -115,7 +115,7 @@ onMounted(fetchDomains);
 
     <div
       v-else-if="domains.length === 0"
-      class="mt-6 flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
+      class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4"
     >
       <Globe class="size-10 text-muted-foreground md:size-28" />
       <span>No domains configured yet. Click on Add Domain.</span>
@@ -123,7 +123,7 @@ onMounted(fetchDomains);
 
     <div
       v-else
-      class="mt-6 grid w-full gap-5 pb-10 sm:grid-cols-2 lg:grid-cols-3"
+      class="grid w-full gap-5 pb-10 sm:grid-cols-2 lg:grid-cols-3"
     >
             <NuxtLink
               v-for="domain in domains"
