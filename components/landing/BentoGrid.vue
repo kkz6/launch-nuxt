@@ -10,18 +10,16 @@ const databases = [
 </script>
 
 <template>
-  <section class="site-section bg-[hsl(var(--site-bg))] py-20">
-    <div class="site-grid-pattern absolute inset-0" />
-    <div class="site-glow left-1/4 top-0 h-[500px] w-[500px] bg-emerald-500 opacity-10" />
-    <div class="site-glow bottom-0 right-1/4 h-[400px] w-[400px] bg-cyan-500 opacity-10" />
+  <section class="relative bg-background py-24">
+    <div class="absolute inset-0 bg-gradient-to-b from-muted/30 to-background" />
 
-    <div class="site-container relative">
+    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <!-- Section Header -->
-      <div class="mb-16 text-center" data-aos="fade-up">
-        <h2 class="font-site mb-4 text-3xl font-bold text-[hsl(var(--site-text))] md:text-4xl">
-          Deployments made easy
+      <div class="mb-16 text-center">
+        <h2 class="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          Everything you need to deploy
         </h2>
-        <p class="mx-auto max-w-xl text-base text-[hsl(var(--site-text-muted))]">
+        <p class="mx-auto max-w-2xl text-lg text-muted-foreground">
           Deploy with ease, leave complexities to us.
         </p>
       </div>
@@ -31,35 +29,35 @@ const databases = [
         <!-- Left Column - Terminal + One Click Deploy -->
         <div class="space-y-4 lg:row-span-2 lg:space-y-6">
           <!-- Terminal Card -->
-          <div class="site-card site-card-hover h-full overflow-hidden rounded-xl" data-aos="fade-right">
+          <div class="h-full overflow-hidden rounded-xl border bg-card">
             <div class="flex h-full flex-col p-6">
               <!-- Terminal Window -->
-              <div class="flex-1 rounded-lg border border-white/5 bg-[hsl(220,20%,6%)]">
-                <div class="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+              <div class="flex-1 overflow-hidden rounded-lg border bg-zinc-950">
+                <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
                   <div class="flex gap-1.5">
                     <div class="h-2.5 w-2.5 rounded-full bg-red-500/80" />
                     <div class="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
                     <div class="h-2.5 w-2.5 rounded-full bg-green-500/80" />
                   </div>
-                  <span class="ml-2 font-mono text-[10px] text-white/30"> terminal </span>
+                  <span class="ml-2 font-mono text-[10px] text-zinc-500">terminal</span>
                 </div>
 
                 <div class="space-y-3 p-4 font-mono text-xs">
                   <div class="flex items-center gap-2">
                     <span class="text-emerald-400">$</span>
-                    <span class="text-white/70">git add .</span>
+                    <span class="text-zinc-300">git add .</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-emerald-400">$</span>
-                    <span class="text-white/70"> git commit -m "deploy" </span>
+                    <span class="text-zinc-300">git commit -m "deploy"</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <span class="text-emerald-400">$</span>
-                    <span class="text-white/70">git push</span>
+                    <span class="text-zinc-300">git push</span>
                   </div>
-                  <div class="mt-4 border-t border-white/5 pt-3">
+                  <div class="mt-4 border-t border-zinc-800 pt-3">
                     <div class="flex items-center gap-2 text-cyan-400">
-                      <span>✨</span>
+                      <Icon name="lucide:sparkles" class="h-4 w-4" />
                       <span>your site is live</span>
                     </div>
                   </div>
@@ -68,11 +66,11 @@ const databases = [
 
               <!-- One Click Deploy -->
               <div class="mt-6">
-                <h3 class="font-site mb-2 text-lg font-semibold text-[hsl(var(--site-text))]">
+                <h3 class="mb-2 text-lg font-semibold text-foreground">
                   One click deploy
                 </h3>
-                <p class="text-sm text-[hsl(var(--site-text-muted))]">
-                  Deploy your app in seconds, with our one click deploy feature. Push to Git and we
+                <p class="text-sm text-muted-foreground">
+                  Deploy your app in seconds with our one click deploy feature. Push to Git and we
                   handle the rest.
                 </p>
               </div>
@@ -81,43 +79,40 @@ const databases = [
         </div>
 
         <!-- Right Top - Intuitive Workflow -->
-        <div
-          class="site-card site-card-hover overflow-hidden rounded-xl lg:col-span-2"
-          data-aos="fade-left"
-        >
+        <div class="overflow-hidden rounded-xl border bg-card lg:col-span-2">
           <div class="h-full p-6">
             <div class="flex h-full flex-col gap-6 lg:flex-row">
               <div class="flex flex-col justify-center lg:w-1/2">
-                <h3 class="font-site mb-2 text-lg font-semibold text-[hsl(var(--site-text))]">
+                <h3 class="mb-2 text-lg font-semibold text-foreground">
                   Intuitive workflow
                 </h3>
-                <p class="text-sm text-[hsl(var(--site-text-muted))]">
+                <p class="text-sm text-muted-foreground">
                   With our intuitive workflow, you can easily manage your deployments without complex
                   configurations or DevOps expertise.
                 </p>
               </div>
               <div class="lg:w-1/2">
                 <!-- Dashboard Preview -->
-                <div class="h-full rounded-lg border border-white/5 bg-[hsl(220,20%,6%)] p-4">
+                <div class="h-full rounded-lg border bg-zinc-950 p-4">
                   <div class="space-y-3">
                     <!-- Stats Row -->
                     <div class="grid grid-cols-3 gap-2">
-                      <div class="rounded-md bg-white/5 p-2">
-                        <div class="font-mono text-[10px] text-white/40">Deployments</div>
-                        <div class="text-sm font-semibold text-white">247</div>
+                      <div class="rounded-md bg-zinc-900 p-2">
+                        <div class="font-mono text-[10px] text-zinc-500">Deployments</div>
+                        <div class="text-sm font-semibold text-zinc-100">247</div>
                       </div>
-                      <div class="rounded-md bg-white/5 p-2">
-                        <div class="font-mono text-[10px] text-white/40">Uptime</div>
+                      <div class="rounded-md bg-zinc-900 p-2">
+                        <div class="font-mono text-[10px] text-zinc-500">Uptime</div>
                         <div class="text-sm font-semibold text-emerald-400">99.9%</div>
                       </div>
-                      <div class="rounded-md bg-white/5 p-2">
-                        <div class="font-mono text-[10px] text-white/40">Servers</div>
-                        <div class="text-sm font-semibold text-white">12</div>
+                      <div class="rounded-md bg-zinc-900 p-2">
+                        <div class="font-mono text-[10px] text-zinc-500">Servers</div>
+                        <div class="text-sm font-semibold text-zinc-100">12</div>
                       </div>
                     </div>
 
                     <!-- Mini Chart -->
-                    <div class="rounded-md bg-white/5 p-3">
+                    <div class="rounded-md bg-zinc-900 p-3">
                       <div class="flex h-12 items-end gap-1">
                         <div
                           v-for="(height, i) in chartHeights"
@@ -126,7 +121,7 @@ const databases = [
                           :style="{ height: `${height}%` }"
                         />
                       </div>
-                      <div class="mt-2 font-mono text-[10px] text-white/30">Deployments this week</div>
+                      <div class="mt-2 font-mono text-[10px] text-zinc-500">Deployments this week</div>
                     </div>
                   </div>
                 </div>
@@ -136,11 +131,7 @@ const databases = [
         </div>
 
         <!-- Bottom Left - Global Edge Network -->
-        <div
-          class="site-card site-card-hover overflow-hidden rounded-xl"
-          data-aos="fade-up"
-          data-aos-delay="100"
-        >
+        <div class="overflow-hidden rounded-xl border bg-card">
           <div class="flex h-full flex-col p-6">
             <!-- Globe -->
             <div class="relative min-h-[280px] flex-1">
@@ -158,10 +149,10 @@ const databases = [
 
             <!-- Description -->
             <div class="mt-4">
-              <h3 class="font-site mb-2 text-lg font-semibold text-[hsl(var(--site-text))]">
+              <h3 class="mb-2 text-lg font-semibold text-foreground">
                 Global edge network
               </h3>
-              <p class="text-sm text-[hsl(var(--site-text-muted))]">
+              <p class="text-sm text-muted-foreground">
                 Deploy to multiple regions. Your app runs closer to your users for lightning-fast
                 performance.
               </p>
@@ -170,20 +161,16 @@ const databases = [
         </div>
 
         <!-- Bottom Right - Database Management -->
-        <div
-          class="site-card site-card-hover overflow-hidden rounded-xl"
-          data-aos="fade-up"
-          data-aos-delay="200"
-        >
+        <div class="overflow-hidden rounded-xl border bg-card">
           <div class="flex h-full flex-col p-6">
             <!-- Database Visualization -->
             <div class="flex-1">
-              <div class="h-full rounded-lg border border-white/5 bg-[hsl(220,20%,6%)] p-4">
+              <div class="h-full rounded-lg border bg-zinc-950 p-4">
                 <div class="space-y-3">
                   <!-- Database Header -->
                   <div class="flex items-center justify-between">
-                    <span class="font-mono text-[10px] text-white/40"> Databases </span>
-                    <span class="font-mono text-xs text-emerald-400"> Managed </span>
+                    <span class="font-mono text-[10px] text-zinc-500">Databases</span>
+                    <span class="font-mono text-xs text-emerald-400">Managed</span>
                   </div>
 
                   <!-- Database Types -->
@@ -195,24 +182,15 @@ const databases = [
                         'flex items-center gap-2 rounded-md border p-2',
                         db.active
                           ? 'border-emerald-500/20 bg-emerald-500/10'
-                          : 'border-dashed border-white/10 bg-white/5',
+                          : 'border-dashed border-zinc-700 bg-zinc-900',
                       ]"
                     >
-                      <svg
-                        :class="['h-3.5 w-3.5', db.active ? 'text-emerald-400' : 'text-white/20']"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          :stroke-width="1.5"
-                          d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
-                        />
-                      </svg>
+                      <Icon
+                        name="lucide:database"
+                        :class="['h-3.5 w-3.5', db.active ? 'text-emerald-400' : 'text-zinc-600']"
+                      />
                       <span
-                        :class="['font-mono text-[10px]', db.active ? 'text-white/70' : 'text-white/30']"
+                        :class="['font-mono text-[10px]', db.active ? 'text-zinc-300' : 'text-zinc-600']"
                       >
                         {{ db.name }}
                       </span>
@@ -222,10 +200,10 @@ const databases = [
                   <!-- Storage Indicator -->
                   <div class="space-y-1">
                     <div class="flex justify-between font-mono text-[10px]">
-                      <span class="text-white/40">Storage</span>
-                      <span class="text-white/60">2.4 GB</span>
+                      <span class="text-zinc-500">Storage</span>
+                      <span class="text-zinc-400">2.4 GB</span>
                     </div>
-                    <div class="h-1.5 overflow-hidden rounded-full bg-white/5">
+                    <div class="h-1.5 overflow-hidden rounded-full bg-zinc-800">
                       <div
                         class="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-500"
                         style="width: 24%"
@@ -238,10 +216,10 @@ const databases = [
 
             <!-- Description -->
             <div class="mt-4">
-              <h3 class="font-site mb-2 text-lg font-semibold text-[hsl(var(--site-text))]">
+              <h3 class="mb-2 text-lg font-semibold text-foreground">
                 Database management
               </h3>
-              <p class="text-sm text-[hsl(var(--site-text-muted))]">
+              <p class="text-sm text-muted-foreground">
                 Create and manage databases with one click. Backups, migrations, and monitoring included.
               </p>
             </div>

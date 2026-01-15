@@ -1,43 +1,43 @@
-<script setup lang="ts"></script>
+<script setup lang="ts">
+const { isAuthenticated } = useAuth()
+</script>
 
 <template>
-  <section class="site-section bg-[hsl(var(--site-bg))] py-20">
-    <div class="site-grid-pattern absolute inset-0" />
+  <section class="relative bg-background py-24">
+    <div class="absolute inset-0 bg-gradient-to-t from-muted/50 to-background" />
 
-    <div class="site-container relative">
-      <div class="site-card relative overflow-hidden rounded-lg" data-aos="zoom-y-out">
-        <div class="absolute inset-0 bg-emerald-500/5" />
+    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="relative overflow-hidden rounded-2xl border bg-card">
+        <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-primary/5" />
 
-        <div class="site-glow -bottom-32 -left-32 h-[300px] w-[300px] bg-emerald-500 opacity-20" />
-
-        <div class="relative px-6 py-12 text-center md:px-12 md:py-16">
-          <h2 class="font-site mb-4 text-2xl font-bold text-[hsl(var(--site-text))] md:text-3xl">
-            Ready to <span class="text-emerald-400">Launch</span>?
+        <div class="relative px-6 py-16 text-center sm:px-12 sm:py-20">
+          <h2 class="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+            Ready to simplify your infrastructure?
           </h2>
-          <p class="mx-auto mb-6 max-w-xl text-sm text-[hsl(var(--site-text-muted))]">
-            Simplify your deployment workflow. Start deploying in minutes, not hours.
+          <p class="mx-auto mb-8 max-w-2xl text-lg text-muted-foreground">
+            Join thousands of developers who deploy and manage their servers with launchctl.
+            Start your free trial today.
           </p>
-          <div class="flex flex-wrap justify-center gap-3">
-            <NuxtLink to="/register" class="btn btn-site-primary group">
-              Start Deploying
-              <svg
-                class="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  :stroke-width="2"
-                  d="M13 7l5 5m0 0l-5 5m5-5H6"
-                />
-              </svg>
+
+          <div class="flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <NuxtLink
+              :to="isAuthenticated ? '/servers' : '/register'"
+              class="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-foreground px-8 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
+            >
+              {{ isAuthenticated ? 'Go to Dashboard' : 'Start Free Trial' }}
+              <Icon name="lucide:arrow-right" class="h-4 w-4" />
             </NuxtLink>
-            <NuxtLink to="/support" class="btn btn-site-secondary"> Documentation </NuxtLink>
+            <NuxtLink
+              to="/support"
+              class="inline-flex h-12 items-center justify-center gap-2 rounded-lg border bg-background px-8 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+            >
+              <Icon name="lucide:book-open" class="h-4 w-4" />
+              Read Documentation
+            </NuxtLink>
           </div>
-          <p class="mt-5 font-mono text-[10px] text-[hsl(var(--site-text-muted))]">
-            No credit card required • 14-day free trial
+
+          <p class="mt-6 text-sm text-muted-foreground">
+            No credit card required &bull; 14-day free trial &bull; Cancel anytime
           </p>
         </div>
       </div>
