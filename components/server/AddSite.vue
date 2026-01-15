@@ -172,12 +172,12 @@ const verifyDomain = async (domain: string) => {
 
   isVerifyingDomain.value = true
   try {
-    const result = await $api<DomainVerification>('/sites/verify-domain', {
+    const result = await $api<{ data: DomainVerification }>('/sites/verify-domain', {
       params: { domain },
     })
-    domainVerification.value = result
+    domainVerification.value = result.data
     // Auto-enable DNS record creation if domain is verified
-    if (result.verified && result.can_create_record) {
+    if (result.data.verified && result.data.can_create_record) {
       createDnsRecord.value = true
     }
   } catch {
