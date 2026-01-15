@@ -123,8 +123,8 @@ const formatPhpVersion = (version: string): string => {
   return version
 }
 
-const phpVersion = computed(() => formatPhpVersion(props.service.details?.version || props.service.key))
-const supportsJit = computed(() => parseFloat(phpVersion.value) >= 8.0)
+const phpVersion = ref('')
+const supportsJit = ref(false)
 
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B'
@@ -134,32 +134,38 @@ const formatBytes = (bytes: number): string => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
 
-// Watch both open state and opcache data to handle timing issues
-watch(
-  [open, () => props.service?.details?.opcache],
-  ([isOpen, opcache]) => {
-    if (isOpen) {
-      // Explicitly set each property to ensure reactivity
-      form.value = {
-        enabled: opcache?.enabled ?? defaultSettings.enabled,
-        enable_cli: opcache?.enable_cli ?? defaultSettings.enable_cli,
-        memory_consumption: opcache?.memory_consumption ?? defaultSettings.memory_consumption,
-        interned_strings_buffer: opcache?.interned_strings_buffer ?? defaultSettings.interned_strings_buffer,
-        max_accelerated_files: opcache?.max_accelerated_files ?? defaultSettings.max_accelerated_files,
-        validate_timestamps: opcache?.validate_timestamps ?? defaultSettings.validate_timestamps,
-        revalidate_freq: opcache?.revalidate_freq ?? defaultSettings.revalidate_freq,
-        save_comments: opcache?.save_comments ?? defaultSettings.save_comments,
-        jit_enabled: opcache?.jit_enabled ?? defaultSettings.jit_enabled,
-        jit_buffer_size: opcache?.jit_buffer_size ?? defaultSettings.jit_buffer_size,
-        jit_mode: opcache?.jit_mode ?? defaultSettings.jit_mode,
-      }
-      // Reset status when dialog opens - user needs to click refresh
-      status.value = null
-      hasLoadedStatus.value = false
-    }
-  },
-  { immediate: true },
-)
+// Initialize form when dialog opens
+const initializeForm = () => {
+  const opcache = props.service?.details?.opcache
+  form.value = {
+    enabled: opcache?.enabled ?? defaultSettings.enabled,
+    enable_cli: opcache?.enable_cli ?? defaultSettings.enable_cli,
+    memory_consumption: opcache?.memory_consumption ?? defaultSettings.memory_consumption,
+    interned_strings_buffer: opcache?.interned_strings_buffer ?? defaultSettings.interned_strings_buffer,
+    max_accelerated_files: opcache?.max_accelerated_files ?? defaultSettings.max_accelerated_files,
+    validate_timestamps: opcache?.validate_timestamps ?? defaultSettings.validate_timestamps,
+    revalidate_freq: opcache?.revalidate_freq ?? defaultSettings.revalidate_freq,
+    save_comments: opcache?.save_comments ?? defaultSettings.save_comments,
+    jit_enabled: opcache?.jit_enabled ?? defaultSettings.jit_enabled,
+    jit_buffer_size: opcache?.jit_buffer_size ?? defaultSettings.jit_buffer_size,
+    jit_mode: opcache?.jit_mode ?? defaultSettings.jit_mode,
+  }
+
+  // Update PHP version info
+  phpVersion.value = formatPhpVersion(props.service?.details?.version || props.service?.key || '')
+  supportsJit.value = parseFloat(phpVersion.value) >= 8.0
+
+  // Reset status
+  status.value = null
+  hasLoadedStatus.value = false
+}
+
+watch(open, async (isOpen) => {
+  if (isOpen) {
+    await nextTick()
+    initializeForm()
+  }
+})
 
 const fetchStatus = async () => {
   statusLoading.value = true
