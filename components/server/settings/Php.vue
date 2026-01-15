@@ -20,38 +20,51 @@ import {
 interface PhpExtension {
   value: string
   label: string
-  description: string
+  status: string
   is_installed: boolean
   is_pending: boolean
-  status: string
 }
 
-interface PhpSoftwareFile {
+interface PhpOpcache {
+  enable_cli: boolean
+  enabled: boolean
+  interned_strings_buffer: number
+  jit_buffer_size: string
+  jit_enabled: boolean
+  jit_mode: string
+  max_accelerated_files: number
+  memory_consumption: number
+  revalidate_freq: number
+  save_comments: boolean
+  status: string
+  validate_timestamps: boolean
+}
+
+interface PhpDetails {
   id: string
+  server_id: string
+  type: string
+  type_label: string
   name: string
-  path: string
-}
-
-interface PhpSoftware {
-  default?: PhpSoftwareFile[]
-  configuration?: PhpSoftwareFile[]
-}
-
-interface PhpService {
-  id: string
-  status: string
   version: string
-  type_data?: Record<string, unknown>
+  status: string
+  status_label: string
+  is_default: boolean
+  software: string
+  software_label: string
+  extensions?: PhpExtension[]
+  opcache?: PhpOpcache
+  created_at: string
+  updated_at: string
 }
 
 interface PhpVersionData {
   key: string
   display_name: string
+  version: string
   is_installed: boolean
   is_default: boolean
-  details?: PhpService
-  software?: PhpSoftware
-  extensions: PhpExtension[]
+  details?: PhpDetails
 }
 
 interface Props {
@@ -73,16 +86,11 @@ const extensionsDialogService = ref<PhpVersionData | null>(null)
 const opcacheDialogOpen = ref(false)
 const opcacheDialogService = ref<PhpVersionData | null>(null)
 
-const phpIniEditorOpen = ref(false)
-const phpIniEditorFile = ref<PhpSoftwareFile | null>(null)
-
-const fpmConfigEditorOpen = ref(false)
-const fpmConfigEditorFile = ref<PhpSoftwareFile | null>(null)
-
 const fetchPhpVersions = async () => {
   try {
-    const data = await $api<{ data: PhpVersionData[] }>(`/servers/${props.serverId}/php`)
-    phpVersions.value = data.data || []
+    const response = await $api<PhpVersionData[] | { data: PhpVersionData[] }>(`/servers/${props.serverId}/php`)
+    // Handle both array and { data: array } response formats
+    phpVersions.value = Array.isArray(response) ? response : (response.data || [])
   } catch {
     toast.error('Failed to load PHP versions')
   } finally {
@@ -211,16 +219,6 @@ const openOpcacheDialog = (php: PhpVersionData) => {
   opcacheDialogOpen.value = true
 }
 
-const openPhpIniEditor = (file: PhpSoftwareFile) => {
-  phpIniEditorFile.value = file
-  phpIniEditorOpen.value = true
-}
-
-const openFpmConfigEditor = (file: PhpSoftwareFile) => {
-  fpmConfigEditorFile.value = file
-  fpmConfigEditorOpen.value = true
-}
-
 onMounted(fetchPhpVersions)
 </script>
 
@@ -244,26 +242,6 @@ onMounted(fetchPhpVersions)
       :server-id="serverId"
       :service="opcacheDialogService"
       @updated="fetchPhpVersions"
-    />
-
-    <!-- php.ini Editor -->
-    <ServerSettingsConfigEditorDialog
-      v-if="phpIniEditorFile"
-      v-model:open="phpIniEditorOpen"
-      :server-id="serverId"
-      :file="phpIniEditorFile"
-      title="Edit php.ini"
-      @saved="fetchPhpVersions"
-    />
-
-    <!-- FPM Config Editor -->
-    <ServerSettingsConfigEditorDialog
-      v-if="fpmConfigEditorFile"
-      v-model:open="fpmConfigEditorOpen"
-      :server-id="serverId"
-      :file="fpmConfigEditorFile"
-      title="Edit FPM Config"
-      @saved="fetchPhpVersions"
     />
 
     <div v-if="isLoading" class="flex items-center justify-center py-16">
@@ -419,28 +397,14 @@ onMounted(fetchPhpVersions)
                       <DropdownMenuContent align="end" class="w-48">
                         <template v-if="service.details?.status === 'installed'">
                           <DropdownMenuItem
-                            v-if="service.software?.default?.[0]"
-                            @click="openPhpIniEditor(service.software.default[0])"
-                          >
-                            <Icon name="lucide:file-code" class="mr-2 h-4 w-4" />
-                            Edit php.ini
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            v-if="service.software?.configuration?.[0]"
-                            @click="openFpmConfigEditor(service.software.configuration[0])"
-                          >
-                            <Icon name="lucide:settings" class="mr-2 h-4 w-4" />
-                            Edit FPM Config
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            v-if="service.details"
+                            v-if="service.details?.opcache"
                             @click="openOpcacheDialog(service)"
                           >
                             <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
                             OPcache
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            v-if="service.details"
+                            v-if="service.details?.extensions"
                             @click="openExtensionsDialog(service)"
                           >
                             <Icon name="lucide:package" class="mr-2 h-4 w-4" />
@@ -525,28 +489,14 @@ onMounted(fetchPhpVersions)
                     <DropdownMenuContent align="end" class="w-48">
                       <template v-if="service.details?.status === 'installed'">
                         <DropdownMenuItem
-                          v-if="service.software?.default?.[0]"
-                          @click="openPhpIniEditor(service.software.default[0])"
-                        >
-                          <Icon name="lucide:file-code" class="mr-2 h-4 w-4" />
-                          Edit php.ini
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          v-if="service.software?.configuration?.[0]"
-                          @click="openFpmConfigEditor(service.software.configuration[0])"
-                        >
-                          <Icon name="lucide:settings" class="mr-2 h-4 w-4" />
-                          Edit FPM Config
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          v-if="service.details"
+                          v-if="service.details?.opcache"
                           @click="openOpcacheDialog(service)"
                         >
                           <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
                           OPcache
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          v-if="service.details"
+                          v-if="service.details?.extensions"
                           @click="openExtensionsDialog(service)"
                         >
                           <Icon name="lucide:package" class="mr-2 h-4 w-4" />

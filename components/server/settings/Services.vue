@@ -58,8 +58,6 @@ const selectedServiceForStatus = ref<Service | null>(null)
 
 // Map service types to image paths
 const getServiceImagePath = (service: Service) => {
-  if (service.image_path) return service.image_path
-
   const imageMap: Record<string, string> = {
     php: '/images/services/php.svg',
     mysql: '/images/services/mysql.svg',
@@ -72,7 +70,18 @@ const getServiceImagePath = (service: Service) => {
     node: '/images/services/node.svg',
     launch_agent: '/images/services/launch_agent.svg',
   }
-  return imageMap[service.type] || '/images/services/package_manager.svg'
+
+  // First check if we have a local mapping for this type
+  if (imageMap[service.type]) {
+    return imageMap[service.type]
+  }
+
+  // Transform API path from /images/software/ to /images/services/
+  if (service.image_path) {
+    return service.image_path.replace('/images/software/', '/images/services/')
+  }
+
+  return '/images/services/package_manager.svg'
 }
 
 const fetchServices = async () => {

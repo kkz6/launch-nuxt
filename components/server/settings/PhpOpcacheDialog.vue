@@ -64,9 +64,7 @@ interface PhpService {
   id: string
   status: string
   version: string
-  type_data?: {
-    opcache?: OpcacheSettings
-  }
+  opcache?: OpcacheSettings
 }
 
 interface PhpVersionData {
@@ -138,7 +136,7 @@ const formatBytes = (bytes: number): string => {
 
 watch(open, (isOpen) => {
   if (isOpen) {
-    const currentSettings = props.service.details?.type_data?.opcache
+    const currentSettings = props.service.details?.opcache
     form.value = { ...defaultSettings, ...currentSettings }
     // Reset status when dialog opens - user needs to click refresh
     status.value = null

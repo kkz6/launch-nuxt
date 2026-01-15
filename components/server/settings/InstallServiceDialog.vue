@@ -54,8 +54,9 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 const fetchAvailableServices = async () => {
   isLoading.value = true
   try {
-    const data = await $api<ServiceGroup[]>(`/servers/${props.serverId}/services/create`)
-    serviceGroups.value = data || []
+    const response = await $api<ServiceGroup[] | { data: ServiceGroup[] }>(`/servers/${props.serverId}/services/create`)
+    // Handle both array and { data: array } response formats
+    serviceGroups.value = Array.isArray(response) ? response : (response.data || [])
   } catch {
     toast.error('Failed to load available services')
   } finally {
@@ -135,7 +136,7 @@ const availableVersions = computed(() => {
   return getAvailableVersionsForService(selectedGroup.value)
 })
 
-const getServiceImagePath = (type: string) => {
+const getServiceImagePath = (type: string, apiPath?: string) => {
   const imageMap: Record<string, string> = {
     php: '/images/services/php.svg',
     mysql: '/images/services/mysql.svg',
@@ -148,7 +149,18 @@ const getServiceImagePath = (type: string) => {
     node: '/images/services/node.svg',
     launch_agent: '/images/services/launch_agent.svg',
   }
-  return imageMap[type] || '/images/services/package_manager.svg'
+
+  // First check if we have a local mapping for this type
+  if (imageMap[type]) {
+    return imageMap[type]
+  }
+
+  // Transform API path from /images/software/ to /images/services/
+  if (apiPath) {
+    return apiPath.replace('/images/software/', '/images/services/')
+  }
+
+  return '/images/services/package_manager.svg'
 }
 </script>
 
@@ -188,7 +200,7 @@ const getServiceImagePath = (type: string) => {
             >
               <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
                 <img
-                  :src="service.image_path || getServiceImagePath(service.type)"
+                  :src="getServiceImagePath(service.type, service.image_path)"
                   :alt="service.label"
                   class="h-6 w-6 object-contain"
                   @error="($event.target as HTMLImageElement).style.display = 'none'"

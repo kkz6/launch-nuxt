@@ -23,25 +23,29 @@ import {
 interface PhpExtension {
   value: string
   label: string
-  description: string
+  status: string
   is_installed: boolean
   is_pending: boolean
-  status: string
 }
 
-interface PhpService {
+interface PhpDetails {
   id: string
-  status: string
+  server_id: string
+  type: string
+  name: string
   version: string
+  status: string
+  software: string
+  extensions?: PhpExtension[]
 }
 
 interface PhpVersionData {
   key: string
   display_name: string
+  version: string
   is_installed: boolean
   is_default: boolean
-  details?: PhpService
-  extensions: PhpExtension[]
+  details?: PhpDetails
 }
 
 interface Props {
@@ -118,7 +122,8 @@ const confirmAction = () => {
   confirmDialog.value = { open: false, action: 'install', extension: null }
 }
 
-const pendingCount = computed(() => props.service.extensions?.filter(e => e.is_pending).length || 0)
+const extensions = computed(() => props.service.details?.extensions || [])
+const pendingCount = computed(() => extensions.value.filter(e => e.is_pending).length)
 </script>
 
 <template>
@@ -139,7 +144,7 @@ const pendingCount = computed(() => props.service.extensions?.filter(e => e.is_p
 
       <div class="grid max-h-[400px] gap-2 overflow-y-auto pr-1">
         <div
-          v-for="ext in service.extensions"
+          v-for="ext in extensions"
           :key="ext.value"
           :class="[
             'flex items-center justify-between rounded-lg border p-3',
@@ -164,9 +169,6 @@ const pendingCount = computed(() => props.service.extensions?.filter(e => e.is_p
                 Failed
               </Badge>
             </div>
-            <p class="mt-0.5 truncate text-xs text-muted-foreground">
-              {{ ext.description }}
-            </p>
           </div>
 
           <div class="ml-3 flex flex-shrink-0 items-center gap-2">
@@ -204,7 +206,7 @@ const pendingCount = computed(() => props.service.extensions?.filter(e => e.is_p
           </div>
         </div>
 
-        <div v-if="!service.extensions?.length" class="py-8 text-center text-muted-foreground">
+        <div v-if="extensions.length === 0" class="py-8 text-center text-muted-foreground">
           No extensions available
         </div>
       </div>
