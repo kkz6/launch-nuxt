@@ -193,9 +193,7 @@ declare global {
     <template v-else>
       <!-- Subscription Section -->
       <div class="space-y-4">
-        <div class="border-l-2 border-primary pl-4">
-          <h3 class="text-lg font-semibold">Subscription</h3>
-        </div>
+        <h3 class="text-lg font-semibold">Subscription</h3>
 
         <!-- Active Subscription Card -->
         <div v-if="hasSubscription" class="rounded-xl border bg-card p-5">
@@ -252,9 +250,7 @@ declare global {
 
       <!-- Payment Method Section -->
       <div v-if="hasSubscription" class="space-y-4">
-        <div class="border-l-2 border-primary pl-4">
-          <h3 class="text-lg font-semibold">Payment Method</h3>
-        </div>
+        <h3 class="text-lg font-semibold">Payment Method</h3>
 
         <div class="rounded-xl border bg-card p-5">
           <div class="flex items-center justify-between">
@@ -289,9 +285,7 @@ declare global {
 
       <!-- Billing History Section -->
       <div v-if="receipts.length > 0" class="space-y-4">
-        <div class="border-l-2 border-primary pl-4">
-          <h3 class="text-lg font-semibold">Billing History</h3>
-        </div>
+        <h3 class="text-lg font-semibold">Billing History</h3>
 
         <div class="rounded-xl border bg-card">
           <div class="divide-y">
@@ -329,9 +323,7 @@ declare global {
 
       <!-- Danger Zone -->
       <div v-if="hasSubscription && !isEnding" class="space-y-4">
-        <div class="border-l-2 border-destructive pl-4">
-          <h3 class="text-lg font-semibold">Danger Zone</h3>
-        </div>
+        <h3 class="text-lg font-semibold text-destructive">Danger Zone</h3>
 
         <div class="rounded-xl border border-destructive/20 bg-destructive/5 p-5">
           <div class="flex items-center justify-between">
