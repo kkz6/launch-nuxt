@@ -20,6 +20,7 @@ const isTerminalOpen = useState('serverTerminalOpen', () => false);
 
 // Valid tab values
 const validTabs = ["sites", "databases", "networks", "daemons", "schedulers", "advanced"];
+const validSubTabs = ["general", "backups", "ssh-keys", "packages", "php", "services"];
 
 // Get initial tab from query params or default to "sites"
 const getInitialTab = () => {
@@ -28,6 +29,12 @@ const getInitialTab = () => {
 };
 
 const activeTab = ref(getInitialTab());
+
+// Get active subtab for advanced settings
+const activeSubTab = computed(() => {
+  const subtabFromQuery = route.query.subtab as string;
+  return validSubTabs.includes(subtabFromQuery) ? subtabFromQuery : "general";
+});
 
 // Sync tab changes to URL query params
 watch(activeTab, (newTab) => {
@@ -91,7 +98,7 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'advanced'">
-      <ServerAdvancedSettings :server="server" />
+      <ServerAdvancedSettings :server="server" :active-sub-tab="activeSubTab" />
     </div>
 
     <!-- Server Terminal -->
