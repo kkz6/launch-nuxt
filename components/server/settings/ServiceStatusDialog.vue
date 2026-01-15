@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
@@ -41,32 +39,23 @@ interface Service {
   image_path?: string
 }
 
+interface LiveStatus {
+  status: string
+  memory?: string
+  uptime?: string
+  pid?: number
+}
+
 interface Props {
   service: Service
   getImagePath: (service: Service) => string
+  liveStatus?: LiveStatus | null
+  lastUpdated?: Date | null
 }
 
 const props = defineProps<Props>()
 
-const emit = defineEmits<{
-  'refresh': []
-}>()
-
 const open = defineModel<boolean>('open', { required: true })
-
-const isRefreshing = ref(false)
-
-const handleRefresh = async () => {
-  isRefreshing.value = true
-  try {
-    emit('refresh')
-  } finally {
-    // The parent will update isRefreshing through the service prop update
-    setTimeout(() => {
-      isRefreshing.value = false
-    }, 500)
-  }
-}
 
 const getStatusColor = (status?: string) => {
   switch (status) {
@@ -99,26 +88,43 @@ const getStatusIconName = (status?: string) => {
   }
 }
 
-const formatRelativeTime = (timestamp?: string) => {
-  if (!timestamp) return 'Never'
+const formatRelativeTime = (date?: Date | null) => {
+  if (!date) return 'Never'
   try {
-    const date = new Date(timestamp)
     const now = new Date()
     const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
+    const diffSecs = Math.floor(diffMs / 1000)
+    const diffMins = Math.floor(diffSecs / 60)
     const diffHours = Math.floor(diffMins / 60)
-    const diffDays = Math.floor(diffHours / 24)
 
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins} minutes ago`
-    if (diffHours < 24) return `${diffHours} hours ago`
-    return `${diffDays} days ago`
+    if (diffSecs < 5) return 'Just now'
+    if (diffSecs < 60) return `${diffSecs} seconds ago`
+    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`
+    return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`
   } catch {
     return 'Unknown'
   }
 }
 
+// Get display values preferring live data
+const displayStatus = computed(() => props.liveStatus?.status || props.service.status)
+const displayStatusLabel = computed(() => {
+  const status = displayStatus.value
+  return status.charAt(0).toUpperCase() + status.slice(1)
+})
+const displayMemory = computed(() => props.liveStatus?.memory || props.service.status_details?.memory_usage)
+const displayUptime = computed(() => props.liveStatus?.uptime)
+const displayPid = computed(() => props.liveStatus?.pid || (props.service.status_details?.pid ? Number(props.service.status_details.pid) : undefined))
+
 const statusDetails = computed(() => props.service.status_details)
+
+// Filter out empty values from additional_info
+const filteredAdditionalInfo = computed(() => {
+  if (!statusDetails.value?.additional_info) return null
+  const filtered = Object.entries(statusDetails.value.additional_info)
+    .filter(([_, value]) => value && String(value).trim() !== '')
+  return filtered.length > 0 ? Object.fromEntries(filtered) : null
+})
 </script>
 
 <template>
@@ -135,14 +141,14 @@ const statusDetails = computed(() => props.service.status_details)
               >
               <div class="absolute -bottom-1 -right-1">
                 <Icon
-                  :name="getStatusIconName(service.status)"
+                  :name="getStatusIconName(displayStatus)"
                   :class="[
                     'h-4 w-4',
-                    service.status === 'running' && 'text-green-600',
-                    service.status === 'stopped' && 'text-red-600',
-                    service.status === 'failed' && 'text-red-600',
-                    service.status === 'pending' && 'animate-spin text-yellow-600',
-                    !['running', 'stopped', 'failed', 'pending'].includes(service.status) && 'text-gray-600',
+                    displayStatus === 'running' && 'text-green-600',
+                    displayStatus === 'stopped' && 'text-red-600',
+                    displayStatus === 'failed' && 'text-red-600',
+                    displayStatus === 'pending' && 'animate-spin text-yellow-600',
+                    !['running', 'stopped', 'failed', 'pending'].includes(displayStatus) && 'text-gray-600',
                   ]"
                 />
               </div>
@@ -153,10 +159,10 @@ const statusDetails = computed(() => props.service.status_details)
                 <Badge
                   :class="[
                     'flex-shrink-0 border text-xs font-medium hover:bg-transparent hover:opacity-100',
-                    getStatusColor(service.status),
+                    getStatusColor(displayStatus),
                   ]"
                 >
-                  {{ service.status_label || service.status }}
+                  {{ displayStatusLabel }}
                 </Badge>
               </DialogTitle>
               <DialogDescription class="truncate text-sm text-gray-600 dark:text-gray-400">
@@ -167,24 +173,28 @@ const statusDetails = computed(() => props.service.status_details)
         </div>
       </DialogHeader>
 
-      <ScrollArea class="w-full flex-1 px-4 py-4">
+      <ScrollArea class="max-h-[60vh] w-full flex-1 overflow-y-auto px-4 py-4">
         <div class="w-full space-y-4">
           <!-- Service Overview -->
           <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2">
-            <!-- Last Checked -->
+            <!-- Last Updated (Live) -->
             <div class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50">
               <div class="mb-1 flex items-center gap-2">
                 <Icon name="lucide:clock" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Last Checked</span>
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</span>
+                <span v-if="liveStatus" class="ml-auto flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                  <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                  Live
+                </span>
               </div>
               <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
-                {{ formatRelativeTime(service.last_status_check) }}
+                {{ formatRelativeTime(lastUpdated) }}
               </p>
             </div>
 
             <!-- No status data message -->
             <div
-              v-if="!statusDetails && !service.status_output"
+              v-if="!statusDetails && !service.status_output && !liveStatus"
               class="col-span-2 w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
             >
               <div class="mb-1 flex items-center gap-2">
@@ -192,13 +202,13 @@ const statusDetails = computed(() => props.service.status_details)
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Status Information</span>
               </div>
               <p class="break-words text-sm text-gray-600 dark:text-gray-400">
-                No status information available. Click the refresh button to check the current status.
+                Waiting for status information...
               </p>
             </div>
 
             <!-- Process ID -->
             <div
-              v-if="statusDetails?.pid"
+              v-if="displayPid"
               class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
             >
               <div class="mb-1 flex items-center gap-2">
@@ -206,13 +216,13 @@ const statusDetails = computed(() => props.service.status_details)
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Process ID</span>
               </div>
               <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
-                {{ statusDetails.pid }}
+                {{ displayPid }}
               </p>
             </div>
 
             <!-- Memory Usage -->
             <div
-              v-if="statusDetails?.memory_usage"
+              v-if="displayMemory"
               class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
             >
               <div class="mb-1 flex items-center gap-2">
@@ -220,7 +230,21 @@ const statusDetails = computed(() => props.service.status_details)
                 <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Memory Usage</span>
               </div>
               <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
-                {{ statusDetails.memory_usage }}
+                {{ displayMemory }}
+              </p>
+            </div>
+
+            <!-- Uptime -->
+            <div
+              v-if="displayUptime"
+              class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
+            >
+              <div class="mb-1 flex items-center gap-2">
+                <Icon name="lucide:timer" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
+                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Uptime</span>
+              </div>
+              <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
+                {{ displayUptime }}
               </p>
             </div>
           </div>
@@ -275,7 +299,7 @@ const statusDetails = computed(() => props.service.status_details)
 
           <!-- Additional Service Information -->
           <div
-            v-if="statusDetails?.additional_info && Object.keys(statusDetails.additional_info).length > 0"
+            v-if="filteredAdditionalInfo"
             class="w-full"
           >
             <div class="mb-2 flex items-center gap-2">
@@ -283,7 +307,7 @@ const statusDetails = computed(() => props.service.status_details)
               <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Service Details</h3>
             </div>
             <div class="w-full space-y-3">
-              <div v-for="(value, key) in statusDetails.additional_info" :key="key" class="w-full">
+              <div v-for="(value, key) in filteredAdditionalInfo" :key="key" class="w-full">
                 <h4 class="mb-1 text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
                   {{ String(key).replace('_', ' ') }}
                 </h4>
@@ -310,22 +334,6 @@ const statusDetails = computed(() => props.service.status_details)
         </div>
       </ScrollArea>
 
-      <DialogFooter class="border-t border-gray-200 p-4 pt-3 dark:border-gray-800">
-        <Button
-          variant="outline"
-          :disabled="isRefreshing"
-          class="w-full sm:w-auto"
-          @click="handleRefresh"
-        >
-          <Icon
-            v-if="isRefreshing"
-            name="lucide:loader-2"
-            class="mr-2 h-4 w-4 animate-spin"
-          />
-          <Icon v-else name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-          Refresh Status
-        </Button>
-      </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
