@@ -22,6 +22,7 @@ import {
   FormMessage,
 } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
 import { Switch } from '~/components/ui/switch'
 import {
   Select,
@@ -206,22 +207,18 @@ const onSubmit = handleSubmit(async (formValues) => {
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <!-- Record Type Selector (only for new records) -->
-        <div v-if="!record && availableRecordTypes.length > 0">
-          <FormItem>
-            <FormLabel>Record Type</FormLabel>
-            <Select :model-value="selectedType" @update:model-value="handleTypeChange">
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select record type" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem v-for="type in availableRecordTypes" :key="type" :value="type">
-                  {{ type }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </FormItem>
+        <div v-if="!record && availableRecordTypes.length > 0" class="space-y-2">
+          <Label>Record Type</Label>
+          <Select :model-value="selectedType" @update:model-value="handleTypeChange">
+            <SelectTrigger>
+              <SelectValue placeholder="Select record type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="type in availableRecordTypes" :key="type" :value="type">
+                {{ type }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <FormField v-slot="{ componentField }" name="name">
