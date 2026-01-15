@@ -2,15 +2,7 @@
 import { toast } from 'vue-sonner'
 import { Eye, EyeOff } from 'lucide-vue-next'
 import { Button } from '~/components/ui/button'
-import { Label } from '~/components/ui/label'
 import { Toggle } from '~/components/ui/toggle'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 
 interface FileInfo {
   name: string
@@ -27,7 +19,7 @@ interface Props {
 const props = defineProps<Props>()
 
 const files = ref<FileInfo[]>([])
-const selectedFileIndex = ref<string>('')
+const selectedFileIndex = ref<number | null>(null)
 const contents = ref('')
 const isLoading = ref(true)
 const isFetching = ref(false)
@@ -36,9 +28,28 @@ const isVisible = ref(true)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const selectedFile = computed(() => {
-  if (selectedFileIndex.value === '') return null
-  return files.value[Number(selectedFileIndex.value)]
+  if (selectedFileIndex.value === null) return null
+  return files.value[selectedFileIndex.value]
 })
+
+const selectFile = (index: number) => {
+  if (selectedFileIndex.value === index) {
+    selectedFileIndex.value = null
+    contents.value = ''
+  } else {
+    selectedFileIndex.value = index
+  }
+}
+
+const getFileIcon = (fileName: string) => {
+  const name = fileName.toLowerCase()
+  if (name.includes('nginx') || name.includes('vhost')) return 'lucide:server'
+  if (name.includes('env')) return 'lucide:file-key'
+  if (name.includes('deploy') || name.includes('script')) return 'lucide:file-code'
+  if (name.includes('php')) return 'lucide:file-code-2'
+  if (name.includes('supervisor') || name.includes('worker')) return 'lucide:cpu'
+  return 'lucide:file-text'
+}
 
 const fetchFiles = async () => {
   isLoading.value = true
@@ -97,7 +108,7 @@ const saveFile = async () => {
 }
 
 watch(selectedFileIndex, (newVal) => {
-  if (newVal !== '') {
+  if (newVal !== null) {
     contents.value = ''
     isVisible.value = true
     fetchFileContents()
@@ -111,11 +122,9 @@ onMounted(fetchFiles)
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div class="mb-4 flex items-start justify-between gap-4">
-      <div>
-        <h3 class="text-lg font-semibold">Files</h3>
-        <p class="text-sm text-muted-foreground">View and edit site configuration files</p>
-      </div>
+    <div class="mb-4">
+      <h3 class="text-lg font-semibold">Files</h3>
+      <p class="text-sm text-muted-foreground">View and edit site configuration files</p>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
@@ -123,72 +132,86 @@ onMounted(fetchFiles)
     </div>
 
     <template v-else>
-      <div class="space-y-4">
-        <div class="space-y-2">
-          <Label>Select File</Label>
-          <Select v-model="selectedFileIndex">
-            <SelectTrigger class="w-full max-w-sm">
-              <SelectValue placeholder="Select a file to edit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="(file, index) in files"
-                :key="index"
-                :value="String(index)"
-              >
-                {{ file.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+      <!-- File List -->
+      <div class="space-y-3">
+        <div
+          v-for="(file, index) in files"
+          :key="index"
+          class="rounded-lg border bg-card overflow-hidden"
+        >
+          <!-- File Header (always visible) -->
+          <button
+            type="button"
+            class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50"
+            :class="{ 'bg-muted/30': selectedFileIndex === index }"
+            @click="selectFile(index)"
+          >
+            <div class="flex h-9 w-9 items-center justify-center rounded-md bg-muted">
+              <Icon :name="getFileIcon(file.name)" class="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="font-medium truncate">{{ file.name }}</p>
+              <p v-if="file.description" class="text-sm text-muted-foreground truncate">
+                {{ file.description }}
+              </p>
+            </div>
+            <Icon
+              name="lucide:chevron-down"
+              class="h-4 w-4 text-muted-foreground transition-transform"
+              :class="{ 'rotate-180': selectedFileIndex === index }"
+            />
+          </button>
+
+          <!-- File Content (expandable) -->
+          <div v-if="selectedFileIndex === index" class="border-t">
+            <div v-if="isFetching" class="flex items-center justify-center py-8">
+              <Icon name="lucide:loader-2" class="mr-2 h-5 w-5 animate-spin" />
+              <span class="text-sm text-muted-foreground">Loading file contents...</span>
+            </div>
+
+            <div v-else-if="isUpdating" class="flex items-center justify-center py-8">
+              <Icon name="lucide:loader-2" class="mr-2 h-5 w-5 animate-spin" />
+              <span class="text-sm text-muted-foreground">Updating file...</span>
+            </div>
+
+            <template v-else>
+              <div class="flex items-center justify-end border-b px-4 py-2">
+                <Toggle
+                  :pressed="!isVisible"
+                  aria-label="Toggle visibility"
+                  size="sm"
+                  @click="isVisible = !isVisible"
+                >
+                  <EyeOff v-if="isVisible" class="h-4 w-4" />
+                  <Eye v-else class="h-4 w-4" />
+                  <span class="ml-2 text-sm">{{ isVisible ? 'Show' : 'Hide' }}</span>
+                </Toggle>
+              </div>
+
+              <div class="p-4 space-y-4">
+                <SharedCodeEditor
+                  :model-value="contents ?? ''"
+                  :disabled="isVisible"
+                  :masked="isVisible"
+                  class="h-80"
+                  @update:model-value="contents = $event"
+                />
+
+                <div class="flex justify-end">
+                  <Button :disabled="isVisible || isUpdating" @click="saveFile">
+                    <Icon v-if="isUpdating" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+                    Save Changes
+                  </Button>
+                </div>
+              </div>
+            </template>
+          </div>
         </div>
 
-        <div v-if="selectedFile" class="rounded-lg border bg-card">
-          <div v-if="isFetching" class="flex items-center justify-center py-8">
-            <Icon name="lucide:loader-2" class="mr-2 h-5 w-5 animate-spin" />
-            <span>Loading file contents...</span>
-          </div>
-
-          <div v-else-if="isUpdating" class="flex items-center justify-center py-8">
-            <Icon name="lucide:loader-2" class="mr-2 h-5 w-5 animate-spin" />
-            <span>Updating file...</span>
-          </div>
-
-          <template v-else>
-            <div class="flex items-center justify-between border-b px-4 py-3">
-              <div>
-                <h4 class="font-medium">{{ selectedFile.name }}</h4>
-                <p v-if="selectedFile.description" class="text-sm text-muted-foreground">
-                  {{ selectedFile.description }}
-                </p>
-              </div>
-
-              <Toggle
-                :pressed="!isVisible"
-                aria-label="Toggle visibility"
-                @click="isVisible = !isVisible"
-              >
-                <EyeOff v-if="isVisible" class="h-4 w-4 text-muted-foreground" />
-                <Eye v-else class="h-4 w-4 text-muted-foreground" />
-              </Toggle>
-            </div>
-
-            <div class="space-y-4 p-4">
-              <SharedCodeEditor
-                :model-value="contents ?? ''"
-                :disabled="isVisible"
-                :masked="isVisible"
-                class="h-96"
-                @update:model-value="contents = $event"
-              />
-
-              <div class="flex justify-end">
-                <Button :disabled="isVisible || isUpdating" @click="saveFile">
-                  <Icon v-if="isUpdating" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                  Save Changes
-                </Button>
-              </div>
-            </div>
-          </template>
+        <!-- Empty State -->
+        <div v-if="files.length === 0" class="rounded-lg border bg-card p-8 text-center">
+          <Icon name="lucide:file-x" class="mx-auto h-10 w-10 text-muted-foreground" />
+          <p class="mt-2 text-sm text-muted-foreground">No configuration files available</p>
         </div>
       </div>
     </template>

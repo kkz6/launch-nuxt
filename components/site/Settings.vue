@@ -3,7 +3,6 @@ import { toast } from 'vue-sonner'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Separator } from '~/components/ui/separator'
 import { Label } from '~/components/ui/label'
@@ -204,13 +203,15 @@ onMounted(fetchSettings)
 </script>
 
 <template>
-  <Card class="bg-background">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <CardHeader>
-      <CardTitle class="text-xl">Site Settings</CardTitle>
-      <CardDescription>Configure your site settings</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-6">
+
+    <div class="mb-4">
+      <h3 class="text-lg font-semibold">Site Settings</h3>
+      <p class="text-sm text-muted-foreground">Configure your site settings</p>
+    </div>
+
+    <div class="space-y-6">
       <!-- General Settings -->
       <form class="space-y-6" @submit.prevent="onSubmit">
         <div class="grid grid-cols-2 gap-6">
@@ -346,6 +347,6 @@ onMounted(fetchSettings)
           Delete Site
         </Button>
       </div>
-    </CardContent>
-  </Card>
+    </div>
+  </div>
 </template>
