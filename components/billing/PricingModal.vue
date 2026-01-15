@@ -11,8 +11,9 @@ import {
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group'
 
 interface PlanOption {
-  id: number
+  id: string
   name: string
+  description?: string
   monthly_pricing: number
   yearly_pricing: number
   features: string[]
@@ -21,14 +22,17 @@ interface PlanOption {
 
 interface Props {
   plans: PlanOption[]
-  currentPlanId?: number
+  currentPlanId?: string
 }
 
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  selectPlan: [planId: number, isAnnual: boolean]
+  selectPlan: [planId: string, isAnnual: boolean]
 }>()
+
+// Format price from cents to dollars
+const formatPrice = (cents: number) => (cents / 100).toFixed(2)
 
 const isOpen = defineModel<boolean>('isOpen', { required: true })
 
@@ -36,17 +40,17 @@ const availablePlans = computed(() =>
   props.plans.filter((plan) => plan.id !== props.currentPlanId)
 )
 
-const selectedPlan = ref<string>(availablePlans.value[0]?.id.toString() ?? '')
+const selectedPlan = ref<string>(availablePlans.value[0]?.id ?? '')
 
 watch(availablePlans, (plans) => {
   if (plans.length > 0 && !selectedPlan.value) {
-    selectedPlan.value = plans[0].id.toString()
+    selectedPlan.value = plans[0].id
   }
 })
 
 const handleSelectPlan = (isAnnual: boolean) => {
   if (selectedPlan.value) {
-    emit('selectPlan', Number(selectedPlan.value), isAnnual)
+    emit('selectPlan', selectedPlan.value, isAnnual)
   }
 }
 </script>
@@ -71,7 +75,7 @@ const handleSelectPlan = (isAnnual: boolean) => {
             {{ plans.find((p) => p.id === currentPlanId)?.name }}
           </span>
           <span class="text-sm font-medium">
-            ${{ plans.find((p) => p.id === currentPlanId)?.monthly_pricing.toFixed(2) }}/mo
+            ${{ formatPrice(plans.find((p) => p.id === currentPlanId)?.monthly_pricing || 0) }}/mo
           </span>
         </div>
       </div>
@@ -82,12 +86,12 @@ const handleSelectPlan = (isAnnual: boolean) => {
           :key="plan.id"
           class="relative flex cursor-pointer flex-col rounded-xl border-2 p-4 transition-all"
           :class="[
-            selectedPlan === plan.id.toString()
+            selectedPlan === plan.id
               ? 'border-primary bg-primary/5'
               : 'border-border hover:border-primary/50',
           ]"
         >
-          <RadioGroupItem :value="plan.id.toString()" class="sr-only" />
+          <RadioGroupItem :value="plan.id" class="sr-only" />
           <div class="mb-2 flex items-center justify-between">
             <div>
               <h3 class="text-sm font-semibold">{{ plan.name }}</h3>
@@ -96,10 +100,13 @@ const handleSelectPlan = (isAnnual: boolean) => {
               </span>
             </div>
             <div class="flex items-baseline">
-              <span class="text-2xl font-bold">${{ plan.monthly_pricing.toFixed(2) }}</span>
+              <span class="text-2xl font-bold">${{ formatPrice(plan.monthly_pricing) }}</span>
               <span class="ml-1 text-muted-foreground">/mo</span>
             </div>
           </div>
+          <p v-if="plan.description" class="mb-2 text-sm text-muted-foreground">
+            {{ plan.description }}
+          </p>
           <ul class="mt-4 space-y-2">
             <li
               v-for="(feature, index) in plan.features"
@@ -110,7 +117,7 @@ const handleSelectPlan = (isAnnual: boolean) => {
               {{ feature }}
             </li>
           </ul>
-          <div v-if="selectedPlan === plan.id.toString()" class="absolute -right-2 -top-2">
+          <div v-if="selectedPlan === plan.id" class="absolute -right-2 -top-2">
             <span class="flex h-4 w-4 items-center justify-center rounded-full bg-primary">
               <Icon name="lucide:check" class="h-3 w-3 text-primary-foreground" />
             </span>

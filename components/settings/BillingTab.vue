@@ -3,16 +3,26 @@ import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Progress } from '~/components/ui/progress'
 
+interface SubscriptionPlanOptions {
+  max_servers: number
+  max_sites_per_server: number
+  max_deployments_per_site: number
+  max_team_members: number
+  has_backups: boolean
+  has_monitoring: boolean
+}
+
 interface SubscriptionPlan {
-  id: number
+  id: string
   name: string
+  description: string
+  monthly_id: string
+  yearly_id: string
   monthly_pricing: number
   yearly_pricing: number
   features: string[]
   recommended?: boolean
-  options?: {
-    max_servers: number
-  }
+  options?: SubscriptionPlanOptions
 }
 
 interface Subscription {
@@ -27,8 +37,11 @@ interface Subscription {
 
 interface Receipt {
   order_number: string
-  total: string
   ordered_at: string
+  discount: number
+  subtotal: number
+  total: number
+  tax: number
   receipt_url: string
 }
 
@@ -54,17 +67,23 @@ const hasSubscription = computed(() => subscriptions.value.length > 0)
 const isEnding = computed(() => Boolean(currentSubscription.value?.ends_at))
 const isAtMaxServers = computed(() => serverCount.value === maxServers.value)
 
+interface BillingData {
+  subscription_plans: SubscriptionPlan[]
+  subscriptions: Subscription[]
+  server_count: number
+  receipts: Receipt[]
+}
+
 const fetchBillingData = async () => {
   try {
-    const data = await $api<{
-      subscription_plans: SubscriptionPlan[]
-      subscriptions: Subscription[]
-      server_count: number
-      receipts: Receipt[]
-    }>('/billing')
-    subscriptionPlans.value = data.subscription_plans
-    subscriptions.value = data.subscriptions
-    serverCount.value = data.server_count
+    const response = await $api<{ data: BillingData } | BillingData>('/billing')
+    // Handle both { data: {...} } and direct response formats
+    const data = 'data' in response && response.data && typeof response.data === 'object' && 'subscription_plans' in response.data
+      ? response.data
+      : response as BillingData
+    subscriptionPlans.value = data.subscription_plans || []
+    subscriptions.value = data.subscriptions || []
+    serverCount.value = data.server_count || 0
     receipts.value = data.receipts || []
   } catch {
     toast.error('Failed to load billing information')
@@ -73,7 +92,7 @@ const fetchBillingData = async () => {
   }
 }
 
-const handleCheckout = async (planId: number, isAnnual: boolean) => {
+const handleCheckout = async (planId: string, isAnnual: boolean) => {
   try {
     const data = await $api<{ url: string }>('/billing/generate-checkout-url', {
       method: 'POST',
@@ -281,7 +300,7 @@ declare global {
             <div class="space-y-0.5">
               <p class="text-sm font-medium"># {{ receipt.order_number }}</p>
               <p class="text-xs text-muted-foreground">
-                {{ receipt.total }} - {{ receipt.ordered_at }}
+                ${{ receipt.total.toFixed(2) }} - {{ receipt.ordered_at }}
               </p>
             </div>
             <a :href="receipt.receipt_url" target="_blank" rel="noreferrer">
