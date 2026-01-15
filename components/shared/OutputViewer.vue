@@ -117,7 +117,7 @@ const handleDownload = () => {
       <slot />
     </SheetTrigger>
     <SheetContent
-      class="!inset-0 flex !h-auto w-auto flex-col overflow-hidden sm:!inset-y-auto sm:!left-auto sm:!top-16 sm:!right-3 sm:!bottom-4 sm:w-full sm:max-w-3xl sm:rounded-lg sm:border"
+      class="!inset-0 flex !h-full !w-full flex-col overflow-hidden !border-0 sm:!inset-y-auto sm:!left-auto sm:!top-16 sm:!right-3 sm:!bottom-4 sm:!h-auto sm:!w-full sm:!max-w-3xl sm:!rounded-lg sm:!border"
       :show-close="true"
     >
       <SheetHeader class="flex-shrink-0 pb-4">
