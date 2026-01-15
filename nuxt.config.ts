@@ -11,7 +11,23 @@ export default defineNuxtConfig({
     "@vee-validate/nuxt",
     "@nuxt/icon",
     "motion-v/nuxt",
+    "@nuxt/content",
   ],
+
+  content: {
+    highlight: {
+      theme: {
+        default: 'github-light',
+        dark: 'github-dark',
+      },
+    },
+    markdown: {
+      toc: {
+        depth: 3,
+        searchDepth: 3,
+      },
+    },
+  },
 
   css: ["~/assets/css/main.css"],
 
@@ -43,7 +59,7 @@ export default defineNuxtConfig({
     pageTransition: { name: "page", mode: "out-in" },
     layoutTransition: { name: "layout", mode: "out-in" },
     head: {
-      title: "Launch",
+      title: "launchctl",
       meta: [
         { charset: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
