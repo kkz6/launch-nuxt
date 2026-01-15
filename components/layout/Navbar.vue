@@ -311,36 +311,38 @@ onMounted(fetchTeams);
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
 
-              <!-- Theme Options -->
-              <DropdownMenuLabel class="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                Theme
-              </DropdownMenuLabel>
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  class="cursor-pointer gap-2 px-2 py-2"
-                  @click="setColorMode('light')"
-                >
-                  <Sun class="h-4 w-4 text-muted-foreground" />
-                  <span>Light</span>
-                  <Check v-if="colorMode.preference === 'light'" class="ml-auto h-4 w-4 text-primary" />
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  class="cursor-pointer gap-2 px-2 py-2"
-                  @click="setColorMode('dark')"
-                >
-                  <Moon class="h-4 w-4 text-muted-foreground" />
-                  <span>Dark</span>
-                  <Check v-if="colorMode.preference === 'dark'" class="ml-auto h-4 w-4 text-primary" />
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  class="cursor-pointer gap-2 px-2 py-2"
-                  @click="setColorMode('system')"
-                >
-                  <Monitor class="h-4 w-4 text-muted-foreground" />
-                  <span>System</span>
-                  <Check v-if="colorMode.preference === 'system'" class="ml-auto h-4 w-4 text-primary" />
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
+              <!-- Theme Switcher -->
+              <div class="px-2 py-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm text-muted-foreground">Theme</span>
+                  <div class="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
+                    <button
+                      type="button"
+                      class="rounded-md p-1.5 transition-colors"
+                      :class="colorMode.preference === 'light' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                      @click.stop="setColorMode('light')"
+                    >
+                      <Sun class="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-md p-1.5 transition-colors"
+                      :class="colorMode.preference === 'dark' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                      @click.stop="setColorMode('dark')"
+                    >
+                      <Moon class="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      class="rounded-md p-1.5 transition-colors"
+                      :class="colorMode.preference === 'system' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                      @click.stop="setColorMode('system')"
+                    >
+                      <Monitor class="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 class="cursor-pointer gap-2 px-2 py-2.5 text-destructive focus:text-destructive sm:py-2"
