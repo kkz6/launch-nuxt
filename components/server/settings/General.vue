@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
@@ -154,15 +153,16 @@ const deleteServer = async () => {
   <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!-- Server Information Card -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Server Information</CardTitle>
-        <CardDescription>
-          Update your server name and description. Changes will be saved immediately.
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="space-y-4">
+    <!-- Server Information -->
+    <div class="space-y-4">
+      <div>
+        <h3 class="text-lg font-medium">Server Information</h3>
+        <p class="text-sm text-muted-foreground">
+          Update your server name and description.
+        </p>
+      </div>
+
+      <div class="space-y-4">
         <div class="space-y-2">
           <Label for="name">Server Name</Label>
           <Input id="name" v-model="name" placeholder="Enter server name" />
@@ -188,174 +188,160 @@ const deleteServer = async () => {
           <Switch v-model="autoUpdate" />
         </div>
 
-        <Button :disabled="isLoading" class="w-full sm:w-auto" @click="updateServer">
+        <Button :disabled="isLoading" @click="updateServer">
           <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
           Save Changes
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
 
     <Separator />
 
-    <!-- Archive Server Card -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Archive Server</CardTitle>
-        <CardDescription>
+    <!-- Archive Server -->
+    <div class="space-y-4">
+      <div>
+        <h3 class="text-lg font-medium">Archive Server</h3>
+        <p class="text-sm text-muted-foreground">
           Archive this server to remove access from the application while preserving
           the server data. You can unarchive it later to restore access.
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-4">
-        <div v-if="siteCount > 0" class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
-              Server has active sites
-            </p>
-            <p class="text-sm text-blue-700 dark:text-blue-300">
-              This server has {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }}.
-              Archiving will not affect the sites, but you won't be able to manage them through the dashboard.
+        </p>
+      </div>
+
+      <div v-if="siteCount > 0" class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
+        <div class="space-y-1">
+          <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
+            Server has active sites
+          </p>
+          <p class="text-sm text-blue-700 dark:text-blue-300">
+            This server has {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }}.
+            Archiving will not affect the sites, but you won't be able to manage them through the dashboard.
+          </p>
+        </div>
+      </div>
+
+      <AlertDialog v-model:open="showArchiveConfirm">
+        <AlertDialogTrigger as-child>
+          <Button
+            variant="outline"
+            class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
+          >
+            Archive Server
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent class="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Server</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to archive "{{ server.name }}"?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div class="space-y-4 py-2">
+            <p class="text-sm text-muted-foreground">
+              This will revoke access keys and remove the server from your dashboard.
+              <template v-if="siteCount > 0">
+                The {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }} will continue running
+                but cannot be managed.
+              </template>
+              You can unarchive it later by running the provision script again.
             </p>
           </div>
-        </div>
-
-        <div>
-          <AlertDialog v-model:open="showArchiveConfirm">
-            <AlertDialogTrigger as-child>
-              <Button
-                variant="outline"
-                class="w-full border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300 sm:w-auto"
-              >
-                Archive Server
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent class="max-w-lg">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Archive Server</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to archive "{{ server.name }}"?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <div class="space-y-4 py-2">
-                <p class="text-sm text-muted-foreground">
-                  This will revoke access keys and remove the server from your dashboard.
-                  <template v-if="siteCount > 0">
-                    The {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }} will continue running
-                    but cannot be managed.
-                  </template>
-                  You can unarchive it later by running the provision script again.
-                </p>
-              </div>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  :disabled="archiveLoading"
-                  class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
-                  @click="archiveServer"
-                >
-                  <Icon v-if="archiveLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                  {{ archiveLoading ? 'Archiving...' : 'Yes, archive server' }}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </CardContent>
-    </Card>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              :disabled="archiveLoading"
+              class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
+              @click="archiveServer"
+            >
+              <Icon v-if="archiveLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+              {{ archiveLoading ? 'Archiving...' : 'Yes, archive server' }}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
 
     <Separator />
 
-    <!-- Security Audit Card -->
-    <Card>
-      <CardHeader>
-        <CardTitle class="flex items-center gap-2">
+    <!-- Security Vulnerability Audit -->
+    <div class="space-y-4">
+      <div>
+        <h3 class="flex items-center gap-2 text-lg font-medium">
           <Icon name="lucide:shield" class="h-5 w-5" />
           Security Vulnerability Audit
-        </CardTitle>
-        <CardDescription>
+        </h3>
+        <p class="text-sm text-muted-foreground">
           Run a comprehensive security audit on your server to identify potential
-          vulnerabilities and security issues. The report will be sent to your email
-          when completed.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form class="space-y-4" @submit.prevent="runVulnerabilityAudit">
-          <div class="space-y-2">
-            <Label for="audit-email">Email Address (Optional)</Label>
-            <Input
-              id="audit-email"
-              v-model="auditEmail"
-              type="email"
-              placeholder="Leave empty to use your account email"
-            />
-          </div>
+          vulnerabilities and security issues.
+        </p>
+      </div>
 
-          <div class="space-y-3">
-            <div class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
-              <div class="space-y-1">
-                <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
-                  What will be audited?
-                </p>
-                <ul class="list-inside list-disc space-y-1 text-sm text-blue-700 dark:text-blue-300">
-                  <li>Security updates and patches</li>
-                  <li>SSH configuration and security settings</li>
-                  <li>User accounts and password policies</li>
-                  <li>Network security and firewall settings</li>
-                  <li>File permissions and SUID/SGID files</li>
-                  <li>Running services and processes</li>
-                  <li>System logs for security events</li>
-                </ul>
-              </div>
-            </div>
+      <form class="space-y-4" @submit.prevent="runVulnerabilityAudit">
+        <div class="space-y-2">
+          <Label for="audit-email">Email Address (Optional)</Label>
+          <Input
+            id="audit-email"
+            v-model="auditEmail"
+            type="email"
+            placeholder="Leave empty to use your account email"
+          />
+        </div>
 
-            <Button
-              type="submit"
-              :disabled="auditLoading"
-              class="w-full sm:w-auto"
-            >
-              <Icon v-if="auditLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-              {{ auditLoading ? 'Running Security Audit...' : 'Start Security Audit' }}
-            </Button>
+        <div class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
+              What will be audited?
+            </p>
+            <ul class="list-inside list-disc space-y-1 text-sm text-blue-700 dark:text-blue-300">
+              <li>Security updates and patches</li>
+              <li>SSH configuration and security settings</li>
+              <li>User accounts and password policies</li>
+              <li>Network security and firewall settings</li>
+              <li>File permissions and SUID/SGID files</li>
+              <li>Running services and processes</li>
+              <li>System logs for security events</li>
+            </ul>
           </div>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+
+        <Button type="submit" :disabled="auditLoading">
+          <Icon v-if="auditLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+          {{ auditLoading ? 'Running Security Audit...' : 'Start Security Audit' }}
+        </Button>
+      </form>
+    </div>
 
     <Separator />
 
-    <!-- Danger Zone Card -->
-    <Card>
-      <CardHeader>
-        <CardTitle>Danger Zone</CardTitle>
-        <CardDescription>
+    <!-- Danger Zone -->
+    <div class="space-y-4">
+      <div>
+        <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+        <p class="text-sm text-muted-foreground">
           Permanently delete this server. This action cannot be undone.
-        </CardDescription>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-4">
-        <div v-if="!canDelete" class="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/50">
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-              Cannot delete server
-            </p>
-            <p class="text-sm text-yellow-700 dark:text-yellow-300">
-              This server has {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }}.
-              Please delete all sites before removing the server.
-            </p>
-          </div>
-        </div>
+        </p>
+      </div>
 
-        <div>
-          <Button
-            variant="destructive"
-            :disabled="!canDelete || deleteLoading"
-            class="w-full sm:w-auto"
-            @click="deleteServer"
-          >
-            <Icon v-if="deleteLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            Delete Server
-          </Button>
+      <div v-if="!canDelete" class="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/50">
+        <div class="space-y-1">
+          <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+            Cannot delete server
+          </p>
+          <p class="text-sm text-yellow-700 dark:text-yellow-300">
+            This server has {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }}.
+            Please delete all sites before removing the server.
+          </p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <Button
+        variant="destructive"
+        :disabled="!canDelete || deleteLoading"
+        @click="deleteServer"
+      >
+        <Icon v-if="deleteLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+        <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
+        Delete Server
+      </Button>
+    </div>
   </div>
 </template>

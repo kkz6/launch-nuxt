@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
@@ -162,104 +161,104 @@ onMounted(fetchComposerConfig)
 </script>
 
 <template>
-  <Card>
+  <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <CardHeader>
-      <CardTitle>Composer Package Authentication</CardTitle>
-      <CardDescription>
+
+    <div>
+      <h3 class="text-lg font-medium">Composer Package Authentication</h3>
+      <p class="text-sm text-muted-foreground">
         Manage your server's auth.json Composer configuration. This file is loaded
         on demand from server and no credential data is stored.
-      </CardDescription>
-    </CardHeader>
-    <CardContent>
-      <div v-if="isLoading" class="flex items-center justify-center py-8">
-        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      </p>
+    </div>
+
+    <div v-if="isLoading" class="flex items-center justify-center py-8">
+      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+
+    <template v-else>
+      <div v-if="credentials.length === 0" class="flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
+        <Icon name="lucide:info" class="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+        <p class="text-sm text-muted-foreground">
+          Composer configurations are yet to be added
+        </p>
       </div>
 
-      <template v-else>
-        <div v-if="credentials.length === 0" class="mb-4 flex items-center gap-3 rounded-lg border bg-muted/50 p-4">
-          <Icon name="lucide:info" class="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-          <p class="text-sm text-muted-foreground">
-            Composer configurations are yet to be added
-          </p>
-        </div>
+      <div class="space-y-6">
+        <div
+          v-for="(credential, index) in credentials"
+          :key="index"
+          class="space-y-4"
+        >
+          <Separator v-if="index > 0" />
 
-        <div class="space-y-6">
-          <div
-            v-for="(credential, index) in credentials"
-            :key="index"
-            class="space-y-4"
-          >
-            <Separator v-if="index > 0" />
-
-            <div class="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
-              <div class="space-y-2 sm:col-span-2">
-                <Label :for="`url-${index}`">Repository URL</Label>
-                <Input
-                  :id="`url-${index}`"
-                  :model-value="credential.url"
-                  placeholder="e.g., repo.packagist.org"
-                  :class="{ 'border-destructive': errors[index]?.url }"
-                  @update:model-value="updateCredential(index, 'url', String($event))"
-                />
-                <p v-if="errors[index]?.url" class="text-sm text-destructive">
-                  {{ errors[index].url }}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                class="w-full sm:w-auto sm:justify-self-end"
-                @click="removeCredential(index)"
-              >
-                <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
-                Remove
-              </Button>
+          <div class="grid grid-cols-1 items-end gap-4 sm:grid-cols-3">
+            <div class="space-y-2 sm:col-span-2">
+              <Label :for="`url-${index}`">Repository URL</Label>
+              <Input
+                :id="`url-${index}`"
+                :model-value="credential.url"
+                placeholder="e.g., repo.packagist.org"
+                :class="{ 'border-destructive': errors[index]?.url }"
+                @update:model-value="updateCredential(index, 'url', String($event))"
+              />
+              <p v-if="errors[index]?.url" class="text-sm text-destructive">
+                {{ errors[index].url }}
+              </p>
             </div>
+            <Button
+              variant="outline"
+              class="w-full sm:w-auto sm:justify-self-end"
+              @click="removeCredential(index)"
+            >
+              <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+              Remove
+            </Button>
+          </div>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div class="space-y-2">
-                <Label :for="`username-${index}`">Username</Label>
-                <Input
-                  :id="`username-${index}`"
-                  :model-value="credential.username"
-                  placeholder="Username"
-                  :class="{ 'border-destructive': errors[index]?.username }"
-                  @update:model-value="updateCredential(index, 'username', String($event))"
-                />
-                <p v-if="errors[index]?.username" class="text-sm text-destructive">
-                  {{ errors[index].username }}
-                </p>
-              </div>
-              <div class="space-y-2">
-                <Label :for="`password-${index}`">Password</Label>
-                <Input
-                  :id="`password-${index}`"
-                  type="password"
-                  :model-value="credential.password"
-                  placeholder="Password"
-                  :class="{ 'border-destructive': errors[index]?.password }"
-                  @update:model-value="updateCredential(index, 'password', String($event))"
-                />
-                <p v-if="errors[index]?.password" class="text-sm text-destructive">
-                  {{ errors[index].password }}
-                </p>
-              </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="space-y-2">
+              <Label :for="`username-${index}`">Username</Label>
+              <Input
+                :id="`username-${index}`"
+                :model-value="credential.username"
+                placeholder="Username"
+                :class="{ 'border-destructive': errors[index]?.username }"
+                @update:model-value="updateCredential(index, 'username', String($event))"
+              />
+              <p v-if="errors[index]?.username" class="text-sm text-destructive">
+                {{ errors[index].username }}
+              </p>
+            </div>
+            <div class="space-y-2">
+              <Label :for="`password-${index}`">Password</Label>
+              <Input
+                :id="`password-${index}`"
+                type="password"
+                :model-value="credential.password"
+                placeholder="Password"
+                :class="{ 'border-destructive': errors[index]?.password }"
+                @update:model-value="updateCredential(index, 'password', String($event))"
+              />
+              <p v-if="errors[index]?.password" class="text-sm text-destructive">
+                {{ errors[index].password }}
+              </p>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="mt-6 flex gap-3">
-          <Button variant="outline" @click="addCredential">
-            <Icon name="lucide:plus" class="mr-2 block size-4" />
-            Add Credential
-          </Button>
-          <Button :disabled="isSaving" @click="saveConfig">
-            <Icon v-if="isSaving" name="lucide:loader-2" class="mr-2 block size-4 animate-spin" />
-            <Icon v-else name="lucide:save" class="mr-2 block size-4" />
-            Save Configuration
-          </Button>
-        </div>
-      </template>
-    </CardContent>
-  </Card>
+      <div class="flex gap-3">
+        <Button variant="outline" @click="addCredential">
+          <Icon name="lucide:plus" class="mr-2 block size-4" />
+          Add Credential
+        </Button>
+        <Button :disabled="isSaving" @click="saveConfig">
+          <Icon v-if="isSaving" name="lucide:loader-2" class="mr-2 block size-4 animate-spin" />
+          <Icon v-else name="lucide:save" class="mr-2 block size-4" />
+          Save Configuration
+        </Button>
+      </div>
+    </template>
+  </div>
 </template>
