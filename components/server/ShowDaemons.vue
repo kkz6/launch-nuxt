@@ -4,13 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/com
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '~/components/ui/dialog'
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -157,24 +150,15 @@ onMounted(fetchData)
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!-- Log Viewer Dialog -->
-    <Dialog v-model:open="isLogDialogOpen">
-      <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-7xl">
-        <DialogHeader>
-          <DialogTitle class="text-xl">Daemon Logs</DialogTitle>
-          <DialogDescription>{{ selectedDaemonForLogs?.command }}</DialogDescription>
-        </DialogHeader>
-        <div class="flex flex-col gap-4 pt-2.5">
-          <ServerLogViewer
-            v-if="isLogDialogOpen && selectedDaemonForLogs"
-            :server-id="serverId"
-            entity="daemon"
-            :entity-id="selectedDaemonForLogs.id"
-            type-switcher
-            no-timestamp
-          />
-        </div>
-      </DialogContent>
-    </Dialog>
+    <SharedLogViewerDialog
+      v-if="selectedDaemonForLogs"
+      v-model:open="isLogDialogOpen"
+      :server-id="serverId"
+      entity="daemon"
+      :entity-id="selectedDaemonForLogs.id"
+      title="Daemon Logs"
+      :description="selectedDaemonForLogs.command"
+    />
 
     <!-- Edit Daemon Dialog -->
     <ServerCreateDaemon
