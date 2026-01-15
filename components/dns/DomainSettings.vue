@@ -36,6 +36,8 @@ const emit = defineEmits<{
 }>()
 
 const isLoading = ref(false)
+const syncLoading = ref(false)
+const deleteLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const domainSchema = toTypedSchema(
@@ -87,27 +89,62 @@ const onSubmit = handleSubmit(async (values) => {
   }
 })
 
+const syncRecords = async () => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Sync DNS Records',
+    description: 'This will fetch the latest DNS records from your provider and update the local cache. Any local changes that were not pushed will be overwritten.',
+    confirmText: 'Sync Records',
+    cancelText: 'Cancel',
+  })
+
+  if (!result.ok) return
+
+  syncLoading.value = true
+
+  try {
+    await $api(`/dns/domains/${props.domain.id}/sync`, {
+      method: 'POST',
+    })
+    toast.success('DNS records synced successfully')
+    emit('updated')
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || 'Failed to sync DNS records')
+  } finally {
+    syncLoading.value = false
+  }
+}
+
 const deleteDomain = async () => {
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
     title: 'Delete Domain',
-    description: `Are you sure you want to delete "${props.domain.label}"? This will not delete the actual DNS records from your provider.`,
+    description: `Are you sure you want to delete "${props.domain.address}"? This will remove the domain from your dashboard but will not delete the actual DNS records from your provider.`,
     confirmText: 'Delete Domain',
     cancelText: 'Cancel',
     destructive: true,
+    helpText: 'Type the domain address to confirm deletion:',
+    inputVerificationText: props.domain.address,
   })
 
-  if (result.ok) {
-    try {
-      await $api(`/dns/domains/${props.domain.id}`, {
-        method: 'DELETE',
-      })
-      toast.success('Domain deleted')
-      emit('deleted')
-    } catch {
-      toast.error('Failed to delete domain')
-    }
+  if (!result.ok) return
+
+  deleteLoading.value = true
+
+  try {
+    await $api(`/dns/domains/${props.domain.id}`, {
+      method: 'DELETE',
+    })
+    toast.success('Domain deleted')
+    emit('deleted')
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || 'Failed to delete domain')
+  } finally {
+    deleteLoading.value = false
   }
 }
 </script>
@@ -128,27 +165,27 @@ const deleteDomain = async () => {
           </FormItem>
         </FormField>
 
-        <div class="space-y-2">
-          <FormLabel>Domain Address</FormLabel>
-          <Input :model-value="domain.address" disabled />
-          <p class="text-sm text-muted-foreground">
-            The domain address cannot be changed
-          </p>
-        </div>
-
-        <div class="space-y-2">
-          <FormLabel>DNS Provider</FormLabel>
-          <Input :model-value="domain.provider?.provider_label || 'Unknown'" disabled />
-          <p class="text-sm text-muted-foreground">
-            The DNS provider cannot be changed. To use a different provider, delete this domain and add it again.
-          </p>
-        </div>
-
         <Button type="submit" :disabled="isLoading">
           <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
           Update Settings
         </Button>
       </form>
+
+      <Separator />
+
+      <div class="space-y-4 pt-2">
+        <div>
+          <h3 class="text-lg font-medium">Sync DNS Records</h3>
+          <p class="text-sm text-muted-foreground">
+            Fetch the latest DNS records from your provider. This will update your local cache with the current state of your DNS records.
+          </p>
+        </div>
+        <Button variant="outline" :disabled="syncLoading" @click="syncRecords">
+          <Icon v-if="syncLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+          <Icon v-else name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+          {{ syncLoading ? 'Syncing...' : 'Sync Records' }}
+        </Button>
+      </div>
 
       <Separator />
 
@@ -160,8 +197,9 @@ const deleteDomain = async () => {
             You will need to delete those records manually if needed.
           </p>
         </div>
-        <Button variant="destructive" @click="deleteDomain">
-          <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+        <Button variant="destructive" :disabled="deleteLoading" @click="deleteDomain">
+          <Icon v-if="deleteLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+          <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
           Delete Domain
         </Button>
       </div>
