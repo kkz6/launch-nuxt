@@ -19,7 +19,7 @@ const isLoading = ref(true);
 const isTerminalOpen = useState('serverTerminalOpen', () => false);
 
 // Valid tab values
-const validTabs = ["sites", "databases", "networks", "logs", "daemons", "schedulers", "advanced"];
+const validTabs = ["sites", "databases", "networks", "daemons", "schedulers", "advanced"];
 
 // Get initial tab from query params or default to "sites"
 const getInitialTab = () => {
@@ -80,10 +80,6 @@ onMounted(async () => {
 
     <div v-else-if="activeTab === 'networks'">
       <ServerShowNetworks :server-id="server.id" />
-    </div>
-
-    <div v-else-if="activeTab === 'logs'">
-      <ServerShowLogs :server-id="server.id" />
     </div>
 
     <div v-else-if="activeTab === 'daemons'">
