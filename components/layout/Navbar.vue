@@ -55,6 +55,16 @@ const serverDetailTabs = [
   { value: "advanced", label: "Advanced", query: "advanced" },
 ];
 
+// Advanced sub-tabs (second level)
+const advancedSubTabs = [
+  { value: "general", label: "General", query: "general" },
+  { value: "backups", label: "Backups", query: "backups" },
+  { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys" },
+  { value: "packages", label: "Packages", query: "packages" },
+  { value: "php", label: "PHP", query: "php" },
+  { value: "services", label: "Services", query: "services" },
+];
+
 // Site detail tabs (base - filtered based on site type)
 const allSiteDetailTabs = [
   { value: "general", label: "Overview", query: "general" },
@@ -229,6 +239,15 @@ const isGlobalTabActive = (tabRoute: string) => {
 const isServerTabActive = (query: string) => {
   const currentTab = route.query.tab as string || 'sites';
   return currentTab === query;
+};
+
+const isAdvancedTabActive = computed(() => {
+  return (route.query.tab as string) === 'advanced';
+});
+
+const isAdvancedSubTabActive = (query: string) => {
+  const currentSubTab = route.query.subtab as string || 'general';
+  return currentSubTab === query;
 };
 
 const isSiteTabActive = (query: string) => {
@@ -673,11 +692,11 @@ onMounted(fetchTeams);
           <ServerAddSite v-if="serverId" :server-id="serverId" />
         </div>
       </div>
-      <nav class="-mb-px flex gap-1 overflow-x-auto">
+      <nav class="-mb-px flex gap-1 overflow-x-auto" :class="{ 'border-b border-border': isAdvancedTabActive }">
         <NuxtLink
           v-for="tab in serverDetailTabs"
           :key="tab.value"
-          :to="{ path: `/servers/${serverId}`, query: { tab: tab.query } }"
+          :to="{ path: `/servers/${serverId}`, query: tab.query === 'advanced' ? { tab: tab.query, subtab: 'general' } : { tab: tab.query } }"
           class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isServerTabActive(tab.query)
@@ -686,6 +705,22 @@ onMounted(fetchTeams);
           ]"
         >
           {{ tab.label }}
+        </NuxtLink>
+      </nav>
+      <!-- Advanced Sub-tabs -->
+      <nav v-if="isAdvancedTabActive" class="-mb-px flex gap-1 overflow-x-auto pt-1">
+        <NuxtLink
+          v-for="subtab in advancedSubTabs"
+          :key="subtab.value"
+          :to="{ path: `/servers/${serverId}`, query: { tab: 'advanced', subtab: subtab.query } }"
+          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            isAdvancedSubTabActive(subtab.query)
+              ? 'border-primary text-primary'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+          ]"
+        >
+          {{ subtab.label }}
         </NuxtLink>
       </nav>
     </div>
