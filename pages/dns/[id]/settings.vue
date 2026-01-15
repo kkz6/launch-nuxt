@@ -1,12 +1,5 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbSeparator,
-} from "~/components/ui/breadcrumb";
 
 definePageMeta({
   layout: "default",
@@ -67,37 +60,6 @@ onMounted(fetchDomainData);
     </div>
 
     <template v-else-if="domain">
-      <div class="flex flex-col gap-4">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink as-child>
-                <NuxtLink to="/dns">Domains</NuxtLink>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink as-child>
-                <NuxtLink :to="`/dns/${domain.id}`">{{
-                  domain.address
-                }}</NuxtLink>
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink>Settings</BreadcrumbLink>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-
-        <header class="mb-6">
-          <h1 class="text-xl font-bold lg:text-3xl">Domain Settings</h1>
-          <p class="mt-1 text-muted-foreground">
-            Manage settings for {{ domain.address }}
-          </p>
-        </header>
-      </div>
-
       <DnsDomainSettings
         :domain="domain"
         @deleted="handleDeleted"

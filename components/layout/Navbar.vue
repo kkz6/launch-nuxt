@@ -65,6 +65,12 @@ const allSiteDetailTabs = [
   { value: "settings", label: "Settings", query: "settings" },
 ];
 
+// DNS domain detail tabs
+const dnsDetailTabs = [
+  { value: "records", label: "Records", path: "" },
+  { value: "settings", label: "Settings", path: "/settings" },
+];
+
 // Check if we're on a server detail page
 const isServerDetailPage = computed(() => {
   const match = route.path.match(/^\/servers\/([^/]+)$/);
@@ -75,6 +81,17 @@ const isServerDetailPage = computed(() => {
 const isSiteDetailPage = computed(() => {
   const match = route.path.match(/^\/servers\/([^/]+)\/sites\/([^/]+)$/);
   return match !== null;
+});
+
+// Check if we're on a DNS domain detail page
+const isDnsDetailPage = computed(() => {
+  const match = route.path.match(/^\/dns\/([^/]+)(?:\/|$)/);
+  return match && match[1] !== 'create';
+});
+
+// Check if we're on DNS settings page
+const isDnsSettingsPage = computed(() => {
+  return route.path.match(/^\/dns\/([^/]+)\/settings$/) !== null;
 });
 
 const serverId = computed(() => {
@@ -88,6 +105,11 @@ const siteId = computed(() => {
   return match ? match[2] : null;
 });
 
+const domainId = computed(() => {
+  const match = route.path.match(/^\/dns\/([^/]+)(?:\/|$)/);
+  return match ? match[1] : null;
+});
+
 // Server data for detail page
 const serverName = ref<string | null>(null);
 const serverIp = ref<string | null>(null);
@@ -98,6 +120,11 @@ const serverProvider = ref<string | null>(null);
 const siteAddress = ref<string | null>(null);
 const siteType = ref<string | null>(null);
 const siteUrl = ref<string | null>(null);
+
+// Domain data for DNS detail page
+const domainAddress = ref<string | null>(null);
+const domainProvider = ref<string | null>(null);
+const domainProviderLabel = ref<string | null>(null);
 
 const providerLabels: Record<string, string> = {
   digitalocean: "DigitalOcean",
@@ -168,6 +195,33 @@ watch([serverId, siteId], async ([sId, stId]) => {
   }
 }, { immediate: true });
 
+// Fetch domain info when on DNS detail page
+watch(domainId, async (dId) => {
+  if (dId && dId !== 'create') {
+    try {
+      const response = await $api<{
+        data: {
+          domain: {
+            address: string;
+            provider?: { provider: string; profile: string };
+          };
+        };
+      }>(`/dns/domains/${dId}`);
+      domainAddress.value = response.data.domain.address;
+      domainProvider.value = response.data.domain.provider?.provider || null;
+      domainProviderLabel.value = response.data.domain.provider?.profile || null;
+    } catch {
+      domainAddress.value = null;
+      domainProvider.value = null;
+      domainProviderLabel.value = null;
+    }
+  } else {
+    domainAddress.value = null;
+    domainProvider.value = null;
+    domainProviderLabel.value = null;
+  }
+}, { immediate: true });
+
 const isGlobalTabActive = (tabRoute: string) => {
   return route.path === tabRoute || route.path.startsWith(`${tabRoute}/`);
 };
@@ -182,8 +236,24 @@ const isSiteTabActive = (query: string) => {
   return currentTab === query;
 };
 
+const isDnsTabActive = (tabPath: string) => {
+  if (tabPath === '') {
+    // Records tab is active when not on settings page
+    return !isDnsSettingsPage.value;
+  }
+  if (tabPath === '/settings') {
+    return isDnsSettingsPage.value;
+  }
+  return false;
+};
+
 const showGlobalTabs = computed(() => {
-  return (route.path === '/servers' || route.path === '/dns') || route.path.startsWith('/dns/');
+  // Show global tabs only on list pages, not detail pages
+  return route.path === '/servers' || route.path === '/dns';
+});
+
+const showDnsTabs = computed(() => {
+  return isDnsDetailPage.value;
 });
 
 const showServerTabs = computed(() => {
@@ -681,6 +751,44 @@ onMounted(fetchTeams);
           class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isSiteTabActive(tab.query)
+              ? 'border-foreground text-foreground'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+          ]"
+        >
+          {{ tab.label }}
+        </NuxtLink>
+      </nav>
+    </div>
+
+    <!-- DNS Domain Detail Navigation -->
+    <div v-if="showDnsTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
+      <div class="flex items-center justify-between py-2">
+        <!-- Breadcrumb: Domains / domain.address -->
+        <div class="flex items-center gap-3">
+          <NuxtLink
+            to="/dns"
+            class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Globe class="h-4 w-4" />
+            Domains
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">{{ domainAddress || 'Loading...' }}</span>
+            <span v-if="domainProviderLabel" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+              {{ domainProviderLabel }}
+            </span>
+          </div>
+        </div>
+      </div>
+      <nav class="-mb-px flex gap-1 overflow-x-auto">
+        <NuxtLink
+          v-for="tab in dnsDetailTabs"
+          :key="tab.value"
+          :to="`/dns/${domainId}${tab.path}`"
+          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            isDnsTabActive(tab.path)
               ? 'border-foreground text-foreground'
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
