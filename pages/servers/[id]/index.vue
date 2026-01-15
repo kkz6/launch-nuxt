@@ -2,12 +2,6 @@
 import { Terminal } from "lucide-vue-next";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "~/components/ui/tooltip";
 import type { Server, Site } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -88,9 +82,6 @@ onMounted(async () => {
     <!-- Server info bar -->
     <div class="mb-6 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <Badge :variant="server.connected ? 'success' : 'destructive'">
-          {{ server.connected ? "Connected" : "Disconnected" }}
-        </Badge>
         <Badge>
           {{
             server.provider === "custom_server"
@@ -103,23 +94,14 @@ onMounted(async () => {
         </span>
       </div>
       <div v-if="server.connected" class="flex items-center gap-2">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button
-                variant="outline"
-                size="sm"
-                @click="isTerminalOpen = true"
-              >
-                <Terminal class="mr-2 h-4 w-4" />
-                Terminal
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Open Terminal</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          variant="outline"
+          size="sm"
+          @click="isTerminalOpen = true"
+        >
+          <Terminal class="mr-2 h-4 w-4" />
+          Terminal
+        </Button>
       </div>
     </div>
 

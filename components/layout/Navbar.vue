@@ -471,7 +471,13 @@ onMounted(fetchTeams);
         </NuxtLink>
         <span class="text-muted-foreground">/</span>
         <div class="flex items-center gap-2 py-3">
-          <span class="text-sm font-medium">{{ serverName || 'Loading...' }}</span>
+          <span class="relative flex items-center gap-1.5 text-sm font-medium">
+            <span
+              class="h-2 w-2 rounded-full"
+              :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
+            />
+            {{ serverName || 'Loading...' }}
+          </span>
           <span v-if="serverIp" class="text-xs text-muted-foreground">({{ serverIp }})</span>
         </div>
       </div>
