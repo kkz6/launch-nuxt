@@ -31,6 +31,13 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 // Notification channels
 const channels = ref<NotificationChannel[]>([])
 const isChannelsLoading = ref(true)
+const editingChannel = ref<NotificationChannel | null>(null)
+const isEditOpen = ref(false)
+
+const openEditDialog = (channel: NotificationChannel) => {
+  editingChannel.value = channel
+  isEditOpen.value = true
+}
 
 const channelLabels: Record<string, string> = {
   slack: 'Slack',
@@ -243,14 +250,24 @@ onMounted(() => {
                 {{ getChannelDetail(channel) }}
               </p>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-              @click="deleteChannel(channel)"
-            >
-              <Icon name="lucide:trash-2" class="h-4 w-4 text-muted-foreground hover:text-destructive" />
-            </Button>
+            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                @click="openEditDialog(channel)"
+              >
+                <Icon name="lucide:pencil" class="h-4 w-4 text-muted-foreground hover:text-foreground" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                @click="deleteChannel(channel)"
+              >
+                <Icon name="lucide:trash-2" class="h-4 w-4 text-muted-foreground hover:text-destructive" />
+              </Button>
+            </div>
           </div>
         </div>
       </template>
@@ -289,5 +306,12 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <!-- Edit Notification Channel Dialog -->
+    <SettingsEditNotificationChannel
+      v-model:open="isEditOpen"
+      :channel="editingChannel"
+      @updated="fetchChannels"
+    />
   </div>
 </template>
