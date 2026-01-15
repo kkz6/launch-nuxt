@@ -14,20 +14,6 @@ export default defineNuxtConfig({
     "@nuxt/content",
   ],
 
-  content: {
-    highlight: {
-      theme: {
-        default: 'github-light',
-        dark: 'github-dark',
-      },
-    },
-    markdown: {
-      toc: {
-        depth: 3,
-        searchDepth: 3,
-      },
-    },
-  },
 
   css: ["~/assets/css/main.css"],
 
