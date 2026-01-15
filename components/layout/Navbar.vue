@@ -591,34 +591,34 @@ onMounted(fetchTeams);
             </span>
           </div>
         </div>
-        <Button
-          v-if="serverConnected"
-          variant="outline"
-          size="sm"
-          @click="openTerminal"
-        >
-          <Terminal class="mr-2 h-4 w-4" />
-          Terminal
-        </Button>
-      </div>
-      <div class="-mb-px flex items-center justify-between">
-        <nav class="flex gap-1 overflow-x-auto">
-          <NuxtLink
-            v-for="tab in serverDetailTabs"
-            :key="tab.value"
-            :to="{ path: `/servers/${serverId}`, query: { tab: tab.query } }"
-            class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
-            :class="[
-              isServerTabActive(tab.query)
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
-            ]"
+        <div class="flex items-center gap-2">
+          <Button
+            v-if="serverConnected"
+            variant="outline"
+            size="sm"
+            @click="openTerminal"
           >
-            {{ tab.label }}
-          </NuxtLink>
-        </nav>
-        <ServerAddSite v-if="isServerTabActive('sites')" :server-id="serverId" />
+            <Terminal class="mr-2 h-4 w-4" />
+            Terminal
+          </Button>
+          <ServerAddSite v-if="serverId" :server-id="serverId" />
+        </div>
       </div>
+      <nav class="-mb-px flex gap-1 overflow-x-auto">
+        <NuxtLink
+          v-for="tab in serverDetailTabs"
+          :key="tab.value"
+          :to="{ path: `/servers/${serverId}`, query: { tab: tab.query } }"
+          class="relative whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            isServerTabActive(tab.query)
+              ? 'border-foreground text-foreground'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+          ]"
+        >
+          {{ tab.label }}
+        </NuxtLink>
+      </nav>
     </div>
 
     <!-- Site Detail Navigation -->
