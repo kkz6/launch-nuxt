@@ -105,6 +105,12 @@ const showServerTabs = computed(() => {
   return isServerDetailPage.value;
 });
 
+// DNS refresh trigger
+const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
+const onDnsCreated = () => {
+  dnsRefreshKey.value++;
+};
+
 const setColorMode = (mode: "light" | "dark" | "system") => {
   colorMode.preference = mode;
   if (mode === "dark") {
@@ -440,22 +446,26 @@ onMounted(fetchTeams);
 
     <!-- Global Navigation Tabs (Servers / Domains) -->
     <div v-if="showGlobalTabs" class="mx-auto max-w-8xl px-4 sm:px-6">
-      <nav class="-mb-px flex gap-6">
-        <NuxtLink
-          v-for="tab in globalTabs"
-          :key="tab.value"
-          :to="tab.route"
-          class="relative flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors"
-          :class="[
-            isGlobalTabActive(tab.route)
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
-          ]"
-        >
-          <component :is="tab.icon" class="h-4 w-4" />
-          {{ tab.label }}
-        </NuxtLink>
-      </nav>
+      <div class="-mb-px flex items-center justify-between">
+        <nav class="flex gap-6">
+          <NuxtLink
+            v-for="tab in globalTabs"
+            :key="tab.value"
+            :to="tab.route"
+            class="relative flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors"
+            :class="[
+              isGlobalTabActive(tab.route)
+                ? 'border-foreground text-foreground'
+                : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+            ]"
+          >
+            <component :is="tab.icon" class="h-4 w-4" />
+            {{ tab.label }}
+          </NuxtLink>
+        </nav>
+        <ServerCreateServerDialog v-if="route.path === '/servers'" />
+        <DnsAddDomain v-if="route.path === '/dns'" :providers="[]" @created="onDnsCreated" />
+      </div>
     </div>
 
     <!-- Server Detail Navigation -->

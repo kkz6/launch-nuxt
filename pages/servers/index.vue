@@ -67,10 +67,6 @@ onMounted(async () => {
 
 <template>
   <div>
-    <div class="mb-6 flex justify-end">
-      <ServerCreateServerDialog />
-    </div>
-
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
         name="lucide:loader-2"
