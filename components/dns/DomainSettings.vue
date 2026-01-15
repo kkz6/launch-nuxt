@@ -3,7 +3,6 @@ import { toast } from 'vue-sonner'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '~/components/ui/card'
 import { Button } from '~/components/ui/button'
 import { Separator } from '~/components/ui/separator'
 import {
@@ -114,15 +113,10 @@ const deleteDomain = async () => {
 </script>
 
 <template>
-  <Card class="bg-background">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
-    <CardHeader>
-      <CardTitle class="text-xl">Domain Settings</CardTitle>
-      <CardDescription>
-        Manage settings for {{ domain.address }}
-      </CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-6">
+
+    <div class="space-y-6">
       <form class="space-y-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="label">
           <FormItem>
@@ -171,6 +165,6 @@ const deleteDomain = async () => {
           Delete Domain
         </Button>
       </div>
-    </CardContent>
-  </Card>
+    </div>
+  </div>
 </template>

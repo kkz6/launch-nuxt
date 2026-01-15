@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { Cloud, CloudOff, MessageSquare, AlertTriangle } from "lucide-vue-next";
 import { toast } from "vue-sonner";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import {
@@ -201,61 +200,45 @@ onMounted(fetchDomainData);
         </Breadcrumb>
       </div>
 
-      <!-- Main DNS Records Card -->
-      <Card class="mt-6 bg-background">
-        <CardHeader>
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle class="text-xl">
-                DNS management for
-                <span class="font-bold">{{ domain.address }}</span>
-              </CardTitle>
-              <CardDescription class="mt-1">
-                Review, add, and edit DNS records. Edits will go into effect
-                once saved.
-              </CardDescription>
-            </div>
+      <!-- DNS Records Section -->
+      <div class="mt-6">
+        <div class="mb-4 flex items-start justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-semibold">DNS Records</h3>
+            <p class="text-sm text-muted-foreground">
+              Review, add, and edit DNS records for {{ domain.address }}
+            </p>
           </div>
-        </CardHeader>
-
-        <CardContent class="space-y-4">
-          <!-- Search and Actions Bar -->
-          <div class="flex flex-wrap items-center gap-3">
-            <span class="text-sm text-muted-foreground">Search DNS Records</span>
-          </div>
-          <div class="flex flex-wrap items-center gap-3">
-            <Button variant="outline" size="sm">
-              <Icon name="lucide:filter" class="mr-2 h-4 w-4" />
-              Add filter
+          <DnsRecordModal
+            :domain="domain"
+            :available-record-types="recordTypes.filter((t) => t !== 'NS')"
+            :is-cloudflare="isCloudflare"
+            @created="fetchDomainData"
+          >
+            <Button>
+              <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+              Add Record
             </Button>
-            <div class="relative flex-1">
-              <Icon
-                name="lucide:search"
-                class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              />
-              <Input
-                v-model="searchQuery"
-                placeholder=""
-                class="pl-9"
-              />
-            </div>
-            <Button variant="outline">Search</Button>
-            <DnsRecordModal
-              :domain="domain"
-              :available-record-types="recordTypes.filter((t) => t !== 'NS')"
-              :is-cloudflare="isCloudflare"
-              @created="fetchDomainData"
-            >
-              <Button>
-                <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-                Add record
-              </Button>
-            </DnsRecordModal>
+          </DnsRecordModal>
+        </div>
+
+        <!-- Search Bar -->
+        <div class="mb-4 flex flex-wrap items-center gap-3">
+          <div class="relative flex-1">
+            <Icon
+              name="lucide:search"
+              class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              v-model="searchQuery"
+              placeholder="Search records..."
+              class="pl-9"
+            />
           </div>
+        </div>
 
           <!-- DNS Records Table -->
-          <div class="rounded-lg border">
-            <Table>
+          <Table>
               <TableHeader>
                 <TableRow class="bg-muted/40 hover:bg-muted/40">
                   <TableHead class="w-12">
@@ -437,79 +420,71 @@ onMounted(fetchDomainData);
                 </TableRow>
               </TableBody>
             </Table>
-          </div>
-        </CardContent>
-      </Card>
+      </div>
 
-      <!-- Nameservers Card -->
-      <Card v-if="nsRecords.length > 0 || domain.nameservers?.length" class="mt-6 bg-background">
-        <CardHeader>
-          <CardTitle class="text-lg">
+      <!-- Nameservers Section -->
+      <div v-if="nsRecords.length > 0 || domain.nameservers?.length" class="mt-8">
+        <div class="mb-4">
+          <h3 class="text-lg font-semibold">
             {{ isCloudflare ? "Cloudflare Nameservers" : "Nameservers" }}
-          </CardTitle>
-          <CardDescription>
+          </h3>
+          <p class="text-sm text-muted-foreground">
             {{
               isCloudflare
                 ? "Every DNS zone on Cloudflare is assigned a set of Cloudflare-branded nameservers."
                 : "Configure these nameservers at your domain registrar."
             }}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div class="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow class="bg-muted/40 hover:bg-muted/40">
-                  <TableHead class="w-[100px]">Type</TableHead>
-                  <TableHead>Value</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <template v-if="nsRecords.length > 0">
-                  <TableRow
-                    v-for="record in nsRecords"
-                    :key="record.id"
-                    class="hover:bg-muted/20"
-                  >
-                    <TableCell class="font-medium">NS</TableCell>
-                    <TableCell>{{ record.value }}</TableCell>
-                  </TableRow>
-                </template>
-                <template v-else-if="domain.nameservers?.length">
-                  <TableRow
-                    v-for="(ns, index) in domain.nameservers"
-                    :key="index"
-                    class="hover:bg-muted/20"
-                  >
-                    <TableCell class="font-medium">NS</TableCell>
-                    <TableCell>{{ ns }}</TableCell>
-                  </TableRow>
-                </template>
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+          </p>
+        </div>
+        <Table>
+          <TableHeader>
+            <TableRow class="bg-muted/40 hover:bg-muted/40">
+              <TableHead class="w-[100px]">Type</TableHead>
+              <TableHead>Value</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <template v-if="nsRecords.length > 0">
+              <TableRow
+                v-for="record in nsRecords"
+                :key="record.id"
+                class="hover:bg-muted/20"
+              >
+                <TableCell class="font-medium">NS</TableCell>
+                <TableCell>{{ record.value }}</TableCell>
+              </TableRow>
+            </template>
+            <template v-else-if="domain.nameservers?.length">
+              <TableRow
+                v-for="(ns, index) in domain.nameservers"
+                :key="index"
+                class="hover:bg-muted/20"
+              >
+                <TableCell class="font-medium">NS</TableCell>
+                <TableCell>{{ ns }}</TableCell>
+              </TableRow>
+            </template>
+          </TableBody>
+        </Table>
+      </div>
 
-      <!-- Domain Settings Link -->
-      <Card class="mt-6 bg-background">
-        <CardHeader>
-          <div class="flex items-center justify-between">
-            <div>
-              <CardTitle class="text-lg">Domain Settings</CardTitle>
-              <CardDescription>
-                Manage domain configuration and danger zone options
-              </CardDescription>
-            </div>
-            <NuxtLink :to="`/dns/${domain.id}/settings`">
-              <Button variant="outline">
-                <Icon name="lucide:settings" class="mr-2 h-4 w-4" />
-                Settings
-              </Button>
-            </NuxtLink>
+      <!-- Domain Settings Section -->
+      <div class="mt-8">
+        <div class="flex items-center justify-between rounded-lg border bg-card p-4">
+          <div>
+            <h3 class="font-semibold">Domain Settings</h3>
+            <p class="text-sm text-muted-foreground">
+              Manage domain configuration and danger zone options
+            </p>
           </div>
-        </CardHeader>
-      </Card>
+          <NuxtLink :to="`/dns/${domain.id}/settings`">
+            <Button variant="outline">
+              <Icon name="lucide:settings" class="mr-2 h-4 w-4" />
+              Settings
+            </Button>
+          </NuxtLink>
+        </div>
+      </div>
     </template>
   </div>
 </template>
