@@ -396,17 +396,11 @@ onMounted(fetchPhpVersions)
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" class="w-48">
                         <template v-if="service.details?.status === 'installed'">
-                          <DropdownMenuItem
-                            v-if="service.details?.opcache"
-                            @click="openOpcacheDialog(service)"
-                          >
+                          <DropdownMenuItem @click="openOpcacheDialog(service)">
                             <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
                             OPcache
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            v-if="service.details?.extensions"
-                            @click="openExtensionsDialog(service)"
-                          >
+                          <DropdownMenuItem @click="openExtensionsDialog(service)">
                             <Icon name="lucide:package" class="mr-2 h-4 w-4" />
                             Extensions
                           </DropdownMenuItem>
@@ -488,17 +482,11 @@ onMounted(fetchPhpVersions)
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" class="w-48">
                       <template v-if="service.details?.status === 'installed'">
-                        <DropdownMenuItem
-                          v-if="service.details?.opcache"
-                          @click="openOpcacheDialog(service)"
-                        >
+                        <DropdownMenuItem @click="openOpcacheDialog(service)">
                           <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
                           OPcache
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          v-if="service.details?.extensions"
-                          @click="openExtensionsDialog(service)"
-                        >
+                        <DropdownMenuItem @click="openExtensionsDialog(service)">
                           <Icon name="lucide:package" class="mr-2 h-4 w-4" />
                           Extensions
                         </DropdownMenuItem>
