@@ -260,9 +260,9 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <SharedConfirmationDialog ref="confirmationDialog" />
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
+      <SharedConfirmationDialog ref="confirmationDialog" />
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Icon name="lucide:zap" class="h-5 w-5" />
