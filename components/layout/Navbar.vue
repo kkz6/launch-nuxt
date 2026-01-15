@@ -11,6 +11,8 @@ import {
   Sun,
   Moon,
   Monitor,
+  Server,
+  Globe,
 } from "lucide-vue-next";
 import {
   DropdownMenu,
@@ -33,6 +35,20 @@ interface Team {
 const { user, logout } = useAuth();
 const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
+const route = useRoute();
+
+const navTabs = [
+  { value: "servers", label: "Servers", route: "/servers", icon: Server },
+  { value: "domains", label: "Domains", route: "/dns", icon: Globe },
+];
+
+const isTabActive = (tabRoute: string) => {
+  return route.path === tabRoute || route.path.startsWith(`${tabRoute}/`);
+};
+
+const showTabs = computed(() => {
+  return route.path.startsWith('/servers') || route.path.startsWith('/dns');
+});
 
 const setColorMode = (mode: "light" | "dark" | "system") => {
   colorMode.preference = mode;
@@ -365,6 +381,26 @@ onMounted(fetchTeams);
           </template>
         </ClientOnly>
       </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div v-if="showTabs" class="mx-auto max-w-8xl px-4 sm:px-6">
+      <nav class="-mb-px flex gap-6">
+        <NuxtLink
+          v-for="tab in navTabs"
+          :key="tab.value"
+          :to="tab.route"
+          class="relative flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors"
+          :class="[
+            isTabActive(tab.route)
+              ? 'border-foreground text-foreground'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+          ]"
+        >
+          <component :is="tab.icon" class="h-4 w-4" />
+          {{ tab.label }}
+        </NuxtLink>
+      </nav>
     </div>
 
     <!-- Create Team Dialog -->

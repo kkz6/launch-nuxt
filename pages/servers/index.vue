@@ -13,10 +13,8 @@ useHead({
   title: "Servers",
 });
 
-const router = useRouter();
 const servers = ref<Server[]>([]);
 const isLoading = ref(true);
-const activeTab = ref("servers");
 
 const serviceProviders: Record<string, string> = {
   digitalocean: "DigitalOcean",
@@ -36,11 +34,6 @@ const serverStatus: Record<string, string> = {
   deleting: "Deleting",
   unknown: "Unknown",
 };
-
-const tabs = [
-  { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
-  { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
-];
 
 const formatDate = (dateString: string) => {
   if (!dateString) return "";
@@ -85,8 +78,6 @@ onMounted(async () => {
       </div>
       <ServerCreateServerDialog />
     </header>
-
-    <SharedPageTabs v-model:active-tab="activeTab" :tabs="tabs" />
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon

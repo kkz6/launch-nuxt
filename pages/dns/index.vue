@@ -47,16 +47,9 @@ interface DomainsResponse {
   };
 }
 
-const router = useRouter();
 const domains = ref<Domain[]>([]);
 const providers = ref<DnsProvider[]>([]);
 const isLoading = ref(true);
-const activeTab = ref("domains");
-
-const tabs = [
-  { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
-  { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
-];
 
 const fetchDomains = async () => {
   try {
@@ -124,8 +117,6 @@ onMounted(fetchDomains);
         </Button>
       </DnsAddDomain>
     </header>
-
-    <SharedPageTabs v-model:active-tab="activeTab" :tabs="tabs" />
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
