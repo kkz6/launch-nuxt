@@ -185,7 +185,7 @@ const deleteServer = async () => {
               Automatically install security updates
             </p>
           </div>
-          <Switch v-model:checked="autoUpdate" />
+          <Switch v-model="autoUpdate" />
         </div>
 
         <Button :disabled="isLoading" class="w-full sm:w-auto" @click="updateServer">

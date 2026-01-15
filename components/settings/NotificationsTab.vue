@@ -112,8 +112,8 @@ onMounted(fetchSettings)
         </div>
         <Switch
           :id="option.key"
-          v-model:checked="settings[option.key as keyof NotificationSettings]"
-          @update:checked="saveSettings"
+          v-model="settings[option.key as keyof NotificationSettings]"
+          @update:model-value="saveSettings"
         />
       </div>
     </div>

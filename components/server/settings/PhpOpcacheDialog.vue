@@ -39,22 +39,32 @@ interface OpcacheSettings {
 interface OpcacheStatus {
   enabled: boolean
   error?: string
+  cache_full?: boolean
+  restart_pending?: boolean
+  restart_in_progress?: boolean
   memory?: {
-    used: number
-    free: number
-    wasted: number
-    usage_percentage: number
+    used_memory: number
+    free_memory: number
+    wasted_memory: number
+    current_wasted_percentage: number
   }
   statistics?: {
-    cached_scripts: number
-    cached_keys: number
+    num_cached_scripts: number
+    num_cached_keys: number
     max_cached_keys: number
     hits: number
     misses: number
     hit_rate: number
   }
+  interned_strings?: {
+    buffer_size: number
+    used_memory: number
+    free_memory: number
+    number_of_strings: number
+  }
   jit?: {
     enabled: boolean
+    on: boolean
     buffer_size: number
     buffer_free: number
   }
@@ -278,8 +288,8 @@ const handleSubmit = async () => {
                 </div>
                 <div>
                   <p class="text-xs text-muted-foreground">Memory Used</p>
-                  <p class="font-medium">{{ formatBytes(status.memory?.used || 0) }}</p>
-                  <p class="text-xs text-muted-foreground">{{ formatBytes(status.memory?.free || 0) }} free</p>
+                  <p class="font-medium">{{ formatBytes(status.memory?.used_memory || 0) }}</p>
+                  <p class="text-xs text-muted-foreground">{{ formatBytes(status.memory?.free_memory || 0) }} free</p>
                 </div>
               </div>
 
@@ -302,7 +312,7 @@ const handleSubmit = async () => {
                 </div>
                 <div>
                   <p class="text-xs text-muted-foreground">Cached Scripts</p>
-                  <p class="font-medium">{{ status.statistics?.cached_scripts || 0 }}</p>
+                  <p class="font-medium">{{ status.statistics?.num_cached_scripts || 0 }}</p>
                   <p class="text-xs text-muted-foreground">of {{ status.statistics?.max_cached_keys || 0 }} max</p>
                 </div>
               </div>
@@ -331,7 +341,7 @@ const handleSubmit = async () => {
                   <Label class="font-medium">Enable OPcache</Label>
                   <p class="text-xs text-muted-foreground">Cache compiled PHP scripts in memory</p>
                 </div>
-                <Switch v-model:checked="form.enabled" />
+                <Switch v-model="form.enabled" />
               </div>
 
               <!-- Enable CLI -->
@@ -340,7 +350,7 @@ const handleSubmit = async () => {
                   <Label class="font-medium">Enable CLI</Label>
                   <p class="text-xs text-muted-foreground">Enable OPcache for CLI scripts</p>
                 </div>
-                <Switch v-model:checked="form.enable_cli" />
+                <Switch v-model="form.enable_cli" />
               </div>
 
               <!-- Memory Consumption -->
@@ -370,7 +380,7 @@ const handleSubmit = async () => {
                   <Label class="font-medium">Validate Timestamps</Label>
                   <p class="text-xs text-muted-foreground">Check for file changes (disable in production)</p>
                 </div>
-                <Switch v-model:checked="form.validate_timestamps" />
+                <Switch v-model="form.validate_timestamps" />
               </div>
 
               <!-- Revalidate Frequency -->
@@ -386,7 +396,7 @@ const handleSubmit = async () => {
                   <Label class="font-medium">Save Comments</Label>
                   <p class="text-xs text-muted-foreground">Keep doc comments in cached scripts</p>
                 </div>
-                <Switch v-model:checked="form.save_comments" />
+                <Switch v-model="form.save_comments" />
               </div>
 
               <!-- JIT Section (PHP 8.0+) -->
@@ -404,7 +414,7 @@ const handleSubmit = async () => {
                     <Label class="font-medium">Enable JIT</Label>
                     <p class="text-xs text-muted-foreground">Just-In-Time compilation for better performance</p>
                   </div>
-                  <Switch v-model:checked="form.jit_enabled" />
+                  <Switch v-model="form.jit_enabled" />
                 </div>
 
                 <template v-if="form.jit_enabled">
