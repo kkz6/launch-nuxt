@@ -43,9 +43,12 @@ interface Queue {
 interface Props {
   serverId: string
   siteId: string
+  autoRestartQueue?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  autoRestartQueue: false,
+})
 
 const queues = ref<Queue[]>([])
 const isLoading = ref(true)
@@ -207,10 +210,13 @@ onMounted(fetchQueues)
         <CardTitle class="text-xl">Queue Workers</CardTitle>
         <CardDescription>Manage Laravel queue workers for this site</CardDescription>
       </div>
-      <Button v-if="queues.length > 0" variant="outline" @click="syncStatus">
-        <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-        Sync Status
-      </Button>
+      <div class="flex items-center gap-4">
+        <SiteAutoRestartQueue :server-id="serverId" :site-id="siteId" :auto-restart-queue="autoRestartQueue" />
+        <Button v-if="queues.length > 0" variant="outline" @click="syncStatus">
+          <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+          Sync Status
+        </Button>
+      </div>
     </CardHeader>
     <CardContent>
       <div v-if="isLoading" class="flex items-center justify-center py-8">
