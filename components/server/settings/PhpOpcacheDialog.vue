@@ -119,20 +119,41 @@ const defaultSettings: OpcacheSettings = {
   jit_mode: 'tracing',
 }
 
-// Initialize form directly from props - data comes from PHP endpoint
-const opcache = props.service?.details?.opcache
-const form = ref<OpcacheSettings>({
-  enabled: opcache?.enabled ?? defaultSettings.enabled,
-  enable_cli: opcache?.enable_cli ?? defaultSettings.enable_cli,
-  memory_consumption: opcache?.memory_consumption ?? defaultSettings.memory_consumption,
-  interned_strings_buffer: opcache?.interned_strings_buffer ?? defaultSettings.interned_strings_buffer,
-  max_accelerated_files: opcache?.max_accelerated_files ?? defaultSettings.max_accelerated_files,
-  validate_timestamps: opcache?.validate_timestamps ?? defaultSettings.validate_timestamps,
-  revalidate_freq: opcache?.revalidate_freq ?? defaultSettings.revalidate_freq,
-  save_comments: opcache?.save_comments ?? defaultSettings.save_comments,
-  jit_enabled: opcache?.jit_enabled ?? defaultSettings.jit_enabled,
-  jit_buffer_size: opcache?.jit_buffer_size ?? defaultSettings.jit_buffer_size,
-  jit_mode: opcache?.jit_mode ?? defaultSettings.jit_mode,
+const form = ref<OpcacheSettings>({ ...defaultSettings })
+
+// Initialize form from service props
+const initializeForm = () => {
+  const opcache = props.service?.details?.opcache
+  form.value = {
+    enabled: opcache?.enabled ?? defaultSettings.enabled,
+    enable_cli: opcache?.enable_cli ?? defaultSettings.enable_cli,
+    memory_consumption: opcache?.memory_consumption ?? defaultSettings.memory_consumption,
+    interned_strings_buffer: opcache?.interned_strings_buffer ?? defaultSettings.interned_strings_buffer,
+    max_accelerated_files: opcache?.max_accelerated_files ?? defaultSettings.max_accelerated_files,
+    validate_timestamps: opcache?.validate_timestamps ?? defaultSettings.validate_timestamps,
+    revalidate_freq: opcache?.revalidate_freq ?? defaultSettings.revalidate_freq,
+    save_comments: opcache?.save_comments ?? defaultSettings.save_comments,
+    jit_enabled: opcache?.jit_enabled ?? defaultSettings.jit_enabled,
+    jit_buffer_size: opcache?.jit_buffer_size ?? defaultSettings.jit_buffer_size,
+    jit_mode: opcache?.jit_mode ?? defaultSettings.jit_mode,
+  }
+  // Reset status when service changes
+  status.value = null
+  hasLoadedStatus.value = false
+  activeTab.value = 'status'
+}
+
+// Re-initialize when dialog opens or service changes
+watch(() => props.service?.key, () => {
+  if (open.value) {
+    initializeForm()
+  }
+})
+
+watch(open, (isOpen) => {
+  if (isOpen) {
+    initializeForm()
+  }
 })
 
 // Format PHP version from "php84" to "8.4"
@@ -147,8 +168,8 @@ const formatPhpVersion = (version: string): string => {
   return version
 }
 
-const phpVersion = formatPhpVersion(props.service?.details?.version || props.service?.key || '')
-const supportsJit = parseFloat(phpVersion) >= 8.0
+const phpVersion = computed(() => formatPhpVersion(props.service?.details?.version || props.service?.key || ''))
+const supportsJit = computed(() => parseFloat(phpVersion.value) >= 8.0)
 
 const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B'
