@@ -130,31 +130,60 @@ const databases = [
           </div>
         </div>
 
-        <!-- Bottom Left - Global Edge Network -->
+        <!-- Bottom Left - SSL Certificates -->
         <div class="overflow-hidden rounded-xl border bg-card">
           <div class="flex h-full flex-col p-6">
-            <!-- Globe -->
-            <div class="relative min-h-[280px] flex-1">
-              <Suspense>
-                <LandingGitHubGlobe class="opacity-85" />
-                <template #fallback>
-                  <div class="absolute inset-0 flex items-center justify-center">
-                    <div
-                      class="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-500"
-                    />
+            <!-- SSL Visualization -->
+            <div class="flex-1">
+              <div class="h-full rounded-lg border bg-zinc-950 p-4">
+                <div class="space-y-4">
+                  <!-- Header -->
+                  <div class="flex items-center justify-between">
+                    <span class="font-mono text-[10px] text-zinc-500">SSL Certificates</span>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] text-emerald-400">
+                      <Icon name="lucide:zap" class="h-3 w-3" />
+                      Auto-renew
+                    </span>
                   </div>
-                </template>
-              </Suspense>
+
+                  <!-- Lock Icon -->
+                  <div class="flex items-center justify-center py-6">
+                    <div class="relative">
+                      <div class="absolute -inset-4 rounded-full bg-emerald-500/20 blur-xl" />
+                      <div class="relative flex h-20 w-20 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10">
+                        <Icon name="lucide:shield-check" class="h-10 w-10 text-emerald-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Certificate Info -->
+                  <div class="space-y-2">
+                    <div class="flex items-center justify-between rounded-md bg-zinc-900 p-2">
+                      <div class="flex items-center gap-2">
+                        <Icon name="lucide:lock" class="h-3.5 w-3.5 text-emerald-400" />
+                        <span class="font-mono text-[10px] text-zinc-300">myapp.com</span>
+                      </div>
+                      <span class="font-mono text-[10px] text-emerald-400">Active</span>
+                    </div>
+                    <div class="flex items-center justify-between rounded-md bg-zinc-900 p-2">
+                      <div class="flex items-center gap-2">
+                        <Icon name="lucide:lock" class="h-3.5 w-3.5 text-emerald-400" />
+                        <span class="font-mono text-[10px] text-zinc-300">api.myapp.com</span>
+                      </div>
+                      <span class="font-mono text-[10px] text-emerald-400">Active</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Description -->
             <div class="mt-4">
               <h3 class="mb-2 text-lg font-semibold text-foreground">
-                Global edge network
+                Free SSL certificates
               </h3>
               <p class="text-sm text-muted-foreground">
-                Deploy to multiple regions. Your app runs closer to your users for lightning-fast
-                performance.
+                Automatic HTTPS for all your sites with Let's Encrypt. Zero configuration, auto-renewal included.
               </p>
             </div>
           </div>
