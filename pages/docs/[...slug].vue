@@ -12,7 +12,23 @@ const slug = computed(() => {
   return parts || 'overview'
 })
 
-const path = computed(() => `/docs/${slug.value}`)
+const { data: page } = await useAsyncData(`docs-${slug.value}`, () =>
+  queryCollection('docs').path(`/docs/${slug.value}`).first()
+)
+
+if (!page.value) {
+  throw createError({
+    statusCode: 404,
+    statusMessage: 'Page not found',
+  })
+}
+
+useHead({
+  title: page.value?.title ? `${page.value.title} - launchctl Docs` : 'Documentation - launchctl',
+  meta: [
+    { name: 'description', content: page.value?.description || 'launchctl documentation' },
+  ],
+})
 </script>
 
 <template>
@@ -46,32 +62,20 @@ const path = computed(() => `/docs/${slug.value}`)
       </details>
     </div>
 
-    <!-- Content -->
-    <ContentDoc :path="path">
-      <template #default="{ doc }">
-        <div class="mb-8">
-          <h1 class="text-3xl font-bold tracking-tight text-foreground">
-            {{ doc.title }}
-          </h1>
-          <p v-if="doc.description" class="mt-2 text-lg text-muted-foreground">
-            {{ doc.description }}
-          </p>
-        </div>
-        <article class="prose-content">
-          <ContentRenderer :value="doc" />
-        </article>
-      </template>
+    <!-- Page header -->
+    <div v-if="page" class="mb-8">
+      <h1 class="text-3xl font-bold tracking-tight text-foreground">
+        {{ page.title }}
+      </h1>
+      <p v-if="page.description" class="mt-2 text-lg text-muted-foreground">
+        {{ page.description }}
+      </p>
+    </div>
 
-      <template #not-found>
-        <div class="py-12 text-center">
-          <h1 class="mb-4 text-2xl font-bold text-foreground">Page not found</h1>
-          <p class="mb-6 text-muted-foreground">The documentation page you're looking for doesn't exist.</p>
-          <NuxtLink to="/docs/overview" class="text-primary hover:underline">
-            Go to Overview
-          </NuxtLink>
-        </div>
-      </template>
-    </ContentDoc>
+    <!-- Content -->
+    <article v-if="page" class="prose-content">
+      <ContentRenderer :value="page" />
+    </article>
   </div>
 </template>
 
