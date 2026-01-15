@@ -3,16 +3,8 @@ import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 
 const { user, setUser } = useAuth()
-const colorMode = useColorMode()
 
 // Profile form state
 const isLoading = ref(false)
@@ -26,9 +18,6 @@ const currentPassword = ref('')
 const password = ref('')
 const passwordConfirmation = ref('')
 const passwordErrors = ref<{ current_password?: string; password?: string; password_confirmation?: string }>({})
-
-// Appearance state
-const appearance = ref(colorMode.preference || 'system')
 
 watch(
   user,
@@ -125,23 +114,6 @@ const onPasswordSubmit = async () => {
   }
 }
 
-const setColorModePreference = (mode: unknown) => {
-  if (typeof mode !== 'string') return
-  if (mode !== 'light' && mode !== 'dark' && mode !== 'system') return
-  colorMode.preference = mode
-  if (mode === 'dark') {
-    document.documentElement.classList.add('dark')
-  } else if (mode === 'light') {
-    document.documentElement.classList.remove('dark')
-  } else {
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }
-  toast.success('Theme updated')
-}
 </script>
 
 <template>
@@ -184,39 +156,6 @@ const setColorModePreference = (mode: unknown) => {
           Save Changes
         </Button>
       </form>
-    </div>
-
-    <!-- Appearance Section -->
-    <div class="px-6 py-6">
-      <h3 class="mb-4 text-base font-semibold">Appearance</h3>
-      <div class="space-y-1.5">
-        <Label for="appearance" class="text-xs font-medium text-muted-foreground">Theme</Label>
-        <Select v-model="appearance" @update:model-value="setColorModePreference">
-          <SelectTrigger class="w-full sm:w-48">
-            <SelectValue placeholder="Select a theme" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="light">
-              <div class="flex items-center gap-2">
-                <Icon name="lucide:sun" class="block size-4" />
-                Light
-              </div>
-            </SelectItem>
-            <SelectItem value="dark">
-              <div class="flex items-center gap-2">
-                <Icon name="lucide:moon" class="block size-4" />
-                Dark
-              </div>
-            </SelectItem>
-            <SelectItem value="system">
-              <div class="flex items-center gap-2">
-                <Icon name="lucide:laptop" class="block size-4" />
-                System
-              </div>
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
     </div>
 
     <!-- Password Section -->
