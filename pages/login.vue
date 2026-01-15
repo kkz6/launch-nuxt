@@ -21,6 +21,7 @@ const { login, checkUserStatus, isLoading: authLoading } = useAuth()
 const email = ref('')
 const password = ref('')
 const remember = ref(false)
+const passwordInputRef = ref<{ $el: HTMLInputElement } | null>(null)
 const errors = ref<Record<string, string>>({})
 const loading = ref(false)
 const showPasswordField = ref(false)
@@ -94,6 +95,16 @@ const handlePasskeyLogin = async () => {
   toast.info('Passkey authentication coming soon')
   passkeyLoading.value = false
 }
+
+// Focus password input when it appears
+watch(showPasswordField, (show) => {
+  if (show) {
+    // Wait for animation to complete before focusing
+    setTimeout(() => {
+      passwordInputRef.value?.$el?.focus()
+    }, 250)
+  }
+})
 </script>
 
 <template>
@@ -205,9 +216,9 @@ const handlePasskeyLogin = async () => {
                 <Label for="password">Password</Label>
                 <Input
                   id="password"
+                  ref="passwordInputRef"
                   v-model="password"
                   type="password"
-                  autofocus
                   required
                 />
                 <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
