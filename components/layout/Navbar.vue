@@ -8,6 +8,9 @@ import {
   Plus,
   Trash2,
   Check,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-vue-next";
 import {
   DropdownMenu,
@@ -29,6 +32,22 @@ interface Team {
 
 const { user, logout } = useAuth();
 const { open: openSettingsSheet } = useSettingsSheet();
+const colorMode = useColorMode();
+
+const setColorMode = (mode: "light" | "dark" | "system") => {
+  colorMode.preference = mode;
+  if (mode === "dark") {
+    document.documentElement.classList.add("dark");
+  } else if (mode === "light") {
+    document.documentElement.classList.remove("dark");
+  } else {
+    if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }
+};
 
 const isOpen = ref(false);
 const isTeamOpen = ref(false);
@@ -230,8 +249,6 @@ onMounted(fetchTeams);
           </template>
         </ClientOnly>
 
-        <ModeToggle />
-
         <!-- User Menu -->
         <ClientOnly>
           <DropdownMenu v-model:open="isOpen">
@@ -290,6 +307,38 @@ onMounted(fetchTeams);
                 >
                   <Settings class="h-4 w-4 text-muted-foreground" />
                   <span>Settings</span>
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+
+              <!-- Theme Options -->
+              <DropdownMenuLabel class="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                Theme
+              </DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  class="cursor-pointer gap-2 px-2 py-2"
+                  @click="setColorMode('light')"
+                >
+                  <Sun class="h-4 w-4 text-muted-foreground" />
+                  <span>Light</span>
+                  <Check v-if="colorMode.preference === 'light'" class="ml-auto h-4 w-4 text-primary" />
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  class="cursor-pointer gap-2 px-2 py-2"
+                  @click="setColorMode('dark')"
+                >
+                  <Moon class="h-4 w-4 text-muted-foreground" />
+                  <span>Dark</span>
+                  <Check v-if="colorMode.preference === 'dark'" class="ml-auto h-4 w-4 text-primary" />
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  class="cursor-pointer gap-2 px-2 py-2"
+                  @click="setColorMode('system')"
+                >
+                  <Monitor class="h-4 w-4 text-muted-foreground" />
+                  <span>System</span>
+                  <Check v-if="colorMode.preference === 'system'" class="ml-auto h-4 w-4 text-primary" />
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />

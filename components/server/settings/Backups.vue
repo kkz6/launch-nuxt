@@ -9,7 +9,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
-import { Switch } from '~/components/ui/switch'
 
 interface BackupJob {
   id: string
@@ -115,23 +114,6 @@ const runBackup = async (backup: Backup) => {
     fetchBackups()
   } catch {
     toast.error('Failed to start backup')
-  } finally {
-    loadingActions.value = { ...loadingActions.value, [backup.id]: '' }
-  }
-}
-
-const toggleEnabled = async (backup: Backup) => {
-  loadingActions.value = { ...loadingActions.value, [backup.id]: 'toggle' }
-
-  try {
-    await $api(`/servers/${props.serverId}/backups/${backup.id}`, {
-      method: 'PUT',
-      body: { enabled: !backup.enabled },
-    })
-    toast.success(backup.enabled ? 'Backup disabled' : 'Backup enabled')
-    fetchBackups()
-  } catch {
-    toast.error('Failed to update backup')
   } finally {
     loadingActions.value = { ...loadingActions.value, [backup.id]: '' }
   }
@@ -287,11 +269,10 @@ onMounted(fetchBackups)
             <div class="overflow-hidden rounded-lg border">
               <!-- Table Header -->
               <div class="hidden border-b bg-muted/50 px-6 py-3 md:grid md:grid-cols-12 md:gap-4">
-                <div class="col-span-2 text-sm font-medium text-muted-foreground">Provider</div>
+                <div class="col-span-3 text-sm font-medium text-muted-foreground">Provider</div>
                 <div class="col-span-2 text-sm font-medium text-muted-foreground">Source</div>
                 <div class="col-span-2 text-sm font-medium text-muted-foreground">Schedule</div>
                 <div class="col-span-2 text-sm font-medium text-muted-foreground">Last Backup</div>
-                <div class="col-span-1 text-sm font-medium text-muted-foreground">Enabled</div>
                 <div class="col-span-3 text-right text-sm font-medium text-muted-foreground">Actions</div>
               </div>
 
@@ -306,15 +287,11 @@ onMounted(fetchBackups)
                   <div class="flex flex-col gap-3 md:hidden">
                     <div class="flex items-center justify-between">
                       <div>
-                        <div class="font-medium">{{ getProviderName(backup.storage_provider_id) }}</div>
+                        <div class="flex items-center gap-2">
+                          <span class="font-medium">{{ getProviderName(backup.storage_provider_id) }}</span>
+                          <Badge v-if="!backup.enabled" variant="secondary" class="text-xs">Disabled</Badge>
+                        </div>
                         <div class="text-sm text-muted-foreground">{{ getBackupSource(backup) }}</div>
-                      </div>
-                      <div class="flex items-center gap-2">
-                        <Switch
-                          :checked="backup.enabled"
-                          :disabled="loadingActions[backup.id] === 'toggle'"
-                          @update:checked="toggleEnabled(backup)"
-                        />
                       </div>
                     </div>
                     <div class="flex items-center justify-between">
@@ -349,8 +326,11 @@ onMounted(fetchBackups)
 
                   <!-- Desktop Layout -->
                   <div class="hidden items-center gap-4 md:grid md:grid-cols-12">
-                    <div class="col-span-2">
-                      <span class="font-medium">{{ getProviderName(backup.storage_provider_id) }}</span>
+                    <div class="col-span-3">
+                      <div class="flex items-center gap-2">
+                        <span class="font-medium">{{ getProviderName(backup.storage_provider_id) }}</span>
+                        <Badge v-if="!backup.enabled" variant="secondary" class="text-xs">Disabled</Badge>
+                      </div>
                     </div>
 
                     <div class="col-span-2">
@@ -370,14 +350,6 @@ onMounted(fetchBackups)
                         {{ getStatusConfig(getLatestJobStatus(backup)!).label }}
                       </Badge>
                       <span v-else class="text-sm text-muted-foreground">-</span>
-                    </div>
-
-                    <div class="col-span-1">
-                      <Switch
-                        :checked="backup.enabled"
-                        :disabled="loadingActions[backup.id] === 'toggle'"
-                        @update:checked="toggleEnabled(backup)"
-                      />
                     </div>
 
                     <div class="col-span-3 flex items-center justify-end gap-1">
