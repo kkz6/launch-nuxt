@@ -366,15 +366,27 @@ onMounted(fetchDomainData);
                   </TableCell>
                   <TableCell>{{ formatTtl(record) }}</TableCell>
                   <TableCell class="text-right">
-                    <Button
-                      variant="link"
-                      size="sm"
-                      class="text-primary"
-                      @click="deleteRecord(record)"
-                    >
-                      Edit
-                      <Icon name="lucide:chevron-right" class="ml-1 h-4 w-4" />
-                    </Button>
+                    <div class="flex items-center justify-end gap-1">
+                      <DnsRecordModal
+                        :domain="domain"
+                        :record="record"
+                        :available-record-types="recordTypes.filter((t) => t !== 'NS')"
+                        :is-cloudflare="isCloudflare"
+                        @updated="fetchDomainData"
+                      >
+                        <Button variant="ghost" size="sm">
+                          <Icon name="lucide:pencil" class="h-4 w-4" />
+                        </Button>
+                      </DnsRecordModal>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        class="text-destructive hover:text-destructive"
+                        @click="deleteRecord(record)"
+                      >
+                        <Icon name="lucide:trash-2" class="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
                 <TableRow v-if="filteredRecords.length === 0">
