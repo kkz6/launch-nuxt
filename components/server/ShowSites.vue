@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { toast } from "vue-sonner";
 import { formatDistanceToNow } from "date-fns";
 import type { Server, Site } from "~/types";
 
@@ -7,7 +8,41 @@ interface Props {
   server: Server;
 }
 
-defineProps<Props>();
+const props = defineProps<Props>();
+const emit = defineEmits<{
+  deleted: []
+}>();
+
+const isDeleting = ref<string | null>(null);
+const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null);
+
+const deleteSite = async (site: Site) => {
+  if (!confirmationDialog.value) return;
+
+  const result = await confirmationDialog.value.show({
+    title: 'Delete Site',
+    description: `Are you sure you want to delete "${site.address}"? This action cannot be undone.`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    destructive: true,
+  });
+
+  if (!result.ok) return;
+
+  isDeleting.value = site.id;
+  try {
+    await $api(`/servers/${props.server.id}/sites/${site.id}`, {
+      method: 'DELETE',
+    });
+    toast.success('Site deleted successfully');
+    emit('deleted');
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || 'Failed to delete site');
+  } finally {
+    isDeleting.value = null;
+  }
+};
 
 const getSiteTypeIcon = (type: string): string => {
   const t = type?.toLowerCase() || "";
@@ -78,6 +113,8 @@ const formatDate = (date: string): string => {
 
 <template>
   <div>
+    <SharedConfirmationDialog ref="confirmationDialog" />
+
     <div
       v-if="sites?.length === 0"
       class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4 rounded-lg border bg-card"
@@ -98,11 +135,27 @@ const formatDate = (date: string): string => {
         :class="{ 'pointer-events-none': !isAccessible(site) }"
       >
         <div
-          class="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+          class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
           :class="{
             'opacity-60': !isAccessible(site),
           }"
         >
+          <!-- Delete button for failed installations -->
+          <button
+            v-if="site.installation_failed_at"
+            type="button"
+            class="pointer-events-auto absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            :disabled="isDeleting === site.id"
+            @click.prevent.stop="deleteSite(site)"
+          >
+            <Icon
+              v-if="isDeleting === site.id"
+              name="lucide:loader-2"
+              class="h-4 w-4 animate-spin"
+            />
+            <Icon v-else name="lucide:trash-2" class="h-4 w-4" />
+          </button>
+
           <div class="flex items-start gap-3">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
               <Icon

@@ -25,6 +25,18 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Switch } from '~/components/ui/switch'
+import {
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxItemIndicator,
+  ComboboxPortal,
+  ComboboxRoot,
+  ComboboxTrigger,
+} from 'reka-ui'
 
 interface Props {
   serverId: string
@@ -54,8 +66,10 @@ const domainVerification = ref<DomainVerification | null>(null)
 const createDnsRecord = ref(false)
 
 interface PhpVersion {
-  value: string
-  label: string
+  id: string
+  key: string
+  display_name: string
+  version: string
   is_default: boolean
 }
 
@@ -71,8 +85,30 @@ interface DatabaseUser {
   status: string
 }
 
+interface SourceControl {
+  id: string
+  provider: string
+  provider_label: string
+  login: string
+  avatar_url?: string
+  repository_count: number
+}
+
+interface Repository {
+  id: string
+  name: string
+  full_name: string
+  default_branch: string
+  html_url: string
+  public: boolean
+  ssh_url?: string
+}
+
 const phpVersions = ref<PhpVersion[]>([])
-const sourceControls = ref<Record<string, string>>({})
+const sourceControls = ref<SourceControl[]>([])
+const repositories = ref<Repository[]>([])
+const isLoadingRepositories = ref(false)
+const repositorySearchTerm = ref('')
 const databases = ref<Record<string, string>>({})
 const databaseUsers = ref<Record<string, string>>({})
 const hasDatabase = ref(true)
@@ -83,6 +119,12 @@ const applicationTypes: Record<string, string> = {
   wordpress: 'WordPress',
   generic: 'Generic PHP',
 }
+
+// Get selected repository display name
+const selectedRepository = computed(() => {
+  if (!values.source_control_repositories_id) return null
+  return repositories.value.find(r => r.id === values.source_control_repositories_id)
+})
 
 const advancedOptions = ref({
   create_database: false,
@@ -104,6 +146,7 @@ const schema = toTypedSchema(z.object({
   web_folder: z.string().default('/public'),
   zero_downtime_deployment: z.boolean().default(false),
   source_control_id: z.string().optional(),
+  source_control_repositories_id: z.string().optional(),
   repository_branch: z.string().optional(),
 }))
 
@@ -116,11 +159,12 @@ const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
     web_folder: '/public',
     zero_downtime_deployment: false,
     source_control_id: '',
+    source_control_repositories_id: '',
     repository_branch: 'main',
   },
 })
 
-type StringFields = 'address' | 'php_version' | 'web_folder' | 'source_control_id' | 'repository_branch'
+type StringFields = 'address' | 'php_version' | 'web_folder' | 'source_control_id' | 'source_control_repositories_id' | 'repository_branch'
 const setStringField = (field: StringFields, value: unknown) => {
   setFieldValue(field, value != null ? String(value) : '', false)
 }
@@ -129,14 +173,14 @@ const fetchOptions = async () => {
   try {
     const [phpData, scData] = await Promise.all([
       $api<{ data: PhpVersion[] }>(`/servers/${props.serverId}/php-versions`),
-      $api<{ data: Record<string, string> }>('/source-controls'),
+      $api<{ data: SourceControl[] }>('/source-controls'),
     ])
     phpVersions.value = phpData.data
-    sourceControls.value = scData.data
+    sourceControls.value = scData.data || []
 
     if (phpVersions.value.length > 0) {
       const defaultVersion = phpVersions.value.find(v => v.is_default)
-      setFieldValue('php_version', defaultVersion?.value ?? phpVersions.value[0].value, false)
+      setFieldValue('php_version', defaultVersion?.key ?? phpVersions.value[0].key, false)
     }
   } catch {
     // Silent fail - options will be empty
@@ -161,6 +205,52 @@ const fetchOptions = async () => {
     // Silent fail - existing databases/users will be empty but user can still create new ones
   }
 }
+
+// Fetch repositories for a source control
+const fetchRepositories = async (sourceControlId: string) => {
+  if (!sourceControlId) {
+    repositories.value = []
+    return
+  }
+
+  isLoadingRepositories.value = true
+  try {
+    const result = await $api<{ data: Repository[] }>(`/source-controls/${sourceControlId}/repositories`)
+    repositories.value = result.data || []
+  } catch {
+    repositories.value = []
+  } finally {
+    isLoadingRepositories.value = false
+  }
+}
+
+// Handle source control change
+const handleSourceControlChange = (sourceControlId: string) => {
+  setStringField('source_control_id', sourceControlId)
+  setStringField('source_control_repositories_id', '')
+  setStringField('repository_branch', 'main')
+  repositories.value = []
+
+  if (sourceControlId) {
+    fetchRepositories(sourceControlId)
+  }
+}
+
+// Handle repository selection from combobox
+const handleRepositorySelect = (repo: Repository) => {
+  setStringField('source_control_repositories_id', repo.id)
+  setStringField('repository_branch', repo.default_branch || 'main')
+  repositorySearchTerm.value = ''
+}
+
+// Filtered repositories based on search
+const filteredRepositories = computed(() => {
+  if (!repositorySearchTerm.value) return repositories.value
+  const search = repositorySearchTerm.value.toLowerCase()
+  return repositories.value.filter(r =>
+    r.full_name.toLowerCase().includes(search) || r.name.toLowerCase().includes(search)
+  )
+})
 
 // Domain verification
 const verifyDomain = async (domain: string) => {
@@ -269,6 +359,9 @@ watch(isOpen, (open) => {
     // Reset DNS state
     domainVerification.value = null
     createDnsRecord.value = false
+    // Reset repository state
+    repositories.value = []
+    repositorySearchTerm.value = ''
   }
 })
 </script>
@@ -342,8 +435,8 @@ watch(isOpen, (open) => {
                 <SelectValue placeholder="Select PHP version" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="version in phpVersions" :key="version.value" :value="version.value">
-                  {{ version.label }}
+                <SelectItem v-for="version in phpVersions" :key="version.key" :value="version.key">
+                  {{ version.display_name }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -361,6 +454,85 @@ watch(isOpen, (open) => {
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+
+        <!-- Source Control Section -->
+        <div v-if="sourceControls.length > 0 && values.type !== 'wordpress'" class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label for="source_control">Git Provider</Label>
+              <Select :model-value="values.source_control_id" @update:model-value="(val) => handleSourceControlChange(val as string)">
+                <SelectTrigger>
+                  <SelectValue placeholder="Select git provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="sc in sourceControls" :key="sc.id" :value="sc.id">
+                    <div class="flex items-center gap-2">
+                      <Icon :name="`simple-icons:${sc.provider}`" class="h-4 w-4" />
+                      <span>{{ sc.login }} ({{ sc.repository_count }} {{ sc.repository_count === 1 ? 'repo' : 'repos' }})</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="space-y-2">
+              <Label for="repository">Repository</Label>
+              <ComboboxRoot
+                v-model:search-term="repositorySearchTerm"
+                :disabled="!values.source_control_id || isLoadingRepositories"
+                :filter-function="(list: Repository[]) => list"
+                class="relative"
+              >
+                <ComboboxAnchor class="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
+                  <ComboboxInput
+                    class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+                    :placeholder="isLoadingRepositories ? 'Loading...' : selectedRepository ? selectedRepository.name : 'Search repository...'"
+                  />
+                  <ComboboxTrigger class="flex items-center justify-center">
+                    <Icon name="lucide:chevron-down" class="h-4 w-4 opacity-50" />
+                  </ComboboxTrigger>
+                </ComboboxAnchor>
+
+                <ComboboxPortal>
+                  <ComboboxContent
+                    position="popper"
+                    :side-offset="4"
+                    class="z-[200] max-h-60 w-[--reka-combobox-trigger-width] overflow-hidden rounded-md border bg-popover shadow-md"
+                  >
+                    <ComboboxEmpty class="py-6 text-center text-sm text-muted-foreground">
+                      No repository found.
+                    </ComboboxEmpty>
+                    <ComboboxGroup class="overflow-auto p-1">
+                      <ComboboxItem
+                        v-for="repo in filteredRepositories"
+                        :key="repo.id"
+                        :value="repo"
+                        class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                        @select="handleRepositorySelect(repo)"
+                      >
+                        <ComboboxItemIndicator class="mr-2 h-4 w-4">
+                          <Icon name="lucide:check" class="h-4 w-4" />
+                        </ComboboxItemIndicator>
+                        <Icon :name="repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'" class="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span class="truncate">{{ repo.full_name }}</span>
+                      </ComboboxItem>
+                    </ComboboxGroup>
+                  </ComboboxContent>
+                </ComboboxPortal>
+              </ComboboxRoot>
+            </div>
+          </div>
+
+          <div v-if="values.source_control_repositories_id" class="space-y-2">
+            <Label for="repository_branch">Branch</Label>
+            <Input
+              id="repository_branch"
+              :model-value="values.repository_branch"
+              placeholder="main"
+              @update:model-value="setStringField('repository_branch', $event)"
+            />
           </div>
         </div>
 

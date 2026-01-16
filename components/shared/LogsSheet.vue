@@ -96,7 +96,7 @@ const entityId = computed(() => {
     </DropdownMenu>
 
     <Sheet v-model:open="isSheetOpen">
-      <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-2xl">
+      <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-4xl">
         <SheetHeader>
           <SheetTitle>{{ selectedLog?.name || 'Logs' }}</SheetTitle>
           <SheetDescription>
