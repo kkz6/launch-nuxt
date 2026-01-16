@@ -15,6 +15,7 @@ import {
   Globe,
   Terminal,
 } from "lucide-vue-next";
+import { useDeploymentEvents } from "~/composables/useChannelEvents";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -130,6 +131,22 @@ const serverProvider = ref<string | null>(null);
 const siteAddress = ref<string | null>(null);
 const siteType = ref<string | null>(null);
 const siteUrl = ref<string | null>(null);
+const isDeploying = ref(false);
+
+// Get current team for WebSocket channel
+const teamId = computed(() => user.value?.current_team_id?.toString() || '');
+
+// Subscribe to real-time deployment events
+useDeploymentEvents(teamId, (data) => {
+  // Update deployment status for current site
+  if (data.site_id === siteId.value) {
+    if (data.status === 'installing') {
+      isDeploying.value = true;
+    } else if (data.status === 'finished' || data.status === 'failed') {
+      isDeploying.value = false;
+    }
+  }
+});
 
 // Domain data for DNS detail page
 const domainAddress = ref<string | null>(null);
@@ -780,6 +797,7 @@ onMounted(fetchTeams);
             v-if="serverId && siteId && siteType !== 'wordpress'"
             :server-id="serverId"
             :site-id="siteId"
+            :is-deploying="isDeploying"
           />
         </div>
       </div>

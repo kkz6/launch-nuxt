@@ -2,6 +2,7 @@
 import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
+import { useDeploymentEvents } from '~/composables/useChannelEvents'
 import type { Site, Deployment } from '~/types'
 
 interface Props {
@@ -11,6 +12,18 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+// Get current team for WebSocket channel
+const { user } = useAuth()
+const teamId = computed(() => user.value?.current_team_id?.toString() || '')
+
+// Subscribe to real-time deployment events
+useDeploymentEvents(teamId, (data) => {
+  // Only refresh if the event is for this site
+  if (data.site_id === props.siteId) {
+    fetchDeployments()
+  }
+})
 
 const deployments = ref<Deployment[]>([])
 const isLoading = ref(true)

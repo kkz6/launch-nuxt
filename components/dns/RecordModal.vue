@@ -110,6 +110,11 @@ const isProxyableType = computed(() => ['A', 'AAAA', 'CNAME'].includes(selectedT
 const showProxyToggle = computed(() => isProxyableType.value && props.isCloudflare)
 const showTtlField = computed(() => !(values.proxied && isProxyableType.value && props.isCloudflare))
 
+const proxiedField = computed({
+  get: () => values.proxied ?? false,
+  set: (val: boolean) => setFieldValue('proxied', val),
+})
+
 const handleClose = (open = false) => {
   isOpen.value = open
   if (!open) {
@@ -242,14 +247,14 @@ const onSubmit = handleSubmit(async (formValues) => {
         </FormField>
 
         <!-- Proxy Toggle (Cloudflare only) -->
-        <FormField v-if="showProxyToggle" v-slot="{ value }" name="proxied">
+        <FormField v-if="showProxyToggle" name="proxied">
           <FormItem class="flex flex-row items-center justify-between rounded-lg border p-4">
             <div class="space-y-0.5">
               <FormLabel>Proxied</FormLabel>
               <FormDescription>Route traffic through Cloudflare</FormDescription>
             </div>
             <FormControl>
-              <Switch :checked="value" @update:checked="(val: boolean) => setFieldValue('proxied', val)" />
+              <Switch v-model="proxiedField" />
             </FormControl>
           </FormItem>
         </FormField>

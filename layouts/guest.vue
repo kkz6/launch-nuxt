@@ -13,6 +13,6 @@ defineProps<{
     <div class="w-full max-w-md space-y-8">
       <slot />
     </div>
-    <Toaster rich-colors />
+    <Toaster position="top-right" rich-colors />
   </div>
 </template>

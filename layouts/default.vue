@@ -28,6 +28,6 @@ onMounted(() => {
         <slot />
       </div>
     </main>
-    <Toaster rich-colors />
+    <Toaster position="top-right" rich-colors />
   </div>
 </template>

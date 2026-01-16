@@ -141,6 +141,11 @@ const setStringField = (field: FormFields, value: unknown) => {
   setFieldValue(field, value != null ? String(value) : "");
 };
 
+const installAgent = computed({
+  get: () => values.install_agent ?? true,
+  set: (val: boolean) => setFieldValue('install_agent', val),
+});
+
 const filteredProviders = computed(() => {
   return serverProviders.value.filter(
     (p) => p.provider === values.service_provider
@@ -513,10 +518,7 @@ onMounted(fetchOptions);
                 Required for backups, monitoring, and advanced features
               </p>
             </div>
-            <Switch
-              :checked="values.install_agent"
-              @update:checked="setFieldValue('install_agent', $event)"
-            />
+            <Switch v-model="installAgent" />
           </div>
         </CardContent>
       </Card>

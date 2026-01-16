@@ -117,9 +117,9 @@ const toggleFeature = async (featureId: string, currentlyEnabled: boolean) => {
         </div>
         <Switch
           :id="`${feature.id}-toggle`"
-          :checked="feature.enabled"
+          :model-value="feature.enabled"
           :disabled="feature.pending"
-          @update:checked="toggleFeature(feature.id, feature.enabled)"
+          @update:model-value="toggleFeature(feature.id, feature.enabled)"
         />
       </div>
     </div>
