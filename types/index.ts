@@ -180,8 +180,14 @@ export interface Site extends InstallationStatus {
   queue_deployments?: boolean;
   auto_restart_queue?: boolean;
   repository_url?: string | null;
-  repository?: string | undefined;
-  repository_branch: string | undefined;
+  repository?: {
+    id: number;
+    name: string;
+    full_name: string;
+    default_branch: string;
+    html_url: string;
+  } | null;
+  repository_branch?: string;
   deploy_token: string;
   deployNotificationEmail?: string | null;
   deployKeyPublic?: string | null;
@@ -208,9 +214,13 @@ export interface Site extends InstallationStatus {
   url: string;
   created_at: string;
   updated_at: string;
-  source_control_repository?: {
-    html_url: string;
-  };
+  source_control?: {
+    id: string;
+    provider: string;
+    login: string;
+    name: string;
+    type: string;
+  } | null;
   latest_deployment?: Deployment;
 }
 
@@ -275,6 +285,25 @@ export interface GitProvider {
     username: string;
   };
   created_at: string;
+}
+
+export interface SourceControl {
+  id: string;
+  provider: "github" | "gitlab" | "bitbucket";
+  provider_label: string;
+  login: string;
+  avatar_url?: string;
+  repository_count: number;
+}
+
+export interface Repository {
+  id: string;
+  name: string;
+  full_name: string;
+  default_branch: string;
+  html_url: string;
+  public: boolean;
+  ssh_url?: string;
 }
 
 export interface Subscription {

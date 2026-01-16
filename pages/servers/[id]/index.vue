@@ -50,6 +50,15 @@ watch(() => route.query.tab, (newTab) => {
   }
 });
 
+const fetchSites = async () => {
+  try {
+    const sitesData = await serverService.sites.list(serverId.value);
+    sites.value = sitesData.data;
+  } catch {
+    // Silent fail on refresh
+  }
+};
+
 onMounted(async () => {
   try {
     const [serverData, sitesData] = await Promise.all([
@@ -78,7 +87,7 @@ onMounted(async () => {
   <div v-else-if="server" class="pb-10">
     <!-- Tab Content -->
     <div v-if="activeTab === 'sites'">
-      <ServerShowSites :sites="sites" :server="server" />
+      <ServerShowSites :sites="sites" :server="server" @deleted="fetchSites" />
     </div>
 
     <div v-else-if="activeTab === 'databases'">

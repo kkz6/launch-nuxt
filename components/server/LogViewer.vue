@@ -83,16 +83,25 @@ const getLogType = (message: string): LogLine['type'] => {
   return 'info'
 }
 
+// Strip ANSI escape codes from text
+const stripAnsi = (text: string): string => {
+  // eslint-disable-next-line no-control-regex
+  return text.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
+}
+
 const parseLogs = (raw: string): LogLine[] => {
   if (!raw) return []
   return raw.split('\n').filter(Boolean).map((line) => {
-    const timestampMatch = line.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\]]*)\]?\s*/)
+    // Strip ANSI codes first
+    const cleanLine = stripAnsi(line)
+
+    const timestampMatch = cleanLine.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\]]*)\]?\s*/)
     let timestamp: Date | null = null
-    let message = line
+    let message = cleanLine
 
     if (timestampMatch) {
       timestamp = new Date(timestampMatch[1])
-      message = line.slice(timestampMatch[0].length)
+      message = cleanLine.slice(timestampMatch[0].length)
     }
 
     return {
