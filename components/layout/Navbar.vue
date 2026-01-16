@@ -14,23 +14,6 @@ import {
   Server,
   Globe,
   Terminal,
-  Layout,
-  Database,
-  Network,
-  Bot,
-  Clock,
-  SlidersHorizontal,
-  Info,
-  HardDrive,
-  Key,
-  Package,
-  Code,
-  Cog,
-  LayoutDashboard,
-  GitBranch,
-  FolderOpen,
-  ListTodo,
-  TerminalSquare,
 } from "lucide-vue-next";
 import { Button } from "~/components/ui/button";
 import {
@@ -58,38 +41,38 @@ const route = useRoute();
 
 // Global navigation tabs
 const globalTabs = [
-  { value: "servers", label: "Servers", route: "/servers", icon: Server },
-  { value: "domains", label: "Domains", route: "/dns", icon: Globe },
+  { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
+  { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
 ];
 
 // Server detail tabs
 const serverDetailTabs = [
-  { value: "sites", label: "Sites", query: "sites", icon: Layout },
-  { value: "databases", label: "Databases", query: "databases", icon: Database },
-  { value: "networks", label: "Networks", query: "networks", icon: Network },
-  { value: "daemons", label: "Daemons", query: "daemons", icon: Bot },
-  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: Clock },
-  { value: "advanced", label: "Advanced", query: "advanced", icon: SlidersHorizontal },
+  { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
+  { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
+  { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
+  { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
+  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];
 
 // Advanced sub-tabs (second level)
 const advancedSubTabs = [
-  { value: "general", label: "General", query: "general", icon: Info },
-  { value: "backups", label: "Backups", query: "backups", icon: HardDrive },
-  { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: Key },
-  { value: "packages", label: "Packages", query: "packages", icon: Package },
-  { value: "php", label: "PHP", query: "php", icon: Code },
-  { value: "services", label: "Services", query: "services", icon: Cog },
+  { value: "general", label: "General", query: "general", icon: "lucide:info" },
+  { value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" },
+  { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: "lucide:key" },
+  { value: "packages", label: "Packages", query: "packages", icon: "lucide:package" },
+  { value: "php", label: "PHP", query: "php", icon: "lucide:code" },
+  { value: "services", label: "Services", query: "services", icon: "lucide:cog" },
 ];
 
 // Site detail tabs (base - filtered based on site type)
 const allSiteDetailTabs = [
-  { value: "general", label: "Overview", query: "general", icon: LayoutDashboard },
-  { value: "deployments", label: "Deployments", query: "deployments", icon: GitBranch },
-  { value: "files", label: "Files", query: "files", icon: FolderOpen },
-  { value: "queues", label: "Queues", query: "queues", icon: ListTodo },
-  { value: "commands", label: "Commands", query: "commands", icon: TerminalSquare },
-  { value: "settings", label: "Settings", query: "settings", icon: Settings },
+  { value: "general", label: "Overview", query: "general", icon: "lucide:layout-dashboard" },
+  { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
+  { value: "files", label: "Files", query: "files", icon: "lucide:folder-open" },
+  { value: "queues", label: "Queues", query: "queues", icon: "lucide:list-todo" },
+  { value: "commands", label: "Commands", query: "commands", icon: "lucide:terminal-square" },
+  { value: "settings", label: "Settings", query: "settings", icon: "lucide:settings" },
 ];
 
 // DNS domain detail tabs
@@ -660,7 +643,7 @@ onMounted(fetchTeams);
                 : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
             ]"
           >
-            <component :is="tab.icon" class="h-4 w-4" />
+            <Icon :name="tab.icon" class="h-4 w-4" />
             {{ tab.label }}
           </NuxtLink>
         </nav>
@@ -724,7 +707,7 @@ onMounted(fetchTeams);
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
         >
-          <component :is="tab.icon" class="h-4 w-4" />
+          <Icon :name="tab.icon" class="h-4 w-4" />
           {{ tab.label }}
         </NuxtLink>
       </nav>
@@ -741,7 +724,7 @@ onMounted(fetchTeams);
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
         >
-          <component :is="subtab.icon" class="h-4 w-4" />
+          <Icon :name="subtab.icon" class="h-4 w-4" />
           {{ subtab.label }}
         </NuxtLink>
       </nav>
@@ -812,7 +795,7 @@ onMounted(fetchTeams);
               : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
           ]"
         >
-          <component :is="tab.icon" class="h-4 w-4" />
+          <Icon :name="tab.icon" class="h-4 w-4" />
           {{ tab.label }}
         </NuxtLink>
       </nav>
