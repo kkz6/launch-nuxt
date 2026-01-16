@@ -25,11 +25,14 @@ const baseReconnectDelay = 1000 // 1 second
 
 export const useWebSocket = () => {
   const config = useRuntimeConfig()
-  const { token } = useAuth()
+  const { token, isInitialized, waitForAuth } = useAuth()
 
-  const connect = () => {
+  const connect = async () => {
     // Skip on server
     if (import.meta.server) return
+
+    // Wait for auth to be initialized
+    await waitForAuth()
 
     // Don't connect if no token
     if (!token.value) return
@@ -154,11 +157,11 @@ export const useWebSocket = () => {
     }
   }
 
-  // Auto-connect when token is available
-  watch(token, (newToken) => {
-    if (newToken) {
+  // Auto-connect when auth is initialized and token is available
+  watch([isInitialized, token], ([initialized, newToken]) => {
+    if (initialized && newToken) {
       connect()
-    } else {
+    } else if (initialized && !newToken) {
       disconnect()
     }
   }, { immediate: true })

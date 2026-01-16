@@ -169,6 +169,11 @@ const setStringField = (field: StringFields, value: unknown) => {
   setFieldValue(field, value != null ? String(value) : '', false)
 }
 
+const zeroDowntimeDeployment = computed({
+  get: () => values.zero_downtime_deployment ?? false,
+  set: (val: boolean) => setFieldValue('zero_downtime_deployment', val),
+})
+
 const fetchOptions = async () => {
   try {
     const [phpData, scData] = await Promise.all([
@@ -411,11 +416,7 @@ watch(isOpen, (open) => {
               </div>
               <div class="flex items-center gap-2">
                 <Label for="create_dns" class="text-sm text-green-700 dark:text-green-300">Create DNS record</Label>
-                <Switch
-                  id="create_dns"
-                  :checked="createDnsRecord"
-                  @update:checked="createDnsRecord = $event"
-                />
+                <Switch id="create_dns" v-model="createDnsRecord" />
               </div>
             </div>
             <div v-else class="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900 dark:bg-amber-950">
@@ -554,10 +555,7 @@ watch(isOpen, (open) => {
                 Use atomic deployments with symlinks for zero downtime
               </p>
             </div>
-            <Switch
-              :checked="values.zero_downtime_deployment"
-              @update:checked="(val: boolean) => setFieldValue('zero_downtime_deployment', val, false)"
-            />
+            <Switch v-model="zeroDowntimeDeployment" />
           </div>
         </div>
 

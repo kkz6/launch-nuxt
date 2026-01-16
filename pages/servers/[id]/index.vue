@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSiteEvents, useDeploymentEvents } from "~/composables/useChannelEvents";
 import type { Server, Site } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -17,6 +18,31 @@ const isLoading = ref(true);
 
 // Shared terminal state with navbar
 const isTerminalOpen = useState('serverTerminalOpen', () => false);
+
+// Get current team for WebSocket channel
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || '');
+
+// Subscribe to real-time site events
+useSiteEvents(teamId, (data) => {
+  // Only refresh if the event is for this server
+  // server_id can be at data.server_id or data.site.server_id depending on event type
+  const eventServerId = data.server_id || data.site?.server_id;
+  if (eventServerId === serverId.value) {
+    fetchSites();
+  }
+});
+
+// Subscribe to real-time deployment events
+useDeploymentEvents(teamId, (data) => {
+  // Check if this deployment is for a site on this server
+  // Also check data.site.server_id in case it's included
+  const siteExists = sites.value.some(site => site.id === data.site_id);
+  const eventServerId = data.site?.server_id;
+  if (siteExists || eventServerId === serverId.value) {
+    fetchSites();
+  }
+});
 
 // Valid tab values
 const validTabs = ["sites", "databases", "networks", "daemons", "schedulers", "advanced"];

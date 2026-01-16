@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import stripAnsi from 'strip-ansi'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '~/components/ui/tabs'
@@ -34,7 +35,7 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const config = useRuntimeConfig()
-const { token } = useAuth()
+const { token, isInitialized, waitForAuth } = useAuth()
 const rawLogs = ref('')
 const filteredLogs = ref<LogLine[]>([])
 const autoScroll = ref(true)
@@ -81,12 +82,6 @@ const getLogType = (message: string): LogLine['type'] => {
     return 'debug'
   }
   return 'info'
-}
-
-// Strip ANSI escape codes from text
-const stripAnsi = (text: string): string => {
-  // eslint-disable-next-line no-control-regex
-  return text.replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, '')
 }
 
 const parseLogs = (raw: string): LogLine[] => {
@@ -152,7 +147,7 @@ const typeColorMap: Record<string, string> = {
 // WebSocket connection
 let ws: WebSocket | null = null
 
-const connectWebSocket = () => {
+const connectWebSocket = async () => {
   if (ws) {
     ws.close()
   }
@@ -160,6 +155,9 @@ const connectWebSocket = () => {
   isLoading.value = true
   rawLogs.value = ''
   filteredLogs.value = []
+
+  // Wait for auth to be initialized before connecting
+  await waitForAuth()
 
   const params = new URLSearchParams({
     serverId: props.serverId,

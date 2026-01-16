@@ -35,6 +35,16 @@ const values = defineModel<QueueValues>('values', { required: true })
 const updateValue = <K extends keyof QueueValues>(key: K, value: QueueValues[K]) => {
   values.value = { ...values.value, [key]: value }
 }
+
+const runWithListen = computed({
+  get: () => Boolean(values.value.run_with_listen),
+  set: (val: boolean) => updateValue('run_with_listen', val),
+})
+
+const runOnMaintenance = computed({
+  get: () => Boolean(values.value.run_on_maintenance),
+  set: (val: boolean) => updateValue('run_on_maintenance', val),
+})
 </script>
 
 <template>
@@ -152,10 +162,7 @@ const updateValue = <K extends keyof QueueValues>(key: K, value: QueueValues[K])
               <Label>Run with Listen</Label>
               <p class="text-sm text-muted-foreground">Use queue:listen instead of queue:work</p>
             </div>
-            <Switch
-              :checked="Boolean(values.run_with_listen)"
-              @update:checked="updateValue('run_with_listen', $event)"
-            />
+            <Switch v-model="runWithListen" />
           </div>
 
           <div class="flex items-center justify-between rounded-lg border p-4">
@@ -163,10 +170,7 @@ const updateValue = <K extends keyof QueueValues>(key: K, value: QueueValues[K])
               <Label>Run on Maintenance</Label>
               <p class="text-sm text-muted-foreground">Keep running when application is in maintenance mode</p>
             </div>
-            <Switch
-              :checked="Boolean(values.run_on_maintenance)"
-              @update:checked="updateValue('run_on_maintenance', $event)"
-            />
+            <Switch v-model="runOnMaintenance" />
           </div>
         </div>
       </div>

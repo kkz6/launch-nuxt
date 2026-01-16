@@ -1,9 +1,17 @@
 interface ChannelEventData {
   site_id?: string
   server_id?: string
+  team_id?: string
+  deployment_id?: string
   command_id?: string
   status?: string
+  message?: string
   error?: string
+  site?: {
+    id?: string
+    server_id?: string
+    [key: string]: unknown
+  }
   [key: string]: unknown
 }
 
@@ -57,11 +65,13 @@ export const useChannelEvents = (
     eventsValue.value.forEach((event) => {
       const unsub = subscribe(event, (data) => {
         const eventData = data as ChannelEventData
-        // Filter by channel context (site_id or server_id)
+        // Filter by channel context (site_id, server_id, or team_id)
         const channelParts = channelValue.value.split('.')
         if (channelParts[0] === 'site' && eventData.site_id === channelParts[1]) {
           onEvent(eventData)
         } else if (channelParts[0] === 'server' && eventData.server_id === channelParts[1]) {
+          onEvent(eventData)
+        } else if (channelParts[0] === 'team' && eventData.team_id === channelParts[1]) {
           onEvent(eventData)
         } else {
           // For other channels or when no filtering needed
@@ -129,21 +139,26 @@ export const useSiteCommandEvents = (
 }
 
 /**
- * Composable to subscribe to site deployment events
+ * Composable to subscribe to deployment events
  *
- * @param siteId - The site ID
+ * @param teamId - The team ID
  * @param onEvent - Callback to run when a deployment event is received
  */
-export const useSiteDeploymentEvents = (
-  siteId: string | Ref<string>,
+export const useDeploymentEvents = (
+  teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
 ) => {
-  const siteIdValue = computed(() => unref(siteId))
-  const channel = computed(() => `site.${siteIdValue.value}`)
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
 
   return useChannelEvents(
     channel,
-    ['deployment.started', 'deployment.finished', 'deployment.failed'],
+    [
+      'deployment.progress',
+      'deployment.rollback.started',
+      'deployment.rollback.completed',
+      'deployment.rollback.failed',
+    ],
     onEvent,
   )
 }
@@ -164,6 +179,26 @@ export const useSiteQueueEvents = (
   return useChannelEvents(
     channel,
     ['queue.created', 'queue.updated', 'queue.deleted', 'queue.restarted'],
+    onEvent,
+  )
+}
+
+/**
+ * Composable to subscribe to site lifecycle events (created, updated, deleted, installed)
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a site event is received
+ */
+export const useSiteEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['site.created', 'site.updated', 'site.deleted', 'site.installed', 'site.installation_failed'],
     onEvent,
   )
 }

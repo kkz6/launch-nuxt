@@ -47,9 +47,9 @@ const toggleAutodeploy = async (enabled: boolean) => {
 <template>
   <div class="flex items-center gap-2">
     <Switch
-      :checked="isEnabled"
+      :model-value="isEnabled"
       :disabled="isLoading"
-      @update:checked="toggleAutodeploy"
+      @update:model-value="toggleAutodeploy"
     />
     <Label class="text-sm text-muted-foreground">Auto-deploy</Label>
   </div>

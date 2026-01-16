@@ -47,9 +47,9 @@ const toggleAutoRestart = async (enabled: boolean) => {
 <template>
   <div class="flex items-center gap-2">
     <Switch
-      :checked="isEnabled"
+      :model-value="isEnabled"
       :disabled="isLoading"
-      @update:checked="toggleAutoRestart"
+      @update:model-value="toggleAutoRestart"
     />
     <Label class="text-sm text-muted-foreground">Auto-restart</Label>
   </div>

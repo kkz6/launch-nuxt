@@ -90,6 +90,11 @@ const { handleSubmit, setFieldError, resetForm, setValues, values } = useForm({
   initialValues: getInitialValues(),
 })
 
+const queueDeployments = computed({
+  get: () => values.queue_deployments ?? false,
+  set: (val: boolean) => setValues({ queue_deployments: val }),
+})
+
 const handleClose = (open = false) => {
   isOpen.value = open
   if (!open) {
@@ -180,10 +185,7 @@ const onSubmit = handleSubmit(async (values) => {
               Queue deployments instead of running them immediately when one is already in progress
             </p>
           </div>
-          <Switch
-            :checked="values.queue_deployments"
-            @update:checked="(val: boolean) => setValues({ queue_deployments: val })"
-          />
+          <Switch v-model="queueDeployments" />
         </div>
 
         <template v-if="(site as any).zero_downtime_deployment">

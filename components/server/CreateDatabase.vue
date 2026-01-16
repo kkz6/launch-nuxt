@@ -204,10 +204,7 @@ watch(createUser, (val) => {
               Create a database user along with the database
             </p>
           </div>
-          <Switch
-            :checked="createUser"
-            @click="createUser = !createUser"
-          />
+          <Switch v-model="createUser" />
         </div>
 
         <div v-if="createUser" class="space-y-4">
