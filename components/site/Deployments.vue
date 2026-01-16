@@ -32,11 +32,20 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 
 const statusColors: Record<string, string> = {
   pending: 'bg-yellow-500',
-  installing: 'bg-yellow-500 animate-pulse',
+  installing: 'bg-blue-500 animate-pulse',
   running: 'bg-blue-500 animate-pulse',
   finished: 'bg-green-500',
   completed: 'bg-green-500',
   failed: 'bg-red-500',
+}
+
+const statusLabels: Record<string, string> = {
+  pending: 'Pending',
+  installing: 'Deploying',
+  running: 'Running',
+  finished: 'Finished',
+  completed: 'Completed',
+  failed: 'Failed',
 }
 
 const hasActiveDeployment = computed(() => {
@@ -163,7 +172,7 @@ onMounted(fetchDeployments)
                 <Icon name="lucide:history" class="block size-3" />
                 Rollback
               </Badge>
-              {{ deployment.status }}
+              {{ statusLabels[deployment.status] || deployment.status }}
               <span :class="['size-2.5 rounded-full', statusColors[deployment.status] || 'bg-gray-500']" />
             </span>
             <div class="flex flex-wrap gap-2">
