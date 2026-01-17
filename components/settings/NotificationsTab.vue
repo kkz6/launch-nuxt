@@ -47,17 +47,24 @@ const channelLabels: Record<string, string> = {
 }
 
 const channelIcons: Record<string, string> = {
-  slack: 'logos:slack-icon',
-  discord: 'logos:discord-icon',
-  telegram: 'logos:telegram',
+  slack: 'simple-icons:slack',
+  discord: 'simple-icons:discord',
+  telegram: 'simple-icons:telegram',
   email: 'lucide:mail',
 }
 
-const channelColors: Record<string, string> = {
-  slack: 'bg-muted',
-  discord: 'bg-muted',
-  telegram: 'bg-muted',
-  email: 'bg-primary',
+const channelIconColors: Record<string, string> = {
+  slack: 'text-[#4A154B] dark:text-[#E01E5A]',
+  discord: 'text-[#5865F2]',
+  telegram: 'text-[#26A5E4]',
+  email: 'text-rose-600 dark:text-rose-400',
+}
+
+const channelBgColors: Record<string, string> = {
+  slack: 'bg-[#4A154B]/10 dark:bg-[#4A154B]/30',
+  discord: 'bg-[#5865F2]/10 dark:bg-[#5865F2]/20',
+  telegram: 'bg-[#26A5E4]/10 dark:bg-[#26A5E4]/20',
+  email: 'bg-rose-500/10 dark:bg-rose-500/20',
 }
 
 // Notification settings
@@ -81,24 +88,18 @@ const getChannelDetail = (channel: NotificationChannel): string => {
   return channelLabels[channel.provider] || channel.provider
 }
 
+interface NotificationChannelsResponse {
+  data: {
+    channels: NotificationChannel[]
+  }
+}
+
 const fetchChannels = async () => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const response = await $api<any>('/notification-channels')
-    // Handle various response structures
-    if (response?.data?.channels) {
-      channels.value = response.data.channels
-    } else if (Array.isArray(response?.data)) {
-      channels.value = response.data
-    } else if (Array.isArray(response?.channels)) {
-      channels.value = response.channels
-    } else if (Array.isArray(response)) {
-      channels.value = response
-    } else {
-      channels.value = []
-    }
+    const response = await $api<NotificationChannelsResponse>('/settings/notifications')
+    channels.value = response.data.channels || []
   } catch {
-    // Silent fail, show empty state
+    channels.value = []
   } finally {
     isChannelsLoading.value = false
   }
@@ -106,7 +107,7 @@ const fetchChannels = async () => {
 
 const fetchSettings = async () => {
   try {
-    const response = await $api<{ data: NotificationSettings }>('/settings/notifications')
+    const response = await $api<{ data: NotificationSettings }>('/settings/notification-preferences')
     settings.value = response.data
   } catch {
     // Use defaults
@@ -117,13 +118,27 @@ const fetchSettings = async () => {
 
 const saveSettings = async () => {
   try {
-    await $api('/settings/notifications', {
+    await $api('/settings/notification-preferences', {
       method: 'PUT',
       body: settings.value,
     })
     toast.success('Notification settings saved')
   } catch {
     toast.error('Failed to save settings')
+  }
+}
+
+const testingChannelId = ref<string | null>(null)
+
+const testChannel = async (channel: NotificationChannel) => {
+  testingChannelId.value = channel.id
+  try {
+    await $api(`/settings/notifications/${channel.id}/test`, { method: 'POST' })
+    toast.success('Test notification sent!')
+  } catch {
+    toast.error('Failed to send test notification')
+  } finally {
+    testingChannelId.value = null
   }
 }
 
@@ -140,7 +155,7 @@ const deleteChannel = async (channel: NotificationChannel) => {
 
   if (result.ok) {
     try {
-      await $api(`/notification-channels/${channel.id}`, { method: 'DELETE' })
+      await $api(`/settings/notifications/${channel.id}`, { method: 'DELETE' })
       channels.value = channels.value.filter((c) => c.id !== channel.id)
       toast.success('Notification channel deleted')
     } catch {
@@ -227,45 +242,60 @@ onMounted(() => {
             class="group flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
           >
             <div
-              class="flex h-10 w-10 items-center justify-center rounded-lg"
-              :class="[
-                channelColors[channel.provider] || 'bg-muted',
-                channel.provider === 'email' ? 'text-primary-foreground' : ''
-              ]"
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
+              :class="channelBgColors[channel.provider] || 'bg-muted'"
             >
-              <Icon :name="channelIcons[channel.provider] || 'lucide:bell'" class="h-5 w-5" />
+              <Icon
+                :name="channelIcons[channel.provider] || 'lucide:bell'"
+                class="h-4 w-4"
+                :class="channelIconColors[channel.provider] || 'text-muted-foreground'"
+              />
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2">
-                <span class="font-medium">{{ channel.label }}</span>
+                <span class="text-sm font-medium">{{ channel.label }}</span>
                 <span
                   v-if="channel.connected"
-                  class="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+                  class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
                 >
-                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Active
+                  <span class="h-1 w-1 rounded-full bg-emerald-500" />
+                  Connected
                 </span>
               </div>
-              <p class="truncate text-sm text-muted-foreground">
+              <p class="truncate text-xs text-muted-foreground">
                 {{ getChannelDetail(channel) }}
               </p>
             </div>
-            <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div class="flex items-center gap-1">
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8"
-                @click="openEditDialog(channel)"
+                class="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                :disabled="testingChannelId === channel.id"
+                @click="testChannel(channel)"
               >
-                <Icon name="lucide:pencil" class="h-4 w-4 text-muted-foreground hover:text-foreground" />
+                <Icon
+                  v-if="testingChannelId === channel.id"
+                  name="lucide:loader-2"
+                  class="h-3.5 w-3.5 animate-spin text-muted-foreground"
+                />
+                <Icon v-else name="lucide:send" class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                class="h-8 w-8"
+                class="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                @click="openEditDialog(channel)"
+              >
+                <Icon name="lucide:pencil" class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                 @click="deleteChannel(channel)"
               >
-                <Icon name="lucide:trash-2" class="h-4 w-4 text-muted-foreground hover:text-destructive" />
+                <Icon name="lucide:trash-2" class="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
               </Button>
             </div>
           </div>

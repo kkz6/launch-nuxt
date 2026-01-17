@@ -29,7 +29,7 @@ const toggleAutoRestart = async (enabled: boolean) => {
   isLoading.value = true
   try {
     await $api(`/servers/${props.serverId}/sites/${props.siteId}/auto-restart-queue`, {
-      method: 'POST',
+      method: 'PUT',
       body: { enabled },
     })
     isEnabled.value = enabled

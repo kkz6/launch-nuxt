@@ -110,7 +110,7 @@ const onSubmit = async () => {
       body.email = credentials.value.email
     }
 
-    await $api('/notification-channels', {
+    await $api('/settings/notifications', {
       method: 'POST',
       body,
     })

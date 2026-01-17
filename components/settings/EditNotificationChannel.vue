@@ -37,6 +37,7 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 const isLoading = ref(false)
+const isTesting = ref(false)
 const label = ref('')
 const credentials = ref({
   webhook_url: '',
@@ -120,7 +121,7 @@ const onSubmit = async () => {
       body.email = credentials.value.email
     }
 
-    await $api(`/notification-channels/${props.channel.id}`, {
+    await $api(`/settings/notifications/${props.channel.id}`, {
       method: 'PUT',
       body,
     })
@@ -139,6 +140,23 @@ const onSubmit = async () => {
     }
   } finally {
     isLoading.value = false
+  }
+}
+
+const testConnection = async () => {
+  if (!props.channel) return
+
+  isTesting.value = true
+  try {
+    await $api(`/settings/notifications/${props.channel.id}/test`, {
+      method: 'POST',
+    })
+    toast.success('Test notification sent!')
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || 'Failed to send test notification')
+  } finally {
+    isTesting.value = false
   }
 }
 
@@ -219,14 +237,26 @@ watch(open, (isOpen) => {
           <p v-if="errors.email" class="text-sm text-destructive">{{ errors.email }}</p>
         </div>
 
-        <DialogFooter>
-          <Button type="button" variant="outline" @click="open = false">
-            Cancel
+        <DialogFooter class="flex-col gap-2 sm:flex-row sm:justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="isTesting"
+            @click="testConnection"
+          >
+            <Icon v-if="isTesting" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+            <Icon v-else name="lucide:send" class="mr-2 h-4 w-4" />
+            Send Test
           </Button>
-          <Button type="submit" :disabled="isLoading">
-            <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            Save Changes
-          </Button>
+          <div class="flex gap-2">
+            <Button type="button" variant="outline" @click="open = false">
+              Cancel
+            </Button>
+            <Button type="submit" :disabled="isLoading">
+              <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+              Save Changes
+            </Button>
+          </div>
         </DialogFooter>
       </form>
     </DialogContent>
