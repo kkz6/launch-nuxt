@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
+import type { Site } from '~/types'
 
 interface Queue {
   id: string
@@ -39,6 +40,7 @@ interface Queue {
 interface Props {
   serverId: string
   siteId: string
+  site: Site
   autoRestartQueue?: boolean
 }
 
@@ -188,6 +190,7 @@ onMounted(fetchQueues)
       v-model:open="isEditDialogOpen"
       :server-id="serverId"
       :site-id="siteId"
+      :site="site"
       :queue="selectedQueue"
       @updated="handleQueueUpdated"
     />
@@ -203,7 +206,7 @@ onMounted(fetchQueues)
           <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
           Sync
         </Button>
-        <SiteCreateQueue v-if="queues.length > 0" :server-id="serverId" :site-id="siteId" @created="fetchQueues" />
+        <SiteCreateQueue v-if="queues.length > 0" :server-id="serverId" :site-id="siteId" :site="site" @created="fetchQueues" />
       </div>
     </div>
 
@@ -296,7 +299,7 @@ onMounted(fetchQueues)
         </template>
 
         <template #empty>
-          <SiteCreateQueue :server-id="serverId" :site-id="siteId" @created="fetchQueues" />
+          <SiteCreateQueue :server-id="serverId" :site-id="siteId" :site="site" @created="fetchQueues" />
         </template>
       </SharedDataTable>
     </template>

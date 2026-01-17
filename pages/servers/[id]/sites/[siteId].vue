@@ -102,7 +102,7 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'queues'">
-      <SiteQueues :server-id="server.id" :site-id="site.id" :auto-restart-queue="site.auto_restart_queue" />
+      <SiteQueues :server-id="server.id" :site-id="site.id" :site="site" :auto-restart-queue="site.auto_restart_queue" />
     </div>
 
     <div v-else-if="activeTab === 'commands'">

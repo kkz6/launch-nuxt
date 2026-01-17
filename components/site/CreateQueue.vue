@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import type { Site } from '~/types'
 
 interface QueueValues {
   queue_connection: string
@@ -55,6 +56,7 @@ interface Queue extends QueueValues {
 interface Props {
   serverId: string
   siteId: string
+  site: Site
   queue?: Queue
 }
 
@@ -68,10 +70,13 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
 const isAdvancedOpen = ref(false)
-const availableUsers = ref<Record<string, string>>({})
-const directory = ref('')
-const redisInstalled = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Use site data directly instead of making API call
+const availableUsers = computed(() => {
+  const user = props.site.user
+  return { [user]: user }
+})
 
 const queueSchema = toTypedSchema(
   z.object({
@@ -93,15 +98,18 @@ const queueSchema = toTypedSchema(
 )
 
 const getInitialValues = () => {
+  const siteUser = props.site.user
+  const sitePath = props.site.path
+
   if (props.queue) {
     return {
       queue_connection: props.queue.queue_connection,
       queue: props.queue.queue,
-      user: props.queue.user || Object.keys(availableUsers.value)[0] || '',
+      user: props.queue.user || siteUser,
       max_seconds_per_job: props.queue.max_seconds_per_job,
       rest_seconds_on_empty: props.queue.rest_seconds_on_empty,
       failed_job_delay_seconds: props.queue.failed_job_delay_seconds,
-      directory: props.queue.directory || directory.value,
+      directory: props.queue.directory || sitePath,
       run_on_maintenance: props.queue.run_on_maintenance,
       run_with_listen: props.queue.run_with_listen,
       environment: props.queue.environment,
@@ -112,13 +120,13 @@ const getInitialValues = () => {
     }
   }
   return {
-    queue_connection: redisInstalled.value ? 'redis' : 'database',
+    queue_connection: 'database',
     queue: 'default',
-    user: Object.keys(availableUsers.value)[0] || '',
+    user: siteUser,
     max_seconds_per_job: 60,
     rest_seconds_on_empty: 10,
     failed_job_delay_seconds: 3,
-    directory: directory.value,
+    directory: sitePath,
     run_on_maintenance: false,
     run_with_listen: false,
     numprocs: 1,
@@ -132,33 +140,6 @@ const { handleSubmit, resetForm, setFieldError, values, setValues } = useForm({
   initialValues: getInitialValues(),
 })
 
-const fetchOptions = async () => {
-  try {
-    const response = await $api<{
-      data: {
-        directory: string
-        redis_installed: boolean
-        available_users: Record<string, string>
-      }
-    }>(`/servers/${props.serverId}/sites/${props.siteId}/queues/create`)
-    availableUsers.value = response.data.available_users || {}
-    directory.value = response.data.directory || ''
-    redisInstalled.value = response.data.redis_installed || false
-
-    // Update form with fetched defaults
-    if (!props.queue) {
-      setValues({
-        ...values,
-        queue_connection: redisInstalled.value ? 'redis' : 'database',
-        user: Object.keys(availableUsers.value)[0] || '',
-        directory: directory.value,
-      })
-    }
-  } catch {
-    // Silent fail
-  }
-}
-
 const handleClose = (isOpen = false) => {
   open.value = isOpen
   if (!isOpen) {
@@ -168,11 +149,8 @@ const handleClose = (isOpen = false) => {
 
 watch(open, (isOpen) => {
   if (isOpen) {
-    fetchOptions()
-    // Reset form with queue values when editing
-    if (props.queue) {
-      setValues(getInitialValues())
-    }
+    // Reset form with initial values when opening
+    setValues(getInitialValues())
   }
 })
 
