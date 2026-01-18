@@ -36,6 +36,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const config = useRuntimeConfig()
 const { token, isInitialized, waitForAuth } = useAuth()
+const { getCurrentTeamId } = useApi()
 const rawLogs = ref('')
 const filteredLogs = ref<LogLine[]>([])
 const autoScroll = ref(true)
@@ -159,6 +160,7 @@ const connectWebSocket = async () => {
   // Wait for auth to be initialized before connecting
   await waitForAuth()
 
+  const teamId = getCurrentTeamId()
   const params = new URLSearchParams({
     serverId: props.serverId,
     entity: props.entity,
@@ -168,6 +170,9 @@ const connectWebSocket = async () => {
     token: token.value || '',
   })
 
+  if (teamId) {
+    params.set('team_id', teamId)
+  }
   if (logType.value) {
     params.set('type', logType.value)
   }
