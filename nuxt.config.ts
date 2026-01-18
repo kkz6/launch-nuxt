@@ -46,6 +46,7 @@ export default defineNuxtConfig({
     layoutTransition: { name: "layout", mode: "out-in" },
     head: {
       title: "launchctl",
+      titleTemplate: "%s - launchctl",
       meta: [
         { charset: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },

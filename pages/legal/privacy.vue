@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'Privacy Policy - Launch' })
+useHead({ title: 'Privacy Policy' })
 
 const { data: policy } = await useAsyncData('privacy-policy', () =>
   $api<{ policy: string }>('/legal/privacy-policy')

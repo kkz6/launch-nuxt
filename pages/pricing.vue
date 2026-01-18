@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'Pricing - launchctl' })
+useHead({ title: 'Pricing' })
 </script>
 
 <template>

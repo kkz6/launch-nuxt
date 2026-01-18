@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'launchctl - Server Management Made Simple' })
+useHead({ title: 'launchctl - Server Management Made Simple', titleTemplate: '' })
 </script>
 
 <template>
