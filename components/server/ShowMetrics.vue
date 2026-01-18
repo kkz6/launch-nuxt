@@ -68,18 +68,21 @@ onUnmounted(() => {
 <template>
   <div>
     <div class="mb-4 flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <h3 class="text-lg font-semibold">Metrics</h3>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <span :class="['h-2 w-2 rounded-full cursor-help', statusColor]" />
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{{ statusTooltip }}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <div>
+        <div class="flex items-center gap-2">
+          <h3 class="text-lg font-semibold">Metrics</h3>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span :class="['h-2 w-2 rounded-full cursor-help', statusColor]" />
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{{ statusTooltip }}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <p class="text-sm text-muted-foreground">Real-time server resource monitoring</p>
       </div>
       <Button
         v-if="connectionStatus === 'disconnected' || connectionStatus === 'error'"
