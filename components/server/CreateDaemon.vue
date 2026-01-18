@@ -22,14 +22,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import type { QueueDaemon } from '~/types'
+import type { QueueDaemon, Server } from '~/types'
 
 interface Props {
-  serverId: string
+  server: Server
   daemon?: QueueDaemon
 }
 
 const props = defineProps<Props>()
+const serverId = computed(() => props.server.id)
+
+// Server users with local user prioritized first
+const serverUsers = computed(() => {
+  const users = props.server.users
+  if (!users) {
+    return []
+  }
+
+  const result: { value: string; label: string }[] = []
+
+  // Add local user first (priority)
+  if (users.local) {
+    result.push({ value: users.local, label: users.local })
+  }
+
+  // Add root user second
+  if (users.root) {
+    result.push({ value: users.root, label: users.root })
+  }
+
+  return result
+})
+
+// Get default user (local user has priority)
+const defaultUser = computed(() => serverUsers.value[0]?.value || '')
 const emit = defineEmits<{
   created: []
   updated: []
@@ -62,7 +88,7 @@ const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
   initialValues: {
     command: props.daemon?.command || '',
     directory: props.daemon?.directory || '',
-    user: props.daemon?.user || 'launch',
+    user: props.daemon?.user || defaultUser.value,
     processes: props.daemon?.processes || 1,
     stop_wait_seconds: props.daemon?.stop_wait_seconds || 5,
     stop_signal: props.daemon?.stop_signal || 'SIGTERM',
@@ -94,14 +120,14 @@ const onSubmit = handleSubmit(async (data) => {
   isLoading.value = true
   try {
     if (props.daemon) {
-      await $api(`/servers/${props.serverId}/daemons/${props.daemon.id}`, {
+      await $api(`/servers/${serverId.value}/daemons/${props.daemon.id}`, {
         method: 'PATCH',
         body: data,
       })
       toast.success('Daemon updated successfully')
       emit('updated')
     } else {
-      await $api(`/servers/${props.serverId}/daemons`, {
+      await $api(`/servers/${serverId.value}/daemons`, {
         method: 'POST',
         body: data,
       })
@@ -125,7 +151,7 @@ watch(open, (isOpen) => {
       values: {
         command: props.daemon.command || '',
         directory: props.daemon.directory || '',
-        user: props.daemon.user || 'launch',
+        user: props.daemon.user || defaultUser.value,
         processes: props.daemon.processes || 1,
         stop_wait_seconds: props.daemon.stop_wait_seconds || 5,
         stop_signal: props.daemon.stop_signal || 'SIGTERM',
@@ -178,11 +204,16 @@ watch(open, (isOpen) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="user">User</Label>
-            <Input
-              id="user"
-              :model-value="values.user"
-              @update:model-value="setStringField('user', $event)"
-            />
+            <Select :model-value="values.user" @update:model-value="setStringField('user', $event)">
+              <SelectTrigger>
+                <SelectValue placeholder="Select user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem v-for="user in serverUsers" :key="user.value" :value="user.value">
+                  {{ user.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
             <p v-if="errors.user" class="text-sm text-destructive">{{ errors.user }}</p>
           </div>
 

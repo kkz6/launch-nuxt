@@ -130,7 +130,7 @@ const filteredAdditionalInfo = computed(() => {
 <template>
   <Dialog v-model:open="open">
     <DialogContent class="flex max-h-[85vh] w-full max-w-3xl flex-col gap-0 overflow-hidden p-0">
-      <DialogHeader class="border-b border-gray-200 p-4 pb-3 dark:border-gray-800">
+      <DialogHeader class="border-b border-border p-4 pb-3">
         <div class="flex w-full items-center justify-between">
           <div class="flex min-w-0 flex-1 items-center gap-3">
             <div class="relative flex-shrink-0">
@@ -144,17 +144,17 @@ const filteredAdditionalInfo = computed(() => {
                   :name="getStatusIconName(displayStatus)"
                   :class="[
                     'h-4 w-4',
-                    displayStatus === 'running' && 'text-green-600',
-                    displayStatus === 'stopped' && 'text-red-600',
-                    displayStatus === 'failed' && 'text-red-600',
-                    displayStatus === 'pending' && 'animate-spin text-yellow-600',
-                    !['running', 'stopped', 'failed', 'pending'].includes(displayStatus) && 'text-gray-600',
+                    displayStatus === 'running' && 'text-green-600 dark:text-green-500',
+                    displayStatus === 'stopped' && 'text-red-600 dark:text-red-500',
+                    displayStatus === 'failed' && 'text-red-600 dark:text-red-500',
+                    displayStatus === 'pending' && 'animate-spin text-yellow-600 dark:text-yellow-500',
+                    !['running', 'stopped', 'failed', 'pending'].includes(displayStatus) && 'text-muted-foreground',
                   ]"
                 />
               </div>
             </div>
             <div class="min-w-0 flex-1">
-              <DialogTitle class="flex items-center gap-2 truncate text-xl font-semibold text-gray-900 dark:text-gray-100">
+              <DialogTitle class="flex items-center gap-2 truncate text-xl font-semibold text-foreground">
                 {{ service.name }}
                 <Badge
                   :class="[
@@ -165,7 +165,7 @@ const filteredAdditionalInfo = computed(() => {
                   {{ displayStatusLabel }}
                 </Badge>
               </DialogTitle>
-              <DialogDescription class="truncate text-sm text-gray-600 dark:text-gray-400">
+              <DialogDescription class="truncate text-sm text-muted-foreground">
                 Service status and runtime information
               </DialogDescription>
             </div>
@@ -178,16 +178,16 @@ const filteredAdditionalInfo = computed(() => {
           <!-- Service Overview -->
           <div class="grid w-full grid-cols-1 gap-3 md:grid-cols-2">
             <!-- Last Updated (Live) -->
-            <div class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50">
+            <div class="w-full rounded-lg border border-border bg-muted/50 p-3">
               <div class="mb-1 flex items-center gap-2">
-                <Icon name="lucide:clock" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Last Updated</span>
+                <Icon name="lucide:clock" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span class="text-sm font-medium text-muted-foreground">Last Updated</span>
                 <span v-if="liveStatus" class="ml-auto flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
                   <span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                   Live
                 </span>
               </div>
-              <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
+              <p class="break-words text-base font-semibold text-foreground">
                 {{ formatRelativeTime(lastUpdated) }}
               </p>
             </div>
@@ -195,13 +195,13 @@ const filteredAdditionalInfo = computed(() => {
             <!-- No status data message -->
             <div
               v-if="!statusDetails && !service.status_output && !liveStatus"
-              class="col-span-2 w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
+              class="col-span-2 w-full rounded-lg border border-border bg-muted/50 p-3"
             >
               <div class="mb-1 flex items-center gap-2">
-                <Icon name="lucide:activity" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Status Information</span>
+                <Icon name="lucide:activity" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span class="text-sm font-medium text-muted-foreground">Status Information</span>
               </div>
-              <p class="break-words text-sm text-gray-600 dark:text-gray-400">
+              <p class="break-words text-sm text-muted-foreground">
                 Waiting for status information...
               </p>
             </div>
@@ -209,13 +209,13 @@ const filteredAdditionalInfo = computed(() => {
             <!-- Process ID -->
             <div
               v-if="displayPid"
-              class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
+              class="w-full rounded-lg border border-border bg-muted/50 p-3"
             >
               <div class="mb-1 flex items-center gap-2">
-                <Icon name="lucide:cpu" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Process ID</span>
+                <Icon name="lucide:cpu" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span class="text-sm font-medium text-muted-foreground">Process ID</span>
               </div>
-              <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
+              <p class="break-words text-base font-semibold text-foreground">
                 {{ displayPid }}
               </p>
             </div>
@@ -223,13 +223,13 @@ const filteredAdditionalInfo = computed(() => {
             <!-- Memory Usage -->
             <div
               v-if="displayMemory"
-              class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
+              class="w-full rounded-lg border border-border bg-muted/50 p-3"
             >
               <div class="mb-1 flex items-center gap-2">
-                <Icon name="lucide:memory-stick" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Memory Usage</span>
+                <Icon name="lucide:memory-stick" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span class="text-sm font-medium text-muted-foreground">Memory Usage</span>
               </div>
-              <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
+              <p class="break-words text-base font-semibold text-foreground">
                 {{ displayMemory }}
               </p>
             </div>
@@ -237,13 +237,13 @@ const filteredAdditionalInfo = computed(() => {
             <!-- Uptime -->
             <div
               v-if="displayUptime"
-              class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
+              class="w-full rounded-lg border border-border bg-muted/50 p-3"
             >
               <div class="mb-1 flex items-center gap-2">
-                <Icon name="lucide:timer" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-                <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Uptime</span>
+                <Icon name="lucide:timer" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                <span class="text-sm font-medium text-muted-foreground">Uptime</span>
               </div>
-              <p class="break-words text-base font-semibold text-gray-900 dark:text-gray-100">
+              <p class="break-words text-base font-semibold text-foreground">
                 {{ displayUptime }}
               </p>
             </div>
@@ -252,13 +252,13 @@ const filteredAdditionalInfo = computed(() => {
           <!-- Started At -->
           <div
             v-if="statusDetails?.started_at"
-            class="w-full rounded-lg border border-gray-200 bg-gray-50/50 p-3 dark:border-gray-800 dark:bg-gray-800/50"
+            class="w-full rounded-lg border border-border bg-muted/50 p-3"
           >
             <div class="mb-1 flex items-center gap-2">
-              <Icon name="lucide:play" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-              <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Started At</span>
+              <Icon name="lucide:play" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <span class="text-sm font-medium text-muted-foreground">Started At</span>
             </div>
-            <p class="break-words text-sm text-gray-900 dark:text-gray-100">
+            <p class="break-words text-sm text-foreground">
               {{ statusDetails.started_at }}
             </p>
           </div>
@@ -266,14 +266,14 @@ const filteredAdditionalInfo = computed(() => {
           <!-- Running Processes -->
           <div v-if="statusDetails?.processes && statusDetails.processes.length > 0" class="w-full">
             <div class="mb-2 flex items-center gap-2">
-              <Icon name="lucide:server" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-              <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Running Processes</h3>
+              <Icon name="lucide:server" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <h3 class="text-base font-semibold text-foreground">Running Processes</h3>
             </div>
             <div class="w-full space-y-1">
               <div
                 v-for="(process, index) in statusDetails.processes"
                 :key="index"
-                class="w-full overflow-hidden break-all rounded-md border border-gray-200 bg-gray-100 p-2 font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                class="w-full overflow-hidden break-all rounded-md border border-border bg-muted p-2 font-mono text-xs text-foreground"
               >
                 {{ process }}
               </div>
@@ -283,14 +283,14 @@ const filteredAdditionalInfo = computed(() => {
           <!-- Network Connections -->
           <div v-if="statusDetails?.connections && statusDetails.connections.length > 0" class="w-full">
             <div class="mb-2 flex items-center gap-2">
-              <Icon name="lucide:network" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-              <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Network Connections</h3>
+              <Icon name="lucide:network" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <h3 class="text-base font-semibold text-foreground">Network Connections</h3>
             </div>
             <div class="w-full space-y-1">
               <div
                 v-for="(connection, index) in statusDetails.connections"
                 :key="index"
-                class="w-full overflow-hidden break-all rounded-md border border-gray-200 bg-gray-100 p-2 font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                class="w-full overflow-hidden break-all rounded-md border border-border bg-muted p-2 font-mono text-xs text-foreground"
               >
                 {{ connection }}
               </div>
@@ -303,15 +303,15 @@ const filteredAdditionalInfo = computed(() => {
             class="w-full"
           >
             <div class="mb-2 flex items-center gap-2">
-              <Icon name="lucide:database" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-              <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Service Details</h3>
+              <Icon name="lucide:database" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <h3 class="text-base font-semibold text-foreground">Service Details</h3>
             </div>
             <div class="w-full space-y-3">
               <div v-for="(value, key) in filteredAdditionalInfo" :key="key" class="w-full">
-                <h4 class="mb-1 text-sm font-medium capitalize text-gray-700 dark:text-gray-300">
+                <h4 class="mb-1 text-sm font-medium capitalize text-muted-foreground">
                   {{ String(key).replace('_', ' ') }}
                 </h4>
-                <div class="w-full overflow-hidden whitespace-pre-wrap break-all rounded-md border border-gray-200 bg-gray-100 p-2 font-mono text-xs text-gray-800 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200">
+                <div class="w-full overflow-hidden whitespace-pre-wrap break-all rounded-md border border-border bg-muted p-2 font-mono text-xs text-foreground">
                   {{ value }}
                 </div>
               </div>
@@ -322,11 +322,11 @@ const filteredAdditionalInfo = computed(() => {
           <div v-if="service.status_output" class="w-full">
             <Separator class="my-4" />
             <div class="mb-2 flex items-center gap-2">
-              <Icon name="lucide:hard-drive" class="h-4 w-4 flex-shrink-0 text-gray-500 dark:text-gray-400" />
-              <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Raw System Output</h3>
+              <Icon name="lucide:hard-drive" class="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+              <h3 class="text-base font-semibold text-foreground">Raw System Output</h3>
             </div>
-            <ScrollArea class="h-48 w-full rounded-md border border-gray-200 dark:border-gray-800">
-              <div class="whitespace-pre-wrap break-all bg-gray-50 p-3 font-mono text-xs text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+            <ScrollArea class="h-48 w-full rounded-md border border-border">
+              <div class="whitespace-pre-wrap break-all bg-muted p-3 font-mono text-xs text-foreground">
                 {{ service.status_output }}
               </div>
             </ScrollArea>

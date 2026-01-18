@@ -113,6 +113,11 @@ export interface TeamInvitation {
   updated_at: string | null;
 }
 
+export interface ServerUsers {
+  root: string;
+  local: string;
+}
+
 export interface Server {
   id: string;
   team_id: string;
@@ -141,6 +146,7 @@ export interface Server {
   private_key?: string;
   user_public_key?: string;
   username: string;
+  users?: ServerUsers;
   password?: string;
   database_password?: string;
   ssh_port: number | string;

@@ -7,13 +7,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
-import type { Cron } from '~/types'
+import type { Cron, Server } from '~/types'
 
 interface Props {
-  serverId: string
+  server: Server
 }
 
 const props = defineProps<Props>()
+const serverId = computed(() => props.server.id)
 
 const schedulers = ref<Cron[]>([])
 const isLoading = ref(true)
@@ -39,7 +40,7 @@ const editScheduler = (cron: Cron) => {
 
 const fetchData = async () => {
   try {
-    const data = await $api<{ data: Cron[] }>(`/servers/${props.serverId}/crons`)
+    const data = await $api<{ data: Cron[] }>(`/servers/${serverId.value}/crons`)
     schedulers.value = data.data
   } catch {
     toast.error('Failed to load schedulers')
@@ -63,7 +64,7 @@ const deleteScheduler = async (cron: Cron) => {
 
   if (result.ok) {
     try {
-      await $api(`/servers/${props.serverId}/crons/${cron.id}`, {
+      await $api(`/servers/${serverId.value}/crons/${cron.id}`, {
         method: 'DELETE',
       })
       schedulers.value = schedulers.value.filter((s) => s.id !== cron.id)
@@ -90,7 +91,7 @@ watch(isEditDialogOpen, (open) => {
 })
 
 // Subscribe to real-time cron events
-useServerModelEvents('cron', props.serverId, fetchData)
+useServerModelEvents('cron', serverId.value, fetchData)
 
 onMounted(fetchData)
 </script>
@@ -109,7 +110,7 @@ onMounted(fetchData)
         <div class="flex flex-col gap-4 pt-2.5">
           <ServerLogViewer
             v-if="isLogDialogOpen && selectedSchedulerForLogs"
-            :server-id="serverId"
+            :server-id="server.id"
             entity="cron"
             :entity-id="selectedSchedulerForLogs.id"
             type-switcher
@@ -123,7 +124,7 @@ onMounted(fetchData)
     <ServerCreateScheduler
       v-if="selectedSchedulerForEdit"
       v-model:open="isEditDialogOpen"
-      :server-id="serverId"
+      :server="server"
       :cron="selectedSchedulerForEdit"
       @updated="handleSchedulerUpdated"
     />
@@ -133,7 +134,7 @@ onMounted(fetchData)
         <h3 class="text-lg font-semibold">Schedulers</h3>
         <p class="text-sm text-muted-foreground">Manage cron jobs on this server</p>
       </div>
-      <ServerCreateScheduler v-if="schedulers.length > 0" :server-id="serverId" @created="fetchData" />
+      <ServerCreateScheduler v-if="schedulers.length > 0" :server="server" @created="fetchData" />
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
@@ -159,7 +160,7 @@ onMounted(fetchData)
         empty-icon="lucide:clock"
       >
         <template #empty>
-          <ServerCreateScheduler :server-id="serverId" @created="fetchData" />
+          <ServerCreateScheduler :server="server" @created="fetchData" />
         </template>
 
         <template #cell-status="{ row }">
