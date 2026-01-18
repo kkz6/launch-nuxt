@@ -17,6 +17,18 @@ onMounted(() => {
   }
 })
 
+// Time-based greeting
+const greeting = computed(() => {
+  const hour = new Date().getHours()
+  if (hour < 12) return 'Good morning'
+  if (hour < 18) return 'Good afternoon'
+  return 'Good evening'
+})
+
+const firstName = computed(() => {
+  return user.value?.name?.split(' ')[0] || ''
+})
+
 // Placeholder data - will be replaced with API calls
 const isLoading = ref(false)
 
@@ -28,11 +40,11 @@ const servers = ref([
 ])
 
 const recentActivity = ref([
-  { id: '1', type: 'deployment', siteName: 'api.example.com', serverId: '1', siteId: 's1', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 5).toISOString(), commitSha: 'a1b2c3d', commitMessage: 'Fix authentication bug' },
-  { id: '2', type: 'deployment', siteName: 'app.example.com', serverId: '2', siteId: 's2', serverName: 'production-web-02', status: 'deploying', time: new Date(Date.now() - 1000 * 60 * 10).toISOString(), commitSha: 'e4f5g6h', commitMessage: 'Add new dashboard features' },
-  { id: '3', type: 'deployment', siteName: 'staging.example.com', serverId: '3', siteId: 's3', serverName: 'staging-server', status: 'failed', time: new Date(Date.now() - 1000 * 60 * 30).toISOString(), commitSha: 'i7j8k9l', commitMessage: 'Update dependencies' },
-  { id: '4', type: 'deployment', siteName: 'docs.example.com', serverId: '1', siteId: 's4', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 60).toISOString(), commitSha: 'm0n1o2p', commitMessage: 'Documentation updates' },
-  { id: '5', type: 'deployment', siteName: 'api.example.com', serverId: '1', siteId: 's1', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 120).toISOString(), commitSha: 'q3r4s5t', commitMessage: 'Performance improvements' },
+  { id: '1', siteName: 'api.example.com', serverId: '1', siteId: 's1', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 5).toISOString(), commitSha: 'a1b2c3d', user: 'Karthick' },
+  { id: '2', siteName: 'app.example.com', serverId: '2', siteId: 's2', serverName: 'production-web-02', status: 'deploying', time: new Date(Date.now() - 1000 * 60 * 10).toISOString(), commitSha: 'e4f5g6h', user: 'John' },
+  { id: '3', siteName: 'staging.example.com', serverId: '3', siteId: 's3', serverName: 'staging-server', status: 'failed', time: new Date(Date.now() - 1000 * 60 * 30).toISOString(), commitSha: 'i7j8k9l', user: 'Karthick' },
+  { id: '4', siteName: 'docs.example.com', serverId: '1', siteId: 's4', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 60).toISOString(), commitSha: 'm0n1o2p', user: 'Sarah' },
+  { id: '5', siteName: 'api.example.com', serverId: '1', siteId: 's1', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 120).toISOString(), commitSha: 'q3r4s5t', user: 'Karthick' },
 ])
 
 // Limit displayed items
@@ -61,25 +73,16 @@ const getStatusColor = (status: string): string => {
   }
 }
 
-const getStatusLabel = (status: string): string => {
-  switch (status) {
-    case 'finished':
-      return 'Deployed'
-    case 'deploying':
-      return 'Deploying'
-    case 'failed':
-      return 'Failed'
-    default:
-      return status
-  }
-}
-
 const formatDate = (date: string): string => {
   try {
     return formatDistanceToNow(new Date(date), { addSuffix: true })
   } catch {
     return ''
   }
+}
+
+const getUserInitials = (name: string): string => {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
 }
 </script>
 
@@ -90,6 +93,11 @@ const formatDate = (date: string): string => {
     </div>
 
     <template v-else>
+      <!-- Greeting -->
+      <div class="mb-6">
+        <h1 class="text-xl font-semibold">{{ greeting }}, {{ firstName }}</h1>
+      </div>
+
       <!-- Empty State -->
       <div v-if="servers.length === 0" class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-16">
         <Icon name="lucide:server" class="h-12 w-12 text-muted-foreground" />
@@ -104,7 +112,7 @@ const formatDate = (date: string): string => {
         <!-- Servers Section -->
         <div class="mb-8">
           <div class="mb-3 flex items-center justify-between">
-            <h2 class="font-medium">Servers</h2>
+            <h2 class="text-sm font-medium text-muted-foreground">Servers</h2>
             <NuxtLink v-if="servers.length > 8" to="/servers" class="text-sm text-muted-foreground hover:text-foreground">
               View all {{ servers.length }}
             </NuxtLink>
@@ -140,7 +148,7 @@ const formatDate = (date: string): string => {
         <!-- Recent Activity -->
         <div>
           <div class="mb-3 flex items-center justify-between">
-            <h2 class="font-medium">Recent Activity</h2>
+            <h2 class="text-sm font-medium text-muted-foreground">Recent Activity</h2>
           </div>
 
           <div v-if="recentActivity.length === 0" class="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed py-12">
@@ -153,34 +161,39 @@ const formatDate = (date: string): string => {
               v-for="(activity, index) in displayedActivity"
               :key="activity.id"
               :to="`/servers/${activity.serverId}/sites/${activity.siteId}?tab=deployments`"
-              class="flex items-center gap-4 p-4 transition-colors hover:bg-muted/50"
+              class="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
               :class="{ 'border-b': index < displayedActivity.length - 1 }"
             >
+              <!-- Status dot -->
               <span
                 class="h-2 w-2 shrink-0 rounded-full"
                 :class="getStatusColor(activity.status)"
               />
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2">
-                  <span class="font-medium">{{ activity.siteName }}</span>
-                  <span class="text-muted-foreground">&middot;</span>
-                  <span class="text-sm text-muted-foreground">{{ activity.serverName }}</span>
-                </div>
-                <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                  <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">{{ activity.commitSha }}</code>
-                  <span class="truncate">{{ activity.commitMessage }}</span>
-                </div>
+
+              <!-- Site & Server -->
+              <div class="min-w-0 flex-1">
+                <span class="font-medium">{{ activity.siteName }}</span>
+                <span class="mx-1.5 text-muted-foreground">/</span>
+                <span class="text-sm text-muted-foreground">{{ activity.serverName }}</span>
               </div>
-              <div class="shrink-0 text-right">
-                <p class="text-sm font-medium" :class="{
-                  'text-green-600 dark:text-green-400': activity.status === 'finished',
-                  'text-blue-600 dark:text-blue-400': activity.status === 'deploying',
-                  'text-red-600 dark:text-red-400': activity.status === 'failed',
-                }">
-                  {{ getStatusLabel(activity.status) }}
-                </p>
-                <p class="text-xs text-muted-foreground">{{ formatDate(activity.time) }}</p>
+
+              <!-- Commit SHA -->
+              <code class="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:block">
+                {{ activity.commitSha }}
+              </code>
+
+              <!-- User -->
+              <div
+                class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium"
+                :title="activity.user"
+              >
+                {{ getUserInitials(activity.user) }}
               </div>
+
+              <!-- Time -->
+              <span class="shrink-0 text-xs text-muted-foreground">
+                {{ formatDate(activity.time) }}
+              </span>
             </NuxtLink>
           </div>
         </div>
