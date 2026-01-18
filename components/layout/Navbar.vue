@@ -49,6 +49,7 @@ const globalTabs = [
 // Server detail tabs
 const serverDetailTabs = [
   { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
+  { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
   { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
   { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
   { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },

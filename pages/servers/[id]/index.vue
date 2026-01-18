@@ -45,7 +45,7 @@ useDeploymentEvents(teamId, (data) => {
 });
 
 // Valid tab values
-const validTabs = ["sites", "databases", "networks", "daemons", "schedulers", "advanced"];
+const validTabs = ["sites", "metrics", "databases", "networks", "daemons", "schedulers", "advanced"];
 const validSubTabs = ["general", "backups", "ssh-keys", "packages", "php", "services"];
 
 // Get initial tab from query params or default to "sites"
@@ -114,6 +114,10 @@ onMounted(async () => {
     <!-- Tab Content -->
     <div v-if="activeTab === 'sites'">
       <ServerShowSites :sites="sites" :server="server" @deleted="fetchSites" />
+    </div>
+
+    <div v-else-if="activeTab === 'metrics'">
+      <ServerShowMetrics :server="server" />
     </div>
 
     <div v-else-if="activeTab === 'databases'">
