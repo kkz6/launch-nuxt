@@ -23,6 +23,7 @@ const wsRef = ref<WebSocket | null>(null)
 const connectionStatus = ref<'connecting' | 'connected' | 'disconnected'>('connecting')
 
 const { token } = useAuth()
+const { getCurrentTeamId } = useApi()
 
 const sendResize = (cols: number, rows: number, ws: WebSocket) => {
   if (ws.readyState === WebSocket.OPEN) {
@@ -84,6 +85,10 @@ const initializeTerminal = () => {
   urlParams.set('siteId', props.siteId)
   urlParams.set('username', 'launcher')
   urlParams.set('token', token.value || '')
+  const teamId = getCurrentTeamId()
+  if (teamId) {
+    urlParams.set('team_id', teamId)
+  }
 
   const wsBase = config.public.wsBase as string
   const wsUrl = `${wsBase}/terminal/ws?${urlParams}`

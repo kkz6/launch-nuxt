@@ -26,6 +26,7 @@ const baseReconnectDelay = 1000 // 1 second
 export const useWebSocket = () => {
   const config = useRuntimeConfig()
   const { token, isInitialized, waitForAuth } = useAuth()
+  const { getCurrentTeamId } = useApi()
 
   const connect = async () => {
     // Skip on server
@@ -46,7 +47,8 @@ export const useWebSocket = () => {
     }
 
     const wsBase = config.public.wsBase as string
-    const wsUrl = `${wsBase}/ws?token=${token.value}`
+    const teamId = getCurrentTeamId()
+    const wsUrl = `${wsBase}/ws?token=${token.value}${teamId ? `&team_id=${teamId}` : ''}`
 
     ws.value = new WebSocket(wsUrl)
 
@@ -127,6 +129,13 @@ export const useWebSocket = () => {
     isConnected.value = false
   }
 
+  const reconnect = () => {
+    // Force reconnection (useful when team changes)
+    disconnect()
+    reconnectAttempts.value = 0
+    connect()
+  }
+
   const subscribe = (event: string, handler: EventHandler): (() => void) => {
     if (!handlers.value.has(event)) {
       handlers.value.set(event, new Set())
@@ -170,6 +179,7 @@ export const useWebSocket = () => {
     isConnected: readonly(isConnected),
     connect,
     disconnect,
+    reconnect,
     subscribe,
     subscribeToChannel,
     unsubscribeFromChannel,

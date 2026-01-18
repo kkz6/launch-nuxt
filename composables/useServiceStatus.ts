@@ -26,6 +26,7 @@ interface UseServiceStatusOptions {
 export function useServiceStatus(options: UseServiceStatusOptions) {
   const config = useRuntimeConfig()
   const { token } = useAuth()
+  const { getCurrentTeamId } = useApi()
 
   const services = ref<ServiceStatus[]>([])
   const isConnected = ref(false)
@@ -54,11 +55,16 @@ export function useServiceStatus(options: UseServiceStatusOptions) {
     isConnecting.value = true
     error.value = null
 
+    const teamId = getCurrentTeamId()
     const params = new URLSearchParams({
       serverId: options.serverId,
       interval: (options.interval || 5).toString(),
       token: token.value,
     })
+
+    if (teamId) {
+      params.set('team_id', teamId)
+    }
 
     if (options.serviceId) {
       params.set('serviceId', options.serviceId)

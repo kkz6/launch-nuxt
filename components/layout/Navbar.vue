@@ -37,6 +37,7 @@ interface Team {
 
 const { user, logout, fetchUser } = useAuth();
 const { setCurrentTeamId } = useApi();
+const { reconnect: reconnectWebSocket } = useWebSocket();
 const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
@@ -369,6 +370,8 @@ const switchTeam = async (teamId: string) => {
     setCurrentTeamId(teamId);
     // Refresh user data to get updated current_team_id
     await fetchUser();
+    // Reconnect WebSocket with new team context
+    reconnectWebSocket();
     // Navigate to servers page and trigger refresh
     navigateTo("/servers");
     // Trigger servers list refresh (works even if already on /servers)

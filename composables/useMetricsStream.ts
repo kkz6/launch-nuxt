@@ -74,6 +74,7 @@ const MAX_HISTORY_LENGTH = 60
 export const useMetricsStream = (serverId: MaybeRef<string>) => {
   const config = useRuntimeConfig()
   const { token } = useAuth()
+  const { getCurrentTeamId } = useApi()
 
   const metrics = ref<MetricsData | null>(null)
   const history = ref<MetricsData[]>([])
@@ -143,7 +144,8 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
     error.value = null
 
     const wsBase = config.public.wsBase as string
-    const wsUrl = `${wsBase}/metrics/stream?serverId=${serverIdValue}&token=${token.value}`
+    const teamId = getCurrentTeamId()
+    const wsUrl = `${wsBase}/metrics/stream?serverId=${serverIdValue}&token=${token.value}${teamId ? `&team_id=${teamId}` : ''}`
 
     console.log('[MetricsStream] Connecting...')
 
