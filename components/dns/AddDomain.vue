@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import {
@@ -13,14 +11,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '~/components/ui/dialog'
-import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -51,6 +43,80 @@ const isOpen = ref(false)
 const isLoading = ref(false)
 const localProviders = ref<DnsProvider[]>([])
 const isProvidersLoading = ref(false)
+const errors = ref<Record<string, string>>({})
+
+// Form values
+const label = ref('')
+const address = ref('')
+const provider = ref('')
+
+const schema = z.object({
+  label: z.string().min(1, 'Label is required'),
+  address: z.string().min(1, 'Domain address is required'),
+  provider: z.string().min(1, 'Provider is required'),
+})
+
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (label.value.trim().length === 0) return false
+  if (address.value.trim().length === 0) return false
+  if (provider.value.length === 0) return false
+  return true
+})
+
+const resetForm = () => {
+  label.value = ''
+  address.value = ''
+  provider.value = ''
+  errors.value = {}
+}
+
+const validate = () => {
+  const result = schema.safeParse({
+    label: label.value.trim(),
+    address: address.value.trim(),
+    provider: provider.value,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      label: fieldErrors.label?.[0] || '',
+      address: fieldErrors.address?.[0] || '',
+      provider: fieldErrors.provider?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
+}
+
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
+  isLoading.value = true
+  try {
+    await $api('/dns/domains', {
+      method: 'POST',
+      body: data,
+    })
+    toast.success('Domain added successfully')
+    isOpen.value = false
+    resetForm()
+    emit('created')
+  } catch (error: unknown) {
+    const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
+    if (err.data?.errors) {
+      for (const [field, messages] of Object.entries(err.data.errors)) {
+        errors.value[field] = messages[0]
+      }
+    } else {
+      toast.error(err.data?.message || 'Failed to add domain')
+    }
+  } finally {
+    isLoading.value = false
+  }
+}
 
 // Fetch providers when dialog opens if not provided
 watch(isOpen, async (open) => {
@@ -64,56 +130,8 @@ watch(isOpen, async (open) => {
     } finally {
       isProvidersLoading.value = false
     }
-  }
-})
-
-const domainSchema = toTypedSchema(
-  z.object({
-    label: z.string().min(1, 'Label is required'),
-    address: z.string().min(1, 'Domain address is required'),
-    provider: z.string().min(1, 'Provider is required'),
-  })
-)
-
-const { handleSubmit, resetForm, setFieldError } = useForm({
-  validationSchema: domainSchema,
-  initialValues: {
-    label: '',
-    address: '',
-    provider: '',
-  },
-  validateOnMount: false,
-})
-
-const handleClose = (open = false) => {
-  isOpen.value = open
-  if (!open) {
+  } else if (!open) {
     resetForm()
-  }
-}
-
-const onSubmit = handleSubmit(async (values) => {
-  isLoading.value = true
-
-  try {
-    await $api('/dns/domains', {
-      method: 'POST',
-      body: values,
-    })
-    toast.success('Domain added successfully')
-    handleClose(false)
-    emit('created')
-  } catch (error: unknown) {
-    const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
-    if (err.data?.errors) {
-      for (const [field, messages] of Object.entries(err.data.errors)) {
-        setFieldError(field as keyof typeof values, messages[0])
-      }
-    } else {
-      toast.error(err.data?.message || 'Failed to add domain')
-    }
-  } finally {
-    isLoading.value = false
   }
 })
 
@@ -127,7 +145,7 @@ const providerOptions = computed(() =>
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen" @update:open="handleClose">
+  <Dialog v-model:open="isOpen">
     <DialogTrigger as-child>
       <slot>
         <Button>
@@ -145,51 +163,47 @@ const providerOptions = computed(() =>
       </DialogHeader>
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
-        <FormField v-slot="{ componentField }" name="label">
-          <FormItem>
-            <FormLabel>Label</FormLabel>
-            <FormControl>
-              <Input placeholder="My Website" v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label for="label">Label</Label>
+          <Input
+            id="label"
+            v-model="label"
+            placeholder="My Website"
+          />
+          <p v-if="errors.label" class="text-sm text-destructive">{{ errors.label }}</p>
+        </div>
 
-        <FormField v-slot="{ componentField }" name="address">
-          <FormItem>
-            <FormLabel>Domain Address</FormLabel>
-            <FormControl>
-              <Input placeholder="example.com" v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label for="address">Domain Address</Label>
+          <Input
+            id="address"
+            v-model="address"
+            placeholder="example.com"
+          />
+          <p v-if="errors.address" class="text-sm text-destructive">{{ errors.address }}</p>
+        </div>
 
-        <FormField v-slot="{ componentField }" name="provider">
-          <FormItem>
-            <FormLabel>DNS Provider</FormLabel>
-            <Select v-bind="componentField">
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a provider" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem
-                  v-for="option in providerOptions"
-                  :key="option.value"
-                  :value="option.value"
-                >
-                  {{ option.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label for="provider">DNS Provider</Label>
+          <Select v-model="provider">
+            <SelectTrigger>
+              <SelectValue placeholder="Select a provider" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                v-for="option in providerOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.provider" class="text-sm text-destructive">{{ errors.provider }}</p>
+        </div>
 
         <DialogFooter class="mt-4 sm:justify-start">
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             Add Domain
           </Button>

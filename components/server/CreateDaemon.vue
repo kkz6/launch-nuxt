@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import {
@@ -64,7 +62,16 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
+const errors = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Form values
+const command = ref(props.daemon?.command || '')
+const directory = ref(props.daemon?.directory || '')
+const user = ref(props.daemon?.user || defaultUser.value)
+const processes = ref(props.daemon?.processes || 1)
+const stopWaitSeconds = ref(props.daemon?.stop_wait_seconds || 5)
+const stopSignal = ref(props.daemon?.stop_signal || 'SIGTERM')
 
 const signals: Record<string, string> = {
   SIGTERM: 'SIGTERM',
@@ -73,34 +80,59 @@ const signals: Record<string, string> = {
   SIGQUIT: 'SIGQUIT',
 }
 
-const schema = toTypedSchema(z.object({
+const schema = z.object({
   command: z.string().min(1, 'Command is required').max(255),
   directory: z.string().optional(),
   user: z.string().min(1, 'User is required'),
   processes: z.number().min(1, 'At least 1 process required'),
   stop_wait_seconds: z.number().min(0),
   stop_signal: z.string(),
-}))
-
-const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
-  validationSchema: schema,
-  validateOnMount: false,
-  initialValues: {
-    command: props.daemon?.command || '',
-    directory: props.daemon?.directory || '',
-    user: props.daemon?.user || defaultUser.value,
-    processes: props.daemon?.processes || 1,
-    stop_wait_seconds: props.daemon?.stop_wait_seconds || 5,
-    stop_signal: props.daemon?.stop_signal || 'SIGTERM',
-  },
 })
 
-type StringFields = 'command' | 'directory' | 'user' | 'stop_signal'
-const setStringField = (field: StringFields, value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : '')
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (command.value.trim().length === 0) return false
+  if (user.value.length === 0) return false
+  if (processes.value < 1) return false
+  return true
+})
+
+const resetForm = () => {
+  command.value = props.daemon?.command || ''
+  directory.value = props.daemon?.directory || ''
+  user.value = props.daemon?.user || defaultUser.value
+  processes.value = props.daemon?.processes || 1
+  stopWaitSeconds.value = props.daemon?.stop_wait_seconds || 5
+  stopSignal.value = props.daemon?.stop_signal || 'SIGTERM'
+  errors.value = {}
 }
 
-const onSubmit = handleSubmit(async (data) => {
+const validate = () => {
+  const result = schema.safeParse({
+    command: command.value.trim(),
+    directory: directory.value.trim() || undefined,
+    user: user.value,
+    processes: processes.value,
+    stop_wait_seconds: stopWaitSeconds.value,
+    stop_signal: stopSignal.value,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      command: fieldErrors.command?.[0] || '',
+      user: fieldErrors.user?.[0] || '',
+      processes: fieldErrors.processes?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
+}
+
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -142,22 +174,10 @@ const onSubmit = handleSubmit(async (data) => {
   } finally {
     isLoading.value = false
   }
-})
+}
 
 watch(open, (isOpen) => {
-  if (isOpen && props.daemon) {
-    // Reset form with daemon values when opening for edit
-    resetForm({
-      values: {
-        command: props.daemon.command || '',
-        directory: props.daemon.directory || '',
-        user: props.daemon.user || defaultUser.value,
-        processes: props.daemon.processes || 1,
-        stop_wait_seconds: props.daemon.stop_wait_seconds || 5,
-        stop_signal: props.daemon.stop_signal || 'SIGTERM',
-      },
-    })
-  } else if (!isOpen) {
+  if (isOpen) {
     resetForm()
   }
 })
@@ -184,9 +204,8 @@ watch(open, (isOpen) => {
           <Label for="command">Command</Label>
           <Input
             id="command"
-            :model-value="values.command"
+            v-model="command"
             placeholder="php artisan queue:work"
-            @update:model-value="setStringField('command', $event)"
           />
           <p v-if="errors.command" class="text-sm text-destructive">{{ errors.command }}</p>
         </div>
@@ -195,22 +214,21 @@ watch(open, (isOpen) => {
           <Label for="directory">Directory (optional)</Label>
           <Input
             id="directory"
-            :model-value="values.directory"
+            v-model="directory"
             placeholder="/home/launch/example.com"
-            @update:model-value="setStringField('directory', $event)"
           />
         </div>
 
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="user">User</Label>
-            <Select :model-value="values.user" @update:model-value="setStringField('user', $event)">
+            <Select v-model="user">
               <SelectTrigger>
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="user in serverUsers" :key="user.value" :value="user.value">
-                  {{ user.label }}
+                <SelectItem v-for="serverUser in serverUsers" :key="serverUser.value" :value="serverUser.value">
+                  {{ serverUser.label }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -221,10 +239,9 @@ watch(open, (isOpen) => {
             <Label for="processes">Processes</Label>
             <Input
               id="processes"
+              v-model.number="processes"
               type="number"
-              :model-value="values.processes"
               min="1"
-              @update:model-value="setFieldValue('processes', Number($event))"
             />
           </div>
 
@@ -232,16 +249,15 @@ watch(open, (isOpen) => {
             <Label for="stop_wait_seconds">Stop Wait Seconds</Label>
             <Input
               id="stop_wait_seconds"
+              v-model.number="stopWaitSeconds"
               type="number"
-              :model-value="values.stop_wait_seconds"
               min="0"
-              @update:model-value="setFieldValue('stop_wait_seconds', Number($event))"
             />
           </div>
 
           <div class="space-y-2">
             <Label for="stop_signal">Stop Signal</Label>
-            <Select :model-value="values.stop_signal" @update:model-value="setStringField('stop_signal', $event)">
+            <Select v-model="stopSignal">
               <SelectTrigger>
                 <SelectValue placeholder="Select signal" />
               </SelectTrigger>
@@ -255,7 +271,7 @@ watch(open, (isOpen) => {
         </div>
 
         <DialogFooter>
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             {{ daemon ? 'Update' : 'Create' }}
           </Button>

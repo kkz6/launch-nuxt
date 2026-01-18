@@ -1,8 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import {
@@ -30,9 +27,14 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const isLoading = ref(false)
 const showPassword = ref(false)
-const createUser = ref(false)
-const hasSubmitted = ref(false)
+const errors = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Form values
+const name = ref('')
+const createUser = ref(false)
+const userName = ref('')
+const userPassword = ref('')
 
 const generatePassword = () => {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -41,7 +43,7 @@ const generatePassword = () => {
     .join('')
 }
 
-const schema = toTypedSchema(z.object({
+const schema = z.object({
   name: z
     .string()
     .min(1, 'Database name is required')
@@ -87,30 +89,51 @@ const schema = toTypedSchema(z.object({
 }, {
   message: 'Password is required',
   path: ['user_password'],
-}))
-
-const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
-  validationSchema: schema,
-  initialValues: {
-    name: '',
-    create_user: false as boolean,
-    user_name: '',
-    user_password: '',
-  },
-  validateOnMount: false,
 })
 
-type StringFields = 'name' | 'user_name' | 'user_password'
-const setStringField = (field: StringFields, value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : '', false)
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (name.value.trim().length === 0) return false
+  if (createUser.value) {
+    if (userName.value.trim().length === 0) return false
+    if (userPassword.value.length === 0) return false
+  }
+  return true
+})
+
+const resetForm = () => {
+  name.value = ''
+  createUser.value = false
+  userName.value = ''
+  userPassword.value = ''
+  showPassword.value = false
+  errors.value = {}
 }
 
-const handleCreateUserToggle = (checked: boolean) => {
-  createUser.value = checked
-  setFieldValue('create_user', checked, false)
+const validate = () => {
+  const result = schema.safeParse({
+    name: name.value.trim(),
+    create_user: createUser.value,
+    user_name: userName.value.trim() || undefined,
+    user_password: userPassword.value || undefined,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      name: fieldErrors.name?.[0] || '',
+      user_name: fieldErrors.user_name?.[0] || '',
+      user_password: fieldErrors.user_password?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
 }
 
-const submitHandler = handleSubmit(async (data) => {
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -141,29 +164,12 @@ const submitHandler = handleSubmit(async (data) => {
   } finally {
     isLoading.value = false
   }
-})
-
-const onSubmit = () => {
-  hasSubmitted.value = true
-  submitHandler()
 }
 
 watch(isOpen, (open) => {
-  if (open) {
-    // Reset form when dialog opens to clear any stale errors
+  if (!open) {
     resetForm()
-    hasSubmitted.value = false
-  } else {
-    resetForm()
-    showPassword.value = false
-    createUser.value = false
-    hasSubmitted.value = false
   }
-})
-
-// Sync createUser with form field
-watch(createUser, (val) => {
-  setFieldValue('create_user', val, false)
 })
 </script>
 
@@ -190,11 +196,10 @@ watch(createUser, (val) => {
           <Label for="name">Database Name</Label>
           <Input
             id="name"
-            :model-value="values.name"
+            v-model="name"
             placeholder="my_database"
-            @update:model-value="setStringField('name', $event)"
           />
-          <p v-if="hasSubmitted && errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
+          <p v-if="errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
         </div>
 
         <div class="flex items-center justify-between rounded-lg border p-4">
@@ -212,12 +217,11 @@ watch(createUser, (val) => {
             <Label for="user_name">Username</Label>
             <Input
               id="user_name"
-              :model-value="values.user_name"
+              v-model="userName"
               placeholder="my_user"
               autocomplete="off"
-              @update:model-value="setStringField('user_name', $event)"
             />
-            <p v-if="hasSubmitted && errors.user_name" class="text-sm text-destructive">{{ errors.user_name }}</p>
+            <p v-if="errors.user_name" class="text-sm text-destructive">{{ errors.user_name }}</p>
           </div>
 
           <div class="space-y-2">
@@ -228,7 +232,7 @@ watch(createUser, (val) => {
                 variant="link"
                 size="sm"
                 class="h-auto p-0 text-xs"
-                @click="setFieldValue('user_password', generatePassword(), false)"
+                @click="userPassword = generatePassword()"
               >
                 <Icon name="lucide:braces" class="mr-1 h-3 w-3" />
                 Generate Password
@@ -237,12 +241,11 @@ watch(createUser, (val) => {
             <div class="relative">
               <Input
                 id="user_password"
+                v-model="userPassword"
                 :type="showPassword ? 'text' : 'password'"
-                :model-value="values.user_password"
                 placeholder="Enter password"
                 autocomplete="new-password"
                 class="pr-10"
-                @update:model-value="setStringField('user_password', $event)"
               />
               <Button
                 type="button"
@@ -255,12 +258,12 @@ watch(createUser, (val) => {
                 <Icon v-else name="lucide:eye" class="h-4 w-4" />
               </Button>
             </div>
-            <p v-if="hasSubmitted && errors.user_password" class="text-sm text-destructive">{{ errors.user_password }}</p>
+            <p v-if="errors.user_password" class="text-sm text-destructive">{{ errors.user_password }}</p>
           </div>
         </div>
 
         <DialogFooter>
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             Create Database
           </Button>
