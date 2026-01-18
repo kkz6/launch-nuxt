@@ -1,6 +1,7 @@
 // Token storage keys
 const ACCESS_TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "auth_refresh_token";
+const TEAM_ID_KEY = "current_team_id";
 
 // Track if we're currently refreshing to prevent multiple refresh calls
 let isRefreshing = false;
@@ -83,6 +84,26 @@ export const useApi = () => {
 
   const clearTokens = () => {
     setTokens(null, null);
+    clearCurrentTeamId();
+  };
+
+  // Team ID management
+  const getCurrentTeamId = (): string | null => {
+    if (import.meta.server) return null;
+    return useCookie(TEAM_ID_KEY).value || null;
+  };
+
+  const setCurrentTeamId = (teamId: string | number | null) => {
+    const teamCookie = useCookie(TEAM_ID_KEY, {
+      maxAge: 60 * 60 * 24 * 365, // 1 year
+      secure: true,
+      sameSite: "lax",
+    });
+    teamCookie.value = teamId ? String(teamId) : null;
+  };
+
+  const clearCurrentTeamId = () => {
+    setCurrentTeamId(null);
   };
 
   // Refresh the access token
@@ -136,6 +157,7 @@ export const useApi = () => {
     options: RequestOptions = {}
   ): Promise<T> => {
     const token = getAccessToken();
+    const teamId = getCurrentTeamId();
 
     const fetchOptions = {
       baseURL,
@@ -146,6 +168,7 @@ export const useApi = () => {
         Accept: "application/json",
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(teamId ? { "X-Team-ID": teamId } : {}),
         ...options.headers,
       },
     };
@@ -153,13 +176,14 @@ export const useApi = () => {
     try {
       return await $fetch<T>(url, fetchOptions);
     } catch (error: unknown) {
+      const errorResponse = error as {
+        response?: { status?: number };
+        data?: { message?: string };
+      };
+
       // Check if it's a 401 error
       if (
-        error &&
-        typeof error === "object" &&
-        "response" in error &&
-        (error as { response?: { status?: number } }).response?.status ===
-          401 &&
+        errorResponse?.response?.status === 401 &&
         getRefreshToken()
       ) {
         const newToken = await refreshAccessToken();
@@ -173,6 +197,22 @@ export const useApi = () => {
               Authorization: `Bearer ${newToken}`,
             },
           });
+        }
+      }
+
+      // Handle team-related errors (400: missing header, 403: not a member)
+      if (import.meta.client) {
+        const status = errorResponse?.response?.status;
+        const message = errorResponse?.data?.message || "";
+
+        if (
+          (status === 400 && message.includes("X-Team-ID")) ||
+          (status === 403 && message.includes("not a member"))
+        ) {
+          // Clear team ID and redirect - user can switch teams via navbar
+          clearCurrentTeamId();
+          navigateTo("/servers");
+          throw error;
         }
       }
 
@@ -217,6 +257,11 @@ export const useApi = () => {
     clearTokens,
     refreshAccessToken,
 
+    // Team ID management
+    getCurrentTeamId,
+    setCurrentTeamId,
+    clearCurrentTeamId,
+
     // Fetch methods
     fetch: apiFetch,
     get,
@@ -245,9 +290,10 @@ export function useApiQuery<T>(
     default?: () => T;
   } = {}
 ) {
-  const { getAccessToken, clearTokens } = useApi();
+  const { getAccessToken, getCurrentTeamId, clearTokens, clearCurrentTeamId } = useApi();
   const config = useRuntimeConfig();
   const token = getAccessToken();
+  const teamId = getCurrentTeamId();
 
   return useFetch(url, {
     baseURL: config.public.apiBase as string,
@@ -261,12 +307,23 @@ export function useApiQuery<T>(
       Accept: "application/json",
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(teamId ? { "X-Team-ID": teamId } : {}),
       ...options.headers,
     },
     onResponseError({ response }) {
       if (response.status === 401) {
         clearTokens();
         navigateTo("/login");
+      }
+
+      // Handle team-related errors
+      const message = (response._data as { message?: string })?.message || "";
+      if (
+        (response.status === 400 && message.includes("X-Team-ID")) ||
+        (response.status === 403 && message.includes("not a member"))
+      ) {
+        clearCurrentTeamId();
+        navigateTo("/servers");
       }
     },
   });

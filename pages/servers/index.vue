@@ -15,6 +15,12 @@ useHead({
 const servers = ref<Server[]>([]);
 const isLoading = ref(true);
 
+// Watch for refresh trigger (e.g., after team switch)
+const serversRefreshKey = useState('serversRefreshKey', () => 0);
+watch(serversRefreshKey, () => {
+  fetchServers();
+});
+
 const getProviderIcon = (provider: string): string => {
   const name = provider?.toLowerCase() || "";
   if (name.includes("digitalocean")) return "simple-icons:digitalocean";
@@ -67,7 +73,8 @@ const formatDate = (date: string): string => {
   }
 };
 
-onMounted(async () => {
+const fetchServers = async () => {
+  isLoading.value = true;
   try {
     const response = await serverService.list();
     servers.value = response.data;
@@ -76,7 +83,9 @@ onMounted(async () => {
   } finally {
     isLoading.value = false;
   }
-});
+};
+
+onMounted(fetchServers);
 </script>
 
 <template>

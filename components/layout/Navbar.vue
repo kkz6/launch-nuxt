@@ -35,7 +35,8 @@ interface Team {
   image_url?: string;
 }
 
-const { user, logout } = useAuth();
+const { user, logout, fetchUser } = useAuth();
+const { setCurrentTeamId } = useApi();
 const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
@@ -357,11 +358,21 @@ const fetchTeams = async () => {
   }
 };
 
+// Servers refresh trigger for team switch
+const serversRefreshKey = useState('serversRefreshKey', () => 0);
+
 const switchTeam = async (teamId: string) => {
   if (teamId === String(user.value?.current_team_id)) return;
   try {
     await $api(`/teams/${teamId}/switch`, { method: "POST" });
-    window.location.reload();
+    // Update stored team ID
+    setCurrentTeamId(teamId);
+    // Refresh user data to get updated current_team_id
+    await fetchUser();
+    // Navigate to servers page and trigger refresh
+    navigateTo("/servers");
+    // Trigger servers list refresh (works even if already on /servers)
+    serversRefreshKey.value++;
   } catch {
     toast.error("Failed to switch team");
   }
