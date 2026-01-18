@@ -31,6 +31,7 @@ interface Redirect {
 interface Props {
   serverId: string
   siteId: string
+  siteAddress?: string
   redirect?: Redirect
 }
 
@@ -51,10 +52,10 @@ const to = ref(props.redirect?.to || '')
 const redirectType = ref(props.redirect?.type?.toString() || '301')
 
 const redirectTypes = [
-  { value: '301', label: 'Permanent (301)', description: 'Recommended for most cases' },
+  { value: '301', label: 'Permanent (301)', description: 'Recommended for SEO' },
   { value: '302', label: 'Temporary (302)', description: 'Temporary redirect' },
-  { value: '307', label: 'Temporary (307)', description: 'Preserves request method' },
-  { value: '308', label: 'Permanent (308)', description: 'Preserves request method' },
+  { value: '307', label: 'Temporary (307)', description: 'Preserves method' },
+  { value: '308', label: 'Permanent (308)', description: 'Preserves method' },
 ]
 
 const schema = z.object({
@@ -68,6 +69,35 @@ const canSubmit = computed(() => {
   if (from.value.trim().length === 0) return false
   if (to.value.trim().length === 0) return false
   return true
+})
+
+// Detect if it's a pattern redirect
+const isPatternRedirect = computed(() => {
+  return from.value.includes('*')
+})
+
+// Generate preview examples
+const previewExamples = computed(() => {
+  const baseUrl = props.siteAddress ? `https://${props.siteAddress}` : 'https://yoursite.com'
+  const fromPath = from.value.trim() || '/old-path'
+  const toPath = to.value.trim() || '/new-path'
+
+  if (isPatternRedirect.value) {
+    // Pattern redirect preview
+    const examplePath = fromPath.replace('*', 'example-page')
+    const exampleTo = toPath.includes('{path}')
+      ? toPath.replace('{path}', 'example-page')
+      : toPath
+
+    return [
+      { from: `${baseUrl}${examplePath}`, to: exampleTo.startsWith('http') ? exampleTo : `${baseUrl}${exampleTo}` },
+    ]
+  }
+
+  // Exact redirect preview
+  return [
+    { from: `${baseUrl}${fromPath}`, to: toPath.startsWith('http') ? toPath : `${baseUrl}${toPath}` },
+  ]
 })
 
 const resetForm = () => {
@@ -153,7 +183,7 @@ watch(open, (isOpen) => {
       <DialogHeader>
         <DialogTitle>{{ redirect ? 'Update Redirect' : 'Create Redirect' }}</DialogTitle>
         <DialogDescription>
-          {{ redirect ? 'Update the redirect configuration.' : 'Create a new URL redirect for this site.' }}
+          Configure URL redirects for your site.
         </DialogDescription>
       </DialogHeader>
 
@@ -163,10 +193,12 @@ watch(open, (isOpen) => {
           <Input
             id="from"
             v-model="from"
-            placeholder="/old-page"
+            placeholder="/old-page or /blog/*"
           />
           <p v-if="errors.from" class="text-sm text-destructive">{{ errors.from }}</p>
-          <p class="text-sm text-muted-foreground">The path to redirect from (must start with /)</p>
+          <p v-else class="text-sm text-muted-foreground">
+            Use <code class="rounded bg-muted px-1">*</code> for pattern matching (e.g., <code class="rounded bg-muted px-1">/blog/*</code>)
+          </p>
         </div>
 
         <div class="space-y-2">
@@ -174,10 +206,17 @@ watch(open, (isOpen) => {
           <Input
             id="to"
             v-model="to"
-            placeholder="/new-page or https://example.com"
+            placeholder="/new-page or /news/{path}"
           />
           <p v-if="errors.to" class="text-sm text-destructive">{{ errors.to }}</p>
-          <p class="text-sm text-muted-foreground">The destination path or full URL</p>
+          <p v-else class="text-sm text-muted-foreground">
+            <template v-if="isPatternRedirect">
+              Use <code class="rounded bg-muted px-1">{path}</code> to include the matched wildcard
+            </template>
+            <template v-else>
+              Enter a path or full URL
+            </template>
+          </p>
         </div>
 
         <div class="space-y-2">
@@ -192,13 +231,32 @@ watch(open, (isOpen) => {
                 :key="rt.value"
                 :value="rt.value"
               >
-                <div class="flex flex-col">
-                  <span>{{ rt.label }}</span>
-                </div>
+                <span>{{ rt.label }}</span>
+                <span class="ml-2 text-muted-foreground">- {{ rt.description }}</span>
               </SelectItem>
             </SelectContent>
           </Select>
           <p v-if="errors.type" class="text-sm text-destructive">{{ errors.type }}</p>
+        </div>
+
+        <!-- Live Preview -->
+        <div v-if="from.trim() && to.trim()" class="rounded-lg border bg-muted/50 p-4">
+          <div class="mb-3 flex items-center gap-2">
+            <Icon name="lucide:eye" class="h-4 w-4 text-muted-foreground" />
+            <span class="text-sm font-medium">Preview</span>
+            <Badge v-if="isPatternRedirect" variant="secondary" class="text-xs">Pattern</Badge>
+            <Badge v-else variant="outline" class="text-xs">Exact</Badge>
+          </div>
+          <div v-for="(example, index) in previewExamples" :key="index" class="space-y-2">
+            <div class="flex items-baseline gap-2">
+              <span class="w-8 shrink-0 text-xs font-medium text-muted-foreground">From</span>
+              <code class="min-w-0 break-all rounded bg-background px-2 py-1 text-xs">{{ example.from }}</code>
+            </div>
+            <div class="flex items-baseline gap-2">
+              <span class="w-8 shrink-0 text-xs font-medium text-muted-foreground">To</span>
+              <code class="min-w-0 break-all rounded bg-background px-2 py-1 text-xs">{{ example.to }}</code>
+            </div>
+          </div>
         </div>
 
         <DialogFooter class="mt-4">
