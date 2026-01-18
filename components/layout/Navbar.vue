@@ -44,6 +44,7 @@ const route = useRoute();
 
 // Global navigation tabs
 const globalTabs = [
+  { value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" },
   { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
   { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
   { value: "scripts", label: "Scripts", route: "/scripts", icon: "lucide:scroll-text" },
@@ -290,7 +291,7 @@ const isDnsTabActive = (tabPath: string) => {
 
 const showGlobalTabs = computed(() => {
   // Show global tabs only on list pages, not detail pages
-  return route.path === '/servers' || route.path === '/dns' || route.path === '/scripts';
+  return route.path === '/dashboard' || route.path === '/servers' || route.path === '/dns' || route.path === '/scripts';
 });
 
 const showDnsTabs = computed(() => {
@@ -372,8 +373,8 @@ const switchTeam = async (teamId: string) => {
     await fetchUser();
     // Reconnect WebSocket with new team context
     reconnectWebSocket();
-    // Navigate to servers page and trigger refresh
-    navigateTo("/servers");
+    // Navigate to dashboard and trigger refresh
+    navigateTo("/dashboard");
     // Trigger servers list refresh (works even if already on /servers)
     serversRefreshKey.value++;
   } catch {
@@ -464,7 +465,7 @@ onMounted(fetchTeams);
     <div
       class="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 lg:px-8"
     >
-      <NuxtLink to="/servers" class="flex items-center gap-2">
+      <NuxtLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
       </NuxtLink>
 

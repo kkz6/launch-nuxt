@@ -106,7 +106,7 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'redirects'">
-      <SiteRedirects :server-id="server.id" :site-id="site.id" />
+      <SiteRedirects :server-id="server.id" :site-id="site.id" :site-address="site.address" />
     </div>
 
     <div v-else-if="activeTab === 'commands'">

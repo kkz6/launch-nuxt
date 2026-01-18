@@ -14,6 +14,7 @@ interface Redirect {
 interface Props {
   serverId: string
   siteId: string
+  siteAddress?: string
 }
 
 const props = defineProps<Props>()
@@ -103,6 +104,7 @@ onMounted(fetchRedirects)
       v-model:open="isEditDialogOpen"
       :server-id="serverId"
       :site-id="siteId"
+      :site-address="siteAddress"
       :redirect="selectedRedirect"
       @updated="handleRedirectUpdated"
     />
@@ -112,7 +114,7 @@ onMounted(fetchRedirects)
         <h3 class="text-lg font-semibold">Redirects</h3>
         <p class="text-sm text-muted-foreground">Manage URL redirects for this site</p>
       </div>
-      <SiteCreateRedirect v-if="redirects.length > 0" :server-id="serverId" :site-id="siteId" @created="fetchRedirects" />
+      <SiteCreateRedirect v-if="redirects.length > 0" :server-id="serverId" :site-id="siteId" :site-address="siteAddress" @created="fetchRedirects" />
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
@@ -166,7 +168,7 @@ onMounted(fetchRedirects)
         </template>
 
         <template #empty>
-          <SiteCreateRedirect :server-id="serverId" :site-id="siteId" @created="fetchRedirects" />
+          <SiteCreateRedirect :server-id="serverId" :site-id="siteId" :site-address="siteAddress" @created="fetchRedirects" />
         </template>
       </SharedDataTable>
     </template>
