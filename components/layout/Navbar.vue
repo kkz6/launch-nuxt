@@ -475,7 +475,7 @@ onMounted(fetchTeams);
           <DropdownMenu v-model:open="isOpen">
             <DropdownMenuTrigger as-child>
               <div
-                class="group flex h-9 cursor-pointer items-center gap-0.5 rounded-full border border-transparent py-0.5 pl-0.5 pr-1 transition-all duration-200 ease-out hover:border-border hover:bg-accent/10 sm:pr-1.5"
+                class="group flex h-9 cursor-pointer items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-2 transition-colors duration-150 hover:bg-muted/50 sm:pr-2.5"
               >
                 <Avatar class="h-8 w-8 border-2 border-background shadow-sm">
                   <AvatarImage :src="user?.profile_photo_url || ''" />
@@ -485,138 +485,104 @@ onMounted(fetchTeams);
                 </Avatar>
 
                 <span
-                  class="ml-0.5 mr-1 hidden max-w-[150px] truncate text-sm font-medium sm:inline"
+                  class="ml-1 hidden max-w-[150px] truncate text-sm font-medium sm:inline"
                 >
                   {{ user?.name }}
                 </span>
 
-                <ChevronDown class="h-4 w-4 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                <ChevronDown class="ml-0.5 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5" />
               </div>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" class="w-[280px] sm:w-64">
-              <DropdownMenuLabel
-                class="flex items-center gap-2 px-2 py-3 sm:py-2"
-              >
-                <Avatar class="h-10 w-10 sm:hidden">
-                  <AvatarImage :src="user?.profile_photo_url || ''" />
-                  <AvatarFallback class="text-sm font-medium">
-                    {{ userInitials }}
-                  </AvatarFallback>
-                </Avatar>
-                <div class="flex flex-col">
-                  <span class="text-sm font-semibold">{{ user?.name }}</span>
-                  <span class="text-xs text-muted-foreground">{{
-                    user?.email
-                  }}</span>
-                </div>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
+            <DropdownMenuContent align="end" class="w-52 p-1">
+              <!-- User Info -->
+              <div class="px-2 py-1.5">
+                <p class="text-sm font-medium">{{ user?.name }}</p>
+                <p class="text-xs text-muted-foreground">{{ user?.email }}</p>
+              </div>
+              <DropdownMenuSeparator class="my-1" />
 
               <!-- Teams Section -->
-              <DropdownMenuLabel class="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-                Teams
-              </DropdownMenuLabel>
-              <div v-if="isTeamsLoading" class="flex items-center justify-center py-3">
-                <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin text-muted-foreground" />
+              <div v-if="isTeamsLoading" class="flex items-center justify-center py-2">
+                <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin text-muted-foreground" />
               </div>
               <template v-else>
-                <DropdownMenuItem
-                  v-for="team in teams"
-                  :key="team.id"
-                  class="group cursor-pointer justify-between gap-2 px-2 py-2"
-                  @click="switchTeam(team.id)"
-                >
-                  <div class="flex items-center gap-2">
-                    <Avatar class="h-5 w-5">
-                      <AvatarImage v-if="team.image_url" :src="team.image_url" />
-                      <AvatarFallback class="text-[10px]">
-                        {{ getTeamInitials(team.name) }}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span class="truncate text-sm">{{ team.name }}</span>
-                  </div>
-                  <div class="flex items-center gap-1">
-                    <Check
-                      v-if="team.id === String(user?.current_team_id)"
-                      class="h-4 w-4 text-primary"
-                    />
-                    <button
-                      v-if="canDeleteTeam(team)"
-                      class="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                      @click.stop="deleteTeam(team)"
-                    >
-                      <Trash2 class="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  class="cursor-pointer gap-2 px-2 py-2"
-                  @click="isCreateTeamOpen = true"
-                >
-                  <Plus class="h-4 w-4 text-muted-foreground" />
-                  <span class="text-sm">Create Team</span>
-                </DropdownMenuItem>
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    v-for="team in teams"
+                    :key="team.id"
+                    class="cursor-pointer justify-between gap-2 rounded-md px-2 py-1.5 text-sm"
+                    @click="switchTeam(team.id)"
+                  >
+                    <span class="truncate">{{ team.name }}</span>
+                    <Check v-if="team.id === String(user?.current_team_id)" class="h-3.5 w-3.5 text-primary" />
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
+                    @click="isCreateTeamOpen = true"
+                  >
+                    <Plus class="h-3.5 w-3.5" />
+                    <span>New team</span>
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
               </template>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator class="my-1" />
 
-              <DropdownMenuGroup>
-                <DropdownMenuItem
-                  v-if="user?.onboarded"
-                  class="cursor-pointer gap-2 px-2 py-2.5 sm:py-2"
-                  @click="navigateTo('/onboarding')"
-                >
-                  <Rocket class="h-4 w-4 text-muted-foreground" />
-                  <span>Onboarding</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  class="cursor-pointer gap-2 px-2 py-2.5 sm:py-2"
-                  @click="openSettings"
-                >
-                  <Settings class="h-4 w-4 text-muted-foreground" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-              </DropdownMenuGroup>
-              <DropdownMenuSeparator />
+              <!-- Menu Items -->
+              <DropdownMenuItem
+                v-if="user?.onboarded"
+                class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
+                @click="navigateTo('/onboarding')"
+              >
+                <Rocket class="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Onboarding</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
+                @click="openSettings"
+              >
+                <Settings class="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator class="my-1" />
 
               <!-- Theme Switcher -->
-              <div class="px-2 py-2">
-                <div class="flex items-center justify-between">
-                  <span class="text-sm text-muted-foreground">Theme</span>
-                  <div class="flex items-center gap-1 rounded-lg border bg-muted/50 p-1">
-                    <button
-                      type="button"
-                      class="rounded-md p-1.5 transition-colors"
-                      :class="colorMode.preference === 'light' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                      @click.stop="setColorMode('light')"
-                    >
-                      <Sun class="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md p-1.5 transition-colors"
-                      :class="colorMode.preference === 'dark' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                      @click.stop="setColorMode('dark')"
-                    >
-                      <Moon class="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      class="rounded-md p-1.5 transition-colors"
-                      :class="colorMode.preference === 'system' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                      @click.stop="setColorMode('system')"
-                    >
-                      <Monitor class="h-4 w-4" />
-                    </button>
-                  </div>
+              <div class="flex items-center justify-between px-2 py-1.5">
+                <span class="text-sm text-muted-foreground">Theme</span>
+                <div class="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5">
+                  <button
+                    type="button"
+                    class="rounded p-1 transition-colors"
+                    :class="colorMode.preference === 'light' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    @click.stop="setColorMode('light')"
+                  >
+                    <Sun class="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded p-1 transition-colors"
+                    :class="colorMode.preference === 'dark' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    @click.stop="setColorMode('dark')"
+                  >
+                    <Moon class="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded p-1 transition-colors"
+                    :class="colorMode.preference === 'system' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    @click.stop="setColorMode('system')"
+                  >
+                    <Monitor class="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator class="my-1" />
+
               <DropdownMenuItem
-                class="cursor-pointer gap-2 px-2 py-2.5 text-destructive focus:text-destructive sm:py-2"
+                class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm text-destructive focus:text-destructive"
                 @click="handleLogout"
               >
-                <LogOut class="h-4 w-4" />
+                <LogOut class="h-3.5 w-3.5" />
                 <span>Sign Out</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -624,10 +590,11 @@ onMounted(fetchTeams);
 
           <template #fallback>
             <div
-              class="flex h-9 animate-pulse items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-1 sm:pr-1.5"
+              class="flex h-9 animate-pulse items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-2 sm:pr-2.5"
             >
               <div class="h-8 w-8 rounded-full bg-muted" />
-              <div class="ml-0.5 mr-1 hidden h-4 w-16 rounded bg-muted sm:block" />
+              <div class="ml-1 hidden h-4 w-16 rounded bg-muted sm:block" />
+              <div class="ml-0.5 h-3.5 w-3.5 rounded bg-muted" />
             </div>
           </template>
         </ClientOnly>
