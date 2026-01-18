@@ -16,14 +16,47 @@ import {
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group'
-import type { Cron } from '~/types'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
+import type { Cron, Server } from '~/types'
 
 interface Props {
-  serverId: string
+  server: Server
   cron?: Cron
 }
 
 const props = defineProps<Props>()
+const serverId = computed(() => props.server.id)
+
+// Server users with local user prioritized first
+const serverUsers = computed(() => {
+  const users = props.server.users
+  if (!users) {
+    return []
+  }
+
+  const result: { value: string; label: string }[] = []
+
+  // Add local user first (priority)
+  if (users.local) {
+    result.push({ value: users.local, label: users.local })
+  }
+
+  // Add root user second
+  if (users.root) {
+    result.push({ value: users.root, label: users.root })
+  }
+
+  return result
+})
+
+// Get default user (local user has priority)
+const defaultUser = computed(() => serverUsers.value[0]?.value || '')
 const emit = defineEmits<{
   created: []
   updated: []
@@ -65,7 +98,7 @@ const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
   validateOnMount: false,
   initialValues: {
     command: props.cron?.command || '',
-    user: props.cron?.user || 'launch',
+    user: props.cron?.user || defaultUser.value,
     frequency: props.cron?.frequency || '* * * * *',
     custom_expression: props.cron?.expression || '',
   },
@@ -96,14 +129,14 @@ const onSubmit = handleSubmit(async (data) => {
   isLoading.value = true
   try {
     if (props.cron) {
-      await $api(`/servers/${props.serverId}/crons/${props.cron.id}`, {
+      await $api(`/servers/${serverId.value}/crons/${props.cron.id}`, {
         method: 'PATCH',
         body: data,
       })
       toast.success('Scheduler updated successfully')
       emit('updated')
     } else {
-      await $api(`/servers/${props.serverId}/crons`, {
+      await $api(`/servers/${serverId.value}/crons`, {
         method: 'POST',
         body: data,
       })
@@ -126,7 +159,7 @@ watch(open, (isOpen) => {
     resetForm({
       values: {
         command: props.cron.command || '',
-        user: props.cron.user || 'launch',
+        user: props.cron.user || defaultUser.value,
         frequency: props.cron.frequency === 'custom' ? 'custom' : (props.cron.expression || '* * * * *'),
         custom_expression: props.cron.frequency === 'custom' ? props.cron.expression : '',
       },
@@ -167,11 +200,16 @@ watch(open, (isOpen) => {
 
         <div class="space-y-2">
           <Label for="user">User</Label>
-          <Input
-            id="user"
-            :model-value="values.user"
-            @update:model-value="setStringField('user', $event)"
-          />
+          <Select :model-value="values.user" @update:model-value="setStringField('user', $event)">
+            <SelectTrigger>
+              <SelectValue placeholder="Select user" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="user in serverUsers" :key="user.value" :value="user.value">
+                {{ user.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
           <p v-if="errors.user" class="text-sm text-destructive">{{ errors.user }}</p>
         </div>
 

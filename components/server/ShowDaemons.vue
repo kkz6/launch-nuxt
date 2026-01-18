@@ -8,13 +8,14 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
-import type { QueueDaemon } from '~/types'
+import type { QueueDaemon, Server } from '~/types'
 
 interface Props {
-  serverId: string
+  server: Server
 }
 
 const props = defineProps<Props>()
+const serverId = computed(() => props.server.id)
 
 const daemons = ref<QueueDaemon[]>([])
 const isLoading = ref(true)
@@ -40,7 +41,7 @@ const editDaemon = (daemon: QueueDaemon) => {
 
 const fetchData = async () => {
   try {
-    const data = await $api<{ data: QueueDaemon[] }>(`/servers/${props.serverId}/daemons`)
+    const data = await $api<{ data: QueueDaemon[] }>(`/servers/${serverId.value}/daemons`)
     daemons.value = data.data
   } catch {
     toast.error('Failed to load daemons')
@@ -64,7 +65,7 @@ const deleteDaemon = async (daemon: QueueDaemon) => {
 
   if (result.ok) {
     try {
-      await $api(`/servers/${props.serverId}/daemons/${daemon.id}`, {
+      await $api(`/servers/${serverId.value}/daemons/${daemon.id}`, {
         method: 'DELETE',
       })
       daemons.value = daemons.value.filter((d) => d.id !== daemon.id)
@@ -89,7 +90,7 @@ const restartDaemon = async (daemon: QueueDaemon) => {
 
   if (result.ok) {
     try {
-      await $api(`/servers/${props.serverId}/daemons/${daemon.id}/restart`, {
+      await $api(`/servers/${serverId.value}/daemons/${daemon.id}/restart`, {
         method: 'POST',
       })
       toast.success('Daemon restart initiated')
@@ -112,7 +113,7 @@ const syncStatus = async () => {
 
   if (result.ok) {
     try {
-      await $api(`/servers/${props.serverId}/daemons/sync`, {
+      await $api(`/servers/${serverId.value}/daemons/sync`, {
         method: 'POST',
       })
       toast.success('Daemon sync initiated')
@@ -139,7 +140,7 @@ watch(isEditDialogOpen, (open) => {
 const hasStatusInfo = computed(() => daemons.value.some((d) => d.last_status_check !== null))
 
 // Subscribe to real-time daemon events
-useServerModelEvents('daemon', props.serverId, fetchData)
+useServerModelEvents('daemon', serverId.value, fetchData)
 
 onMounted(fetchData)
 </script>
@@ -152,7 +153,7 @@ onMounted(fetchData)
     <SharedLogViewerDialog
       v-if="selectedDaemonForLogs"
       v-model:open="isLogDialogOpen"
-      :server-id="serverId"
+      :server-id="server.id"
       entity="daemon"
       :entity-id="selectedDaemonForLogs.id"
       title="Daemon Logs"
@@ -163,7 +164,7 @@ onMounted(fetchData)
     <ServerCreateDaemon
       v-if="selectedDaemonForEdit"
       v-model:open="isEditDialogOpen"
-      :server-id="serverId"
+      :server="server"
       :daemon="selectedDaemonForEdit"
       @updated="handleDaemonUpdated"
     />
@@ -178,7 +179,7 @@ onMounted(fetchData)
           <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
           Sync Status
         </Button>
-        <ServerCreateDaemon v-if="daemons.length > 0" :server-id="serverId" @created="fetchData" />
+        <ServerCreateDaemon v-if="daemons.length > 0" :server="server" @created="fetchData" />
       </div>
     </div>
 
@@ -210,7 +211,7 @@ onMounted(fetchData)
         empty-icon="lucide:activity"
       >
         <template #empty>
-          <ServerCreateDaemon :server-id="serverId" @created="fetchData" />
+          <ServerCreateDaemon :server="server" @created="fetchData" />
         </template>
 
         <template #cell-running="{ value, row }">

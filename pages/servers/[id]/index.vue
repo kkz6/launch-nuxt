@@ -125,11 +125,11 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'daemons'">
-      <ServerShowDaemons :server-id="server.id" />
+      <ServerShowDaemons :server="server" />
     </div>
 
     <div v-else-if="activeTab === 'schedulers'">
-      <ServerShowSchedulers :server-id="server.id" />
+      <ServerShowSchedulers :server="server" />
     </div>
 
     <div v-else-if="activeTab === 'advanced'">

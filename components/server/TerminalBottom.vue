@@ -32,13 +32,37 @@ const emit = defineEmits<{
   close: [];
 }>();
 
-type TerminalUser = "launcher" | "root";
 type ConnectionStatus = "connecting" | "connected" | "disconnected";
+
+// Server users with local user prioritized first
+const serverUsers = computed(() => {
+  const users = props.server.users;
+  if (!users) {
+    return [];
+  }
+
+  const result: { value: string; label: string; isRoot: boolean }[] = [];
+
+  // Add local user first (priority)
+  if (users.local) {
+    result.push({ value: users.local, label: users.local, isRoot: false });
+  }
+
+  // Add root user second
+  if (users.root) {
+    result.push({ value: users.root, label: users.root, isRoot: true });
+  }
+
+  return result;
+});
+
+// Get default user (local user has priority)
+const defaultUser = computed(() => serverUsers.value[0]?.value || "");
 
 const height = ref(400);
 const isMaximized = ref(false);
 const connectionStatus = ref<ConnectionStatus>("connecting");
-const selectedUser = ref<TerminalUser>("launcher");
+const selectedUser = ref(defaultUser.value);
 const terminalKey = ref(0);
 const showWarning = ref(true);
 const terminalRef = ref<InstanceType<typeof ServerTerminal> | null>(null);
@@ -54,7 +78,9 @@ const toggleMaximize = () => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleUserChange = (user: any) => {
-  selectedUser.value = user as TerminalUser;
+  if (typeof user === 'string') {
+    selectedUser.value = user;
+  }
 };
 
 const handleConnectionStatusChange = (status: ConnectionStatus) => {
@@ -163,21 +189,15 @@ onBeforeUnmount(() => {
                 </SelectTrigger>
                 <SelectContent class="border-zinc-700 bg-zinc-900">
                   <SelectItem
-                    value="launcher"
+                    v-for="user in serverUsers"
+                    :key="user.value"
+                    :value="user.value"
                     class="text-xs text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
                   >
                     <div class="flex items-center gap-1.5">
-                      <User class="h-3 w-3" />
-                      <span>launcher</span>
-                    </div>
-                  </SelectItem>
-                  <SelectItem
-                    value="root"
-                    class="text-xs text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
-                  >
-                    <div class="flex items-center gap-1.5">
-                      <Shield class="h-3 w-3 text-amber-500" />
-                      <span>root</span>
+                      <Shield v-if="user.isRoot" class="h-3 w-3 text-amber-500" />
+                      <User v-else class="h-3 w-3" />
+                      <span>{{ user.label }}</span>
                     </div>
                   </SelectItem>
                 </SelectContent>

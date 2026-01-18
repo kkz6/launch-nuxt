@@ -5,7 +5,7 @@ import '@xterm/xterm/css/xterm.css'
 
 interface Props {
   serverId: string
-  username?: 'launcher' | 'root'
+  username?: string
   isMaximized?: boolean
 }
 
