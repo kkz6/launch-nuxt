@@ -148,7 +148,7 @@ onMounted(async () => {
             <div class="flex items-center gap-4">
               <div class="flex items-center gap-1.5 text-muted-foreground">
                 <Icon name="lucide:globe" class="h-3.5 w-3.5" />
-                <span>{{ server.services_count ?? server.sites_count ?? 0 }} sites</span>
+                <span>{{ server.sites_count ?? 0 }} sites</span>
               </div>
               <div class="flex items-center gap-1.5">
                 <span
