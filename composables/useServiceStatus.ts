@@ -162,10 +162,12 @@ export function useServiceStatus(options: UseServiceStatusOptions) {
     })
   }
 
-  // Cleanup on unmount
-  onUnmounted(() => {
-    disconnect()
-  })
+  // Cleanup on unmount (only if called within a component)
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      disconnect()
+    })
+  }
 
   return {
     services,

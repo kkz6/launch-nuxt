@@ -101,8 +101,10 @@ export const useChannelEvents = (
     }
   }, { immediate: true })
 
-  // Clean up on unmount
-  onUnmounted(cleanup)
+  // Clean up on unmount (only if called within a component)
+  if (getCurrentInstance()) {
+    onUnmounted(cleanup)
+  }
 
   return {
     isConnected,

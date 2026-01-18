@@ -166,12 +166,6 @@ export const useWebSocket = () => {
     }
   }, { immediate: true })
 
-  // Clean up on unmount (only for the component that initiated connection)
-  onUnmounted(() => {
-    // Don't disconnect here as other components may still need it
-    // The connection persists across component lifecycles
-  })
-
   return {
     isConnected: readonly(isConnected),
     connect,
