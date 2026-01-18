@@ -12,22 +12,59 @@ export interface MetricsDisk {
   percent: number
 }
 
+export interface MetricsProcess {
+  pid: number
+  user: string
+  cpu: number
+  mem: number
+  command: string
+}
+
+export interface MetricsNetwork {
+  rx_bytes: number
+  tx_bytes: number
+  rx_rate: number
+  tx_rate: number
+}
+
+export interface SystemInfo {
+  hostname: string
+  os: string
+  kernel: string
+  cpu_model: string
+  cpu_cores: number
+  total_memory: number
+  uptime: number
+}
+
 export interface MetricsData {
   timestamp: string
   cpu: number
   load: [number, number, number]
   memory: MetricsMemory
   disk: MetricsDisk
+  processes: MetricsProcess[]
+  network: MetricsNetwork
 }
 
 interface MetricsEvent {
-  event: 'connected' | 'error' | 'metrics'
+  event: 'connected' | 'error' | 'metrics' | 'system_info'
   message?: string
   timestamp?: string
   cpu?: number
   load?: [number, number, number]
   memory?: MetricsMemory
   disk?: MetricsDisk
+  processes?: MetricsProcess[]
+  network?: MetricsNetwork
+  // system_info fields
+  hostname?: string
+  os?: string
+  kernel?: string
+  cpu_model?: string
+  cpu_cores?: number
+  total_memory?: number
+  uptime?: number
 }
 
 type ConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error'
@@ -40,6 +77,7 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
 
   const metrics = ref<MetricsData | null>(null)
   const history = ref<MetricsData[]>([])
+  const systemInfo = ref<SystemInfo | null>(null)
   const isConnected = ref(false)
   const error = ref<string | null>(null)
   const connectionStatus = ref<ConnectionStatus>('disconnected')
@@ -125,6 +163,17 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
           connectionStatus.value = 'connected'
           reconnectAttempts.value = 0
           error.value = null
+        } else if (data.event === 'system_info') {
+          console.log('[MetricsStream] Received system info')
+          systemInfo.value = {
+            hostname: data.hostname || '',
+            os: data.os || '',
+            kernel: data.kernel || '',
+            cpu_model: data.cpu_model || '',
+            cpu_cores: data.cpu_cores || 0,
+            total_memory: data.total_memory || 0,
+            uptime: data.uptime || 0,
+          }
         } else if (data.event === 'error') {
           console.error('[MetricsStream] Error:', data.message)
           error.value = data.message || 'Unknown error'
@@ -136,6 +185,8 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
             load: data.load || [0, 0, 0],
             memory: data.memory || { total: 0, used: 0, free: 0, percent: 0 },
             disk: data.disk || { total: 0, used: 0, free: 0, percent: 0 },
+            processes: data.processes || [],
+            network: data.network || { rx_bytes: 0, tx_bytes: 0, rx_rate: 0, tx_rate: 0 },
           }
 
           metrics.value = metricsData
@@ -193,6 +244,7 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
   return {
     metrics,
     history,
+    systemInfo,
     isConnected,
     error,
     connectionStatus,
