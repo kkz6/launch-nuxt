@@ -17,6 +17,7 @@ const props = defineProps<Props>()
 const {
   metrics,
   history,
+  systemInfo,
   isConnected,
   error,
   connectionStatus,
@@ -112,11 +113,30 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <ServerMetricsCpuCard :metrics="metrics" :history="history" />
-      <ServerMetricsMemoryCard :metrics="metrics" :history="history" />
-      <ServerMetricsDiskCard :metrics="metrics" />
-      <ServerMetricsLoadCard :metrics="metrics" :history="history" />
+    <div v-else class="space-y-3">
+      <!-- Resource metrics row -->
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <ServerMetricsCpuCard :metrics="metrics" :history="history" />
+        <ServerMetricsMemoryCard :metrics="metrics" :history="history" />
+        <ServerMetricsDiskCard :metrics="metrics" />
+        <ServerMetricsLoadCard :metrics="metrics" :history="history" />
+      </div>
+
+      <!-- Processes and Network row -->
+      <div class="grid gap-3 sm:grid-cols-2">
+        <ServerMetricsProcessesCard
+          :processes="metrics?.processes || []"
+        />
+        <ServerMetricsNetworkCard
+          :network="metrics?.network || null"
+          :history="history"
+        />
+      </div>
+
+      <!-- System Info row -->
+      <ServerMetricsSystemInfoCard
+        :system-info="systemInfo"
+      />
     </div>
 
     <div v-if="connectionStatus === 'connecting'" class="mt-6 flex flex-col items-center justify-center py-6">
