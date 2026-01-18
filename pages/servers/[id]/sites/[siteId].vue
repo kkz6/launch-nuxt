@@ -32,7 +32,7 @@ useDeploymentEvents(teamId, (data) => {
 })
 
 // Valid tab values
-const validTabs = ['general', 'deployments', 'files', 'queues', 'commands', 'settings']
+const validTabs = ['general', 'deployments', 'files', 'queues', 'redirects', 'commands', 'settings']
 
 // Get initial tab from query params or default to "general"
 const getInitialTab = () => {
@@ -103,6 +103,10 @@ onMounted(async () => {
 
     <div v-else-if="activeTab === 'queues'">
       <SiteQueues :server-id="server.id" :site-id="site.id" :site="site" :auto-restart-queue="site.auto_restart_queue" />
+    </div>
+
+    <div v-else-if="activeTab === 'redirects'">
+      <SiteRedirects :server-id="server.id" :site-id="site.id" />
     </div>
 
     <div v-else-if="activeTab === 'commands'">
