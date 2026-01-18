@@ -44,6 +44,7 @@ const route = useRoute();
 const globalTabs = [
   { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
   { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
+  { value: "scripts", label: "Scripts", route: "/scripts", icon: "lucide:scroll-text" },
 ];
 
 // Server detail tabs
@@ -287,7 +288,7 @@ const isDnsTabActive = (tabPath: string) => {
 
 const showGlobalTabs = computed(() => {
   // Show global tabs only on list pages, not detail pages
-  return route.path === '/servers' || route.path === '/dns';
+  return route.path === '/servers' || route.path === '/dns' || route.path === '/scripts';
 });
 
 const showDnsTabs = computed(() => {
@@ -306,6 +307,12 @@ const showSiteTabs = computed(() => {
 const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
 const onDnsCreated = () => {
   dnsRefreshKey.value++;
+};
+
+// Scripts refresh trigger
+const scriptsRefreshKey = useState('scriptsRefreshKey', () => 0);
+const onScriptCreated = () => {
+  scriptsRefreshKey.value++;
 };
 
 // Terminal state (shared with server detail page)
@@ -634,6 +641,7 @@ onMounted(fetchTeams);
         </nav>
         <ServerCreateServerDialog v-if="route.path === '/servers'" />
         <DnsAddDomain v-if="route.path === '/dns'" :providers="[]" @created="onDnsCreated" />
+        <ScriptsCreateScript v-if="route.path === '/scripts'" @created="onScriptCreated" />
       </div>
     </div>
 
