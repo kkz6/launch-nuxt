@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'Terms of Service - Launch' })
+useHead({ title: 'Terms of Service' })
 
 const { data: terms } = await useAsyncData('terms-of-service', () =>
   $api<{ terms: string }>('/legal/terms-of-service')

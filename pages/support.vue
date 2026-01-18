@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'Documentation - Launch' })
+useHead({ title: 'Documentation' })
 </script>
 
 <template>

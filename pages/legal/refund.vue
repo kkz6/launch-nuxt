@@ -3,7 +3,7 @@ definePageMeta({
   layout: 'site',
 })
 
-useHead({ title: 'Refund Policy - Launch' })
+useHead({ title: 'Refund Policy' })
 
 const { data: policy } = await useAsyncData('refund-policy', () =>
   $api<{ policy: string }>('/legal/refund-policy')

@@ -24,7 +24,7 @@ if (!page.value) {
 }
 
 useHead({
-  title: page.value?.title ? `${page.value.title} - launchctl Docs` : 'Documentation - launchctl',
+  title: page.value?.title ? `${page.value.title} - Docs` : 'Documentation',
   meta: [
     { name: 'description', content: page.value?.description || 'launchctl documentation' },
   ],
