@@ -39,53 +39,51 @@ const handleLogout = async () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center">
-    <div class="w-full max-w-md px-6">
-      <Alert v-if="status === 'verification-link-sent'" class="mb-6">
-        <Icon name="lucide:info" class="h-4 w-4" />
-        <AlertDescription>
-          A new verification link has been sent to the email address you
-          provided during registration.
-        </AlertDescription>
-      </Alert>
+  <div>
+    <Alert v-if="status === 'verification-link-sent'" class="mb-6">
+      <Icon name="lucide:info" class="h-4 w-4" />
+      <AlertDescription>
+        A new verification link has been sent to the email address you
+        provided during registration.
+      </AlertDescription>
+    </Alert>
 
-      <div class="mb-8 flex items-center">
-        <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
-      </div>
+    <div class="mb-8 flex items-center">
+      <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+    </div>
 
-      <h3 class="mb-2 text-lg font-semibold text-foreground">
-        Email Verification
-      </h3>
-      <p class="mb-8 text-sm text-muted-foreground">
-        Thanks for signing up! Before getting started, could you verify your
-        email address by clicking on the link we just emailed to you? If you
-        didn't receive the email, we will gladly send you another.
-      </p>
+    <h3 class="mb-2 text-lg font-semibold text-foreground">
+      Email Verification
+    </h3>
+    <p class="mb-8 text-sm text-muted-foreground">
+      Thanks for signing up! Before getting started, could you verify your
+      email address by clicking on the link we just emailed to you? If you
+      didn't receive the email, we will gladly send you another.
+    </p>
 
-      <div class="space-y-4">
-        <Button
-          type="button"
-          class="w-full"
-          :disabled="loading"
-          @click="handleResend"
-        >
-          <Icon
-            v-if="loading"
-            name="lucide:loader-2"
-            class="mr-2 h-4 w-4 animate-spin"
-          />
-          {{ loading ? "Sending..." : "Resend Verification Email" }}
-        </Button>
+    <div class="space-y-4">
+      <Button
+        type="button"
+        class="w-full"
+        :disabled="loading"
+        @click="handleResend"
+      >
+        <Icon
+          v-if="loading"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        {{ loading ? 'Sending...' : 'Resend Verification Email' }}
+      </Button>
 
-        <Button
-          type="button"
-          variant="outline"
-          class="w-full"
-          @click="handleLogout"
-        >
-          Log Out
-        </Button>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        class="w-full"
+        @click="handleLogout"
+      >
+        Log Out
+      </Button>
     </div>
   </div>
 </template>

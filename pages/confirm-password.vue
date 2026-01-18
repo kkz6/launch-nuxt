@@ -48,36 +48,34 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center">
-    <div class="w-full max-w-md px-6">
-      <div class="mb-8 flex items-center">
-        <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+  <div>
+    <div class="mb-8 flex items-center">
+      <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+    </div>
+
+    <h3 class="mb-2 text-lg font-semibold text-foreground">Confirm Password</h3>
+    <p class="mb-8 text-sm text-muted-foreground">
+      This is a secure area of the application. Please confirm your password before continuing.
+    </p>
+
+    <form class="space-y-4" @submit.prevent="handleSubmit">
+      <div class="space-y-2">
+        <Label for="password">Password</Label>
+        <Input
+          id="password"
+          v-model="password"
+          type="password"
+          autocomplete="current-password"
+          autofocus
+          required
+        />
+        <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
       </div>
 
-      <h3 class="mb-2 text-lg font-semibold text-foreground">Confirm Password</h3>
-      <p class="mb-8 text-sm text-muted-foreground">
-        This is a secure area of the application. Please confirm your password before continuing.
-      </p>
-
-      <form class="space-y-4" @submit.prevent="handleSubmit">
-        <div class="space-y-2">
-          <Label for="password">Password</Label>
-          <Input
-            id="password"
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            autofocus
-            required
-          />
-          <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
-        </div>
-
-        <Button type="submit" class="w-full" :disabled="loading">
-          <Icon v-if="loading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          {{ loading ? 'Confirming...' : 'Confirm' }}
-        </Button>
-      </form>
-    </div>
+      <Button type="submit" class="w-full" :disabled="loading">
+        <Icon v-if="loading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+        {{ loading ? 'Confirming...' : 'Confirm' }}
+      </Button>
+    </form>
   </div>
 </template>
