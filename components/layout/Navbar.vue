@@ -73,6 +73,7 @@ const allSiteDetailTabs = [
   { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
   { value: "files", label: "Files", query: "files", icon: "lucide:folder-open" },
   { value: "queues", label: "Queues", query: "queues", icon: "lucide:list-todo" },
+  { value: "redirects", label: "Redirects", query: "redirects", icon: "lucide:corner-up-right" },
   { value: "commands", label: "Commands", query: "commands", icon: "lucide:terminal-square" },
   { value: "settings", label: "Settings", query: "settings", icon: "lucide:settings" },
 ];
@@ -176,7 +177,7 @@ const siteDetailTabs = computed(() => {
     return allSiteDetailTabs.filter((t) => !['deployments', 'queues'].includes(t.value));
   }
   if (siteType.value === 'generic') {
-    return allSiteDetailTabs.filter((t) => t.value !== 'queues');
+    return allSiteDetailTabs.filter((t) => !['queues'].includes(t.value));
   }
   return allSiteDetailTabs;
 });
