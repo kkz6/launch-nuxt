@@ -47,60 +47,58 @@ const handleSubmit = async () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center">
-    <div class="w-full max-w-md px-6">
-      <Alert v-if="status" class="mb-6">
-        <Icon name="lucide:info" class="h-4 w-4" />
-        <AlertDescription>{{ status }}</AlertDescription>
-      </Alert>
+  <div>
+    <Alert v-if="status" class="mb-6">
+      <Icon name="lucide:info" class="h-4 w-4" />
+      <AlertDescription>{{ status }}</AlertDescription>
+    </Alert>
 
-      <div class="mb-8 flex items-center">
-        <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+    <div class="mb-8 flex items-center">
+      <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+    </div>
+
+    <h3 class="mb-2 text-lg font-semibold text-foreground">
+      Forgot your password?
+    </h3>
+    <p class="mb-8 text-sm text-muted-foreground">
+      No problem. Just let us know your email address and we will email you a
+      password reset link that will allow you to choose a new one.
+    </p>
+
+    <form class="space-y-4" @submit.prevent="handleSubmit">
+      <div class="space-y-2">
+        <Label for="email">Email</Label>
+        <Input
+          id="email"
+          v-model="email"
+          type="email"
+          placeholder="m@example.com"
+          autocomplete="email"
+          required
+        />
+        <p v-if="errors.email" class="text-sm text-destructive">
+          {{ errors.email }}
+        </p>
       </div>
 
-      <h3 class="mb-2 text-lg font-semibold text-foreground">
-        Forgot your password?
-      </h3>
-      <p class="mb-8 text-sm text-muted-foreground">
-        No problem. Just let us know your email address and we will email you a
-        password reset link that will allow you to choose a new one.
-      </p>
+      <Button type="submit" class="w-full" :disabled="isLoading">
+        <Icon
+          v-if="isLoading"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        {{ isLoading ? 'Sending...' : 'Email Password Reset Link' }}
+      </Button>
+    </form>
 
-      <form class="space-y-4" @submit.prevent="handleSubmit">
-        <div class="space-y-2">
-          <Label for="email">Email</Label>
-          <Input
-            id="email"
-            v-model="email"
-            type="email"
-            placeholder="m@example.com"
-            autocomplete="email"
-            required
-          />
-          <p v-if="errors.email" class="text-sm text-destructive">
-            {{ errors.email }}
-          </p>
-        </div>
-
-        <Button type="submit" class="w-full" :disabled="isLoading">
-          <Icon
-            v-if="isLoading"
-            name="lucide:loader-2"
-            class="mr-2 h-4 w-4 animate-spin"
-          />
-          {{ isLoading ? "Sending..." : "Email Password Reset Link" }}
-        </Button>
-      </form>
-
-      <p class="mt-6 text-sm text-muted-foreground">
-        Remember your password?
-        <NuxtLink
-          to="/login"
-          class="font-medium text-primary hover:text-primary/90"
-        >
-          Back to login
-        </NuxtLink>
-      </p>
-    </div>
+    <p class="mt-6 text-sm text-muted-foreground">
+      Remember your password?
+      <NuxtLink
+        to="/login"
+        class="font-medium text-primary hover:text-primary/90"
+      >
+        Back to login
+      </NuxtLink>
+    </p>
   </div>
 </template>

@@ -67,74 +67,72 @@ const toggleRecovery = () => {
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center">
-    <div class="w-full max-w-md px-6">
-      <div class="mb-8 flex items-center">
-        <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+  <div>
+    <div class="mb-8 flex items-center">
+      <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+    </div>
+
+    <h3 class="mb-2 text-lg font-semibold text-foreground">
+      Two-factor Confirmation
+    </h3>
+    <p class="mb-8 text-sm text-muted-foreground">
+      {{
+        isRecovery
+          ? 'Please confirm access to your account by entering one of your emergency recovery codes.'
+          : 'Please confirm access to your account by entering the authentication code provided by your authenticator application.'
+      }}
+    </p>
+
+    <form class="space-y-4" @submit.prevent="handleSubmit">
+      <div v-if="isRecovery" class="space-y-2">
+        <Label for="recovery_code">Recovery Code</Label>
+        <Input
+          id="recovery_code"
+          v-model="recoveryCode"
+          type="text"
+          autocomplete="one-time-code"
+          autofocus
+          required
+        />
+        <p v-if="errors.recovery_code" class="text-sm text-destructive">
+          {{ errors.recovery_code }}
+        </p>
       </div>
 
-      <h3 class="mb-2 text-lg font-semibold text-foreground">
-        Two-factor Confirmation
-      </h3>
-      <p class="mb-8 text-sm text-muted-foreground">
-        {{
-          isRecovery
-            ? "Please confirm access to your account by entering one of your emergency recovery codes."
-            : "Please confirm access to your account by entering the authentication code provided by your authenticator application."
-        }}
-      </p>
-
-      <form class="space-y-4" @submit.prevent="handleSubmit">
-        <div v-if="isRecovery" class="space-y-2">
-          <Label for="recovery_code">Recovery Code</Label>
-          <Input
-            id="recovery_code"
-            v-model="recoveryCode"
-            type="text"
-            autocomplete="one-time-code"
-            autofocus
-            required
-          />
-          <p v-if="errors.recovery_code" class="text-sm text-destructive">
-            {{ errors.recovery_code }}
-          </p>
-        </div>
-
-        <div v-else class="space-y-2">
-          <Label for="code">Code</Label>
-          <Input
-            id="code"
-            v-model="code"
-            type="text"
-            inputmode="numeric"
-            autocomplete="one-time-code"
-            autofocus
-            required
-          />
-          <p v-if="errors.code" class="text-sm text-destructive">
-            {{ errors.code }}
-          </p>
-        </div>
-
-        <Button type="submit" class="w-full" :disabled="loading">
-          <Icon
-            v-if="loading"
-            name="lucide:loader-2"
-            class="mr-2 h-4 w-4 animate-spin"
-          />
-          {{ loading ? "Verifying..." : "Log in" }}
-        </Button>
-      </form>
-
-      <div class="mt-6 text-center">
-        <button
-          type="button"
-          class="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
-          @click="toggleRecovery"
-        >
-          {{ isRecovery ? "Use an authentication code" : "Use a recovery code" }}
-        </button>
+      <div v-else class="space-y-2">
+        <Label for="code">Code</Label>
+        <Input
+          id="code"
+          v-model="code"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          autofocus
+          required
+        />
+        <p v-if="errors.code" class="text-sm text-destructive">
+          {{ errors.code }}
+        </p>
       </div>
+
+      <Button type="submit" class="w-full" :disabled="loading">
+        <Icon
+          v-if="loading"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        {{ loading ? 'Verifying...' : 'Log in' }}
+      </Button>
+    </form>
+
+    <div class="mt-6 text-center">
+      <button
+        type="button"
+        class="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
+        @click="toggleRecovery"
+      >
+        {{ isRecovery ? 'Use an authentication code' : 'Use a recovery code' }}
+      </button>
     </div>
   </div>
 </template>
