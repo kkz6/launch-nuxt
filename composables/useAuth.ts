@@ -8,7 +8,7 @@ let authInitPromise: Promise<void> | null = null;
  * Authentication composable for managing user state and auth operations
  */
 export const useAuth = () => {
-  const { setTokens, clearTokens, getAccessToken } = useApi();
+  const { setTokens, clearTokens, getAccessToken, setCurrentTeamId } = useApi();
 
   // Reactive state
   const user = useState<User | null>("auth_user", () => null);
@@ -79,6 +79,10 @@ export const useAuth = () => {
    */
   const setUser = (newUser: User | null) => {
     user.value = newUser;
+    // Update stored team ID when user is set
+    if (newUser?.current_team_id) {
+      setCurrentTeamId(newUser.current_team_id);
+    }
   };
 
   /**
