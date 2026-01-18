@@ -97,22 +97,47 @@ onUnmounted(() => {
       </Button>
     </div>
 
-    <div v-if="error" class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950">
-      <div class="flex items-center gap-2">
-        <Icon name="lucide:alert-circle" class="h-4 w-4 text-red-600 dark:text-red-400" />
-        <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+    <!-- Connecting state -->
+    <div v-if="connectionStatus === 'connecting'" class="flex flex-col items-center justify-center py-12">
+      <Icon name="lucide:loader-2" class="h-8 w-8 animate-spin text-muted-foreground" />
+      <p class="mt-3 text-sm text-muted-foreground">Connecting to metrics stream...</p>
+    </div>
+
+    <!-- Error state -->
+    <div v-else-if="error" class="flex flex-col items-center justify-center py-12">
+      <div class="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950">
+        <div class="flex items-center gap-2">
+          <Icon name="lucide:alert-circle" class="h-5 w-5 text-red-600 dark:text-red-400" />
+          <p class="text-sm text-red-600 dark:text-red-400">{{ error }}</p>
+        </div>
       </div>
     </div>
 
-    <div v-if="!server.connected" class="rounded-lg border border-yellow-200 bg-yellow-50 p-3 dark:border-yellow-900 dark:bg-yellow-950">
-      <div class="flex items-center gap-2">
-        <Icon name="lucide:wifi-off" class="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-        <p class="text-sm text-yellow-600 dark:text-yellow-400">
-          Server is not connected. Metrics streaming requires an active connection.
-        </p>
+    <!-- Server not connected state -->
+    <div v-else-if="!server.connected" class="flex flex-col items-center justify-center py-12">
+      <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 dark:border-yellow-900 dark:bg-yellow-950">
+        <div class="flex items-center gap-2">
+          <Icon name="lucide:wifi-off" class="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+          <p class="text-sm text-yellow-600 dark:text-yellow-400">
+            Server is not connected. Metrics streaming requires an active connection.
+          </p>
+        </div>
       </div>
     </div>
 
+    <!-- Disconnected state -->
+    <div v-else-if="connectionStatus === 'disconnected'" class="flex flex-col items-center justify-center py-12">
+      <div class="rounded-lg border border-muted bg-muted/50 p-4">
+        <div class="flex items-center gap-2">
+          <Icon name="lucide:unplug" class="h-5 w-5 text-muted-foreground" />
+          <p class="text-sm text-muted-foreground">
+            Disconnected from metrics stream. Click reconnect to resume.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Connected state - show metrics cards -->
     <div v-else class="space-y-3">
       <!-- Resource metrics row -->
       <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -137,11 +162,6 @@ onUnmounted(() => {
       <ServerMetricsSystemInfoCard
         :system-info="systemInfo"
       />
-    </div>
-
-    <div v-if="connectionStatus === 'connecting'" class="mt-6 flex flex-col items-center justify-center py-6">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
-      <p class="mt-2 text-sm text-muted-foreground">Connecting to metrics stream...</p>
     </div>
   </div>
 </template>
