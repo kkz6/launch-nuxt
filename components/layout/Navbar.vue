@@ -475,7 +475,7 @@ onMounted(fetchTeams);
           <DropdownMenu v-model:open="isOpen">
             <DropdownMenuTrigger as-child>
               <div
-                class="flex h-9 cursor-pointer items-center gap-0.5 rounded-full border border-border bg-background/50 py-0.5 pl-0.5 pr-1 shadow-sm transition-all duration-150 hover:bg-accent/10 hover:shadow-md sm:pr-1.5"
+                class="group flex h-9 cursor-pointer items-center gap-0.5 rounded-full border border-transparent py-0.5 pl-0.5 pr-1 transition-all duration-200 ease-out hover:border-border hover:bg-accent/10 sm:pr-1.5"
               >
                 <Avatar class="h-8 w-8 border-2 border-background shadow-sm">
                   <AvatarImage :src="user?.profile_photo_url || ''" />
@@ -485,12 +485,12 @@ onMounted(fetchTeams);
                 </Avatar>
 
                 <span
-                  class="ml-0.5 mr-2 hidden max-w-[150px] truncate text-sm font-medium sm:inline"
+                  class="ml-0.5 mr-1 hidden max-w-[150px] truncate text-sm font-medium sm:inline"
                 >
                   {{ user?.name }}
                 </span>
 
-                <ChevronsUpDown class="h-4 w-4 text-muted-foreground" />
+                <ChevronsUpDown class="h-4 w-4 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
               </div>
             </DropdownMenuTrigger>
 
@@ -624,11 +624,10 @@ onMounted(fetchTeams);
 
           <template #fallback>
             <div
-              class="flex h-9 animate-pulse items-center gap-0.5 rounded-full border border-border bg-background/50 py-0.5 pl-0.5 pr-1 shadow-sm sm:pr-1.5"
+              class="flex h-9 animate-pulse items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-1 sm:pr-1.5"
             >
               <div class="h-8 w-8 rounded-full bg-muted" />
-              <div class="ml-0.5 mr-2 hidden h-4 w-16 rounded bg-muted sm:block" />
-              <div class="h-4 w-4 rounded bg-muted" />
+              <div class="ml-0.5 mr-1 hidden h-4 w-16 rounded bg-muted sm:block" />
             </div>
           </template>
         </ClientOnly>
