@@ -237,9 +237,12 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
     metrics.value = null
   }
 
-  onUnmounted(() => {
-    disconnect()
-  })
+  // Clean up on unmount (only if called within a component)
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      disconnect()
+    })
+  }
 
   return {
     metrics,

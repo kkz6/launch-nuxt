@@ -64,10 +64,12 @@ export const useModelEvents = (
     setupSubscriptions()
   }, { immediate: true })
 
-  // Clean up on unmount
-  onUnmounted(() => {
-    unsubscribes.forEach((unsub) => unsub())
-  })
+  // Clean up on unmount (only if called within a component)
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      unsubscribes.forEach((unsub) => unsub())
+    })
+  }
 }
 
 /**
