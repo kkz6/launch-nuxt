@@ -9,7 +9,6 @@ import {
   Globe,
   Server,
 } from "lucide-vue-next";
-import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 
 definePageMeta({
@@ -103,6 +102,7 @@ const steps = computed(() =>
   }))
 );
 
+
 const handleStepClick = (step: OnboardingStep & { completed: boolean }) => {
   if (step.settingsTab) {
     openSettings(step.settingsTab);
@@ -143,11 +143,10 @@ const handleSkip = async () => {
   try {
     await $api("/onboarding/complete", { method: "POST" });
     await fetchUser();
-    toast.success("Onboarding completed");
-    router.push("/servers");
+    router.push("/dashboard");
   } catch {
     // If endpoint doesn't exist, just redirect
-    router.push("/servers");
+    router.push("/dashboard");
   } finally {
     isLoading.value = false;
   }
@@ -159,25 +158,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="w-full space-y-6">
-    <div class="mb-6 flex items-center justify-between">
-      <h2 class="text-2xl font-bold">Onboarding</h2>
-      <Button
-        variant="ghost"
-        size="sm"
-        :disabled="isLoading"
-        class="gap-2 text-muted-foreground hover:text-foreground"
-        @click="handleSkip"
-      >
-        <FastForward class="h-4 w-4" />
-        Skip for now
-      </Button>
-    </div>
-
-    <div class="space-y-1">
-      <p class="text-sm text-muted-foreground">
-        To get the best experience, please complete these onboarding steps
-        below:
+  <div class="pb-10">
+    <div class="mb-6">
+      <div class="flex items-center justify-between">
+        <h1 class="text-xl font-semibold">Onboarding</h1>
+        <Button
+          variant="ghost"
+          size="sm"
+          :disabled="isLoading"
+          class="gap-2 text-muted-foreground hover:text-foreground"
+          @click="handleSkip"
+        >
+          <FastForward class="h-4 w-4" />
+          Skip for now
+        </Button>
+      </div>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Complete these steps to get the best experience
       </p>
     </div>
 
@@ -188,56 +185,46 @@ onMounted(() => {
       />
     </div>
 
-    <div v-else class="space-y-3">
-      <div
-        v-for="step in steps"
-        :key="step.id"
-        class="flex items-center justify-between rounded-lg border bg-card p-4 shadow-sm transition-colors hover:bg-muted/50"
-      >
-        <div class="flex items-center gap-4">
-          <div
-            :class="[
-              'flex items-center justify-center rounded-full p-2',
-              step.completed
-                ? 'bg-green-100 dark:bg-green-900/20'
-                : 'bg-muted',
-            ]"
-          >
-            <CheckCircle
-              v-if="step.completed"
-              class="h-5 w-5 text-green-600 dark:text-green-400"
-            />
-            <component
-              :is="step.icon"
-              v-else
-              class="h-5 w-5 text-muted-foreground"
-            />
-          </div>
-          <div class="space-y-1">
-            <div class="flex items-center gap-2">
-              <h4 class="font-medium">{{ step.title }}</h4>
-              <Badge
-                v-if="step.completed"
-                variant="outline"
-                class="px-2 py-0 text-xs"
-              >
-                Done
-              </Badge>
-            </div>
-            <p class="text-sm text-muted-foreground">
-              {{ step.description }}
-            </p>
-          </div>
-        </div>
-        <Button
-          :variant="step.completed ? 'outline' : 'default'"
-          size="sm"
-          class="shrink-0"
+    <div v-else class="rounded-lg border bg-card">
+        <div
+          v-for="(step, index) in steps"
+          :key="step.id"
+          class="group flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50"
+          :class="{ 'border-b': index < steps.length - 1 }"
           @click="handleStepClick(step)"
         >
-          {{ step.completed ? "Review" : "Start" }}
-        </Button>
-      </div>
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded transition-colors"
+              :class="step.completed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'"
+            >
+              <CheckCircle
+                v-if="step.completed"
+                class="h-4 w-4 text-green-600 dark:text-green-400"
+              />
+              <component
+                :is="step.icon"
+                v-else
+                class="h-4 w-4 text-muted-foreground"
+              />
+            </div>
+            <div class="min-w-0">
+              <span
+                class="text-sm font-medium"
+                :class="step.completed ? 'text-muted-foreground' : ''"
+              >
+                {{ step.title }}
+              </span>
+              <p class="text-xs text-muted-foreground">
+                {{ step.description }}
+              </p>
+            </div>
+          </div>
+          <Icon
+            name="lucide:chevron-right"
+            class="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+          />
+        </div>
     </div>
   </div>
 </template>

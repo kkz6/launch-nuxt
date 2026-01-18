@@ -3,10 +3,8 @@ import { toast } from "vue-sonner";
 import {
   ChevronDown,
   LogOut,
-  Rocket,
   Settings,
   Plus,
-  Trash2,
   Check,
   Sun,
   Moon,
@@ -43,12 +41,22 @@ const colorMode = useColorMode();
 const route = useRoute();
 
 // Global navigation tabs
-const globalTabs = [
+const globalTabsBase = [
   { value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" },
   { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
   { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
   { value: "scripts", label: "Scripts", route: "/scripts", icon: "lucide:scroll-text" },
 ];
+
+const globalTabs = computed(() => {
+  if (!user.value?.onboarded) {
+    return [
+      { value: "onboarding", label: "Onboarding", route: "/onboarding", icon: "lucide:rocket" },
+      ...globalTabsBase,
+    ];
+  }
+  return globalTabsBase;
+});
 
 // Server detail tabs
 const serverDetailTabs = [
@@ -291,7 +299,7 @@ const isDnsTabActive = (tabPath: string) => {
 
 const showGlobalTabs = computed(() => {
   // Show global tabs only on list pages, not detail pages
-  return route.path === '/dashboard' || route.path === '/servers' || route.path === '/dns' || route.path === '/scripts';
+  return route.path === '/dashboard' || route.path === '/servers' || route.path === '/dns' || route.path === '/scripts' || route.path === '/onboarding';
 });
 
 const showDnsTabs = computed(() => {
@@ -529,14 +537,6 @@ onMounted(fetchTeams);
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Menu Items -->
-              <DropdownMenuItem
-                v-if="user?.onboarded"
-                class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
-                @click="navigateTo('/onboarding')"
-              >
-                <Rocket class="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Onboarding</span>
-              </DropdownMenuItem>
               <DropdownMenuItem
                 class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
                 @click="openSettings"
