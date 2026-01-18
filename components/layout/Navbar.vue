@@ -329,7 +329,6 @@ const setColorMode = (mode: "light" | "dark" | "system") => {
 };
 
 const isOpen = ref(false);
-const isTeamOpen = ref(false);
 const isCreateTeamOpen = ref(false);
 const teams = ref<Team[]>([]);
 const isTeamsLoading = ref(true);
@@ -448,87 +447,7 @@ onMounted(fetchTeams);
       </NuxtLink>
 
       <div class="flex items-center space-x-2">
-        <!-- Team Switcher -->
-        <ClientOnly>
-          <DropdownMenu v-model:open="isTeamOpen">
-            <DropdownMenuTrigger as-child>
-              <button
-                class="flex h-9 items-center gap-2 rounded-lg border border-border bg-background/50 px-3 text-sm font-medium shadow-sm transition-all duration-150 hover:bg-accent/10 hover:shadow-md"
-              >
-                <Avatar class="h-5 w-5">
-                  <AvatarImage v-if="currentTeam?.image_url" :src="currentTeam.image_url" />
-                  <AvatarFallback class="text-[10px]">
-                    {{ currentTeam ? getTeamInitials(currentTeam.name) : '?' }}
-                  </AvatarFallback>
-                </Avatar>
-                <span class="hidden max-w-[120px] truncate sm:inline">
-                  {{ currentTeam?.name || 'Select Team' }}
-                </span>
-                <ChevronsUpDown class="h-3.5 w-3.5 text-muted-foreground" />
-              </button>
-            </DropdownMenuTrigger>
-
-            <DropdownMenuContent align="end" class="w-64">
-              <DropdownMenuLabel class="text-xs font-medium text-muted-foreground">
-                Teams
-              </DropdownMenuLabel>
-
-              <div v-if="isTeamsLoading" class="flex items-center justify-center py-4">
-                <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
-
-              <template v-else>
-                <DropdownMenuItem
-                  v-for="team in teams"
-                  :key="team.id"
-                  class="cursor-pointer justify-between gap-2 px-2 py-2"
-                  @click="switchTeam(team.id)"
-                >
-                  <div class="flex items-center gap-2">
-                    <Avatar class="h-6 w-6">
-                      <AvatarImage v-if="team.image_url" :src="team.image_url" />
-                      <AvatarFallback class="text-[10px]">
-                        {{ getTeamInitials(team.name) }}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span class="truncate">{{ team.name }}</span>
-                  </div>
-                  <div class="flex items-center gap-1">
-                    <Check
-                      v-if="team.id === String(user?.current_team_id)"
-                      class="h-4 w-4 text-primary"
-                    />
-                    <button
-                      v-if="canDeleteTeam(team)"
-                      class="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                      @click.stop="deleteTeam(team)"
-                    >
-                      <Trash2 class="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </DropdownMenuItem>
-              </template>
-
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                class="cursor-pointer gap-2 px-2 py-2"
-                @click="isCreateTeamOpen = true"
-              >
-                <Plus class="h-4 w-4 text-muted-foreground" />
-                <span>Create Team</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <template #fallback>
-            <div class="flex h-9 w-32 animate-pulse items-center gap-2 rounded-lg border border-border bg-background/50 px-3">
-              <div class="h-5 w-5 rounded-full bg-muted" />
-              <div class="h-4 flex-1 rounded bg-muted" />
-            </div>
-          </template>
-        </ClientOnly>
-
-        <!-- User Menu -->
+        <!-- User Menu (with Teams) -->
         <ClientOnly>
           <DropdownMenu v-model:open="isOpen">
             <DropdownMenuTrigger as-child>
@@ -569,6 +488,53 @@ onMounted(fetchTeams);
                   }}</span>
                 </div>
               </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+
+              <!-- Teams Section -->
+              <DropdownMenuLabel class="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                Teams
+              </DropdownMenuLabel>
+              <div v-if="isTeamsLoading" class="flex items-center justify-center py-3">
+                <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+              <template v-else>
+                <DropdownMenuItem
+                  v-for="team in teams"
+                  :key="team.id"
+                  class="group cursor-pointer justify-between gap-2 px-2 py-2"
+                  @click="switchTeam(team.id)"
+                >
+                  <div class="flex items-center gap-2">
+                    <Avatar class="h-5 w-5">
+                      <AvatarImage v-if="team.image_url" :src="team.image_url" />
+                      <AvatarFallback class="text-[10px]">
+                        {{ getTeamInitials(team.name) }}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span class="truncate text-sm">{{ team.name }}</span>
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <Check
+                      v-if="team.id === String(user?.current_team_id)"
+                      class="h-4 w-4 text-primary"
+                    />
+                    <button
+                      v-if="canDeleteTeam(team)"
+                      class="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
+                      @click.stop="deleteTeam(team)"
+                    >
+                      <Trash2 class="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  class="cursor-pointer gap-2 px-2 py-2"
+                  @click="isCreateTeamOpen = true"
+                >
+                  <Plus class="h-4 w-4 text-muted-foreground" />
+                  <span class="text-sm">Create Team</span>
+                </DropdownMenuItem>
+              </template>
               <DropdownMenuSeparator />
 
               <DropdownMenuGroup>
