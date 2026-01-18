@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import { useForm } from "vee-validate";
-import { toTypedSchema } from "@vee-validate/zod";
 import * as z from "zod";
 import { PlusIcon, Settings2 } from "lucide-vue-next";
 import {
@@ -54,6 +52,7 @@ const isOpen = ref(false);
 const isAdvancedOpen = ref(false);
 const isLoading = ref(false);
 const isLoadingOptions = ref(false);
+const errors = ref<Record<string, string>>({});
 
 // Options from API
 const serverProviders = ref<ConnectedServerProvider[]>([]);
@@ -65,6 +64,21 @@ const sshKeys = ref<SSHKey[]>([]);
 const plans = ref<Record<string, CloudServiceConfig>>({});
 const canCreateServer = ref(true);
 
+// Form values
+const name = ref("");
+const serviceProvider = ref("digitalocean");
+const serverProviderId = ref("");
+const region = ref("");
+const plan = ref("");
+const serverType = ref("php");
+const operatingSystem = ref("ubuntu_24");
+const database = ref("mysql80");
+const php = ref("php83");
+const selectedSshKeys = ref<string[]>([]);
+const ip = ref("");
+const port = ref("22");
+const installAgent = ref(true);
+
 const serviceProviders: Record<string, string> = {
   digitalocean: "DigitalOcean",
   hetzner: "Hetzner",
@@ -74,76 +88,89 @@ const serviceProviders: Record<string, string> = {
   custom_server: "Custom Server",
 };
 
-const schema = toTypedSchema(
-  z.object({
-    name: z.string().min(1, "Server name is required").max(255),
-    service_provider: z.string().min(1, "Provider is required"),
-    server_provider_id: z.string().optional(),
-    region: z.string().optional(),
-    plan: z.string().optional(),
-    type: z.string().default("php"),
-    operating_system: z.string().default("ubuntu_24"),
-    database: z.string().default("mysql80"),
-    php: z.string().default("php83"),
-    ssh_keys: z.array(z.string()).default([]),
-    ip: z.string().optional(),
-    port: z.string().default("22"),
-    install_agent: z.boolean().default(true),
-  })
-);
-
-const { handleSubmit, setFieldValue, values, errors, resetForm } = useForm({
-  validationSchema: schema,
-  validateOnMount: false,
-  initialValues: {
-    name: "",
-    service_provider: "digitalocean",
-    server_provider_id: "",
-    region: "",
-    plan: "",
-    type: "php",
-    operating_system: "ubuntu_24",
-    database: "mysql80",
-    php: "php83",
-    ssh_keys: [] as string[],
-    ip: "",
-    port: "22",
-    install_agent: true,
-  },
+const schema = z.object({
+  name: z.string().min(1, "Server name is required").max(255),
+  service_provider: z.string().min(1, "Provider is required"),
+  server_provider_id: z.string().optional(),
+  region: z.string().optional(),
+  plan: z.string().optional(),
+  type: z.string(),
+  operating_system: z.string(),
+  database: z.string(),
+  php: z.string(),
+  ssh_keys: z.array(z.string()),
+  ip: z.string().optional(),
+  port: z.string(),
+  install_agent: z.boolean(),
 });
 
-// Type-safe field setters
-type FormFields =
-  | "name"
-  | "service_provider"
-  | "server_provider_id"
-  | "region"
-  | "plan"
-  | "type"
-  | "operating_system"
-  | "database"
-  | "php"
-  | "ip"
-  | "port";
+const canSubmit = computed(() => {
+  if (isLoading.value) return false;
+  if (!canCreateServer.value) return false;
+  if (name.value.trim().length === 0) return false;
+  return true;
+});
 
-const setStringField = (field: FormFields, value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : "");
+const resetForm = () => {
+  name.value = "";
+  serviceProvider.value = "digitalocean";
+  serverProviderId.value = "";
+  region.value = "";
+  plan.value = "";
+  serverType.value = "php";
+  operatingSystem.value = "ubuntu_24";
+  database.value = "mysql80";
+  php.value = "php83";
+  selectedSshKeys.value = [];
+  ip.value = "";
+  port.value = "22";
+  installAgent.value = true;
+  errors.value = {};
+};
+
+const validate = () => {
+  const result = schema.safeParse({
+    name: name.value.trim(),
+    service_provider: serviceProvider.value,
+    server_provider_id: serverProviderId.value || undefined,
+    region: region.value || undefined,
+    plan: plan.value || undefined,
+    type: serverType.value,
+    operating_system: operatingSystem.value,
+    database: database.value,
+    php: php.value,
+    ssh_keys: selectedSshKeys.value,
+    ip: ip.value || undefined,
+    port: port.value,
+    install_agent: installAgent.value,
+  });
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors;
+    errors.value = {
+      name: fieldErrors.name?.[0] || "",
+      service_provider: fieldErrors.service_provider?.[0] || "",
+      server_provider_id: fieldErrors.server_provider_id?.[0] || "",
+    };
+    return null;
+  }
+  errors.value = {};
+  return result.data;
 };
 
 const filteredProviders = computed(() => {
   return serverProviders.value.filter(
-    (p) => p.provider === values.service_provider
+    (p) => p.provider === serviceProvider.value
   );
 });
 
 const currentPlans = computed(() => {
-  const provider = values.service_provider;
+  const provider = serviceProvider.value;
   if (!provider || !plans.value[provider]) return [];
   return plans.value[provider]?.plans || [];
 });
 
 const currentRegions = computed(() => {
-  const provider = values.service_provider;
+  const provider = serviceProvider.value;
   if (!provider || !plans.value[provider]) return [];
   return plans.value[provider]?.regions || [];
 });
@@ -176,7 +203,10 @@ const fetchOptions = async () => {
   }
 };
 
-const onSubmit = handleSubmit(async (data) => {
+const onSubmit = async () => {
+  const data = validate();
+  if (!data) return;
+
   isLoading.value = true;
   try {
     const response = await serverService.create(data);
@@ -197,7 +227,7 @@ const onSubmit = handleSubmit(async (data) => {
   } finally {
     isLoading.value = false;
   }
-});
+};
 
 // Fetch options when dialog opens
 watch(isOpen, (open) => {
@@ -243,9 +273,8 @@ watch(isOpen, (open) => {
       >
         <!-- Provider Tabs -->
         <Tabs
-          :model-value="values.service_provider"
+          v-model="serviceProvider"
           class="w-full space-y-2"
-          @update:model-value="setStringField('service_provider', $event)"
         >
           <TabsList class="flex flex-row">
             <TabsTrigger
@@ -259,12 +288,9 @@ watch(isOpen, (open) => {
         </Tabs>
 
         <!-- Server Provider (for cloud providers) -->
-        <div v-if="values.service_provider !== 'custom_server'" class="space-y-2">
+        <div v-if="serviceProvider !== 'custom_server'" class="space-y-2">
           <Label>Server Provider</Label>
-          <Select
-            :model-value="values.server_provider_id"
-            @update:model-value="setStringField('server_provider_id', $event)"
-          >
+          <Select v-model="serverProviderId">
             <SelectTrigger>
               <SelectValue placeholder="Select a provider account" />
             </SelectTrigger>
@@ -295,9 +321,8 @@ watch(isOpen, (open) => {
           <Label for="name">Name</Label>
           <Input
             id="name"
-            :model-value="values.name"
+            v-model="name"
             placeholder="my-awesome-server"
-            @update:model-value="setStringField('name', $event)"
           />
           <p v-if="errors.name" class="text-sm text-destructive">
             {{ errors.name }}
@@ -306,25 +331,22 @@ watch(isOpen, (open) => {
 
         <!-- Plan and Region (for cloud providers) -->
         <div
-          v-if="values.service_provider !== 'custom_server'"
+          v-if="serviceProvider !== 'custom_server'"
           class="grid grid-cols-1 gap-3 lg:grid-cols-2"
         >
           <div class="space-y-2">
             <Label>Plan</Label>
-            <Select
-              :model-value="values.plan"
-              @update:model-value="setStringField('plan', $event)"
-            >
+            <Select v-model="plan">
               <SelectTrigger>
                 <SelectValue placeholder="Select a plan" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  v-for="plan in currentPlans"
-                  :key="plan.value"
-                  :value="plan.value"
+                  v-for="p in currentPlans"
+                  :key="p.value"
+                  :value="p.value"
                 >
-                  {{ plan.title }}
+                  {{ p.title }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -332,20 +354,17 @@ watch(isOpen, (open) => {
 
           <div class="space-y-2">
             <Label>Region</Label>
-            <Select
-              :model-value="values.region"
-              @update:model-value="setStringField('region', $event)"
-            >
+            <Select v-model="region">
               <SelectTrigger>
                 <SelectValue placeholder="Select a region" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  v-for="region in currentRegions"
-                  :key="region.value"
-                  :value="region.value"
+                  v-for="r in currentRegions"
+                  :key="r.value"
+                  :value="r.value"
                 >
-                  {{ region.title }}
+                  {{ r.title }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -354,25 +373,23 @@ watch(isOpen, (open) => {
 
         <!-- IP and Port (for custom server) -->
         <div
-          v-if="values.service_provider === 'custom_server'"
+          v-if="serviceProvider === 'custom_server'"
           class="grid grid-cols-2 gap-3"
         >
           <div class="space-y-2">
             <Label for="ip">IP Address</Label>
             <Input
               id="ip"
-              :model-value="values.ip"
+              v-model="ip"
               placeholder="192.168.1.1"
-              @update:model-value="setStringField('ip', $event)"
             />
           </div>
           <div class="space-y-2">
             <Label for="port">SSH Port</Label>
             <Input
               id="port"
-              :model-value="values.port"
+              v-model="port"
               placeholder="22"
-              @update:model-value="setStringField('port', $event)"
             />
           </div>
         </div>
@@ -400,10 +417,7 @@ watch(isOpen, (open) => {
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-2">
             <Label>Type</Label>
-            <Select
-              :model-value="values.type"
-              @update:model-value="setStringField('type', $event)"
-            >
+            <Select v-model="serverType">
               <SelectTrigger>
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
@@ -432,7 +446,7 @@ watch(isOpen, (open) => {
           </Button>
           <Button
             type="submit"
-            :disabled="isLoading || !canCreateServer"
+            :disabled="!canSubmit"
           >
             <Icon
               v-if="isLoading"
@@ -467,10 +481,7 @@ watch(isOpen, (open) => {
           </h3>
           <div class="space-y-2">
             <Label>Operating System</Label>
-            <Select
-              :model-value="values.operating_system"
-              @update:model-value="setStringField('operating_system', $event)"
-            >
+            <Select v-model="operatingSystem">
               <SelectTrigger>
                 <SelectValue placeholder="Select OS" />
               </SelectTrigger>
@@ -491,12 +502,9 @@ watch(isOpen, (open) => {
         <div class="space-y-4 border-b border-border/50 pb-4">
           <h3 class="text-sm font-medium text-foreground">Software Stack</h3>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div v-if="values.type !== 'database'" class="space-y-2">
+            <div v-if="serverType !== 'database'" class="space-y-2">
               <Label>PHP Version</Label>
-              <Select
-                :model-value="values.php"
-                @update:model-value="setStringField('php', $event)"
-              >
+              <Select v-model="php">
                 <SelectTrigger>
                   <SelectValue placeholder="Select PHP version" />
                 </SelectTrigger>
@@ -514,10 +522,7 @@ watch(isOpen, (open) => {
 
             <div class="space-y-2">
               <Label>Database</Label>
-              <Select
-                :model-value="values.database"
-                @update:model-value="setStringField('database', $event)"
-              >
+              <Select v-model="database">
                 <SelectTrigger>
                   <SelectValue placeholder="Select database" />
                 </SelectTrigger>
@@ -543,8 +548,7 @@ watch(isOpen, (open) => {
           <div class="flex items-start space-x-3 rounded-md border p-4">
             <Checkbox
               id="install_agent"
-              :checked="values.install_agent"
-              @update:checked="setFieldValue('install_agent', $event)"
+              v-model:checked="installAgent"
             />
             <div class="space-y-1 leading-none">
               <Label for="install_agent" class="cursor-pointer">
@@ -554,6 +558,12 @@ watch(isOpen, (open) => {
                 Required for backups, monitoring, and advanced features
               </p>
             </div>
+          </div>
+          <div v-if="!installAgent" class="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+            <p class="text-sm text-amber-600 dark:text-amber-400">
+              <Icon name="lucide:alert-triangle" class="mr-1.5 inline h-4 w-4" />
+              Without the Launch Agent, you will not be able to use backups, server metrics, real-time monitoring, and other advanced features.
+            </p>
           </div>
         </div>
       </div>
