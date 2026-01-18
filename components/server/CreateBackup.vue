@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import {
@@ -64,7 +62,18 @@ const isEditing = computed(() => !!props.backup)
 const isLoading = ref(false)
 const databases = ref<Database[]>([])
 const storageProviders = ref<StorageProviderRecord[]>([])
+const errors = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Form values
+const storageProviderId = ref('')
+const cronExpression = ref('0 0 * * *')
+const path = ref('/')
+const retention = ref(10)
+const selectedDatabases = ref<string[]>([])
+const notificationOnFailure = ref(true)
+const notificationOnSuccess = ref(false)
+const enabled = ref(true)
 
 const cronPresets: Record<string, { label: string; value: string }> = {
   hourly: { label: 'Hourly', value: '0 * * * *' },
@@ -73,7 +82,7 @@ const cronPresets: Record<string, { label: string; value: string }> = {
   monthly: { label: 'Monthly on 1st', value: '0 0 1 * *' },
 }
 
-const schema = toTypedSchema(z.object({
+const schema = z.object({
   storage_provider_id: z.string().min(1, 'Storage provider is required'),
   cron_expression: z.string().min(1, 'Schedule is required'),
   path: z.string().min(1, 'Path is required'),
@@ -82,25 +91,27 @@ const schema = toTypedSchema(z.object({
   notification_on_failure: z.boolean(),
   notification_on_success: z.boolean(),
   enabled: z.boolean(),
-}))
-
-const { handleSubmit, resetForm, setFieldValue, values, errors, setValues } = useForm({
-  validationSchema: schema,
-  validateOnMount: false,
-  initialValues: {
-    storage_provider_id: '',
-    cron_expression: '0 0 * * *',
-    path: '/',
-    retention: 10,
-    databases: [] as string[],
-    notification_on_failure: true,
-    notification_on_success: false,
-    enabled: true,
-  },
 })
 
-const setStringField = (field: 'storage_provider_id' | 'cron_expression' | 'path', value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : '')
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (storageProviderId.value.length === 0) return false
+  if (cronExpression.value.trim().length === 0) return false
+  if (path.value.trim().length === 0) return false
+  if (retention.value < 1) return false
+  return true
+})
+
+const resetForm = () => {
+  storageProviderId.value = props.backup?.storage_provider_id ?? ''
+  cronExpression.value = props.backup?.cron_expression ?? '0 0 * * *'
+  path.value = props.backup?.path ?? '/'
+  retention.value = props.backup?.retention ?? 10
+  selectedDatabases.value = props.backup?.databases ?? []
+  notificationOnFailure.value = props.backup?.notification_on_failure ?? true
+  notificationOnSuccess.value = props.backup?.notification_on_success ?? false
+  enabled.value = props.backup?.enabled ?? true
+  errors.value = {}
 }
 
 const fetchOptions = async () => {
@@ -117,15 +128,42 @@ const fetchOptions = async () => {
 }
 
 const toggleDatabase = (dbId: string) => {
-  const current = values.databases || []
-  if (current.includes(dbId)) {
-    setFieldValue('databases', current.filter(id => id !== dbId))
+  if (selectedDatabases.value.includes(dbId)) {
+    selectedDatabases.value = selectedDatabases.value.filter(id => id !== dbId)
   } else {
-    setFieldValue('databases', [...current, dbId])
+    selectedDatabases.value = [...selectedDatabases.value, dbId]
   }
 }
 
-const onSubmit = handleSubmit(async (data) => {
+const validate = () => {
+  const result = schema.safeParse({
+    storage_provider_id: storageProviderId.value,
+    cron_expression: cronExpression.value.trim(),
+    path: path.value.trim(),
+    retention: retention.value,
+    databases: selectedDatabases.value,
+    notification_on_failure: notificationOnFailure.value,
+    notification_on_success: notificationOnSuccess.value,
+    enabled: enabled.value,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      storage_provider_id: fieldErrors.storage_provider_id?.[0] || '',
+      cron_expression: fieldErrors.cron_expression?.[0] || '',
+      path: fieldErrors.path?.[0] || '',
+      retention: fieldErrors.retention?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
+}
+
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
   if (!confirmationDialog.value) return
 
   const actionText = isEditing.value ? 'Update' : 'Create'
@@ -162,26 +200,12 @@ const onSubmit = handleSubmit(async (data) => {
   } finally {
     isLoading.value = false
   }
-})
+}
 
 watch(open, (isOpen) => {
   if (isOpen) {
     fetchOptions()
-    if (props.backup) {
-      // Populate form with backup data
-      setValues({
-        storage_provider_id: props.backup.storage_provider_id,
-        cron_expression: props.backup.cron_expression,
-        path: props.backup.path,
-        retention: props.backup.retention,
-        databases: props.backup.databases || [],
-        notification_on_failure: props.backup.notification_on_failure,
-        notification_on_success: props.backup.notification_on_success,
-        enabled: props.backup.enabled,
-      })
-    } else {
-      resetForm()
-    }
+    resetForm()
   }
 })
 </script>
@@ -206,7 +230,7 @@ watch(open, (isOpen) => {
         <!-- Storage Provider -->
         <div class="space-y-2">
           <Label for="storage_provider_id">Storage Provider</Label>
-          <Select :model-value="values.storage_provider_id" @update:model-value="setStringField('storage_provider_id', $event)">
+          <Select v-model="storageProviderId">
             <SelectTrigger>
               <SelectValue placeholder="Select storage provider" />
             </SelectTrigger>
@@ -224,9 +248,8 @@ watch(open, (isOpen) => {
           <Label for="path">Backup Path</Label>
           <Input
             id="path"
-            :model-value="values.path"
+            v-model="path"
             placeholder="/"
-            @update:model-value="setStringField('path', $event)"
           />
           <p class="text-xs text-muted-foreground">The path on the server to backup</p>
         </div>
@@ -238,7 +261,7 @@ watch(open, (isOpen) => {
             <div v-for="db in databases" :key="db.id" class="flex items-center space-x-2">
               <Checkbox
                 :id="`db-${db.id}`"
-                :checked="values.databases?.includes(db.id)"
+                :checked="selectedDatabases.includes(db.id)"
                 @update:checked="toggleDatabase(db.id)"
               />
               <Label :for="`db-${db.id}`" class="font-normal">{{ db.name }}</Label>
@@ -251,7 +274,7 @@ watch(open, (isOpen) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label>Schedule Preset</Label>
-            <Select @update:model-value="setStringField('cron_expression', $event)">
+            <Select @update:model-value="cronExpression = String($event)">
               <SelectTrigger>
                 <SelectValue placeholder="Select preset" />
               </SelectTrigger>
@@ -267,9 +290,8 @@ watch(open, (isOpen) => {
             <Label for="cron_expression">Cron Expression</Label>
             <Input
               id="cron_expression"
-              :model-value="values.cron_expression"
+              v-model="cronExpression"
               placeholder="0 0 * * *"
-              @update:model-value="setStringField('cron_expression', $event)"
             />
           </div>
         </div>
@@ -279,10 +301,9 @@ watch(open, (isOpen) => {
           <Label for="retention">Retention (number of backups to keep)</Label>
           <Input
             id="retention"
+            v-model.number="retention"
             type="number"
-            :model-value="values.retention"
             min="1"
-            @update:model-value="setFieldValue('retention', Number($event))"
           />
         </div>
 
@@ -293,16 +314,14 @@ watch(open, (isOpen) => {
             <div class="flex items-center space-x-2">
               <Checkbox
                 id="notification_on_failure"
-                :checked="values.notification_on_failure"
-                @update:checked="setFieldValue('notification_on_failure', $event)"
+                v-model:checked="notificationOnFailure"
               />
               <Label for="notification_on_failure" class="font-normal">Notify on failure</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox
                 id="notification_on_success"
-                :checked="values.notification_on_success"
-                @update:checked="setFieldValue('notification_on_success', $event)"
+                v-model:checked="notificationOnSuccess"
               />
               <Label for="notification_on_success" class="font-normal">Notify on success</Label>
             </div>
@@ -313,8 +332,7 @@ watch(open, (isOpen) => {
         <div class="flex items-center space-x-2">
           <Checkbox
             id="enabled"
-            :checked="values.enabled"
-            @update:checked="setFieldValue('enabled', $event)"
+            v-model:checked="enabled"
           />
           <Label for="enabled" class="font-normal">Enable backup</Label>
         </div>
@@ -323,7 +341,7 @@ watch(open, (isOpen) => {
           <Button type="button" variant="outline" @click="open = false">
             Cancel
           </Button>
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             {{ isEditing ? 'Update' : 'Create' }} Backup
           </Button>

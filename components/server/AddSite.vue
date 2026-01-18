@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Settings } from 'lucide-vue-next'
 import { useDebounceFn } from '@vueuse/core'
@@ -50,7 +48,7 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const isAdvancedOpen = ref(false)
 const isLoading = ref(false)
-const hasSubmitted = ref(false)
+const errors = ref<Record<string, string>>({})
 
 // Domain verification state
 interface DomainVerification {
@@ -114,6 +112,16 @@ const databaseUsers = ref<Record<string, string>>({})
 const hasDatabase = ref(true)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
+// Form values
+const address = ref('')
+const siteType = ref<'laravel' | 'wordpress' | 'generic'>('laravel')
+const phpVersion = ref('')
+const webFolder = ref('/public')
+const zeroDowntimeDeployment = ref(false)
+const sourceControlId = ref('')
+const sourceControlRepositoriesId = ref('')
+const repositoryBranch = ref('main')
+
 const applicationTypes: Record<string, string> = {
   laravel: 'Laravel',
   wordpress: 'WordPress',
@@ -122,8 +130,8 @@ const applicationTypes: Record<string, string> = {
 
 // Get selected repository display name
 const selectedRepository = computed(() => {
-  if (!values.source_control_repositories_id) return null
-  return repositories.value.find(r => r.id === values.source_control_repositories_id)
+  if (!sourceControlRepositoriesId.value) return null
+  return repositories.value.find(r => r.id === sourceControlRepositoriesId.value)
 })
 
 const advancedOptions = ref({
@@ -139,7 +147,7 @@ const advancedOptions = ref({
   create_queue: false,
 })
 
-const schema = toTypedSchema(z.object({
+const schema = z.object({
   address: z.string().min(1, 'Domain is required'),
   type: z.enum(['laravel', 'wordpress', 'generic']),
   php_version: z.string().min(1, 'PHP version is required'),
@@ -148,31 +156,26 @@ const schema = toTypedSchema(z.object({
   source_control_id: z.string().optional(),
   source_control_repositories_id: z.string().optional(),
   repository_branch: z.string().optional(),
-}))
-
-const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
-  validationSchema: schema,
-  initialValues: {
-    address: '',
-    type: 'laravel' as const,
-    php_version: '',
-    web_folder: '/public',
-    zero_downtime_deployment: false,
-    source_control_id: '',
-    source_control_repositories_id: '',
-    repository_branch: 'main',
-  },
 })
 
-type StringFields = 'address' | 'php_version' | 'web_folder' | 'source_control_id' | 'source_control_repositories_id' | 'repository_branch'
-const setStringField = (field: StringFields, value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : '', false)
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (address.value.trim().length === 0) return false
+  if (phpVersion.value.length === 0) return false
+  return true
+})
+
+const resetForm = () => {
+  address.value = ''
+  siteType.value = 'laravel'
+  phpVersion.value = ''
+  webFolder.value = '/public'
+  zeroDowntimeDeployment.value = false
+  sourceControlId.value = ''
+  sourceControlRepositoriesId.value = ''
+  repositoryBranch.value = 'main'
+  errors.value = {}
 }
-
-const zeroDowntimeDeployment = computed({
-  get: () => values.zero_downtime_deployment ?? false,
-  set: (val: boolean) => setFieldValue('zero_downtime_deployment', val),
-})
 
 const fetchOptions = async () => {
   try {
@@ -185,7 +188,7 @@ const fetchOptions = async () => {
 
     if (phpVersions.value.length > 0) {
       const defaultVersion = phpVersions.value.find(v => v.is_default)
-      setFieldValue('php_version', defaultVersion?.key ?? phpVersions.value[0].key, false)
+      phpVersion.value = defaultVersion?.key ?? phpVersions.value[0].key
     }
   } catch {
     // Silent fail - options will be empty
@@ -212,15 +215,15 @@ const fetchOptions = async () => {
 }
 
 // Fetch repositories for a source control
-const fetchRepositories = async (sourceControlId: string) => {
-  if (!sourceControlId) {
+const fetchRepositories = async (scId: string) => {
+  if (!scId) {
     repositories.value = []
     return
   }
 
   isLoadingRepositories.value = true
   try {
-    const result = await $api<{ data: Repository[] }>(`/source-controls/${sourceControlId}/repositories`)
+    const result = await $api<{ data: Repository[] }>(`/source-controls/${scId}/repositories`)
     repositories.value = result.data || []
   } catch {
     repositories.value = []
@@ -230,21 +233,21 @@ const fetchRepositories = async (sourceControlId: string) => {
 }
 
 // Handle source control change
-const handleSourceControlChange = (sourceControlId: string) => {
-  setStringField('source_control_id', sourceControlId)
-  setStringField('source_control_repositories_id', '')
-  setStringField('repository_branch', 'main')
+const handleSourceControlChange = (scId: string) => {
+  sourceControlId.value = scId
+  sourceControlRepositoriesId.value = ''
+  repositoryBranch.value = 'main'
   repositories.value = []
 
-  if (sourceControlId) {
-    fetchRepositories(sourceControlId)
+  if (scId) {
+    fetchRepositories(scId)
   }
 }
 
 // Handle repository selection from combobox
 const handleRepositorySelect = (repo: Repository) => {
-  setStringField('source_control_repositories_id', repo.id)
-  setStringField('repository_branch', repo.default_branch || 'main')
+  sourceControlRepositoriesId.value = repo.id
+  repositoryBranch.value = repo.default_branch || 'main'
   repositorySearchTerm.value = ''
 }
 
@@ -284,13 +287,39 @@ const verifyDomain = async (domain: string) => {
 
 const debouncedVerifyDomain = useDebounceFn(verifyDomain, 500)
 
-const handleDomainChange = (value: unknown) => {
-  const domain = value != null ? String(value) : ''
-  setStringField('address', domain)
+const handleDomainChange = (value: string | number) => {
+  const domain = String(value)
+  address.value = domain
   debouncedVerifyDomain(domain)
 }
 
-const submitHandler = handleSubmit(async (data) => {
+const validate = () => {
+  const result = schema.safeParse({
+    address: address.value.trim(),
+    type: siteType.value,
+    php_version: phpVersion.value,
+    web_folder: webFolder.value,
+    zero_downtime_deployment: zeroDowntimeDeployment.value,
+    source_control_id: sourceControlId.value || undefined,
+    source_control_repositories_id: sourceControlRepositoriesId.value || undefined,
+    repository_branch: repositoryBranch.value || undefined,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      address: fieldErrors.address?.[0] || '',
+      php_version: fieldErrors.php_version?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
+}
+
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -331,11 +360,6 @@ const submitHandler = handleSubmit(async (data) => {
   } finally {
     isLoading.value = false
   }
-})
-
-const onSubmit = () => {
-  hasSubmitted.value = true
-  submitHandler()
 }
 
 const resetAdvancedOptions = () => {
@@ -356,11 +380,9 @@ const resetAdvancedOptions = () => {
 watch(isOpen, (open) => {
   if (open) {
     fetchOptions()
-    hasSubmitted.value = false
   } else {
     resetForm()
     resetAdvancedOptions()
-    hasSubmitted.value = false
     // Reset DNS state
     domainVerification.value = null
     createDnsRecord.value = false
@@ -395,7 +417,7 @@ watch(isOpen, (open) => {
           <div class="relative">
             <Input
               id="address"
-              :model-value="values.address"
+              :model-value="address"
               placeholder="example.com"
               @update:model-value="handleDomainChange"
             />
@@ -403,10 +425,10 @@ watch(isOpen, (open) => {
               <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin text-muted-foreground" />
             </div>
           </div>
-          <p v-if="hasSubmitted && errors.address" class="text-sm text-destructive">{{ errors.address }}</p>
+          <p v-if="errors.address" class="text-sm text-destructive">{{ errors.address }}</p>
 
           <!-- Domain verification status -->
-          <div v-if="domainVerification && values.address" class="mt-2">
+          <div v-if="domainVerification && address" class="mt-2">
             <div v-if="domainVerification.verified && domainVerification.can_create_record" class="flex items-center justify-between rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900 dark:bg-green-950">
               <div class="flex items-center gap-2">
                 <Icon name="lucide:check-circle" class="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -431,7 +453,7 @@ watch(isOpen, (open) => {
         <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="php_version">PHP Version</Label>
-            <Select :model-value="values.php_version" @update:model-value="setStringField('php_version', $event)">
+            <Select v-model="phpVersion">
               <SelectTrigger>
                 <SelectValue placeholder="Select PHP version" />
               </SelectTrigger>
@@ -445,7 +467,7 @@ watch(isOpen, (open) => {
 
           <div class="space-y-2">
             <Label for="type">Site Type</Label>
-            <Select :model-value="values.type" @update:model-value="(val) => val && setFieldValue('type', val as 'laravel' | 'wordpress' | 'generic', false)">
+            <Select v-model="siteType">
               <SelectTrigger>
                 <SelectValue placeholder="Select site type" />
               </SelectTrigger>
@@ -459,11 +481,11 @@ watch(isOpen, (open) => {
         </div>
 
         <!-- Source Control Section -->
-        <div v-if="sourceControls.length > 0 && values.type !== 'wordpress'" class="space-y-4">
+        <div v-if="sourceControls.length > 0 && siteType !== 'wordpress'" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="source_control">Git Provider</Label>
-              <Select :model-value="values.source_control_id" @update:model-value="(val) => handleSourceControlChange(val as string)">
+              <Select :model-value="sourceControlId" @update:model-value="(val) => handleSourceControlChange(val as string)">
                 <SelectTrigger>
                   <SelectValue placeholder="Select git provider" />
                 </SelectTrigger>
@@ -482,7 +504,7 @@ watch(isOpen, (open) => {
               <Label for="repository">Repository</Label>
               <ComboboxRoot
                 v-model:search-term="repositorySearchTerm"
-                :disabled="!values.source_control_id || isLoadingRepositories"
+                :disabled="!sourceControlId || isLoadingRepositories"
                 :filter-function="(list: Repository[]) => list"
                 class="relative"
               >
@@ -526,25 +548,23 @@ watch(isOpen, (open) => {
             </div>
           </div>
 
-          <div v-if="values.source_control_repositories_id" class="space-y-2">
+          <div v-if="sourceControlRepositoriesId" class="space-y-2">
             <Label for="repository_branch">Branch</Label>
             <Input
               id="repository_branch"
-              :model-value="values.repository_branch"
+              v-model="repositoryBranch"
               placeholder="main"
-              @update:model-value="setStringField('repository_branch', $event)"
             />
           </div>
         </div>
 
-        <div v-if="values.type !== 'wordpress'" class="space-y-4">
+        <div v-if="siteType !== 'wordpress'" class="space-y-4">
           <div class="space-y-2">
             <Label for="web_folder">Web Folder</Label>
             <Input
               id="web_folder"
-              :model-value="values.web_folder"
+              v-model="webFolder"
               placeholder="/public"
-              @update:model-value="setStringField('web_folder', $event)"
             />
           </div>
 
@@ -564,7 +584,7 @@ watch(isOpen, (open) => {
             <Settings class="mr-2 h-4 w-4" />
             Advanced Options
           </Button>
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             Add Site
           </Button>
@@ -579,6 +599,6 @@ watch(isOpen, (open) => {
     :has-database="hasDatabase"
     :databases="databases"
     :database-users="databaseUsers"
-    :site-type="values.type ?? 'laravel'"
+    :site-type="siteType"
   />
 </template>

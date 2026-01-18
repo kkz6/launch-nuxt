@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import {
@@ -65,7 +63,14 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
+const errors = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Form values
+const command = ref(props.cron?.command || '')
+const user = ref(props.cron?.user || defaultUser.value)
+const frequency = ref(props.cron?.frequency || '* * * * *')
+const customExpression = ref(props.cron?.expression || '')
 
 const frequencies: Record<string, string> = {
   '* * * * *': 'Every Minute',
@@ -78,7 +83,7 @@ const frequencies: Record<string, string> = {
   'custom': 'Custom Expression',
 }
 
-const schema = toTypedSchema(z.object({
+const schema = z.object({
   command: z.string().min(1, 'Command is required').max(255),
   user: z.string().min(1, 'User is required'),
   frequency: z.string().min(1, 'Frequency is required'),
@@ -91,25 +96,48 @@ const schema = toTypedSchema(z.object({
 }, {
   message: 'Custom expression is required',
   path: ['custom_expression'],
-}))
-
-const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
-  validationSchema: schema,
-  validateOnMount: false,
-  initialValues: {
-    command: props.cron?.command || '',
-    user: props.cron?.user || defaultUser.value,
-    frequency: props.cron?.frequency || '* * * * *',
-    custom_expression: props.cron?.expression || '',
-  },
 })
 
-type StringFields = 'command' | 'user' | 'frequency' | 'custom_expression'
-const setStringField = (field: StringFields, value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : '')
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (command.value.trim().length === 0) return false
+  if (user.value.length === 0) return false
+  if (frequency.value === 'custom' && customExpression.value.trim().length === 0) return false
+  return true
+})
+
+const resetForm = () => {
+  command.value = props.cron?.command || ''
+  user.value = props.cron?.user || defaultUser.value
+  frequency.value = props.cron?.frequency === 'custom' ? 'custom' : (props.cron?.expression || '* * * * *')
+  customExpression.value = props.cron?.frequency === 'custom' ? (props.cron?.expression || '') : ''
+  errors.value = {}
 }
 
-const onSubmit = handleSubmit(async (data) => {
+const validate = () => {
+  const result = schema.safeParse({
+    command: command.value.trim(),
+    user: user.value,
+    frequency: frequency.value,
+    custom_expression: customExpression.value.trim() || undefined,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      command: fieldErrors.command?.[0] || '',
+      user: fieldErrors.user?.[0] || '',
+      custom_expression: fieldErrors.custom_expression?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
+}
+
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -151,20 +179,10 @@ const onSubmit = handleSubmit(async (data) => {
   } finally {
     isLoading.value = false
   }
-})
+}
 
 watch(open, (isOpen) => {
-  if (isOpen && props.cron) {
-    // Reset form with cron values when opening for edit
-    resetForm({
-      values: {
-        command: props.cron.command || '',
-        user: props.cron.user || defaultUser.value,
-        frequency: props.cron.frequency === 'custom' ? 'custom' : (props.cron.expression || '* * * * *'),
-        custom_expression: props.cron.frequency === 'custom' ? props.cron.expression : '',
-      },
-    })
-  } else if (!isOpen) {
+  if (isOpen) {
     resetForm()
   }
 })
@@ -191,22 +209,21 @@ watch(open, (isOpen) => {
           <Label for="command">Command</Label>
           <Input
             id="command"
-            :model-value="values.command"
+            v-model="command"
             placeholder="php artisan schedule:run"
-            @update:model-value="setStringField('command', $event)"
           />
           <p v-if="errors.command" class="text-sm text-destructive">{{ errors.command }}</p>
         </div>
 
         <div class="space-y-2">
           <Label for="user">User</Label>
-          <Select :model-value="values.user" @update:model-value="setStringField('user', $event)">
+          <Select v-model="user">
             <SelectTrigger>
               <SelectValue placeholder="Select user" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="user in serverUsers" :key="user.value" :value="user.value">
-                {{ user.label }}
+              <SelectItem v-for="serverUser in serverUsers" :key="serverUser.value" :value="serverUser.value">
+                {{ serverUser.label }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -216,9 +233,8 @@ watch(open, (isOpen) => {
         <div class="space-y-2">
           <Label>Frequency</Label>
           <RadioGroup
-            :model-value="values.frequency"
+            v-model="frequency"
             class="grid grid-cols-2 gap-2"
-            @update:model-value="setStringField('frequency', $event)"
           >
             <div v-for="(label, value) in frequencies" :key="value" class="flex items-center space-x-2">
               <RadioGroupItem :id="`freq-${value}`" :value="value" />
@@ -227,19 +243,18 @@ watch(open, (isOpen) => {
           </RadioGroup>
         </div>
 
-        <div v-if="values.frequency === 'custom'" class="space-y-2">
+        <div v-if="frequency === 'custom'" class="space-y-2">
           <Label for="custom_expression">Custom Expression</Label>
           <Input
             id="custom_expression"
-            :model-value="values.custom_expression"
+            v-model="customExpression"
             placeholder="*/30 * * * *"
-            @update:model-value="setStringField('custom_expression', $event)"
           />
           <p v-if="errors.custom_expression" class="text-sm text-destructive">{{ errors.custom_expression }}</p>
         </div>
 
         <DialogFooter>
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             {{ cron ? 'Update' : 'Create' }}
           </Button>

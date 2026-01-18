@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import {
@@ -13,13 +11,6 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog'
 import {
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '~/components/ui/form'
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +18,7 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { Input } from '~/components/ui/input'
+import { Label } from '~/components/ui/label'
 
 interface Props {
   teamId?: string
@@ -40,6 +32,11 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 const isLoading = ref(false)
+const errors = ref<Record<string, string>>({})
+
+// Form values
+const email = ref('')
+const role = ref('viewer')
 
 const roles = [
   { value: 'editor', label: 'Editor' },
@@ -47,40 +44,62 @@ const roles = [
   { value: 'viewer', label: 'Viewer' },
 ]
 
-const formSchema = toTypedSchema(
-  z.object({
-    email: z.string().email('Please enter a valid email'),
-    role: z.string().min(1, 'Please select a role'),
-  })
-)
-
-const form = useForm({
-  validationSchema: formSchema,
-  initialValues: {
-    email: '',
-    role: 'viewer',
-  },
-  validateOnMount: false,
+const schema = z.object({
+  email: z.string().email('Please enter a valid email'),
+  role: z.string().min(1, 'Please select a role'),
 })
+
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (email.value.trim().length === 0) return false
+  if (role.value.length === 0) return false
+  return true
+})
+
+const resetForm = () => {
+  email.value = ''
+  role.value = 'viewer'
+  errors.value = {}
+}
 
 const handleClose = (isOpen: boolean) => {
   if (!isOpen) {
-    form.resetForm()
+    resetForm()
   }
 }
 
-const onSubmit = form.handleSubmit(async (values) => {
+const validate = () => {
+  const result = schema.safeParse({
+    email: email.value.trim(),
+    role: role.value,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      email: fieldErrors.email?.[0] || '',
+      role: fieldErrors.role?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
+}
+
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
   if (!props.teamId) return
 
   isLoading.value = true
   try {
     await $api(`/teams/${props.teamId}/invitations`, {
       method: 'POST',
-      body: values,
+      body: data,
     })
     toast.success('Invitation sent')
     open.value = false
-    form.resetForm()
+    resetForm()
     emit('invited')
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'data' in error) {
@@ -92,7 +111,7 @@ const onSubmit = form.handleSubmit(async (values) => {
   } finally {
     isLoading.value = false
   }
-})
+}
 </script>
 
 <template>
@@ -106,40 +125,37 @@ const onSubmit = form.handleSubmit(async (values) => {
       </DialogHeader>
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
-        <FormField v-slot="{ componentField }" name="email">
-          <FormItem>
-            <FormLabel>Email</FormLabel>
-            <FormControl>
-              <Input type="email" placeholder="colleague@example.com" v-bind="componentField" />
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label for="email">Email</Label>
+          <Input
+            id="email"
+            v-model="email"
+            type="email"
+            placeholder="colleague@example.com"
+          />
+          <p v-if="errors.email" class="text-sm text-destructive">{{ errors.email }}</p>
+        </div>
 
-        <FormField v-slot="{ componentField }" name="role">
-          <FormItem>
-            <FormLabel>Role</FormLabel>
-            <Select v-bind="componentField">
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a role" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem v-for="role in roles" :key="role.value" :value="role.value">
-                  {{ role.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <FormMessage />
-          </FormItem>
-        </FormField>
+        <div class="space-y-2">
+          <Label for="role">Role</Label>
+          <Select v-model="role">
+            <SelectTrigger>
+              <SelectValue placeholder="Select a role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="r in roles" :key="r.value" :value="r.value">
+                {{ r.label }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p v-if="errors.role" class="text-sm text-destructive">{{ errors.role }}</p>
+        </div>
 
         <DialogFooter class="mt-4">
           <Button type="button" variant="outline" @click="open = false">
             Cancel
           </Button>
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon
               v-if="isLoading"
               name="lucide:loader-2"

@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import { Checkbox } from '~/components/ui/checkbox'
@@ -39,8 +37,13 @@ const emit = defineEmits<{
 const isOpen = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
 const showPassword = ref(false)
-const hasSubmitted = ref(false)
+const errors = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+// Form values
+const name = ref(props.user?.name ?? '')
+const password = ref(props.user?.password ?? '')
+const selectedDatabases = ref<string[]>(props.user?.databaseIds ?? [])
 
 const generatePassword = () => {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -49,7 +52,7 @@ const generatePassword = () => {
     .join('')
 }
 
-const schema = toTypedSchema(z.object({
+const schema = z.object({
   name: z
     .string()
     .min(1, 'Username is required')
@@ -64,36 +67,58 @@ const schema = toTypedSchema(z.object({
   databases: z.array(z.string()).refine((value) => value.length > 0, {
     message: 'At least one database must be selected',
   }),
-}))
-
-const { handleSubmit, resetForm, setFieldValue, values, errors } = useForm({
-  validationSchema: schema,
-  initialValues: {
-    name: props.user?.name ?? '',
-    password: props.user?.password ?? '',
-    databases: props.user?.databaseIds ?? [],
-  },
-  validateOnMount: false,
 })
-
-type StringFields = 'name' | 'password'
-const setStringField = (field: StringFields, value: unknown) => {
-  setFieldValue(field, value != null ? String(value) : '', false)
-}
-
-const toggleDatabase = (databaseId: string, checked: boolean) => {
-  const current = values.databases ?? []
-  if (checked) {
-    setFieldValue('databases', [...current, databaseId], false)
-  } else {
-    setFieldValue('databases', current.filter((id: string) => id !== databaseId), false)
-  }
-}
 
 const isUpdate = computed(() => Boolean(props.user))
 const isRootUser = computed(() => props.user?.name === 'root')
 
-const submitHandler = handleSubmit(async (data) => {
+const canSubmit = computed(() => {
+  if (isLoading.value) return false
+  if (name.value.trim().length === 0) return false
+  if (password.value.length === 0) return false
+  if (selectedDatabases.value.length === 0 && !isRootUser.value) return false
+  return true
+})
+
+const resetForm = () => {
+  name.value = props.user?.name ?? ''
+  password.value = props.user?.password ?? ''
+  selectedDatabases.value = props.user?.databaseIds ?? []
+  showPassword.value = false
+  errors.value = {}
+}
+
+const toggleDatabase = (databaseId: string, checked: boolean) => {
+  if (checked) {
+    selectedDatabases.value = [...selectedDatabases.value, databaseId]
+  } else {
+    selectedDatabases.value = selectedDatabases.value.filter((id) => id !== databaseId)
+  }
+}
+
+const validate = () => {
+  const result = schema.safeParse({
+    name: name.value.trim(),
+    password: password.value,
+    databases: selectedDatabases.value,
+  })
+  if (!result.success) {
+    const fieldErrors = result.error.flatten().fieldErrors
+    errors.value = {
+      name: fieldErrors.name?.[0] || '',
+      password: fieldErrors.password?.[0] || '',
+      databases: fieldErrors.databases?.[0] || '',
+    }
+    return null
+  }
+  errors.value = {}
+  return result.data
+}
+
+const onSubmit = async () => {
+  const data = validate()
+  if (!data) return
+
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -135,27 +160,13 @@ const submitHandler = handleSubmit(async (data) => {
   } finally {
     isLoading.value = false
   }
-})
-
-const onSubmit = () => {
-  hasSubmitted.value = true
-  submitHandler()
 }
 
 watch(isOpen, (open) => {
   if (open) {
-    // Reset form with user data when opening
-    resetForm({
-      values: {
-        name: props.user?.name ?? '',
-        password: props.user?.password ?? '',
-        databases: props.user?.databaseIds ?? [],
-      },
-    })
-    hasSubmitted.value = false
+    resetForm()
   } else {
-    showPassword.value = false
-    hasSubmitted.value = false
+    resetForm()
   }
 })
 </script>
@@ -183,12 +194,11 @@ watch(isOpen, (open) => {
           <Label for="name">Username</Label>
           <Input
             id="name"
-            :model-value="values.name"
+            v-model="name"
             placeholder="my_user"
             autocomplete="off"
-            @update:model-value="setStringField('name', $event)"
           />
-          <p v-if="hasSubmitted && errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
+          <p v-if="errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
         </div>
 
         <div class="space-y-2">
@@ -199,7 +209,7 @@ watch(isOpen, (open) => {
               variant="link"
               size="sm"
               class="h-auto p-0 text-xs"
-              @click="setFieldValue('password', generatePassword(), false)"
+              @click="password = generatePassword()"
             >
               <Icon name="lucide:braces" class="mr-1 h-3 w-3" />
               Generate Password
@@ -208,12 +218,11 @@ watch(isOpen, (open) => {
           <div class="relative">
             <Input
               id="password"
+              v-model="password"
               :type="showPassword ? 'text' : 'password'"
-              :model-value="values.password"
               placeholder="Enter password"
               autocomplete="new-password"
               class="pr-10"
-              @update:model-value="setStringField('password', $event)"
             />
             <Button
               type="button"
@@ -226,7 +235,7 @@ watch(isOpen, (open) => {
               <Icon v-else name="lucide:eye" class="h-4 w-4" />
             </Button>
           </div>
-          <p v-if="hasSubmitted && errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
+          <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
         </div>
 
         <div class="space-y-4">
@@ -241,26 +250,26 @@ watch(isOpen, (open) => {
           </div>
           <div v-else class="space-y-3">
             <div
-              v-for="(name, id) in databases"
+              v-for="(dbName, id) in databases"
               :key="id"
               class="flex items-center space-x-3"
             >
               <Checkbox
                 :id="`db-${id}`"
-                :checked="values.databases?.includes(String(id))"
+                :checked="selectedDatabases.includes(String(id))"
                 :disabled="isRootUser"
                 @update:checked="toggleDatabase(String(id), $event as boolean)"
               />
               <Label :for="`db-${id}`" class="font-normal cursor-pointer">
-                {{ name }}
+                {{ dbName }}
               </Label>
             </div>
           </div>
-          <p v-if="hasSubmitted && errors.databases" class="text-sm text-destructive">{{ errors.databases }}</p>
+          <p v-if="errors.databases" class="text-sm text-destructive">{{ errors.databases }}</p>
         </div>
 
         <DialogFooter>
-          <Button type="submit" :disabled="isLoading">
+          <Button type="submit" :disabled="!canSubmit">
             <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
             {{ isUpdate ? 'Update User' : 'Create User' }}
           </Button>
