@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import {
-  ChevronsUpDown,
+  ChevronDown,
   LogOut,
   Rocket,
   Settings,
@@ -490,7 +490,7 @@ onMounted(fetchTeams);
                   {{ user?.name }}
                 </span>
 
-                <ChevronsUpDown class="h-4 w-4 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
+                <ChevronDown class="h-4 w-4 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
               </div>
             </DropdownMenuTrigger>
 
