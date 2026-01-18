@@ -47,7 +47,7 @@ const recentActivity = ref([
   { id: '5', siteName: 'api.example.com', serverId: '1', siteId: 's1', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 120).toISOString(), commitSha: 'q3r4s5t', user: 'Karthick' },
 ])
 
-// Limit displayed items
+// Computed values
 const displayedServers = computed(() => servers.value.slice(0, 8))
 const displayedActivity = computed(() => recentActivity.value.slice(0, 6))
 
