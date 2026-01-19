@@ -29,23 +29,54 @@ const firstName = computed(() => {
   return user.value?.name?.split(' ')[0] || ''
 })
 
-// Placeholder data - will be replaced with API calls
-const isLoading = ref(false)
+interface Server {
+  id: string
+  name: string
+  status: string
+  provider: string
+  sites_count: number
+}
 
-const servers = ref([
-  { id: '1', name: 'production-web-01', status: 'connected', ip: '192.168.1.1', provider: 'digitalocean', sitesCount: 4 },
-  { id: '2', name: 'production-web-02', status: 'connected', ip: '192.168.1.2', provider: 'hetzner', sitesCount: 3 },
-  { id: '3', name: 'staging-server', status: 'disconnected', ip: '192.168.1.3', provider: 'vultr', sitesCount: 2 },
-  { id: '4', name: 'dev-server', status: 'connected', ip: '192.168.1.4', provider: 'linode', sitesCount: 3 },
-])
+interface Activity {
+  id: string
+  site_name: string
+  site_id: string
+  server_id: string
+  server_name: string
+  status: string
+  created_at: string
+  commit_sha: string
+  user: {
+    name: string
+  }
+}
 
-const recentActivity = ref([
-  { id: '1', siteName: 'api.example.com', serverId: '1', siteId: 's1', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 5).toISOString(), commitSha: 'a1b2c3d', user: 'Karthick' },
-  { id: '2', siteName: 'app.example.com', serverId: '2', siteId: 's2', serverName: 'production-web-02', status: 'deploying', time: new Date(Date.now() - 1000 * 60 * 10).toISOString(), commitSha: 'e4f5g6h', user: 'John' },
-  { id: '3', siteName: 'staging.example.com', serverId: '3', siteId: 's3', serverName: 'staging-server', status: 'failed', time: new Date(Date.now() - 1000 * 60 * 30).toISOString(), commitSha: 'i7j8k9l', user: 'Karthick' },
-  { id: '4', siteName: 'docs.example.com', serverId: '1', siteId: 's4', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 60).toISOString(), commitSha: 'm0n1o2p', user: 'Sarah' },
-  { id: '5', siteName: 'api.example.com', serverId: '1', siteId: 's1', serverName: 'production-web-01', status: 'finished', time: new Date(Date.now() - 1000 * 60 * 120).toISOString(), commitSha: 'q3r4s5t', user: 'Karthick' },
-])
+interface DashboardResponse {
+  data: {
+    servers: Server[]
+    recent_activity: Activity[]
+  }
+}
+
+const isLoading = ref(true)
+const servers = ref<Server[]>([])
+const recentActivity = ref<Activity[]>([])
+
+const fetchDashboard = async () => {
+  try {
+    const response = await $api<DashboardResponse>('/dashboard')
+    servers.value = response.data.servers
+    recentActivity.value = response.data.recent_activity
+  } catch {
+    // Silent fail
+  } finally {
+    isLoading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchDashboard()
+})
 
 // Computed values
 const displayedServers = computed(() => servers.value.slice(0, 8))
@@ -137,7 +168,7 @@ const getUserInitials = (name: string): string => {
                         :class="server.status === 'connected' ? 'bg-green-500' : 'bg-red-500'"
                       />
                     </div>
-                    <p class="text-xs text-muted-foreground">{{ server.sitesCount }} sites</p>
+                    <p class="text-xs text-muted-foreground">{{ server.sites_count }} sites</p>
                   </div>
                 </div>
               </div>
@@ -160,7 +191,7 @@ const getUserInitials = (name: string): string => {
             <NuxtLink
               v-for="(activity, index) in displayedActivity"
               :key="activity.id"
-              :to="`/servers/${activity.serverId}/sites/${activity.siteId}?tab=deployments`"
+              :to="`/servers/${activity.server_id}/sites/${activity.site_id}`"
               class="group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/50"
               :class="{ 'border-b': index < displayedActivity.length - 1 }"
             >
@@ -172,27 +203,27 @@ const getUserInitials = (name: string): string => {
 
               <!-- Site & Server -->
               <div class="min-w-0 flex-1">
-                <span class="font-medium">{{ activity.siteName }}</span>
+                <span class="font-medium">{{ activity.site_name }}</span>
                 <span class="mx-1.5 text-muted-foreground">/</span>
-                <span class="text-sm text-muted-foreground">{{ activity.serverName }}</span>
+                <span class="text-sm text-muted-foreground">{{ activity.server_name }}</span>
               </div>
 
               <!-- Commit SHA -->
               <code class="hidden shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground sm:block">
-                {{ activity.commitSha }}
+                {{ activity.commit_sha }}
               </code>
 
               <!-- User -->
               <div
                 class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium"
-                :title="activity.user"
+                :title="activity.user.name"
               >
-                {{ getUserInitials(activity.user) }}
+                {{ getUserInitials(activity.user.name) }}
               </div>
 
               <!-- Time -->
               <span class="shrink-0 text-xs text-muted-foreground">
-                {{ formatDate(activity.time) }}
+                {{ formatDate(activity.created_at) }}
               </span>
             </NuxtLink>
           </div>
