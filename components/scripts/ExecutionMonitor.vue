@@ -10,7 +10,7 @@ import {
 import { ScrollArea } from '~/components/ui/scroll-area'
 import { Badge } from '~/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
-import { useScriptExecutionEvents } from '~/composables/useChannelEvents'
+import { useScriptExecution } from '~/composables/useScriptExecution'
 
 interface Execution {
   id: string
@@ -36,23 +36,59 @@ interface Props {
 const props = defineProps<Props>()
 const open = defineModel<boolean>('open', { default: false })
 
-const { user } = useAuth()
-const teamId = computed(() => user.value?.current_team_id?.toString() || '')
+const { executions: wsExecutions, connectExecution, disconnectAll } = useScriptExecution()
 
 const executions = ref<Map<string, Execution>>(new Map())
 const activeServerId = ref<string>('')
 const isLoading = ref(true)
+const outputRefs = ref<Map<string, string>>(new Map())
 
-// Fetch initial executions for the batch
-const fetchExecutions = async () => {
+// Fetch initial executions for the batch and connect WebSockets
+const initializeExecutions = async () => {
   try {
     const response = await $api<{ data: Execution[] }>(`/scripts/${props.scriptId}/executions`, {
       params: { batch_id: props.batchId },
     })
 
     executions.value.clear()
+    outputRefs.value.clear()
+
     for (const exec of response.data) {
       executions.value.set(exec.server_id, exec)
+      outputRefs.value.set(exec.server_id, exec.output || '')
+
+      // Connect WebSocket for executions that are pending or running
+      if (exec.status === 'pending' || exec.status === 'running') {
+        connectExecution(
+          exec.id,
+          exec.server_id,
+          exec.server_name,
+          // onOutput callback
+          (output) => {
+            const currentOutput = outputRefs.value.get(exec.server_id) || ''
+            outputRefs.value.set(exec.server_id, currentOutput + output)
+
+            const existingExec = executions.value.get(exec.server_id)
+            if (existingExec) {
+              existingExec.output = outputRefs.value.get(exec.server_id) || ''
+              existingExec.status = 'running'
+              executions.value.set(exec.server_id, { ...existingExec })
+            }
+          },
+          // onStatusChange callback
+          (status, exitCode) => {
+            const existingExec = executions.value.get(exec.server_id)
+            if (existingExec) {
+              existingExec.status = status as 'pending' | 'running' | 'finished' | 'failed'
+              if (exitCode !== undefined) {
+                existingExec.exit_code = exitCode
+              }
+              existingExec.finished_at = new Date().toISOString()
+              executions.value.set(exec.server_id, { ...existingExec })
+            }
+          },
+        )
+      }
     }
 
     // Set first server as active
@@ -66,39 +102,15 @@ const fetchExecutions = async () => {
   }
 }
 
-// Subscribe to real-time events
-useScriptExecutionEvents(teamId, (data) => {
-  const executionId = data.execution_id as string
-  const serverId = data.server_id as string
+// Get execution for a server
+const getExecution = (serverId: string) => {
+  return executions.value.get(serverId)
+}
 
-  // Find matching execution
-  const execution = Array.from(executions.value.values()).find(
-    (e) => e.id === executionId || e.server_id === serverId
-  )
-
-  if (!execution) return
-
-  if (data.status === 'running' || (data as Record<string, unknown>).output !== undefined) {
-    // script.output event - append output
-    const output = (data as Record<string, unknown>).output as string
-    if (output) {
-      execution.output = (execution.output || '') + output
-      execution.status = 'running'
-      executions.value.set(execution.server_id, { ...execution })
-    }
-  } else if (data.status === 'finished' || data.status === 'failed') {
-    // script.execution.completed event
-    execution.status = data.status as 'finished' | 'failed'
-    execution.exit_code = (data as Record<string, unknown>).exit_code as number
-    execution.finished_at = new Date().toISOString()
-    executions.value.set(execution.server_id, { ...execution })
-  }
-})
-
-// Get execution for active server
-const activeExecution = computed(() => {
-  return executions.value.get(activeServerId.value)
-})
+// Get output for a server
+const getOutput = (serverId: string) => {
+  return outputRefs.value.get(serverId) || executions.value.get(serverId)?.output || ''
+}
 
 // Parse ANSI codes for colored output
 const parseAnsi = (text: string) => {
@@ -151,10 +163,6 @@ const parseAnsi = (text: string) => {
   return parts
 }
 
-const parsedOutput = computed(() => {
-  return parseAnsi(activeExecution.value?.output || '')
-})
-
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'pending':
@@ -192,9 +200,9 @@ const allCompleted = computed(() => {
   )
 })
 
-const handleCopy = async () => {
+const handleCopy = async (serverId: string) => {
   try {
-    const plainText = (activeExecution.value?.output || '').replace(/\x1b\[[0-9;]*m/g, '')
+    const plainText = getOutput(serverId).replace(/\x1b\[[0-9;]*m/g, '')
     await navigator.clipboard.writeText(plainText)
     toast.success('Copied to clipboard')
   } catch {
@@ -206,7 +214,10 @@ watch(open, (isOpen) => {
   if (isOpen) {
     isLoading.value = true
     activeServerId.value = props.serverIds[0] || ''
-    fetchExecutions()
+    initializeExecutions()
+  } else {
+    // Disconnect all WebSockets when closing
+    disconnectAll()
   }
 })
 </script>
@@ -247,9 +258,9 @@ watch(open, (isOpen) => {
             >
               <span
                 class="h-2 w-2 rounded-full"
-                :class="getStatusDot(executions.get(serverId)?.status || 'pending')"
+                :class="getStatusDot(getExecution(serverId)?.status || 'pending')"
               />
-              {{ executions.get(serverId)?.server_name || serverId }}
+              {{ getExecution(serverId)?.server_name || serverId }}
             </TabsTrigger>
           </TabsList>
 
@@ -262,17 +273,17 @@ watch(open, (isOpen) => {
             <div class="flex h-full flex-col gap-2">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <Badge :variant="getStatusBadge(executions.get(serverId)?.status || 'pending').variant">
-                    {{ getStatusBadge(executions.get(serverId)?.status || 'pending').label }}
+                  <Badge :variant="getStatusBadge(getExecution(serverId)?.status || 'pending').variant">
+                    {{ getStatusBadge(getExecution(serverId)?.status || 'pending').label }}
                   </Badge>
                   <span
-                    v-if="executions.get(serverId)?.exit_code !== null"
+                    v-if="getExecution(serverId)?.exit_code !== null && getExecution(serverId)?.exit_code !== undefined"
                     class="text-xs text-muted-foreground"
                   >
-                    Exit code: {{ executions.get(serverId)?.exit_code }}
+                    Exit code: {{ getExecution(serverId)?.exit_code }}
                   </span>
                 </div>
-                <Button variant="ghost" size="sm" @click="handleCopy">
+                <Button variant="ghost" size="sm" @click="handleCopy(serverId)">
                   <Icon name="lucide:copy" class="mr-2 h-4 w-4" />
                   Copy
                 </Button>
@@ -281,10 +292,10 @@ watch(open, (isOpen) => {
               <div class="min-h-0 flex-1 overflow-hidden rounded-lg bg-zinc-950">
                 <ScrollArea class="h-full p-4">
                   <pre class="whitespace-pre-wrap break-words font-mono text-sm text-zinc-100"><template
-                    v-for="(part, index) in parseAnsi(executions.get(serverId)?.output || '')"
+                    v-for="(part, index) in parseAnsi(getOutput(serverId))"
                     :key="index"
                   ><span :style="part.style">{{ part.text }}</span></template><span
-                    v-if="executions.get(serverId)?.status === 'running'"
+                    v-if="getExecution(serverId)?.status === 'running'"
                     class="inline-block h-4 w-2 animate-pulse bg-zinc-100"
                   /></pre>
                 </ScrollArea>
@@ -297,14 +308,17 @@ watch(open, (isOpen) => {
         <div v-else class="flex min-h-0 flex-1 flex-col gap-2">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <Badge :variant="getStatusBadge(activeExecution?.status || 'pending').variant">
-                {{ getStatusBadge(activeExecution?.status || 'pending').label }}
+              <Badge :variant="getStatusBadge(getExecution(activeServerId)?.status || 'pending').variant">
+                {{ getStatusBadge(getExecution(activeServerId)?.status || 'pending').label }}
               </Badge>
-              <span v-if="activeExecution?.exit_code !== null" class="text-xs text-muted-foreground">
-                Exit code: {{ activeExecution?.exit_code }}
+              <span
+                v-if="getExecution(activeServerId)?.exit_code !== null && getExecution(activeServerId)?.exit_code !== undefined"
+                class="text-xs text-muted-foreground"
+              >
+                Exit code: {{ getExecution(activeServerId)?.exit_code }}
               </span>
             </div>
-            <Button variant="ghost" size="sm" @click="handleCopy">
+            <Button variant="ghost" size="sm" @click="handleCopy(activeServerId)">
               <Icon name="lucide:copy" class="mr-2 h-4 w-4" />
               Copy
             </Button>
@@ -313,10 +327,10 @@ watch(open, (isOpen) => {
           <div class="min-h-0 flex-1 overflow-hidden rounded-lg bg-zinc-950">
             <ScrollArea class="h-full p-4">
               <pre class="whitespace-pre-wrap break-words font-mono text-sm text-zinc-100"><template
-                v-for="(part, index) in parsedOutput"
+                v-for="(part, index) in parseAnsi(getOutput(activeServerId))"
                 :key="index"
               ><span :style="part.style">{{ part.text }}</span></template><span
-                v-if="activeExecution?.status === 'running'"
+                v-if="getExecution(activeServerId)?.status === 'running'"
                 class="inline-block h-4 w-2 animate-pulse bg-zinc-100"
               /></pre>
             </ScrollArea>
