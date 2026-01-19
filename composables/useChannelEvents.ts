@@ -204,3 +204,28 @@ export const useSiteEvents = (
     onEvent,
   )
 }
+
+/**
+ * Composable to subscribe to script execution events
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a script execution event is received
+ *
+ * Events:
+ * - script.execution.started: Execution began (data: { execution_id, script_id, server_id })
+ * - script.output: Incremental output chunk (data: { execution_id, output })
+ * - script.execution.completed: Execution finished (data: { execution_id, status, exit_code })
+ */
+export const useScriptExecutionEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['script.execution.started', 'script.output', 'script.execution.completed'],
+    onEvent,
+  )
+}

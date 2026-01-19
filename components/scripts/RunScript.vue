@@ -44,6 +44,11 @@ const isLoadingServers = ref(true)
 const servers = ref<Server[]>([])
 const selectedServers = ref<string[]>([])
 
+// Execution monitor state
+const showMonitor = ref(false)
+const executionBatchId = ref('')
+const executionServerIds = ref<string[]>([])
+
 const providerLabels: Record<string, string> = {
   digitalocean: 'DigitalOcean',
   hetzner: 'Hetzner',
@@ -104,16 +109,24 @@ const onSubmit = async () => {
 
   isLoading.value = true
   try {
-    await $api(`/scripts/${props.script.id}/run`, {
+    const response = await $api<{ data: { batch_id: string } }>(`/scripts/${props.script.id}/execute`, {
       method: 'POST',
       body: {
         servers: selectedServers.value,
       },
     })
 
+    // Store execution info and open monitor
+    executionBatchId.value = response.data.batch_id
+    executionServerIds.value = [...selectedServers.value]
+
     toast.success(`Script "${props.script.name}" started on ${selectedServers.value.length} server(s)`)
     open.value = false
     selectedServers.value = []
+
+    // Open execution monitor
+    showMonitor.value = true
+
     emit('ran')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
@@ -132,6 +145,15 @@ watch(open, (isOpen) => {
 </script>
 
 <template>
+  <!-- Execution Monitor -->
+  <ScriptsExecutionMonitor
+    v-model:open="showMonitor"
+    :script-id="script.id"
+    :script-name="script.name"
+    :batch-id="executionBatchId"
+    :server-ids="executionServerIds"
+  />
+
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
