@@ -27,6 +27,7 @@ const isLoading = ref(true);
 const selectedScript = ref<Script | null>(null);
 const isEditDialogOpen = ref(false);
 const isRunDialogOpen = ref(false);
+const isHistoryDialogOpen = ref(false);
 const confirmationDialog = ref<InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null>(null);
 
 // Watch for refresh trigger from navbar
@@ -64,6 +65,11 @@ const runScript = (script: Script) => {
   isRunDialogOpen.value = true;
 };
 
+const viewHistory = (script: Script) => {
+  selectedScript.value = script;
+  isHistoryDialogOpen.value = true;
+};
+
 const handleScriptUpdated = () => {
   isEditDialogOpen.value = false;
   selectedScript.value = null;
@@ -81,6 +87,10 @@ watch(isEditDialogOpen, (open) => {
 });
 
 watch(isRunDialogOpen, (open) => {
+  if (!open) selectedScript.value = null;
+});
+
+watch(isHistoryDialogOpen, (open) => {
   if (!open) selectedScript.value = null;
 });
 
@@ -127,6 +137,13 @@ onMounted(fetchScripts);
       v-model:open="isRunDialogOpen"
       :script="selectedScript"
       @ran="handleScriptRan"
+    />
+
+    <!-- Execution History -->
+    <ScriptsExecutionHistory
+      v-if="selectedScript && isHistoryDialogOpen"
+      v-model:open="isHistoryDialogOpen"
+      :script="selectedScript"
     />
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -176,6 +193,14 @@ onMounted(fetchScripts);
               @click.stop="runScript(script)"
             >
               <Icon name="lucide:play" class="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              title="History"
+              @click.stop="viewHistory(script)"
+            >
+              <Icon name="lucide:history" class="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"

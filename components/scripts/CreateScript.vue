@@ -21,12 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { Switch } from '~/components/ui/switch'
 
 interface Script {
   id: string
   name: string
   user: string
   script: string
+  team_id: string | null
 }
 
 interface Props {
@@ -44,10 +46,14 @@ const open = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
 const errors = ref<Record<string, string>>({})
 
+const { user: authUser } = useAuth()
+const teamId = computed(() => authUser.value?.current_team_id?.toString() || null)
+
 // Form values
 const name = ref(props.script?.name || '')
 const user = ref(props.script?.user || 'root')
 const scriptContent = ref(props.script?.script || '')
+const shareWithTeam = ref(props.script?.team_id !== null)
 
 const users = [
   { value: 'root', label: 'root' },
@@ -72,6 +78,7 @@ const resetForm = () => {
   name.value = props.script?.name || ''
   user.value = props.script?.user || 'root'
   scriptContent.value = props.script?.script || ''
+  shareWithTeam.value = props.script?.team_id !== null
   errors.value = {}
 }
 
@@ -105,7 +112,10 @@ const onSubmit = async () => {
 
     await $api(url, {
       method: isEdit ? 'PATCH' : 'POST',
-      body: data,
+      body: {
+        ...data,
+        team_id: shareWithTeam.value ? teamId.value : null,
+      },
     })
 
     toast.success(isEdit ? 'Script updated' : 'Script created')
@@ -143,6 +153,8 @@ const variablesInfo = [
   { var: '{{ip_address}}', desc: 'Public IP address' },
   { var: '{{private_ip_address}}', desc: 'Private IP address' },
   { var: '{{username}}', desc: 'Executing user' },
+  { var: '{{db_password}}', desc: 'Database password' },
+  { var: '{{server_type}}', desc: 'Server type' },
 ]
 </script>
 
@@ -218,6 +230,15 @@ const variablesInfo = [
               {{ v.var }}
             </code>
           </div>
+        </div>
+
+        <!-- Team sharing toggle -->
+        <div class="flex items-center justify-between rounded-lg border p-3">
+          <div>
+            <p class="text-sm font-medium">Share with team</p>
+            <p class="text-xs text-muted-foreground">Make this script available to all team members</p>
+          </div>
+          <Switch v-model:checked="shareWithTeam" />
         </div>
 
         <DialogFooter class="mt-4">
