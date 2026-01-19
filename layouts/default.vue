@@ -23,10 +23,8 @@ onMounted(() => {
     class="relative flex min-h-screen w-full flex-col bg-background"
   >
     <LayoutNavbar />
-    <main class="flex w-full flex-1 flex-col items-center pt-4 pb-10">
-      <div class="w-full max-w-8xl px-4 lg:px-8">
-        <slot />
-      </div>
+    <main class="w-full flex-1 px-4 pt-4 pb-10 lg:px-8">
+      <slot />
     </main>
     <Toaster position="bottom-center" :close-button="true" :duration="4000" />
   </div>

@@ -80,6 +80,10 @@ const setTabRef = (key: string, el: unknown) => {
 };
 
 const updateIndicator = () => {
+  if (!showGlobalTabs.value) {
+    indicatorWidth.value = 0;
+    return;
+  }
   const currentPath = route.path.replace(/\/$/, '');
   const activeTab = globalTabs.value.find((tab) => {
     return currentPath === tab.route || currentPath.startsWith(`${tab.route}/`);
@@ -93,6 +97,8 @@ const updateIndicator = () => {
       indicatorLeft.value = tabRect.left - navRect.left;
       indicatorWidth.value = tabRect.width;
     }
+  } else {
+    indicatorWidth.value = 0;
   }
 };
 
@@ -117,6 +123,10 @@ const setServerTabRef = (key: string, el: unknown) => {
 };
 
 const updateServerIndicator = () => {
+  if (!showServerTabs.value) {
+    serverIndicatorWidth.value = 0;
+    return;
+  }
   const currentTab = (route.query.tab as string) || 'sites';
   if (serverTabRefs.value.has(currentTab)) {
     const tabEl = serverTabRefs.value.get(currentTab);
@@ -126,6 +136,8 @@ const updateServerIndicator = () => {
       serverIndicatorLeft.value = tabRect.left - navRect.left;
       serverIndicatorWidth.value = tabRect.width;
     }
+  } else {
+    serverIndicatorWidth.value = 0;
   }
 };
 
@@ -142,6 +154,10 @@ const setSiteTabRef = (key: string, el: unknown) => {
 };
 
 const updateSiteIndicator = () => {
+  if (!showSiteTabs.value) {
+    siteIndicatorWidth.value = 0;
+    return;
+  }
   const currentTab = (route.query.tab as string) || 'general';
   if (siteTabRefs.value.has(currentTab)) {
     const tabEl = siteTabRefs.value.get(currentTab);
@@ -151,6 +167,8 @@ const updateSiteIndicator = () => {
       siteIndicatorLeft.value = tabRect.left - navRect.left;
       siteIndicatorWidth.value = tabRect.width;
     }
+  } else {
+    siteIndicatorWidth.value = 0;
   }
 };
 
@@ -167,6 +185,10 @@ const setAdvancedTabRef = (key: string, el: unknown) => {
 };
 
 const updateAdvancedIndicator = () => {
+  if (!isAdvancedTabActive.value) {
+    advancedIndicatorWidth.value = 0;
+    return;
+  }
   const currentSubTab = (route.query.subtab as string) || 'general';
   if (advancedTabRefs.value.has(currentSubTab)) {
     const tabEl = advancedTabRefs.value.get(currentSubTab);
@@ -176,16 +198,20 @@ const updateAdvancedIndicator = () => {
       advancedIndicatorLeft.value = tabRect.left - navRect.left;
       advancedIndicatorWidth.value = tabRect.width;
     }
+  } else {
+    advancedIndicatorWidth.value = 0;
   }
 };
 
-watch([() => route.query.tab, () => route.query.subtab], () => {
+// Watch for route changes to update all indicators
+watch([() => route.path, () => route.query.tab, () => route.query.subtab], () => {
   nextTick(() => {
     updateServerIndicator();
     updateSiteIndicator();
     updateAdvancedIndicator();
   });
 }, { immediate: true });
+
 
 // Server detail tabs
 const serverDetailTabs = [
@@ -452,6 +478,24 @@ const showSiteTabs = computed(() => {
   return isSiteDetailPage.value;
 });
 
+// Watch for section visibility changes to update indicators when they become visible
+watch([showGlobalTabs, showServerTabs, showSiteTabs, isAdvancedTabActive], ([globalVisible, serverVisible, siteVisible, advancedVisible]) => {
+  // Clear stale refs when sections become hidden
+  if (!serverVisible) serverTabRefs.value.clear();
+  if (!siteVisible) siteTabRefs.value.clear();
+  if (!advancedVisible) advancedTabRefs.value.clear();
+
+  // Wait for refs to be populated after render
+  setTimeout(() => {
+    nextTick(() => {
+      if (globalVisible) updateIndicator();
+      if (serverVisible) updateServerIndicator();
+      if (siteVisible) updateSiteIndicator();
+      if (advancedVisible) updateAdvancedIndicator();
+    });
+  }, 50);
+}, { immediate: true });
+
 // DNS refresh trigger
 const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
 const onDnsCreated = () => {
@@ -619,7 +663,7 @@ onMounted(fetchTeams);
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <div
-      class="mx-auto flex h-16 max-w-8xl items-center justify-between px-4 lg:px-8"
+      class="flex h-16 items-center justify-between px-4 lg:px-8"
     >
       <NuxtLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
@@ -646,7 +690,7 @@ onMounted(fetchTeams);
           <DropdownMenu v-model:open="isOpen">
             <DropdownMenuTrigger as-child>
               <div
-                class="group flex h-9 cursor-pointer items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-2 transition-colors duration-150 hover:bg-muted/50 sm:pr-2.5"
+                class="group flex h-9 cursor-pointer items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2 transition-colors duration-150 hover:bg-muted/50"
               >
                 <Avatar class="h-8 w-8 border-2 border-background shadow-sm">
                   <AvatarImage :src="user?.profile_photo_url || ''" />
@@ -655,13 +699,7 @@ onMounted(fetchTeams);
                   </AvatarFallback>
                 </Avatar>
 
-                <span
-                  class="ml-1 hidden max-w-[150px] truncate text-sm font-medium sm:inline"
-                >
-                  {{ user?.name }}
-                </span>
-
-                <ChevronDown class="ml-0.5 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5" />
+                <ChevronDown class="ml-1 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5" />
               </div>
             </DropdownMenuTrigger>
 
@@ -753,11 +791,10 @@ onMounted(fetchTeams);
 
           <template #fallback>
             <div
-              class="flex h-9 animate-pulse items-center gap-0.5 rounded-full py-0.5 pl-0.5 pr-2 sm:pr-2.5"
+              class="flex h-9 animate-pulse items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2"
             >
               <div class="h-8 w-8 rounded-full bg-muted" />
-              <div class="ml-1 hidden h-4 w-16 rounded bg-muted sm:block" />
-              <div class="ml-0.5 h-3.5 w-3.5 rounded bg-muted" />
+              <div class="h-3.5 w-3.5 rounded bg-muted" />
             </div>
           </template>
         </ClientOnly>
@@ -765,7 +802,7 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Global Navigation Tabs (Servers / Domains) -->
-    <div v-if="showGlobalTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
+    <div v-if="showGlobalTabs" class="px-4 lg:px-8">
       <div class="-mb-px flex items-center justify-between">
         <nav ref="globalNavRef" class="relative flex gap-6">
           <NuxtLink
@@ -796,7 +833,7 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Server Detail Navigation -->
-    <div v-if="showServerTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
+    <div v-if="showServerTabs" class="px-4 lg:px-8">
       <div class="flex items-center justify-between py-2">
         <!-- Breadcrumb + Server info -->
         <div class="flex items-center gap-3">
@@ -887,7 +924,7 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Site Detail Navigation -->
-    <div v-if="showSiteTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
+    <div v-if="showSiteTabs" class="px-4 lg:px-8">
       <div class="flex items-center justify-between py-2">
         <!-- Breadcrumb: Servers / ServerName / SiteAddress -->
         <div class="flex items-center gap-3">
@@ -965,7 +1002,7 @@ onMounted(fetchTeams);
     </div>
 
     <!-- DNS Domain Detail Navigation -->
-    <div v-if="showDnsTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
+    <div v-if="showDnsTabs" class="px-4 lg:px-8">
       <div class="flex items-center justify-between py-2">
         <!-- Breadcrumb: Domains / domain.address -->
         <div class="flex items-center gap-3">
