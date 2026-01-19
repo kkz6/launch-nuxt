@@ -16,6 +16,7 @@ interface Script {
   name: string;
   user: string;
   script: string;
+  team_id: string | null;
   created_at: string;
   updated_at: string;
   last_run_at?: string;
