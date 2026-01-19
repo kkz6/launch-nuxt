@@ -13,7 +13,7 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { Textarea } from '~/components/ui/textarea'
+import { Switch } from '~/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -21,13 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { Switch } from '~/components/ui/switch'
 
 interface Script {
   id: string
   name: string
-  user: string
-  script: string
+  run_as: 'root' | 'local'
+  content: string
   team_id: string | null
 }
 
@@ -45,39 +44,34 @@ const emit = defineEmits<{
 const open = defineModel<boolean>('open', { default: false })
 const isLoading = ref(false)
 const errors = ref<Record<string, string>>({})
+const codeEditorRef = ref<InstanceType<typeof import('~/components/shared/CodeEditor.vue').default> | null>(null)
 
 const { user: authUser } = useAuth()
 const teamId = computed(() => authUser.value?.current_team_id?.toString() || null)
 
 // Form values
 const name = ref(props.script?.name || '')
-const user = ref(props.script?.user || 'root')
-const scriptContent = ref(props.script?.script || '')
+const runAs = ref<'root' | 'local'>(props.script?.run_as || 'root')
+const content = ref(props.script?.content || '')
 const shareWithTeam = ref(props.script?.team_id !== null)
-
-const users = [
-  { value: 'root', label: 'root' },
-  { value: 'launch', label: 'launch' },
-]
 
 const schema = z.object({
   name: z.string().min(1, 'Script name is required').max(255),
-  user: z.string().min(1, 'User is required'),
-  script: z.string().min(1, 'Script content is required'),
+  content: z.string().min(1, 'Script content is required'),
+  run_as: z.enum(['root', 'local']),
 })
 
 const canSubmit = computed(() => {
   if (isLoading.value) return false
   if (name.value.trim().length === 0) return false
-  if (user.value.length === 0) return false
-  if (scriptContent.value.trim().length === 0) return false
+  if (content.value.trim().length === 0) return false
   return true
 })
 
 const resetForm = () => {
   name.value = props.script?.name || ''
-  user.value = props.script?.user || 'root'
-  scriptContent.value = props.script?.script || ''
+  runAs.value = props.script?.run_as || 'root'
+  content.value = props.script?.content || ''
   shareWithTeam.value = props.script?.team_id !== null
   errors.value = {}
 }
@@ -85,20 +79,24 @@ const resetForm = () => {
 const validate = () => {
   const result = schema.safeParse({
     name: name.value.trim(),
-    user: user.value,
-    script: scriptContent.value,
+    content: content.value,
+    run_as: runAs.value,
   })
   if (!result.success) {
     const fieldErrors = result.error.flatten().fieldErrors
     errors.value = {
       name: fieldErrors.name?.[0] || '',
-      user: fieldErrors.user?.[0] || '',
-      script: fieldErrors.script?.[0] || '',
+      content: fieldErrors.content?.[0] || '',
     }
     return null
   }
   errors.value = {}
   return result.data
+}
+
+// Insert variable at cursor position in code editor
+const insertVariable = (variable: string) => {
+  codeEditorRef.value?.insertAtCursor(variable)
 }
 
 const onSubmit = async () => {
@@ -111,9 +109,11 @@ const onSubmit = async () => {
     const url = isEdit ? `/scripts/${props.script!.id}` : '/scripts'
 
     await $api(url, {
-      method: isEdit ? 'PATCH' : 'POST',
+      method: isEdit ? 'PUT' : 'POST',
       body: {
-        ...data,
+        name: data.name,
+        run_as: data.run_as,
+        content: data.content,
         team_id: shareWithTeam.value ? teamId.value : null,
       },
     })
@@ -148,13 +148,13 @@ watch(open, (isOpen) => {
 
 // Placeholder variables info
 const variablesInfo = [
-  { var: '{{server_id}}', desc: 'Server ID' },
-  { var: '{{server_name}}', desc: 'Server name' },
-  { var: '{{ip_address}}', desc: 'Public IP address' },
-  { var: '{{private_ip_address}}', desc: 'Private IP address' },
-  { var: '{{username}}', desc: 'Executing user' },
-  { var: '{{db_password}}', desc: 'Database password' },
-  { var: '{{server_type}}', desc: 'Server type' },
+  { var: '{{server_id}}', label: 'Server ID', icon: 'lucide:hash' },
+  { var: '{{server_name}}', label: 'Server Name', icon: 'lucide:server' },
+  { var: '{{ip_address}}', label: 'Public IP', icon: 'lucide:globe' },
+  { var: '{{private_ip_address}}', label: 'Private IP', icon: 'lucide:network' },
+  { var: '{{username}}', label: 'Username', icon: 'lucide:user' },
+  { var: '{{db_password}}', label: 'DB Password', icon: 'lucide:key' },
+  { var: '{{server_type}}', label: 'Server Type', icon: 'lucide:layers' },
 ]
 </script>
 
@@ -187,48 +187,50 @@ const variablesInfo = [
           </div>
 
           <div class="space-y-2">
-            <Label for="user">Run As User</Label>
-            <Select v-model="user">
+            <Label>Run As</Label>
+            <Select v-model="runAs">
               <SelectTrigger>
                 <SelectValue placeholder="Select user" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem
-                  v-for="u in users"
-                  :key="u.value"
-                  :value="u.value"
-                >
-                  {{ u.label }}
-                </SelectItem>
+                <SelectItem value="root">Root</SelectItem>
+                <SelectItem value="local">Captain</SelectItem>
               </SelectContent>
             </Select>
-            <p v-if="errors.user" class="text-sm text-destructive">{{ errors.user }}</p>
           </div>
         </div>
 
         <div class="space-y-2">
-          <Label for="script">Script</Label>
-          <Textarea
-            id="script"
-            v-model="scriptContent"
+          <div class="flex items-center justify-between">
+            <Label>Script</Label>
+            <span class="text-xs text-muted-foreground">Click variables below to insert</span>
+          </div>
+          <SharedCodeEditor
+            ref="codeEditorRef"
+            v-model="content"
             placeholder="#!/bin/bash&#10;&#10;apt update && apt upgrade -y"
-            class="min-h-[200px] font-mono text-sm"
+            :line-numbers="true"
+            :fold-gutter="false"
+            class="h-[240px]"
           />
-          <p v-if="errors.script" class="text-sm text-destructive">{{ errors.script }}</p>
+          <p v-if="errors.content" class="text-sm text-destructive">{{ errors.content }}</p>
         </div>
 
-        <!-- Variables info -->
-        <div class="rounded-lg border bg-muted/50 p-3">
-          <p class="mb-2 text-sm font-medium">Available Variables</p>
+        <!-- Variables -->
+        <div class="space-y-2">
+          <Label class="text-muted-foreground">Available Variables</Label>
           <div class="flex flex-wrap gap-2">
-            <code
+            <button
               v-for="v in variablesInfo"
               :key="v.var"
-              class="rounded bg-background px-2 py-1 text-xs"
-              :title="v.desc"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-md border bg-background px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted hover:border-primary/50"
+              :title="`Insert ${v.label}`"
+              @click="insertVariable(v.var)"
             >
-              {{ v.var }}
-            </code>
+              <Icon :name="v.icon" class="h-3.5 w-3.5 text-muted-foreground" />
+              <span class="font-mono">{{ v.var }}</span>
+            </button>
           </div>
         </div>
 

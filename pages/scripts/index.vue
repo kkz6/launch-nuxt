@@ -14,13 +14,12 @@ useHead({ title: "Scripts" });
 interface Script {
   id: string;
   name: string;
-  user: string;
-  script: string;
+  run_as: 'root' | 'local';
+  content: string;
+  user_id: string;
   team_id: string | null;
   created_at: string;
   updated_at: string;
-  last_run_at?: string;
-  runs_count: number;
 }
 
 const scripts = ref<Script[]>([]);
@@ -181,9 +180,6 @@ onMounted(fetchScripts);
             </div>
             <div class="flex-1 min-w-0">
               <h3 class="font-semibold truncate">{{ script.name }}</h3>
-              <p class="text-sm text-muted-foreground">
-                Run as: <span class="font-mono">{{ script.user }}</span>
-              </p>
             </div>
           </div>
           <div class="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
@@ -224,15 +220,9 @@ onMounted(fetchScripts);
         </div>
 
         <div class="mt-4 flex items-center justify-between text-sm">
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-1.5 text-muted-foreground">
-              <Icon name="lucide:play-circle" class="h-3.5 w-3.5" />
-              <span>{{ script.runs_count }} runs</span>
-            </div>
-            <Badge v-if="script.last_run_at" variant="secondary" class="text-xs">
-              Last run {{ formatDate(script.last_run_at) }}
-            </Badge>
-          </div>
+          <Badge variant="outline" class="text-xs">
+            {{ script.run_as === 'root' ? 'Root' : 'Captain' }}
+          </Badge>
           <span class="text-muted-foreground">
             {{ formatDate(script.created_at) }}
           </span>

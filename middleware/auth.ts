@@ -1,4 +1,4 @@
-export default defineNuxtRouteMiddleware(async () => {
+export default defineNuxtRouteMiddleware(async (to) => {
   // Skip auth check on server - we can't access localStorage there
   // The client-side check will handle the redirect if needed
   if (import.meta.server) {
@@ -21,5 +21,12 @@ export default defineNuxtRouteMiddleware(async () => {
   // Check if authenticated (has token AND user data)
   if (!isAuthenticated.value || !user.value) {
     return navigateTo("/login");
+  }
+
+  // Check subscription status - redirect non-subscribed users to dashboard
+  const isSubscribed = user.value?.current_team?.is_subscribed ?? true;
+
+  if (!isSubscribed && to.path !== '/dashboard') {
+    return navigateTo('/dashboard');
   }
 });

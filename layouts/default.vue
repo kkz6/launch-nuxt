@@ -28,6 +28,6 @@ onMounted(() => {
         <slot />
       </div>
     </main>
-    <Toaster position="top-right" rich-colors />
+    <Toaster position="bottom-center" :close-button="true" :duration="4000" />
   </div>
 </template>

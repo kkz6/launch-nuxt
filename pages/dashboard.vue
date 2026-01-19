@@ -9,10 +9,14 @@ definePageMeta({
 useHead({ title: 'Dashboard' })
 
 const { user } = useAuth()
+const { open: openSettingsSheet } = useSettingsSheet()
 
-// Redirect to onboarding if not onboarded
+// Check subscription status
+const isSubscribed = computed(() => user.value?.current_team?.is_subscribed ?? true)
+
+// Redirect to onboarding if not onboarded (only if subscribed)
 onMounted(() => {
-  if (!user.value?.onboarded) {
+  if (isSubscribed.value && !user.value?.onboarded) {
     navigateTo('/onboarding')
   }
 })
@@ -61,6 +65,12 @@ interface DashboardResponse {
 const isLoading = ref(true)
 const servers = ref<Server[]>([])
 const recentActivity = ref<Activity[]>([])
+
+// Watch for refresh trigger from navbar (team switch)
+const dashboardRefreshKey = useState('dashboardRefreshKey', () => 0)
+watch(dashboardRefreshKey, () => {
+  fetchDashboard()
+})
 
 const fetchDashboard = async () => {
   try {
@@ -119,27 +129,86 @@ const getUserInitials = (name: string): string => {
 
 <template>
   <div class="pb-10">
-    <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-8 w-8 animate-spin text-muted-foreground" />
-    </div>
-
-    <template v-else>
-      <!-- Greeting -->
+    <!-- Subscription Required State -->
+    <template v-if="!isSubscribed">
       <div class="mb-6">
         <h1 class="text-xl font-semibold">{{ greeting }}, {{ firstName }}</h1>
       </div>
 
-      <!-- Empty State -->
-      <div v-if="servers.length === 0" class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-16">
-        <Icon name="lucide:server" class="h-12 w-12 text-muted-foreground" />
-        <div class="text-center">
-          <p class="font-medium">No servers yet</p>
-          <p class="mt-1 text-sm text-muted-foreground">Add your first server to get started</p>
+      <div class="mx-auto max-w-xl">
+        <div class="rounded-lg border bg-card p-8 text-center">
+          <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+            <Icon name="lucide:credit-card" class="h-7 w-7 text-amber-600 dark:text-amber-400" />
+          </div>
+          <h2 class="mb-2 text-lg font-semibold">Subscription Required</h2>
+          <p class="mb-6 text-sm text-muted-foreground">
+            Your subscription is currently inactive. Add a payment method to access all features and manage your servers.
+          </p>
+          <div class="flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              class="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              @click="openSettingsSheet('billing')"
+            >
+              <Icon name="lucide:credit-card" class="h-4 w-4" />
+              Add Payment Method
+            </button>
+            <a
+              href="mailto:support@launchctl.dev"
+              class="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
+            >
+              <Icon name="lucide:mail" class="h-4 w-4" />
+              Contact Support
+            </a>
+          </div>
         </div>
-        <ServerCreateServerDialog />
+
+        <div class="mt-6 rounded-lg border bg-muted/30 p-4">
+          <h3 class="mb-3 text-sm font-medium">What you'll get with a subscription:</h3>
+          <ul class="space-y-2 text-sm text-muted-foreground">
+            <li class="flex items-center gap-2">
+              <Icon name="lucide:check" class="h-4 w-4 text-emerald-500" />
+              Deploy and manage unlimited servers
+            </li>
+            <li class="flex items-center gap-2">
+              <Icon name="lucide:check" class="h-4 w-4 text-emerald-500" />
+              Automatic deployments from Git
+            </li>
+            <li class="flex items-center gap-2">
+              <Icon name="lucide:check" class="h-4 w-4 text-emerald-500" />
+              SSL certificates, databases, and backups
+            </li>
+            <li class="flex items-center gap-2">
+              <Icon name="lucide:check" class="h-4 w-4 text-emerald-500" />
+              Team collaboration features
+            </li>
+          </ul>
+        </div>
+      </div>
+    </template>
+
+    <!-- Normal Dashboard Content -->
+    <template v-else>
+      <div v-if="isLoading" class="flex items-center justify-center py-12">
+        <Icon name="lucide:loader-2" class="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
 
       <template v-else>
+        <!-- Greeting -->
+        <div class="mb-6">
+          <h1 class="text-xl font-semibold">{{ greeting }}, {{ firstName }}</h1>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="servers.length === 0" class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-16">
+          <Icon name="lucide:server" class="h-12 w-12 text-muted-foreground" />
+          <div class="text-center">
+            <p class="font-medium">No servers yet</p>
+            <p class="mt-1 text-sm text-muted-foreground">Add your first server to get started</p>
+          </div>
+          <ServerCreateServerDialog />
+        </div>
+
+        <template v-else>
         <!-- Servers Section -->
         <div class="mb-8">
           <div class="mb-3 flex items-center justify-between">
@@ -229,6 +298,7 @@ const getUserInitials = (name: string): string => {
           </div>
         </div>
       </template>
+    </template>
     </template>
   </div>
 </template>

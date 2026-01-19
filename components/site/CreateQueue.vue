@@ -23,19 +23,11 @@ import {
   FormMessage,
 } from '~/components/ui/form'
 import { Input } from '~/components/ui/input'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 import type { Site } from '~/types'
 
 interface QueueValues {
   queue_connection: string
   queue: string
-  user?: string
   max_seconds_per_job: number
   rest_seconds_on_empty: number
   failed_job_delay_seconds: number
@@ -51,6 +43,7 @@ interface QueueValues {
 
 interface Queue extends QueueValues {
   id: string
+  user?: string
 }
 
 interface Props {
@@ -72,17 +65,10 @@ const isLoading = ref(false)
 const isAdvancedOpen = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
-// Use site data directly instead of making API call
-const availableUsers = computed(() => {
-  const user = props.site.user
-  return { [user]: user }
-})
-
 const queueSchema = toTypedSchema(
   z.object({
     queue_connection: z.string().min(1).max(50),
     queue: z.string().min(1).max(50),
-    user: z.string().optional(),
     max_seconds_per_job: z.coerce.number().min(1),
     rest_seconds_on_empty: z.coerce.number().min(0),
     failed_job_delay_seconds: z.coerce.number().min(0),
@@ -98,14 +84,12 @@ const queueSchema = toTypedSchema(
 )
 
 const getInitialValues = () => {
-  const siteUser = props.site.user
   const sitePath = props.site.path
 
   if (props.queue) {
     return {
       queue_connection: props.queue.queue_connection,
       queue: props.queue.queue,
-      user: props.queue.user || siteUser,
       max_seconds_per_job: props.queue.max_seconds_per_job,
       rest_seconds_on_empty: props.queue.rest_seconds_on_empty,
       failed_job_delay_seconds: props.queue.failed_job_delay_seconds,
@@ -122,7 +106,6 @@ const getInitialValues = () => {
   return {
     queue_connection: 'database',
     queue: 'default',
-    user: siteUser,
     max_seconds_per_job: 60,
     rest_seconds_on_empty: 10,
     failed_job_delay_seconds: 3,
@@ -250,30 +233,6 @@ const advancedValues = computed({
             </FormItem>
           </FormField>
         </div>
-
-        <FormField v-slot="{ componentField }" name="user">
-          <FormItem>
-            <FormLabel>User</FormLabel>
-            <Select v-bind="componentField">
-              <FormControl>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select user" />
-                </SelectTrigger>
-              </FormControl>
-              <SelectContent>
-                <SelectItem
-                  v-for="(label, value) in availableUsers"
-                  :key="value"
-                  :value="value"
-                >
-                  {{ label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <FormDescription>User to run the queue worker as</FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
 
         <DialogFooter class="sm:justify-between">
           <Button type="button" variant="outline" @click="isAdvancedOpen = true">

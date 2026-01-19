@@ -17,12 +17,13 @@ interface Execution {
   server_id: string
   server_name: string
   batch_id: string
-  user: string
+  run_as: 'root' | 'local'
   status: 'pending' | 'running' | 'finished' | 'failed'
   exit_code: number | null
   output: string
   started_at: string | null
   finished_at: string | null
+  created_at: string
 }
 
 interface Script {
