@@ -89,6 +89,7 @@ export interface Team {
   image_path: string | null;
   image_url: string;
   personal_team: boolean;
+  is_subscribed: boolean;
   created_at: string;
   updated_at: string;
   owner?: User;

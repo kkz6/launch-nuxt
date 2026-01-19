@@ -24,6 +24,34 @@ const props = withDefaults(defineProps<Props>(), {
 
 const modelValue = defineModel<string>({ default: '' })
 
+const editorView = ref<EditorView | null>(null)
+
+const handleReady = (payload: { view: EditorView }) => {
+  editorView.value = payload.view
+}
+
+// Insert text at current cursor position
+const insertAtCursor = (text: string) => {
+  if (!editorView.value) return
+
+  const { state } = editorView.value
+  const selection = state.selection.main
+  const from = selection.from
+  const to = selection.to
+
+  editorView.value.dispatch({
+    changes: { from, to, insert: text },
+    selection: { anchor: from + text.length },
+  })
+
+  // Focus the editor after insertion
+  editorView.value.focus()
+}
+
+defineExpose({
+  insertAtCursor,
+})
+
 const colorMode = useColorMode()
 
 const theme = computed(() => {
@@ -62,6 +90,7 @@ const editorKey = computed(() => `${props.lineNumbers}-${props.foldGutter}-${col
       :extensions="extensions"
       :basic-setup="basicSetup"
       :class="['h-full w-full text-sm leading-relaxed', { 'masked-content': masked }]"
+      @ready="handleReady"
     />
     <div
       v-if="disabled"

@@ -31,6 +31,7 @@ interface Team {
   name: string;
   personal_team: boolean;
   image_url?: string;
+  is_subscribed?: boolean;
 }
 
 const { user, logout, fetchUser } = useAuth();
@@ -39,6 +40,9 @@ const { reconnect: reconnectWebSocket } = useWebSocket();
 const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
+
+// Check if current team is subscribed
+const isSubscribed = computed(() => user.value?.current_team?.is_subscribed ?? true);
 
 // Global navigation tabs
 const globalTabsBase = [
@@ -49,6 +53,11 @@ const globalTabsBase = [
 ];
 
 const globalTabs = computed(() => {
+  // If not subscribed, only show dashboard
+  if (!isSubscribed.value) {
+    return [{ value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" }];
+  }
+
   if (!user.value?.onboarded) {
     return [
       { value: "onboarding", label: "Onboarding", route: "/onboarding", icon: "lucide:rocket" },
@@ -57,6 +66,126 @@ const globalTabs = computed(() => {
   }
   return globalTabsBase;
 });
+
+// Tab indicator animation
+const globalNavRef = ref<HTMLElement | null>(null);
+const tabRefs = ref<Map<string, HTMLElement>>(new Map());
+const indicatorLeft = ref(0);
+const indicatorWidth = ref(0);
+
+const setTabRef = (key: string, el: unknown) => {
+  if (el) {
+    tabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+  }
+};
+
+const updateIndicator = () => {
+  const currentPath = route.path.replace(/\/$/, '');
+  const activeTab = globalTabs.value.find((tab) => {
+    return currentPath === tab.route || currentPath.startsWith(`${tab.route}/`);
+  });
+
+  if (activeTab && tabRefs.value.has(activeTab.value)) {
+    const tabEl = tabRefs.value.get(activeTab.value);
+    if (tabEl && globalNavRef.value) {
+      const navRect = globalNavRef.value.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+      indicatorLeft.value = tabRect.left - navRect.left;
+      indicatorWidth.value = tabRect.width;
+    }
+  }
+};
+
+watch(() => route.path, () => {
+  nextTick(updateIndicator);
+}, { immediate: true });
+
+onMounted(() => {
+  nextTick(updateIndicator);
+});
+
+// Server tabs indicator
+const serverNavRef = ref<HTMLElement | null>(null);
+const serverTabRefs = ref<Map<string, HTMLElement>>(new Map());
+const serverIndicatorLeft = ref(0);
+const serverIndicatorWidth = ref(0);
+
+const setServerTabRef = (key: string, el: unknown) => {
+  if (el) {
+    serverTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+  }
+};
+
+const updateServerIndicator = () => {
+  const currentTab = (route.query.tab as string) || 'sites';
+  if (serverTabRefs.value.has(currentTab)) {
+    const tabEl = serverTabRefs.value.get(currentTab);
+    if (tabEl && serverNavRef.value) {
+      const navRect = serverNavRef.value.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+      serverIndicatorLeft.value = tabRect.left - navRect.left;
+      serverIndicatorWidth.value = tabRect.width;
+    }
+  }
+};
+
+// Site tabs indicator
+const siteNavRef = ref<HTMLElement | null>(null);
+const siteTabRefs = ref<Map<string, HTMLElement>>(new Map());
+const siteIndicatorLeft = ref(0);
+const siteIndicatorWidth = ref(0);
+
+const setSiteTabRef = (key: string, el: unknown) => {
+  if (el) {
+    siteTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+  }
+};
+
+const updateSiteIndicator = () => {
+  const currentTab = (route.query.tab as string) || 'general';
+  if (siteTabRefs.value.has(currentTab)) {
+    const tabEl = siteTabRefs.value.get(currentTab);
+    if (tabEl && siteNavRef.value) {
+      const navRect = siteNavRef.value.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+      siteIndicatorLeft.value = tabRect.left - navRect.left;
+      siteIndicatorWidth.value = tabRect.width;
+    }
+  }
+};
+
+// Advanced sub-tabs indicator
+const advancedNavRef = ref<HTMLElement | null>(null);
+const advancedTabRefs = ref<Map<string, HTMLElement>>(new Map());
+const advancedIndicatorLeft = ref(0);
+const advancedIndicatorWidth = ref(0);
+
+const setAdvancedTabRef = (key: string, el: unknown) => {
+  if (el) {
+    advancedTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+  }
+};
+
+const updateAdvancedIndicator = () => {
+  const currentSubTab = (route.query.subtab as string) || 'general';
+  if (advancedTabRefs.value.has(currentSubTab)) {
+    const tabEl = advancedTabRefs.value.get(currentSubTab);
+    if (tabEl && advancedNavRef.value) {
+      const navRect = advancedNavRef.value.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+      advancedIndicatorLeft.value = tabRect.left - navRect.left;
+      advancedIndicatorWidth.value = tabRect.width;
+    }
+  }
+};
+
+watch([() => route.query.tab, () => route.query.subtab], () => {
+  nextTick(() => {
+    updateServerIndicator();
+    updateSiteIndicator();
+    updateAdvancedIndicator();
+  });
+}, { immediate: true });
 
 // Server detail tabs
 const serverDetailTabs = [
@@ -264,7 +393,8 @@ watch(domainId, async (dId) => {
 }, { immediate: true });
 
 const isGlobalTabActive = (tabRoute: string) => {
-  return route.path === tabRoute || route.path.startsWith(`${tabRoute}/`);
+  const currentPath = route.path.replace(/\/$/, ''); // Remove trailing slash
+  return currentPath === tabRoute || currentPath.startsWith(`${tabRoute}/`);
 };
 
 const isServerTabActive = (query: string) => {
@@ -298,19 +428,27 @@ const isDnsTabActive = (tabPath: string) => {
 };
 
 const showGlobalTabs = computed(() => {
+  const currentPath = route.path.replace(/\/$/, ''); // Remove trailing slash
+  // If not subscribed, only show on dashboard
+  if (!isSubscribed.value) {
+    return currentPath === '/dashboard';
+  }
   // Show global tabs only on list pages, not detail pages
-  return route.path === '/dashboard' || route.path === '/servers' || route.path === '/dns' || route.path === '/scripts' || route.path === '/onboarding';
+  return currentPath === '/dashboard' || currentPath === '/servers' || currentPath === '/dns' || currentPath === '/scripts' || currentPath === '/onboarding';
 });
 
 const showDnsTabs = computed(() => {
+  if (!isSubscribed.value) return false;
   return isDnsDetailPage.value;
 });
 
 const showServerTabs = computed(() => {
+  if (!isSubscribed.value) return false;
   return isServerDetailPage.value;
 });
 
 const showSiteTabs = computed(() => {
+  if (!isSubscribed.value) return false;
   return isSiteDetailPage.value;
 });
 
@@ -368,11 +506,16 @@ const fetchTeams = async () => {
   }
 };
 
-// Servers refresh trigger for team switch
+// Refresh triggers for team switch
 const serversRefreshKey = useState('serversRefreshKey', () => 0);
+const dashboardRefreshKey = useState('dashboardRefreshKey', () => 0);
 
 const switchTeam = async (teamId: string) => {
   if (teamId === String(user.value?.current_team_id)) return;
+
+  // Find the team name for the toast
+  const targetTeam = teams.value.find((t) => t.id === teamId);
+
   try {
     await $api(`/teams/${teamId}/switch`, { method: "POST" });
     // Update stored team ID
@@ -383,8 +526,13 @@ const switchTeam = async (teamId: string) => {
     reconnectWebSocket();
     // Navigate to dashboard and trigger refresh
     navigateTo("/dashboard");
-    // Trigger servers list refresh (works even if already on /servers)
+    // Trigger refresh for various pages
     serversRefreshKey.value++;
+    dashboardRefreshKey.value++;
+    scriptsRefreshKey.value++;
+    dnsRefreshKey.value++;
+    // Show success toast
+    toast.success(`Switched to ${targetTeam?.name || 'team'}`);
   } catch {
     toast.error("Failed to switch team");
   }
@@ -476,6 +624,21 @@ onMounted(fetchTeams);
       <NuxtLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
       </NuxtLink>
+
+      <!-- Subscription Banner -->
+      <div
+        v-if="!isSubscribed"
+        class="group relative h-5 cursor-pointer overflow-hidden text-sm"
+        @click="openSettingsSheet('billing')"
+      >
+        <span class="block text-muted-foreground transition-transform duration-300 ease-out group-hover:-translate-y-full">
+          Your subscription is inactive
+        </span>
+        <span class="absolute inset-x-0 top-full flex items-center gap-1 font-medium text-primary transition-transform duration-300 ease-out group-hover:-translate-y-full">
+          Subscribe now
+          <Icon name="lucide:arrow-right" class="h-3.5 w-3.5" />
+        </span>
+      </div>
 
       <div class="flex items-center space-x-2">
         <!-- User Menu (with Teams) -->
@@ -604,21 +767,27 @@ onMounted(fetchTeams);
     <!-- Global Navigation Tabs (Servers / Domains) -->
     <div v-if="showGlobalTabs" class="mx-auto max-w-8xl px-4 lg:px-8">
       <div class="-mb-px flex items-center justify-between">
-        <nav class="flex gap-6">
+        <nav ref="globalNavRef" class="relative flex gap-6">
           <NuxtLink
             v-for="tab in globalTabs"
             :key="tab.value"
+            :ref="(el) => setTabRef(tab.value, el)"
             :to="tab.route"
-            class="relative flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors"
+            class="relative flex items-center gap-2 px-1 py-3 text-sm font-medium transition-colors"
             :class="[
               isGlobalTabActive(tab.route)
-                ? 'border-foreground text-foreground'
-                : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+                ? 'text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
             ]"
           >
             <Icon :name="tab.icon" class="h-4 w-4" />
             {{ tab.label }}
           </NuxtLink>
+          <!-- Sliding indicator -->
+          <span
+            class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
+            :style="{ left: `${indicatorLeft}px`, width: `${indicatorWidth}px` }"
+          />
         </nav>
         <ServerCreateServerDialog v-if="route.path === '/servers'" />
         <DnsAddDomain v-if="route.path === '/dns'" :providers="[]" @created="onDnsCreated" />
@@ -667,40 +836,53 @@ onMounted(fetchTeams);
         </div>
       </div>
       <nav
-        class="-mb-px flex gap-1 overflow-x-auto"
+        ref="serverNavRef"
+        class="relative -mb-px flex gap-1 overflow-x-auto"
         :class="{ '-mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-border mb-0': isAdvancedTabActive }"
       >
         <NuxtLink
           v-for="tab in serverDetailTabs"
           :key="tab.value"
+          :ref="(el) => setServerTabRef(tab.query, el)"
           :to="{ path: `/servers/${serverId}`, query: tab.query === 'advanced' ? { tab: tab.query, subtab: 'general' } : { tab: tab.query } }"
-          class="relative flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isServerTabActive(tab.query)
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
           ]"
         >
           <Icon :name="tab.icon" class="h-4 w-4" />
           {{ tab.label }}
         </NuxtLink>
+        <!-- Sliding indicator -->
+        <span
+          class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
+          :style="{ left: `${serverIndicatorLeft}px`, width: `${serverIndicatorWidth}px` }"
+        />
       </nav>
       <!-- Advanced Sub-tabs -->
-      <nav v-if="isAdvancedTabActive" class="-mb-px flex gap-1 overflow-x-auto">
+      <nav v-if="isAdvancedTabActive" ref="advancedNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">
         <NuxtLink
           v-for="subtab in advancedSubTabs"
           :key="subtab.value"
+          :ref="(el) => setAdvancedTabRef(subtab.query, el)"
           :to="{ path: `/servers/${serverId}`, query: { tab: 'advanced', subtab: subtab.query } }"
-          class="relative flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isAdvancedSubTabActive(subtab.query)
-              ? 'border-rose-300 text-rose-500 dark:border-rose-400 dark:text-rose-300'
-              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+              ? 'text-rose-500 dark:text-rose-300'
+              : 'text-muted-foreground hover:text-foreground'
           ]"
         >
           <Icon :name="subtab.icon" class="h-4 w-4" />
           {{ subtab.label }}
         </NuxtLink>
+        <!-- Sliding indicator -->
+        <span
+          class="absolute bottom-0 h-0.5 bg-rose-400 transition-all duration-300 ease-out"
+          :style="{ left: `${advancedIndicatorLeft}px`, width: `${advancedIndicatorWidth}px` }"
+        />
       </nav>
     </div>
 
@@ -758,21 +940,27 @@ onMounted(fetchTeams);
           />
         </div>
       </div>
-      <nav class="-mb-px flex gap-1 overflow-x-auto">
+      <nav ref="siteNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">
         <NuxtLink
           v-for="tab in siteDetailTabs"
           :key="tab.value"
+          :ref="(el) => setSiteTabRef(tab.query, el)"
           :to="{ path: `/servers/${serverId}/sites/${siteId}`, query: { tab: tab.query } }"
-          class="relative flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors"
+          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isSiteTabActive(tab.query)
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
           ]"
         >
           <Icon :name="tab.icon" class="h-4 w-4" />
           {{ tab.label }}
         </NuxtLink>
+        <!-- Sliding indicator -->
+        <span
+          class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
+          :style="{ left: `${siteIndicatorLeft}px`, width: `${siteIndicatorWidth}px` }"
+        />
       </nav>
     </div>
 

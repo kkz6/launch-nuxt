@@ -12,12 +12,19 @@ import {
 import { Checkbox } from '~/components/ui/checkbox'
 import { Label } from '~/components/ui/label'
 import { Badge } from '~/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 
 interface Script {
   id: string
   name: string
-  user: string
-  script: string
+  run_as: 'root' | 'local'
+  content: string
 }
 
 interface Server {
@@ -43,6 +50,7 @@ const isLoading = ref(false)
 const isLoadingServers = ref(true)
 const servers = ref<Server[]>([])
 const selectedServers = ref<string[]>([])
+const runAs = ref<'root' | 'local'>('root')
 
 // Execution monitor state
 const showMonitor = ref(false)
@@ -112,7 +120,8 @@ const onSubmit = async () => {
     const response = await $api<{ data: { batch_id: string } }>(`/scripts/${props.script.id}/execute`, {
       method: 'POST',
       body: {
-        servers: selectedServers.value,
+        server_ids: selectedServers.value,
+        run_as: runAs.value,
       },
     })
 
@@ -139,9 +148,10 @@ const onSubmit = async () => {
 watch(open, (isOpen) => {
   if (isOpen) {
     selectedServers.value = []
+    runAs.value = props.script.run_as || 'root'
     fetchServers()
   }
-})
+}, { immediate: true })
 </script>
 
 <template>
@@ -166,11 +176,22 @@ watch(open, (isOpen) => {
       <div class="space-y-4">
         <!-- Script preview -->
         <div class="rounded-lg border bg-muted/50 p-3">
-          <div class="mb-2 flex items-center justify-between">
-            <span class="text-sm font-medium">{{ script.name }}</span>
-            <Badge variant="secondary">{{ script.user }}</Badge>
-          </div>
-          <pre class="max-h-32 overflow-auto rounded bg-background p-2 text-xs"><code>{{ script.script }}</code></pre>
+          <p class="mb-2 text-sm font-medium">{{ script.name }}</p>
+          <pre class="max-h-32 overflow-auto rounded bg-background p-2 text-xs"><code>{{ script.content }}</code></pre>
+        </div>
+
+        <!-- Run as selection -->
+        <div class="space-y-2">
+          <Label>Run As</Label>
+          <Select v-model="runAs">
+            <SelectTrigger>
+              <SelectValue placeholder="Select user type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="root">Root</SelectItem>
+              <SelectItem value="local">Captain</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <!-- Server selection -->
@@ -197,25 +218,25 @@ watch(open, (isOpen) => {
             <p class="mt-2 text-sm text-muted-foreground">No connected servers available</p>
           </div>
 
-          <div v-else class="max-h-64 space-y-2 overflow-auto">
+          <div v-else class="max-h-64 space-y-1.5 overflow-auto">
             <div
               v-for="server in servers"
               :key="server.id"
-              class="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50"
+              class="flex cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 transition-colors hover:bg-muted/50"
               :class="{ 'border-primary bg-primary/5': isSelected(server.id) }"
               @click="toggleServer(server.id)"
             >
               <Checkbox
-                :checked="isSelected(server.id)"
+                :model-value="isSelected(server.id)"
                 @click.stop
-                @update:checked="toggleServer(server.id)"
+                @update:model-value="toggleServer(server.id)"
               />
               <div class="flex flex-1 items-center justify-between">
                 <div>
-                  <p class="font-medium">{{ server.name }}</p>
-                  <p class="text-sm text-muted-foreground">{{ server.public_ipv4 }}</p>
+                  <p class="text-sm font-medium">{{ server.name }}</p>
+                  <p class="text-xs text-muted-foreground">{{ server.public_ipv4 }}</p>
                 </div>
-                <Badge variant="outline">
+                <Badge variant="outline" class="text-xs">
                   {{ providerLabels[server.provider] || server.provider }}
                 </Badge>
               </div>
