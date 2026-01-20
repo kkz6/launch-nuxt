@@ -50,6 +50,7 @@ interface Activity {
   status: string
   created_at: string
   commit_sha: string
+  commit_message: string
   user: {
     name: string
   }
@@ -270,11 +271,16 @@ const getUserInitials = (name: string): string => {
                 :class="getStatusColor(activity.status)"
               />
 
-              <!-- Site & Server -->
+              <!-- Site & Server + Commit Message -->
               <div class="min-w-0 flex-1">
-                <span class="font-medium">{{ activity.site_name }}</span>
-                <span class="mx-1.5 text-muted-foreground">/</span>
-                <span class="text-sm text-muted-foreground">{{ activity.server_name }}</span>
+                <div class="flex items-center gap-1.5">
+                  <span class="font-medium">{{ activity.site_name }}</span>
+                  <span class="text-muted-foreground">/</span>
+                  <span class="text-sm text-muted-foreground">{{ activity.server_name }}</span>
+                </div>
+                <p v-if="activity.commit_message" class="truncate text-xs text-muted-foreground">
+                  {{ activity.commit_message }}
+                </p>
               </div>
 
               <!-- Commit SHA -->

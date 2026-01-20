@@ -52,7 +52,18 @@ const globalTabsBase = [
   { value: "scripts", label: "Scripts", route: "/scripts", icon: "lucide:scroll-text" },
 ];
 
+// Track if component is mounted (client-side)
+const isMounted = ref(false);
+onMounted(() => {
+  isMounted.value = true;
+});
+
 const globalTabs = computed(() => {
+  // On server-side, always return base tabs to avoid hydration mismatch
+  if (!isMounted.value) {
+    return globalTabsBase;
+  }
+
   // If not subscribed, only show dashboard
   if (!isSubscribed.value) {
     return [{ value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" }];
