@@ -4,7 +4,7 @@
  */
 
 interface ExecutionState {
-  id: string
+  id: number
   serverId: string
   serverName: string
   status: 'pending' | 'running' | 'finished' | 'failed'
@@ -18,13 +18,13 @@ export const useScriptExecution = () => {
   const { token } = useAuth()
   const { getCurrentTeamId } = useApi()
 
-  const executions = ref<Map<string, ExecutionState>>(new Map())
+  const executions = ref<Map<number, ExecutionState>>(new Map())
 
   /**
    * Connect to a script execution WebSocket
    */
   const connectExecution = (
-    executionId: string,
+    executionId: number,
     serverId: string,
     serverName: string,
     onOutput?: (output: string) => void,
@@ -97,7 +97,7 @@ export const useScriptExecution = () => {
   /**
    * Disconnect a specific execution WebSocket
    */
-  const disconnectExecution = (executionId: string) => {
+  const disconnectExecution = (executionId: number) => {
     const state = executions.value.get(executionId)
     if (state?.ws) {
       state.ws.close()
@@ -118,7 +118,7 @@ export const useScriptExecution = () => {
   /**
    * Get execution state by ID
    */
-  const getExecution = (executionId: string) => {
+  const getExecution = (executionId: number) => {
     return executions.value.get(executionId)
   }
 
