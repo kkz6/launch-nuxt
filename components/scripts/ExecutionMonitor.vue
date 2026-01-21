@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { useScriptExecution } from '~/composables/useScriptExecution'
 
 interface Execution {
-  id: string
+  id: number
   script_id: string
   server_id: string
   server_name: string

@@ -12,7 +12,7 @@ import { Badge } from '~/components/ui/badge'
 import { ScrollArea } from '~/components/ui/scroll-area'
 
 interface Execution {
-  id: string
+  id: number
   script_id: string
   server_id: string
   server_name: string
@@ -153,7 +153,7 @@ watch(open, (isOpen) => {
     showOutput.value = false
     selectedExecution.value = null
   }
-})
+}, { immediate: true })
 </script>
 
 <template>
