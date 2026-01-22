@@ -14,13 +14,6 @@ const { open: openSettingsSheet } = useSettingsSheet()
 // Check subscription status
 const isSubscribed = computed(() => user.value?.current_team?.is_subscribed ?? true)
 
-// Redirect to onboarding if not onboarded (only if subscribed)
-onMounted(() => {
-  if (isSubscribed.value && !user.value?.onboarded) {
-    navigateTo('/onboarding')
-  }
-})
-
 // Time-based greeting
 const greeting = computed(() => {
   const hour = new Date().getHours()
@@ -53,7 +46,7 @@ interface Activity {
   commit_message: string
   user: {
     name: string
-  }
+  } | null
 }
 
 interface DashboardResponse {
@@ -290,6 +283,7 @@ const getUserInitials = (name: string): string => {
 
               <!-- User -->
               <div
+                v-if="activity.user"
                 class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-medium"
                 :title="activity.user.name"
               >

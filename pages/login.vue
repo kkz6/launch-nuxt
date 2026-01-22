@@ -16,8 +16,6 @@ useHead({
   title: 'Sign in',
 })
 
-const { login, checkUserStatus, isLoading: authLoading } = useAuth()
-
 const email = ref('')
 const password = ref('')
 const remember = ref(false)
@@ -55,6 +53,8 @@ const handleEmailSubmit = async () => {
   }
 }
 
+const { login, checkUserStatus, isLoading: authLoading, user } = useAuth()
+
 const handlePasswordSubmit = async () => {
   loading.value = true
   errors.value = {}
@@ -62,7 +62,13 @@ const handlePasswordSubmit = async () => {
   try {
     await login({ email: email.value, password: password.value })
     toast.success('Signed in successfully')
-    navigateTo('/dashboard')
+
+    // Redirect to onboarding if user hasn't completed it, otherwise dashboard
+    if (!user.value?.onboarded) {
+      navigateTo('/onboarding')
+    } else {
+      navigateTo('/dashboard')
+    }
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'data' in error) {
       const fetchError = error as { data?: { message?: string; errors?: Record<string, string[]> } }
