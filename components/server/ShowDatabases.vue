@@ -217,6 +217,10 @@ onMounted(fetchData)
             <ServerCreateDatabase :server-id="serverId" @created="fetchData" />
           </template>
 
+          <template #cell-name="{ value }">
+            <span class="font-medium">{{ value }}</span>
+          </template>
+
           <template #cell-status="{ row }">
             <SharedInstallationStatus v-bind="row" />
           </template>
@@ -267,6 +271,10 @@ onMounted(fetchData)
         >
           <template #empty>
             <ServerCreateDatabaseUser :server-id="serverId" :databases="databasesMap" @created="fetchData" />
+          </template>
+
+          <template #cell-name="{ value }">
+            <span class="font-medium">{{ value }}</span>
           </template>
 
           <template #cell-status="{ row }">
