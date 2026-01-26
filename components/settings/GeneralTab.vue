@@ -4,7 +4,7 @@ import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 
-const { user, setUser } = useAuth()
+const { user, setUser, fetchUser } = useAuth()
 
 // Profile form state
 const isLoading = ref(false)
@@ -114,6 +114,27 @@ const onPasswordSubmit = async () => {
   }
 }
 
+// Onboarding reset
+const isOnboardingLoading = ref(false)
+const router = useRouter()
+const { close: closeSettings } = useSettingsSheet()
+
+const resetOnboarding = async () => {
+  isOnboardingLoading.value = true
+  try {
+    await $api('/auth/reset-onboarding', { method: 'POST' })
+    await fetchUser()
+    toast.success('Onboarding has been reset')
+    closeSettings()
+    router.push('/onboarding')
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || 'Failed to reset onboarding')
+  } finally {
+    isOnboardingLoading.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -159,7 +180,7 @@ const onPasswordSubmit = async () => {
     </div>
 
     <!-- Password Section -->
-    <div class="px-6 pt-6">
+    <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">Update Password</h3>
       <form class="space-y-4" @submit.prevent="onPasswordSubmit">
         <div class="space-y-1.5">
@@ -213,6 +234,28 @@ const onPasswordSubmit = async () => {
           Update Password
         </Button>
       </form>
+    </div>
+
+    <!-- Onboarding Section -->
+    <div v-if="user?.onboarded" class="px-6 py-6">
+      <h3 class="mb-2 text-base font-semibold">Onboarding</h3>
+      <p class="mb-4 text-sm text-muted-foreground">
+        You have completed the onboarding process. If you'd like to go through it again, you can reset it below.
+      </p>
+      <Button
+        variant="outline"
+        size="sm"
+        :disabled="isOnboardingLoading"
+        @click="resetOnboarding"
+      >
+        <Icon
+          v-if="isOnboardingLoading"
+          name="lucide:loader-2"
+          class="mr-2 block size-4 animate-spin"
+        />
+        <Icon v-else name="lucide:refresh-cw" class="mr-2 size-4" />
+        Reset Onboarding
+      </Button>
     </div>
   </div>
 </template>
