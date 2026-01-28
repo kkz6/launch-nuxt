@@ -562,7 +562,7 @@ watch(isOpen, (open) => {
           <div class="flex items-start space-x-3 rounded-md border p-4">
             <Checkbox
               id="install_agent"
-              v-model:checked="installAgent"
+              v-model="installAgent"
             />
             <div class="space-y-1 leading-none">
               <Label for="install_agent" class="cursor-pointer">

@@ -240,7 +240,7 @@ const variablesInfo = [
             <p class="text-sm font-medium">Share with team</p>
             <p class="text-xs text-muted-foreground">Make this script available to all team members</p>
           </div>
-          <Switch v-model:checked="shareWithTeam" />
+          <Switch v-model="shareWithTeam" />
         </div>
 
         <DialogFooter class="mt-4">
