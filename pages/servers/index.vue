@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "vue-sonner";
 import type { Server } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -34,6 +35,17 @@ const openLogsDialog = (server: Server) => {
 
 const handleServerDeleted = (serverId: string) => {
   servers.value = servers.value.filter(s => s.id !== serverId);
+};
+
+const handleRetryProvision = async (server: Server) => {
+  try {
+    await serverService.retryProvision(server.id);
+    toast.success("Provisioning has been queued");
+    await fetchServers();
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || "Failed to retry provisioning");
+  }
 };
 
 // Check if server needs pending actions UI
@@ -211,6 +223,7 @@ onMounted(fetchServers);
                   @provision="openProvisionDialog"
                   @view-logs="openLogsDialog"
                   @deleted="handleServerDeleted"
+                  @retry-provision="handleRetryProvision"
                 />
               </div>
             </div>

@@ -31,6 +31,7 @@ const emit = defineEmits<{
   provision: [server: Server]
   deleted: [serverId: string]
   viewLogs: [server: Server]
+  retryProvision: [server: Server]
 }>()
 
 const showDeleteDialog = ref(false)
@@ -46,8 +47,17 @@ const isCustomServerPending = computed(() => {
   return props.server.provider === 'custom_server' && props.server.provision_command
 })
 
+// Check if retry provision is available (failed status + connected)
+const canRetryProvision = computed(() => {
+  return props.server.status === 'failed' && props.server.connected
+})
+
 const handleProvision = () => {
   emit('provision', props.server)
+}
+
+const handleRetryProvision = () => {
+  emit('retryProvision', props.server)
 }
 
 const handleViewLogs = () => {
@@ -99,7 +109,7 @@ const handleDelete = async () => {
           <Icon name="lucide:chevron-down" class="h-3.5 w-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" class="w-40">
+      <DropdownMenuContent align="start" class="w-40">
         <!-- Provision option (shown for non-custom servers or as backup) -->
         <DropdownMenuItem
           v-if="isCustomServerPending"
@@ -113,6 +123,15 @@ const handleDelete = async () => {
         <DropdownMenuItem @click.prevent="handleViewLogs">
           <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
           View Logs
+        </DropdownMenuItem>
+
+        <!-- Retry Provision (only for failed servers that connected) -->
+        <DropdownMenuItem
+          v-if="canRetryProvision"
+          @click.prevent="handleRetryProvision"
+        >
+          <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+          Retry Provision
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

@@ -117,6 +117,14 @@ export const serverService = {
     return post<ApiResponse<null>>(`/servers/${id}/reboot`);
   },
 
+  /**
+   * Retry provisioning a failed server
+   */
+  retryProvision: (id: string) => {
+    const { post } = useApi();
+    return post<ApiResponse<null>>(`/servers/${id}/retry-provision`);
+  },
+
   // Sites
   sites: {
     list: (serverId: string) => {
