@@ -190,7 +190,10 @@ onMounted(fetchServers);
 
           <div class="relative mt-4 flex items-center justify-between text-sm">
             <div class="flex items-center gap-4">
-              <div class="flex items-center gap-1.5 text-muted-foreground">
+              <div
+                v-if="server.status === 'running'"
+                class="flex items-center gap-1.5 text-muted-foreground"
+              >
                 <Icon name="lucide:globe" class="h-3.5 w-3.5" />
                 <span>{{ server.sites_count ?? 0 }} sites</span>
               </div>
