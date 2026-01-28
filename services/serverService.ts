@@ -296,12 +296,13 @@ export const serverProviderService = {
  * SSH Keys service (user level)
  */
 export const sshKeyService = {
-  list: () => {
+  list: (globalOnly = false) => {
     const { get } = useApi();
-    return get<ApiResponse<SSHKey[]>>("/ssh-keys");
+    const query = globalOnly ? "?global=true" : "";
+    return get<ApiResponse<SSHKey[]>>(`/ssh-keys${query}`);
   },
 
-  create: (data: { name: string; public_key: string }) => {
+  create: (data: { name: string; public_key: string; is_global?: boolean }) => {
     const { post } = useApi();
     return post<ApiResponse<SSHKey>>("/ssh-keys", data);
   },
