@@ -71,14 +71,27 @@ const fetchProvisionScript = async () => {
   }
 }
 
-// Reset state and fetch script when dialog opens
+// Reset state when serverId changes (different server selected)
+watch(() => props.serverId, () => {
+  provisionScript.value = ''
+  provisionScriptError.value = ''
+  provisionScriptLoading.value = false
+  showScriptContent.value = false
+})
+
+// Fetch script when dialog opens
 watch(open, (isOpen) => {
   if (isOpen) {
-    // Reset error state on open
     provisionScriptError.value = ''
-    if (!provisionScript.value) {
-      fetchProvisionScript()
-    }
+    provisionScript.value = ''
+    fetchProvisionScript()
+  }
+})
+
+// Also fetch when collapsible is opened (if not already loaded)
+watch(showScriptContent, (isOpen) => {
+  if (isOpen && !provisionScript.value && !provisionScriptLoading.value) {
+    fetchProvisionScript()
   }
 })
 </script>
@@ -139,6 +152,7 @@ watch(open, (isOpen) => {
             <div class="space-y-2">
               <div v-if="provisionScriptLoading" class="flex items-center justify-center p-4">
                 <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin" />
+                <span class="ml-2 text-sm text-muted-foreground">Loading script...</span>
               </div>
               <div v-else-if="provisionScriptError" class="rounded-md border border-destructive/50 bg-destructive/10 p-4">
                 <p class="text-sm text-destructive">{{ provisionScriptError }}</p>
@@ -166,6 +180,16 @@ watch(open, (isOpen) => {
                     class="mr-1 h-3 w-3"
                   />
                   {{ scriptCopied ? 'Copied' : 'Copy' }}
+                </Button>
+              </div>
+              <div v-else class="flex items-center justify-center p-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  @click="fetchProvisionScript"
+                >
+                  <Icon name="lucide:download" class="mr-2 h-4 w-4" />
+                  Load Script
                 </Button>
               </div>
               <p class="text-xs text-muted-foreground">
