@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
+import { useServerEvents } from "~/composables/useChannelEvents";
 import type { Server } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -15,6 +16,10 @@ useHead({
 
 const servers = ref<Server[]>([]);
 const isLoading = ref(true);
+
+// Get current team for WebSocket channel
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || '');
 
 // Provision dialog state
 const showProvisionDialog = ref(false);
@@ -123,6 +128,12 @@ const fetchServers = async () => {
   }
 };
 
+// Subscribe to real-time server events
+useServerEvents(teamId, () => {
+  // Refetch servers list when any server event is received
+  fetchServers();
+});
+
 onMounted(fetchServers);
 </script>
 
@@ -200,7 +211,7 @@ onMounted(fetchServers);
             </div>
           </div>
 
-          <div class="relative mt-4 flex items-center justify-between text-sm">
+          <div class="relative mt-4 flex min-h-7 items-center justify-between text-sm">
             <div class="flex items-center gap-4">
               <div
                 v-if="server.status === 'running'"
@@ -211,7 +222,24 @@ onMounted(fetchServers);
               </div>
               <div class="flex items-center gap-1.5">
                 <span
-                  v-if="server.status === 'provisioning' || server.status === 'deleting'"
+                  v-if="server.status === 'provisioning'"
+                  class="flex items-center gap-2 text-muted-foreground"
+                >
+                  <span class="flex items-center gap-1.5">
+                    <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
+                    {{ getStatusLabel(server) }}
+                  </span>
+                  <button
+                    type="button"
+                    class="pointer-events-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                    @click.prevent.stop="openLogsDialog(server)"
+                  >
+                    <Icon name="lucide:terminal" class="h-3 w-3" />
+                    Logs
+                  </button>
+                </span>
+                <span
+                  v-else-if="server.status === 'deleting'"
                   class="flex items-center gap-1.5 text-muted-foreground"
                 >
                   <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
@@ -243,8 +271,8 @@ onMounted(fetchServers);
       :provision-command="selectedServer.provision_command || null"
     />
 
-    <!-- Provision Logs Dialog -->
-    <ServerProvisionLogsDialog
+    <!-- Provision Logs Sheet -->
+    <ServerProvisionLogsSheet
       v-model:open="showLogsDialog"
       :server="selectedServer"
     />

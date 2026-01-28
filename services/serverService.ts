@@ -9,6 +9,8 @@ import type {
   FirewallRule,
   SSHKey,
   ConnectedServerProvider,
+  Task,
+  ProvisionStatus,
 } from "~/types";
 import type { ApiResponse } from "~/composables/useApi";
 
@@ -123,6 +125,26 @@ export const serverService = {
   retryProvision: (id: string) => {
     const { post } = useApi();
     return post<ApiResponse<null>>(`/servers/${id}/retry-provision`);
+  },
+
+  /**
+   * Get provision status for a server
+   */
+  getProvisionStatus: (id: string) => {
+    const { get } = useApi();
+    return get<ApiResponse<ProvisionStatus>>(`/servers/${id}/provision-status`);
+  },
+
+  // Tasks
+  tasks: {
+    list: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<Task[]>>(`/servers/${serverId}/tasks`);
+    },
+    getLatest: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<Task>>(`/servers/${serverId}/tasks/latest`);
+    },
   },
 
   // Sites
