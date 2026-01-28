@@ -68,12 +68,12 @@ const resetForm = () => {
 const generateSSHKey = async (type: 'rsa' | 'ed25519') => {
   isGenerating.value = true
   try {
-    const response = await $api<{ privateKey: string; publicKey: string }>('/ssh-keys/generate', {
+    const response = await $api<{ data: { privateKey: string; publicKey: string } }>('/ssh-keys/generate', {
       method: 'POST',
       body: { type },
     })
-    privateKey.value = response.privateKey
-    publicKey.value = response.publicKey
+    privateKey.value = response.data.privateKey
+    publicKey.value = response.data.publicKey
     toast.success('SSH Key Generated')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
