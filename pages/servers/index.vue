@@ -19,9 +19,26 @@ const isLoading = ref(true);
 const showProvisionDialog = ref(false);
 const selectedServer = ref<Server | null>(null);
 
+// Logs dialog state
+const showLogsDialog = ref(false);
+
 const openProvisionDialog = (server: Server) => {
   selectedServer.value = server;
   showProvisionDialog.value = true;
+};
+
+const openLogsDialog = (server: Server) => {
+  selectedServer.value = server;
+  showLogsDialog.value = true;
+};
+
+const handleServerDeleted = (serverId: string) => {
+  servers.value = servers.value.filter(s => s.id !== serverId);
+};
+
+// Check if server needs pending actions UI
+const needsPendingActions = (server: Server): boolean => {
+  return ['new', 'starting', 'failed'].includes(server.status);
 };
 
 // Watch for refresh trigger (e.g., after team switch)
@@ -128,7 +145,8 @@ onMounted(fetchServers);
         <div
           class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
           :class="{
-            'opacity-60': server.status === 'failed' || server.status === 'unknown',
+            'border-destructive/30 bg-destructive/5': server.status === 'failed',
+            'opacity-60': server.status === 'unknown',
           }"
         >
           <!-- Provisioning progress bar -->
@@ -184,27 +202,13 @@ onMounted(fetchServers);
                   <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
                   {{ getStatusLabel(server) }}
                 </span>
-                <button
-                  v-else-if="server.provider === 'custom_server' && server.provision_command"
-                  class="pointer-events-auto flex items-center gap-1.5 rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90"
-                  @click.prevent="openProvisionDialog(server)"
-                >
-                  <Icon name="lucide:terminal" class="h-3 w-3" />
-                  Provision
-                </button>
-                <span
-                  v-else-if="server.status === 'new' || server.status === 'starting'"
-                  class="flex items-center gap-1.5 text-muted-foreground"
-                >
-                  <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
-                  {{ getStatusLabel(server) }}
-                </span>
-                <span
-                  v-else-if="server.status === 'failed'"
-                  class="text-destructive"
-                >
-                  {{ getStatusLabel(server) }}
-                </span>
+                <ServerPendingActions
+                  v-else-if="needsPendingActions(server)"
+                  :server="server"
+                  @provision="openProvisionDialog"
+                  @view-logs="openLogsDialog"
+                  @deleted="handleServerDeleted"
+                />
               </div>
             </div>
             <span class="text-muted-foreground">
@@ -221,6 +225,12 @@ onMounted(fetchServers);
       v-model:open="showProvisionDialog"
       :server-id="selectedServer.id"
       :provision-command="selectedServer.provision_command || null"
+    />
+
+    <!-- Provision Logs Dialog -->
+    <ServerProvisionLogsDialog
+      v-model:open="showLogsDialog"
+      :server="selectedServer"
     />
   </div>
 </template>
