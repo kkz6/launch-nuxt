@@ -124,12 +124,12 @@ const getUserInitials = (name: string): string => {
 <template>
   <div class="pb-10">
     <!-- Subscription Required State -->
-    <template v-if="!isSubscribed">
+    <div v-if="!isSubscribed">
       <div class="mb-6">
         <h1 class="text-xl font-semibold">{{ greeting }}, {{ firstName }}</h1>
       </div>
 
-      <div class="mx-auto max-w-xl">
+      <div class="mx-auto flex w-full max-w-xl flex-col">
         <div class="rounded-lg border bg-card p-8 text-center">
           <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
             <Icon name="lucide:credit-card" class="h-7 w-7 text-amber-600 dark:text-amber-400" />
@@ -178,10 +178,10 @@ const getUserInitials = (name: string): string => {
           </ul>
         </div>
       </div>
-    </template>
+    </div>
 
     <!-- Normal Dashboard Content -->
-    <template v-else>
+    <div v-else>
       <div v-if="isLoading" class="flex items-center justify-center py-12">
         <Icon name="lucide:loader-2" class="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
@@ -299,6 +299,6 @@ const getUserInitials = (name: string): string => {
         </div>
       </template>
     </template>
-    </template>
+    </div>
   </div>
 </template>
