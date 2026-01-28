@@ -54,6 +54,9 @@ const isLoading = ref(false);
 const isLoadingOptions = ref(false);
 const errors = ref<Record<string, string>>({});
 
+// Get the shared refresh key to trigger server list refresh
+const serversRefreshKey = useState('serversRefreshKey', () => 0);
+
 // Options from API
 const serverProviders = ref<ConnectedServerProvider[]>([]);
 const phpVersions = ref<Record<string, string>>({});
@@ -209,10 +212,11 @@ const onSubmit = async () => {
 
   isLoading.value = true;
   try {
-    const response = await serverService.create(data);
+    await serverService.create(data);
     toast.success("Server creation initiated");
     isOpen.value = false;
-    navigateTo(`/servers/${response.data.id}`);
+    // Trigger server list refresh
+    serversRefreshKey.value++;
   } catch (error: unknown) {
     const err = error as {
       data?: { message?: string; errors?: Record<string, string[]> };

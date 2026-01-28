@@ -15,6 +15,15 @@ useHead({
 const servers = ref<Server[]>([]);
 const isLoading = ref(true);
 
+// Provision dialog state
+const showProvisionDialog = ref(false);
+const selectedServer = ref<Server | null>(null);
+
+const openProvisionDialog = (server: Server) => {
+  selectedServer.value = server;
+  showProvisionDialog.value = true;
+};
+
 // Watch for refresh trigger (e.g., after team switch)
 const serversRefreshKey = useState('serversRefreshKey', () => 0);
 watch(serversRefreshKey, () => {
@@ -129,6 +138,14 @@ onMounted(fetchServers);
             :style="{ width: `${server.progress || 0}%` }"
           />
 
+          <!-- Connecting animation (for new/starting servers) -->
+          <div
+            v-else-if="server.status === 'new' || server.status === 'starting'"
+            class="pointer-events-none absolute inset-0 overflow-hidden rounded-lg"
+          >
+            <div class="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+          </div>
+
           <div class="relative flex items-start gap-3">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
               <Icon
@@ -161,7 +178,22 @@ onMounted(fetchServers);
               </div>
               <div class="flex items-center gap-1.5">
                 <span
-                  v-if="server.status === 'provisioning' || server.status === 'new' || server.status === 'deleting'"
+                  v-if="server.status === 'provisioning' || server.status === 'deleting'"
+                  class="flex items-center gap-1.5 text-muted-foreground"
+                >
+                  <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
+                  {{ getStatusLabel(server) }}
+                </span>
+                <button
+                  v-else-if="server.provider === 'custom_server' && server.provision_command"
+                  class="pointer-events-auto flex items-center gap-1.5 rounded bg-primary px-2 py-1 text-xs text-primary-foreground hover:bg-primary/90"
+                  @click.prevent="openProvisionDialog(server)"
+                >
+                  <Icon name="lucide:terminal" class="h-3 w-3" />
+                  Provision
+                </button>
+                <span
+                  v-else-if="server.status === 'new' || server.status === 'starting'"
                   class="flex items-center gap-1.5 text-muted-foreground"
                 >
                   <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
@@ -182,5 +214,28 @@ onMounted(fetchServers);
         </div>
       </NuxtLink>
     </div>
+
+    <!-- Provision Command Dialog -->
+    <ServerProvisionCommandDialog
+      v-if="selectedServer"
+      v-model:open="showProvisionDialog"
+      :server-id="selectedServer.id"
+      :provision-command="selectedServer.provision_command || null"
+    />
   </div>
 </template>
+
+<style scoped>
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+</style>
