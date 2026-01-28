@@ -334,6 +334,7 @@ export interface SSHKey {
   description: string;
   name: string;
   fingerprint: string;
+  is_global: boolean;
   remove_url: string;
   created_at: string;
   updated_at: string;

@@ -132,6 +132,7 @@ const onSubmit = async () => {
         name: name.value,
         description: description.value,
         public_key: publicKey.value,
+        is_global: true,
       },
     })
     toast.success('SSH key added successfully')
