@@ -77,8 +77,19 @@ export const serverService = {
   create: (data: CreateServerData) => {
     const { post } = useApi();
     return post<ApiResponse<Server>>("/servers", {
-      ...data,
+      name: data.name,
       provider: data.service_provider,
+      credential_id: data.server_provider_id,
+      region: data.region,
+      size: data.plan,
+      type: data.type,
+      operating_system: data.operating_system,
+      database_type: data.database,
+      php_version: data.php,
+      ssh_key_ids: data.ssh_keys,
+      ip: data.ip,
+      port: data.port ? parseInt(data.port, 10) : undefined,
+      install_agent: data.install_agent,
     });
   },
 
