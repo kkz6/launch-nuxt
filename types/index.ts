@@ -266,15 +266,29 @@ export interface VcsData {
 }
 
 export interface Task {
+  id: string;
   server_id: string;
-  user_id: string;
+  user_id?: string;
   name: string;
   user: string;
   type: string;
   status: string;
-  output: string;
+  output?: string;
+  exit_code?: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+}
+
+export interface ProvisionStatusStep {
+  name: string;
+  description: string;
+  status: 'completed' | 'current' | 'pending';
+}
+
+export interface ProvisionStatus {
+  steps: ProvisionStatusStep[];
+  current_step?: ProvisionStatusStep;
+  latest_task?: Task;
 }
 
 export interface GitProvider {
