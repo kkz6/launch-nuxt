@@ -260,6 +260,8 @@ export const useServerEvents = (
       'server.created',
       'server.updated',
       'server.deleted',
+      'server.connected',
+      'server.provisioned',
       'server.provisioning',
       'server.provision_progress',
       'server.provision_step',
