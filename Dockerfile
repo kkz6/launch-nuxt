@@ -12,13 +12,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_OPTIONS=--max-old-space-size=4096
-RUN npm run build 2>&1 | { \
-      while IFS= read -r line; do \
-        echo "$line"; \
-        case "$line" in *"Build complete"*) exit 0;; esac; \
-      done; \
-      exit 1; \
-    }
+RUN npm run build
 
 # --- Production ---
 FROM base AS runtime
