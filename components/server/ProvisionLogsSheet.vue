@@ -77,7 +77,7 @@ const completedCount = computed(() => {
 
 <template>
   <Sheet v-model:open="open">
-    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg sm:max-w-2xl flex flex-col outline-none">
+    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none">
       <SheetHeader class="flex-shrink-0">
         <SheetTitle>Server Provision Status</SheetTitle>
         <SheetDescription v-if="server">
@@ -124,7 +124,7 @@ const completedCount = computed(() => {
         </div>
 
         <!-- Live Logs View -->
-        <div v-else-if="showLogs && provisionStatus?.latest_task" class="flex-1 min-h-0 overflow-hidden">
+        <div v-else-if="showLogs && provisionStatus?.latest_task" class="flex-1 min-h-0 overflow-hidden rounded-lg border border-zinc-800">
           <ServerLogViewer
             :key="provisionStatus.latest_task.id"
             :server-id="server.id"
@@ -133,8 +133,14 @@ const completedCount = computed(() => {
             :no-timestamp="true"
             hide-options
             dark-theme
-            container-class-name="!bg-zinc-900 !border-zinc-800"
+            container-class-name="!bg-zinc-900 !border-0 !rounded-lg"
           />
+        </div>
+
+        <!-- Live Logs Loading (no task yet) -->
+        <div v-else-if="showLogs && !provisionStatus?.latest_task" class="flex-1 min-h-0 flex flex-col items-center justify-center gap-3 rounded-lg border bg-muted/30 py-12">
+          <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-primary" />
+          <p class="text-sm text-muted-foreground">Waiting for provision task to start...</p>
         </div>
 
         <!-- Steps List -->
@@ -142,8 +148,9 @@ const completedCount = computed(() => {
           v-else
           class="flex-1 min-h-0 overflow-y-auto rounded-lg border bg-muted/30 p-4"
         >
-          <div v-if="isLoading" class="flex h-full items-center justify-center py-12">
-            <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+          <div v-if="isLoading" class="flex h-full flex-col items-center justify-center gap-3 py-12">
+            <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-primary" />
+            <p class="text-sm text-muted-foreground">Loading provision status...</p>
           </div>
 
           <ul v-else-if="provisionStatus?.steps" role="list" class="space-y-4">
@@ -168,7 +175,7 @@ const completedCount = computed(() => {
               </div>
 
               <!-- Step icon -->
-              <div class="relative flex h-6 w-6 flex-none items-center justify-center">
+              <div class="relative flex h-6 w-6 flex-none items-center justify-center bg-muted/30 z-10">
                 <template v-if="step.status === 'completed'">
                   <span
                     v-if="latestCompletedIndex === idx"
@@ -182,11 +189,11 @@ const completedCount = computed(() => {
                 <Icon
                   v-else-if="step.status === 'current'"
                   name="lucide:loader-2"
-                  class="h-5 w-5 animate-spin text-muted-foreground"
+                  class="h-5 w-5 animate-spin text-primary"
                 />
                 <div
                   v-else
-                  class="h-2 w-2 rounded-full bg-muted-foreground/30"
+                  class="h-2.5 w-2.5 rounded-full bg-border ring-4 ring-muted/30"
                 />
               </div>
 
