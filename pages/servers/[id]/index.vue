@@ -5,7 +5,7 @@ import { serverService } from "~/services/serverService";
 
 definePageMeta({
   layout: "default",
-  middleware: "auth",
+  middleware: ["auth", "server-provisioned"],
 });
 
 const route = useRoute();
