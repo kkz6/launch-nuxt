@@ -96,6 +96,10 @@ export default defineNuxtConfig({
     },
   },
 
+  build: {
+    transpile: ["@xterm/xterm", "@xterm/addon-fit"],
+  },
+
   vite: {
     optimizeDeps: {
       include: [
