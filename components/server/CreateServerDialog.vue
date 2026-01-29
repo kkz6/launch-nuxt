@@ -54,6 +54,9 @@ const isLoading = ref(false);
 const isLoadingOptions = ref(false);
 const errors = ref<Record<string, string>>({});
 
+// Get the shared refresh key to trigger server list refresh
+const serversRefreshKey = useState('serversRefreshKey', () => 0);
+
 // Options from API
 const serverProviders = ref<ConnectedServerProvider[]>([]);
 const phpVersions = ref<Record<string, string>>({});
@@ -185,7 +188,7 @@ const fetchOptions = async () => {
     const [optionsData, providersData, sshData] = await Promise.all([
       serverService.getCreateOptions(),
       serverProviderService.list(),
-      sshKeyService.list(),
+      sshKeyService.list(true),
     ]);
 
     phpVersions.value = optionsData.data.phpVersions;
@@ -209,10 +212,11 @@ const onSubmit = async () => {
 
   isLoading.value = true;
   try {
-    const response = await serverService.create(data);
+    await serverService.create(data);
     toast.success("Server creation initiated");
     isOpen.value = false;
-    navigateTo(`/servers/${response.data.id}`);
+    // Trigger server list refresh
+    serversRefreshKey.value++;
   } catch (error: unknown) {
     const err = error as {
       data?: { message?: string; errors?: Record<string, string[]> };
@@ -397,20 +401,34 @@ watch(isOpen, (open) => {
         <!-- SSH Keys -->
         <div class="space-y-2">
           <Label>SSH Keys</Label>
-          <Select disabled>
-            <SelectTrigger>
-              <SelectValue placeholder="Select SSH keys" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="key in sshKeys"
-                :key="key.id"
-                :value="key.id"
-              >
-                {{ key.name }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <div v-if="sshKeys.length === 0" class="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
+            No SSH keys available. Add one in Settings.
+          </div>
+          <div v-else class="grid gap-2">
+            <div
+              v-for="key in sshKeys"
+              :key="key.id"
+              class="flex items-center gap-3 rounded-md border p-3"
+            >
+              <Checkbox
+                :id="`ssh-key-${key.id}`"
+                :checked="selectedSshKeys.includes(key.id)"
+                @update:checked="(checked: boolean) => {
+                  if (checked) {
+                    selectedSshKeys.push(key.id)
+                  } else {
+                    selectedSshKeys = selectedSshKeys.filter(id => id !== key.id)
+                  }
+                }"
+              />
+              <Label :for="`ssh-key-${key.id}`" class="flex-1 cursor-pointer">
+                <span class="font-medium">{{ key.name }}</span>
+                <span v-if="key.fingerprint" class="ml-2 font-mono text-xs text-muted-foreground">
+                  {{ key.fingerprint.slice(0, 20) }}...
+                </span>
+              </Label>
+            </div>
+          </div>
         </div>
 
         <!-- Server Type -->
@@ -548,7 +566,7 @@ watch(isOpen, (open) => {
           <div class="flex items-start space-x-3 rounded-md border p-4">
             <Checkbox
               id="install_agent"
-              v-model:checked="installAgent"
+              v-model="installAgent"
             />
             <div class="space-y-1 leading-none">
               <Label for="install_agent" class="cursor-pointer">

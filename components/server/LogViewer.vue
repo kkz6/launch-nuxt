@@ -20,6 +20,7 @@ interface Props {
   noTimestamp?: boolean
   hideOptions?: boolean
   containerClassName?: string
+  darkTheme?: boolean
 }
 
 interface LogLine {
@@ -32,6 +33,7 @@ const props = withDefaults(defineProps<Props>(), {
   typeSwitcher: false,
   noTimestamp: false,
   hideOptions: false,
+  darkTheme: false,
 })
 
 const config = useRuntimeConfig()
@@ -87,25 +89,28 @@ const getLogType = (message: string): LogLine['type'] => {
 
 const parseLogs = (raw: string): LogLine[] => {
   if (!raw) return []
-  return raw.split('\n').filter(Boolean).map((line) => {
-    // Strip ANSI codes first
-    const cleanLine = stripAnsi(line)
+  return raw.split('\n').filter(Boolean)
+    // Filter out internal LAUNCH markers
+    .filter(line => !line.includes('::LAUNCH::'))
+    .map((line) => {
+      // Strip ANSI codes first
+      const cleanLine = stripAnsi(line)
 
-    const timestampMatch = cleanLine.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\]]*)\]?\s*/)
-    let timestamp: Date | null = null
-    let message = cleanLine
+      const timestampMatch = cleanLine.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\]]*)\]?\s*/)
+      let timestamp: Date | null = null
+      let message = cleanLine
 
-    if (timestampMatch) {
-      timestamp = new Date(timestampMatch[1])
-      message = cleanLine.slice(timestampMatch[0].length)
-    }
+      if (timestampMatch) {
+        timestamp = new Date(timestampMatch[1])
+        message = cleanLine.slice(timestampMatch[0].length)
+      }
 
-    return {
-      timestamp,
-      message,
-      type: getLogType(message),
-    }
-  })
+      return {
+        timestamp,
+        message,
+        type: getLogType(message),
+      }
+    })
 }
 
 const scrollToBottom = () => {
@@ -137,13 +142,24 @@ const handleDownload = () => {
   URL.revokeObjectURL(url)
 }
 
-const typeColorMap: Record<string, string> = {
-  error: 'text-red-500',
-  warning: 'text-yellow-500',
-  success: 'text-green-500',
-  debug: 'text-blue-500',
-  info: 'text-muted-foreground',
-}
+const typeColorMap = computed(() => {
+  if (props.darkTheme) {
+    return {
+      error: 'text-red-400',
+      warning: 'text-yellow-400',
+      success: 'text-green-400',
+      debug: 'text-blue-400',
+      info: 'text-zinc-300',
+    }
+  }
+  return {
+    error: 'text-red-500',
+    warning: 'text-yellow-500',
+    success: 'text-green-500',
+    debug: 'text-blue-500',
+    info: 'text-muted-foreground',
+  }
+})
 
 // WebSocket connection
 let ws: WebSocket | null = null
@@ -242,9 +258,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <div class="rounded-lg">
-      <div class="space-y-4">
+  <div :class="hideOptions ? 'h-full flex flex-col' : 'flex flex-col gap-4'">
+    <div :class="hideOptions ? 'h-full flex flex-col' : 'rounded-lg'">
+      <div :class="hideOptions ? 'h-full flex flex-col' : 'space-y-4'">
         <div v-if="!hideOptions" class="flex flex-wrap items-start justify-between gap-4 sm:items-center">
           <div class="flex flex-wrap gap-4">
             <Select v-model="linesString">
@@ -283,8 +299,11 @@ onUnmounted(() => {
 
         <div
           ref="scrollRef"
-          class="relative h-[500px] overflow-y-auto rounded-md border bg-background p-4"
-          :class="containerClassName"
+          :class="[
+            hideOptions ? 'flex-1 min-h-0' : 'h-[500px]',
+            'relative overflow-y-auto rounded-md border bg-background p-4',
+            containerClassName
+          ]"
           @scroll="handleScroll"
         >
           <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-background/80">

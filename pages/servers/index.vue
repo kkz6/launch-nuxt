@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { toast } from "vue-sonner";
+import { useServerEvents } from "~/composables/useChannelEvents";
 import type { Server } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -14,6 +16,47 @@ useHead({
 
 const servers = ref<Server[]>([]);
 const isLoading = ref(true);
+
+// Get current team for WebSocket channel
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || '');
+
+// Provision dialog state
+const showProvisionDialog = ref(false);
+const selectedServer = ref<Server | null>(null);
+
+// Logs dialog state
+const showLogsDialog = ref(false);
+
+const openProvisionDialog = (server: Server) => {
+  selectedServer.value = server;
+  showProvisionDialog.value = true;
+};
+
+const openLogsDialog = (server: Server) => {
+  selectedServer.value = server;
+  showLogsDialog.value = true;
+};
+
+const handleServerDeleted = (serverId: string) => {
+  servers.value = servers.value.filter(s => s.id !== serverId);
+};
+
+const handleRetryProvision = async (server: Server) => {
+  try {
+    await serverService.retryProvision(server.id);
+    toast.success("Provisioning has been queued");
+    await fetchServers();
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || "Failed to retry provisioning");
+  }
+};
+
+// Check if server needs pending actions UI
+const needsPendingActions = (server: Server): boolean => {
+  return ['new', 'starting', 'failed'].includes(server.status);
+};
 
 // Watch for refresh trigger (e.g., after team switch)
 const serversRefreshKey = useState('serversRefreshKey', () => 0);
@@ -85,6 +128,12 @@ const fetchServers = async () => {
   }
 };
 
+// Subscribe to real-time server events
+useServerEvents(teamId, () => {
+  // Refetch servers list when any server event is received
+  fetchServers();
+});
+
 onMounted(fetchServers);
 </script>
 
@@ -119,7 +168,8 @@ onMounted(fetchServers);
         <div
           class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
           :class="{
-            'opacity-60': server.status === 'failed' || server.status === 'unknown',
+            'border-destructive/30 bg-destructive/5': server.status === 'failed',
+            'opacity-60': server.status === 'unknown',
           }"
         >
           <!-- Provisioning progress bar -->
@@ -128,6 +178,14 @@ onMounted(fetchServers);
             class="pointer-events-none absolute inset-0 animate-pulse rounded-lg bg-green-500/20"
             :style="{ width: `${server.progress || 0}%` }"
           />
+
+          <!-- Connecting animation (for new/starting servers) -->
+          <div
+            v-else-if="server.status === 'new' || server.status === 'starting'"
+            class="pointer-events-none absolute inset-0 overflow-hidden rounded-lg"
+          >
+            <div class="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+          </div>
 
           <div class="relative flex items-start gap-3">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
@@ -153,26 +211,48 @@ onMounted(fetchServers);
             </div>
           </div>
 
-          <div class="relative mt-4 flex items-center justify-between text-sm">
+          <div class="relative mt-4 flex min-h-7 items-center justify-between text-sm">
             <div class="flex items-center gap-4">
-              <div class="flex items-center gap-1.5 text-muted-foreground">
+              <div
+                v-if="server.status === 'running'"
+                class="flex items-center gap-1.5 text-muted-foreground"
+              >
                 <Icon name="lucide:globe" class="h-3.5 w-3.5" />
                 <span>{{ server.sites_count ?? 0 }} sites</span>
               </div>
               <div class="flex items-center gap-1.5">
                 <span
-                  v-if="server.status === 'provisioning' || server.status === 'new' || server.status === 'deleting'"
+                  v-if="server.status === 'provisioning'"
+                  class="flex items-center gap-2 text-muted-foreground"
+                >
+                  <span class="flex items-center gap-1.5">
+                    <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
+                    {{ getStatusLabel(server) }}
+                  </span>
+                  <button
+                    type="button"
+                    class="pointer-events-auto flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/10 transition-colors"
+                    @click.prevent.stop="openLogsDialog(server)"
+                  >
+                    <Icon name="lucide:terminal" class="h-3 w-3" />
+                    Logs
+                  </button>
+                </span>
+                <span
+                  v-else-if="server.status === 'deleting'"
                   class="flex items-center gap-1.5 text-muted-foreground"
                 >
                   <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
                   {{ getStatusLabel(server) }}
                 </span>
-                <span
-                  v-else-if="server.status === 'failed'"
-                  class="text-destructive"
-                >
-                  {{ getStatusLabel(server) }}
-                </span>
+                <ServerPendingActions
+                  v-else-if="needsPendingActions(server)"
+                  :server="server"
+                  @provision="openProvisionDialog"
+                  @view-logs="openLogsDialog"
+                  @deleted="handleServerDeleted"
+                  @retry-provision="handleRetryProvision"
+                />
               </div>
             </div>
             <span class="text-muted-foreground">
@@ -182,5 +262,34 @@ onMounted(fetchServers);
         </div>
       </NuxtLink>
     </div>
+
+    <!-- Provision Command Dialog -->
+    <ServerProvisionCommandDialog
+      v-if="selectedServer"
+      v-model:open="showProvisionDialog"
+      :server-id="selectedServer.id"
+      :provision-command="selectedServer.provision_command || null"
+    />
+
+    <!-- Provision Logs Sheet -->
+    <ServerProvisionLogsSheet
+      v-model:open="showLogsDialog"
+      :server="selectedServer"
+    />
   </div>
 </template>
+
+<style scoped>
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+</style>

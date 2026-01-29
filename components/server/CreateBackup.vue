@@ -314,14 +314,14 @@ watch(open, (isOpen) => {
             <div class="flex items-center space-x-2">
               <Checkbox
                 id="notification_on_failure"
-                v-model:checked="notificationOnFailure"
+                v-model="notificationOnFailure"
               />
               <Label for="notification_on_failure" class="font-normal">Notify on failure</Label>
             </div>
             <div class="flex items-center space-x-2">
               <Checkbox
                 id="notification_on_success"
-                v-model:checked="notificationOnSuccess"
+                v-model="notificationOnSuccess"
               />
               <Label for="notification_on_success" class="font-normal">Notify on success</Label>
             </div>
@@ -332,7 +332,7 @@ watch(open, (isOpen) => {
         <div class="flex items-center space-x-2">
           <Checkbox
             id="enabled"
-            v-model:checked="enabled"
+            v-model="enabled"
           />
           <Label for="enabled" class="font-normal">Enable backup</Label>
         </div>

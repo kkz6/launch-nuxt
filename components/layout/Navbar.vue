@@ -306,6 +306,9 @@ const serverName = ref<string | null>(null);
 const serverIp = ref<string | null>(null);
 const serverConnected = ref(false);
 const serverProvider = ref<string | null>(null);
+const serverStatus = ref<string | null>(null);
+const serverProvisionCommand = ref<string | null>(null);
+const showProvisionDialog = ref(false);
 
 // Site data for detail page
 const siteAddress = ref<string | null>(null);
@@ -365,11 +368,13 @@ watch([serverId, siteId], async ([sId, stId]) => {
   if (sId && !stId) {
     // Server detail page only
     try {
-      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string } }>(`/servers/${sId}`);
+      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; provision_command?: string } }>(`/servers/${sId}`);
       serverName.value = response.data.name;
       serverIp.value = response.data.public_ipv4;
       serverConnected.value = response.data.connected;
       serverProvider.value = response.data.provider;
+      serverStatus.value = response.data.status;
+      serverProvisionCommand.value = response.data.provision_command || null;
     } catch {
       serverName.value = null;
     }
@@ -380,13 +385,15 @@ watch([serverId, siteId], async ([sId, stId]) => {
     // Site detail page - fetch both server and site
     try {
       const [serverRes, siteRes] = await Promise.all([
-        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string } }>(`/servers/${sId}`),
+        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; provision_command?: string } }>(`/servers/${sId}`),
         $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`),
       ]);
       serverName.value = serverRes.data.name;
       serverIp.value = serverRes.data.public_ipv4;
       serverConnected.value = serverRes.data.connected;
       serverProvider.value = serverRes.data.provider;
+      serverStatus.value = serverRes.data.status;
+      serverProvisionCommand.value = serverRes.data.provision_command || null;
       siteAddress.value = siteRes.data.address;
       siteType.value = siteRes.data.type;
       siteUrl.value = siteRes.data.url;
@@ -397,6 +404,8 @@ watch([serverId, siteId], async ([sId, stId]) => {
   } else {
     serverName.value = null;
     serverProvider.value = null;
+    serverStatus.value = null;
+    serverProvisionCommand.value = null;
     siteAddress.value = null;
     siteType.value = null;
   }
@@ -463,6 +472,11 @@ const isDnsTabActive = (tabPath: string) => {
   }
   return false;
 };
+
+// Show provision button for custom servers that need provisioning
+const showProvisionButton = computed(() => {
+  return serverProvider.value === 'custom_server' && serverStatus.value === 'new';
+});
 
 const showGlobalTabs = computed(() => {
   const currentPath = route.path.replace(/\/$/, ''); // Remove trailing slash
@@ -872,6 +886,16 @@ onMounted(fetchTeams);
         <div class="flex items-center gap-2">
           <SharedLogsSheet v-if="serverId" :server-id="serverId" type="server" />
           <Button
+            v-if="showProvisionButton"
+            variant="outline"
+            size="sm"
+            class="border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
+            @click="showProvisionDialog = true"
+          >
+            <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
+            Provision
+          </Button>
+          <Button
             v-if="serverConnected"
             variant="outline"
             size="sm"
@@ -1054,5 +1078,13 @@ onMounted(fetchTeams);
     <SettingsCreateTeam v-model:open="isCreateTeamOpen" @created="onTeamCreated" />
 
     <SettingsSheet />
+
+    <!-- Provision Command Dialog -->
+    <ServerProvisionCommandDialog
+      v-if="serverId && serverProvisionCommand"
+      v-model:open="showProvisionDialog"
+      :server-id="serverId"
+      :provision-command="serverProvisionCommand"
+    />
   </nav>
 </template>

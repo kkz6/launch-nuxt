@@ -10,6 +10,7 @@ interface SSHKey {
   description: string
   name: string
   fingerprint: string
+  is_global: boolean
   remove_url: string
   created_at: string
   updated_at: string
@@ -22,7 +23,7 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 
 const fetchSSHKeys = async () => {
   try {
-    const response = await $api<{ data: SSHKey[] }>('/ssh-keys')
+    const response = await $api<{ data: SSHKey[] }>('/ssh-keys?global=true')
     sshKeys.value = response.data
   } catch {
     toast.error('Failed to load SSH keys')
