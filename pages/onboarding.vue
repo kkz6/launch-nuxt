@@ -25,11 +25,11 @@ const router = useRouter();
 const { open: openSettings } = useSettingsSheet();
 
 interface OnboardingData {
-  serverProviders: number;
-  sourceControls: number;
-  domainProviders: number;
-  storageProviders: number;
-  notificationChannels: number;
+  hasServerProvider: boolean;
+  hasSourceControl: boolean;
+  hasDomainProvider: boolean;
+  hasStorageProvider: boolean;
+  hasNotificationChannel: boolean;
 }
 
 interface OnboardingStep {
@@ -43,11 +43,11 @@ interface OnboardingStep {
 }
 
 const onboardingData = ref<OnboardingData>({
-  serverProviders: 0,
-  sourceControls: 0,
-  domainProviders: 0,
-  storageProviders: 0,
-  notificationChannels: 0,
+  hasServerProvider: false,
+  hasSourceControl: false,
+  hasDomainProvider: false,
+  hasStorageProvider: false,
+  hasNotificationChannel: false,
 });
 
 const isLoadingData = ref(true);
@@ -58,7 +58,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     title: "Server service provider",
     description: "Connect your cloud provider to deploy servers",
     icon: Server,
-    completedKey: "serverProviders",
+    completedKey: "hasServerProvider",
     settingsTab: "connections",
   },
   {
@@ -66,7 +66,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     title: "Git provider",
     description: "Link your GitHub, GitLab or Bitbucket account",
     icon: GitBranch,
-    completedKey: "sourceControls",
+    completedKey: "hasSourceControl",
     settingsTab: "connections",
   },
   {
@@ -74,7 +74,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     title: "Domain provider",
     description: "Configure DNS management for your domains",
     icon: Globe,
-    completedKey: "domainProviders",
+    completedKey: "hasDomainProvider",
     href: "/dns",
   },
   {
@@ -82,7 +82,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     title: "Storage Provider",
     description: "Set up backup and file storage solutions",
     icon: Database,
-    completedKey: "storageProviders",
+    completedKey: "hasStorageProvider",
     settingsTab: "connections",
   },
   {
@@ -90,7 +90,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
     title: "Notifications",
     description: "Configure alerts and notification preferences",
     icon: Bell,
-    completedKey: "notificationChannels",
+    completedKey: "hasNotificationChannel",
     settingsTab: "notifications",
   },
 ];
@@ -98,7 +98,7 @@ const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
 const steps = computed(() =>
   stepDefinitions.map((step) => ({
     ...step,
-    completed: onboardingData.value[step.completedKey] > 0,
+    completed: onboardingData.value[step.completedKey],
   }))
 );
 
@@ -117,19 +117,19 @@ const fetchOnboardingStatus = async () => {
   try {
     const response = await $api<{
       data: {
-        server_providers_count: number;
-        source_controls_count: number;
-        domain_providers_count: number;
-        storage_providers_count: number;
-        notification_channels_count: number;
+        has_server_provider: boolean;
+        has_source_control: boolean;
+        has_domain_provider: boolean;
+        has_storage_provider: boolean;
+        has_notification_channel: boolean;
       };
     }>("/onboarding/status");
     onboardingData.value = {
-      serverProviders: response.data.server_providers_count || 0,
-      sourceControls: response.data.source_controls_count || 0,
-      domainProviders: response.data.domain_providers_count || 0,
-      storageProviders: response.data.storage_providers_count || 0,
-      notificationChannels: response.data.notification_channels_count || 0,
+      hasServerProvider: response.data.has_server_provider ?? false,
+      hasSourceControl: response.data.has_source_control ?? false,
+      hasDomainProvider: response.data.has_domain_provider ?? false,
+      hasStorageProvider: response.data.has_storage_provider ?? false,
+      hasNotificationChannel: response.data.has_notification_channel ?? false,
     };
   } catch {
     // If the endpoint doesn't exist, just show empty onboarding

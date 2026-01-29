@@ -229,3 +229,44 @@ export const useScriptExecutionEvents = (
     onEvent,
   )
 }
+
+/**
+ * Composable to subscribe to server lifecycle and provision events
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a server event is received
+ *
+ * Events:
+ * - server.created: New server was created
+ * - server.updated: Server was updated
+ * - server.deleted: Server was deleted
+ * - server.provisioning: Server provisioning started
+ * - server.provision_progress: Provisioning progress update
+ * - server.provision_step: A provision step completed
+ * - server.provision_status: Provision status message update
+ * - server.provision_failed: Provisioning failed
+ * - server.software_installed: Software installation completed
+ */
+export const useServerEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    [
+      'server.created',
+      'server.updated',
+      'server.deleted',
+      'server.provisioning',
+      'server.provision_progress',
+      'server.provision_step',
+      'server.provision_status',
+      'server.provision_failed',
+      'server.software_installed',
+    ],
+    onEvent,
+  )
+}

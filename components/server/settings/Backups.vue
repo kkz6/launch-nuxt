@@ -1,13 +1,6 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '~/components/ui/tooltip'
 
 interface BackupJob {
   id: string
@@ -200,6 +193,37 @@ const getStatusConfig = (status: string) => {
 
 const hasProviders = computed(() => Object.keys(storageProviders.value).length > 0)
 
+const columns = [
+  { key: 'provider', label: 'Provider', width: '25%' },
+  { key: 'source', label: 'Source', width: '20%' },
+  { key: 'schedule', label: 'Schedule', width: '20%' },
+  { key: 'status', label: 'Last Backup', width: '15%' },
+]
+
+const actions = computed(() => [
+  {
+    label: 'Run Backup',
+    icon: 'lucide:play',
+    onClick: runBackup,
+  },
+  {
+    label: 'View History',
+    icon: 'lucide:history',
+    onClick: openHistory,
+  },
+  {
+    label: 'Edit',
+    icon: 'lucide:pencil',
+    onClick: openEdit,
+  },
+  {
+    label: 'Delete',
+    icon: 'lucide:trash-2',
+    onClick: deleteBackup,
+    destructive: true,
+  },
+])
+
 onMounted(fetchBackups)
 </script>
 
@@ -251,164 +275,46 @@ onMounted(fetchBackups)
       </div>
 
       <template v-else>
-        <!-- Empty State -->
-        <div v-if="backups.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
-          <div class="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-            <Icon name="lucide:database-backup" class="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h2 class="mb-2 text-xl font-semibold">No backup configurations</h2>
-          <p class="mb-8 max-w-md text-muted-foreground">
-            Create a backup configuration to automatically backup your databases and files.
-          </p>
-          <ServerCreateBackup :server-id="serverId" @created="fetchBackups" />
-        </div>
+        <SharedDataTable
+          :data="backups"
+          :columns="columns"
+          :actions="actions"
+          empty-icon="lucide:database-backup"
+          empty-title="No backup configurations"
+          empty-description="Create a backup configuration to automatically backup your databases and files."
+        >
+          <template #empty>
+            <ServerCreateBackup :server-id="serverId" @created="fetchBackups" />
+          </template>
 
-        <!-- Backups Table -->
-        <div v-else class="space-y-6">
-          <div class="overflow-hidden rounded-lg border">
-            <!-- Table Header -->
-            <div class="hidden border-b bg-muted/50 px-6 py-3 md:grid md:grid-cols-12 md:gap-4">
-              <div class="col-span-3 text-sm font-medium text-muted-foreground">Provider</div>
-              <div class="col-span-2 text-sm font-medium text-muted-foreground">Source</div>
-              <div class="col-span-2 text-sm font-medium text-muted-foreground">Schedule</div>
-              <div class="col-span-2 text-sm font-medium text-muted-foreground">Last Backup</div>
-              <div class="col-span-3 text-right text-sm font-medium text-muted-foreground">Actions</div>
+          <template #cell-provider="{ row }">
+            <div class="flex items-center gap-2">
+              <span class="font-medium">{{ getProviderName(row.storage_provider_id) }}</span>
+              <Badge v-if="!row.enabled" variant="secondary" class="text-xs">Disabled</Badge>
             </div>
+          </template>
 
-            <!-- Table Body -->
-            <div class="divide-y">
-              <div
-                v-for="backup in backups"
-                :key="backup.id"
-                class="px-4 py-4 transition-colors hover:bg-muted/30 md:px-6"
-              >
-                <!-- Mobile Layout -->
-                <div class="flex flex-col gap-3 md:hidden">
-                  <div class="flex items-center justify-between">
-                    <div>
-                      <div class="flex items-center gap-2">
-                        <span class="font-medium">{{ getProviderName(backup.storage_provider_id) }}</span>
-                        <Badge v-if="!backup.enabled" variant="secondary" class="text-xs">Disabled</Badge>
-                      </div>
-                      <div class="text-sm text-muted-foreground">{{ getBackupSource(backup) }}</div>
-                    </div>
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                      <Badge v-if="getLatestJobStatus(backup)" :class="getStatusConfig(getLatestJobStatus(backup)!).class">
-                        <Icon
-                          :name="getStatusConfig(getLatestJobStatus(backup)!).icon"
-                          :class="['mr-1 h-3 w-3', getLatestJobStatus(backup) === 'running' && 'animate-spin']"
-                        />
-                        {{ getStatusConfig(getLatestJobStatus(backup)!).label }}
-                      </Badge>
-                      <span v-else class="text-sm text-muted-foreground">No backups yet</span>
-                    </div>
-                    <div class="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" @click="runBackup(backup)">
-                        <Icon v-if="loadingActions[backup.id] === 'run'" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
-                        <Icon v-else name="lucide:play" class="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" @click="openHistory(backup)">
-                        <Icon name="lucide:history" class="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" @click="openEdit(backup)">
-                        <Icon name="lucide:pencil" class="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" class="hover:bg-destructive/10 hover:text-destructive" @click="deleteBackup(backup)">
-                        <Icon v-if="loadingActions[backup.id] === 'delete'" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
-                        <Icon v-else name="lucide:trash-2" class="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+          <template #cell-source="{ row }">
+            <span class="text-sm">{{ getBackupSource(row) }}</span>
+          </template>
 
-                <!-- Desktop Layout -->
-                <div class="hidden items-center gap-4 md:grid md:grid-cols-12">
-                  <div class="col-span-3">
-                    <div class="flex items-center gap-2">
-                      <span class="font-medium">{{ getProviderName(backup.storage_provider_id) }}</span>
-                      <Badge v-if="!backup.enabled" variant="secondary" class="text-xs">Disabled</Badge>
-                    </div>
-                  </div>
+          <template #cell-schedule="{ row }">
+            <code class="rounded bg-muted px-1.5 py-0.5 text-xs">{{ row.cron_expression }}</code>
+          </template>
 
-                  <div class="col-span-2">
-                    <span class="text-sm">{{ getBackupSource(backup) }}</span>
-                  </div>
+          <template #cell-status="{ row }">
+            <Badge v-if="getLatestJobStatus(row)" :class="getStatusConfig(getLatestJobStatus(row)!).class">
+              <Icon
+                :name="getStatusConfig(getLatestJobStatus(row)!).icon"
+                :class="['mr-1 h-3 w-3', getLatestJobStatus(row) === 'running' && 'animate-spin']"
+              />
+              {{ getStatusConfig(getLatestJobStatus(row)!).label }}
+            </Badge>
+            <span v-else class="text-sm text-muted-foreground">-</span>
+          </template>
+        </SharedDataTable>
 
-                  <div class="col-span-2">
-                    <code class="rounded bg-muted px-1.5 py-0.5 text-xs">{{ backup.cron_expression }}</code>
-                  </div>
-
-                  <div class="col-span-2">
-                    <Badge v-if="getLatestJobStatus(backup)" :class="getStatusConfig(getLatestJobStatus(backup)!).class">
-                      <Icon
-                        :name="getStatusConfig(getLatestJobStatus(backup)!).icon"
-                        :class="['mr-1 h-3 w-3', getLatestJobStatus(backup) === 'running' && 'animate-spin']"
-                      />
-                      {{ getStatusConfig(getLatestJobStatus(backup)!).label }}
-                    </Badge>
-                    <span v-else class="text-sm text-muted-foreground">-</span>
-                  </div>
-
-                  <div class="col-span-3 flex items-center justify-end gap-1">
-                    <TooltipProvider :delay-duration="0">
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button variant="ghost" size="icon" :disabled="!!loadingActions[backup.id]" @click="runBackup(backup)">
-                            <Icon v-if="loadingActions[backup.id] === 'run'" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
-                            <Icon v-else name="lucide:play" class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Run Backup</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <TooltipProvider :delay-duration="0">
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button variant="ghost" size="icon" @click="openHistory(backup)">
-                            <Icon name="lucide:history" class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>View History</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <TooltipProvider :delay-duration="0">
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button variant="ghost" size="icon" @click="openEdit(backup)">
-                            <Icon name="lucide:pencil" class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-
-                    <TooltipProvider :delay-duration="0">
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            class="hover:bg-destructive/10 hover:text-destructive"
-                            :disabled="!!loadingActions[backup.id]"
-                            @click="deleteBackup(backup)"
-                          >
-                            <Icon v-if="loadingActions[backup.id] === 'delete'" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
-                            <Icon v-else name="lucide:trash-2" class="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
+        <div v-if="backups.length > 0" class="mt-6">
           <ServerCreateBackup :server-id="serverId" @created="fetchBackups" />
         </div>
       </template>

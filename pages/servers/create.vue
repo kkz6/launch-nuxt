@@ -169,7 +169,7 @@ const fetchOptions = async () => {
     const [optionsData, providersData, sshData] = await Promise.all([
       serverService.getCreateOptions(),
       serverProviderService.list(),
-      sshKeyService.list(),
+      sshKeyService.list(true),
     ]);
 
     phpVersions.value = optionsData.data.phpVersions;

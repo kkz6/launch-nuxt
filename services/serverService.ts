@@ -9,6 +9,8 @@ import type {
   FirewallRule,
   SSHKey,
   ConnectedServerProvider,
+  Task,
+  ProvisionStatus,
 } from "~/types";
 import type { ApiResponse } from "~/composables/useApi";
 
@@ -77,8 +79,19 @@ export const serverService = {
   create: (data: CreateServerData) => {
     const { post } = useApi();
     return post<ApiResponse<Server>>("/servers", {
-      ...data,
+      name: data.name,
       provider: data.service_provider,
+      credential_id: data.server_provider_id,
+      region: data.region,
+      size: data.plan,
+      type: data.type,
+      operating_system: data.operating_system,
+      database_type: data.database,
+      php_version: data.php,
+      ssh_key_ids: data.ssh_keys,
+      ip: data.ip,
+      port: data.port ? parseInt(data.port, 10) : undefined,
+      install_agent: data.install_agent,
     });
   },
 
@@ -104,6 +117,34 @@ export const serverService = {
   reboot: (id: string) => {
     const { post } = useApi();
     return post<ApiResponse<null>>(`/servers/${id}/reboot`);
+  },
+
+  /**
+   * Retry provisioning a failed server
+   */
+  retryProvision: (id: string) => {
+    const { post } = useApi();
+    return post<ApiResponse<null>>(`/servers/${id}/retry-provision`);
+  },
+
+  /**
+   * Get provision status for a server
+   */
+  getProvisionStatus: (id: string) => {
+    const { get } = useApi();
+    return get<ApiResponse<ProvisionStatus>>(`/servers/${id}/provision-status`);
+  },
+
+  // Tasks
+  tasks: {
+    list: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<Task[]>>(`/servers/${serverId}/tasks`);
+    },
+    getLatest: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<Task>>(`/servers/${serverId}/tasks/latest`);
+    },
   },
 
   // Sites
@@ -296,12 +337,13 @@ export const serverProviderService = {
  * SSH Keys service (user level)
  */
 export const sshKeyService = {
-  list: () => {
+  list: (globalOnly = false) => {
     const { get } = useApi();
-    return get<ApiResponse<SSHKey[]>>("/ssh-keys");
+    const query = globalOnly ? "?global=true" : "";
+    return get<ApiResponse<SSHKey[]>>(`/ssh-keys${query}`);
   },
 
-  create: (data: { name: string; public_key: string }) => {
+  create: (data: { name: string; public_key: string; is_global?: boolean }) => {
     const { post } = useApi();
     return post<ApiResponse<SSHKey>>("/ssh-keys", data);
   },
