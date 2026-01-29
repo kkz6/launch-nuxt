@@ -134,6 +134,24 @@ useServerEvents(teamId, () => {
   fetchServers();
 });
 
+// Auto-close provision dialogs when selected server's status changes
+watch(servers, (newServers) => {
+  if (!selectedServer.value) return
+
+  const updated = newServers.find(s => s.id === selectedServer.value!.id)
+  if (!updated) return
+
+  // Close provision command dialog when server starts provisioning
+  if (showProvisionDialog.value && updated.status !== 'new') {
+    showProvisionDialog.value = false
+  }
+
+  // Close logs sheet when provisioning completes
+  if (showLogsDialog.value && updated.status === 'running') {
+    showLogsDialog.value = false
+  }
+})
+
 onMounted(fetchServers);
 </script>
 
