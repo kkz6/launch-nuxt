@@ -1,0 +1,13 @@
+node_modules
+.output
+.nuxt
+.data
+dist
+.nitro
+.cache
+.git
+.github
+.vscode
+.idea
+*.md
+LICENSE
