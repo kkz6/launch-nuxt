@@ -186,7 +186,7 @@ const handleRefreshRepositories = async (installationId: string) => {
   refreshingInstallations.value[key] = true
 
   try {
-    const response = await $api<{ status: string }>(`/settings/git-providers/github/installations/${installationId}/refresh`, {
+    const response = await $api<{ status: string }>(`/settings/git-providers/github/installations/${installationId}/refresh-repositories`, {
       method: 'POST',
     })
     if (response.status === 'queued') {

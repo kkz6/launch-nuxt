@@ -90,6 +90,7 @@ interface SourceControl {
   login: string
   avatar_url?: string
   repository_count: number
+  installation_id?: string
 }
 
 interface Repository {
@@ -106,6 +107,7 @@ const phpVersions = ref<PhpVersion[]>([])
 const sourceControls = ref<SourceControl[]>([])
 const repositories = ref<Repository[]>([])
 const isLoadingRepositories = ref(false)
+const isRefreshingRepositories = ref(false)
 const repositorySearchTerm = ref('')
 const databases = ref<Record<string, string>>({})
 const databaseUsers = ref<Record<string, string>>({})
@@ -229,6 +231,35 @@ const fetchRepositories = async (scId: string) => {
     repositories.value = []
   } finally {
     isLoadingRepositories.value = false
+  }
+}
+
+// Get the selected source control
+const selectedSourceControl = computed(() => {
+  if (!sourceControlId.value) return null
+  return sourceControls.value.find(sc => sc.id === sourceControlId.value)
+})
+
+// Refresh repositories from the git provider
+const refreshRepositories = async () => {
+  const sc = selectedSourceControl.value
+  if (!sc || !sc.installation_id) {
+    toast.error('Cannot refresh: No installation found')
+    return
+  }
+
+  isRefreshingRepositories.value = true
+  try {
+    await $api(`/settings/git-providers/${sc.provider}/installations/${sc.installation_id}/refresh-repositories`, {
+      method: 'POST',
+    })
+    toast.success('Repositories synced')
+    // Re-fetch the repositories after sync
+    await fetchRepositories(sourceControlId.value)
+  } catch {
+    toast.error('Failed to refresh repositories')
+  } finally {
+    isRefreshingRepositories.value = false
   }
 }
 
@@ -504,15 +535,31 @@ watch(isOpen, (open) => {
               <Label for="repository">Repository</Label>
               <ComboboxRoot
                 v-model:search-term="repositorySearchTerm"
+                :model-value="selectedRepository"
                 :disabled="!sourceControlId || isLoadingRepositories"
                 :filter-function="(list: Repository[]) => list"
                 class="relative"
+                @update:model-value="(val: Repository | null) => val && handleRepositorySelect(val)"
               >
                 <ComboboxAnchor class="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50">
                   <ComboboxInput
                     class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-                    :placeholder="isLoadingRepositories ? 'Loading...' : selectedRepository ? selectedRepository.name : 'Search repository...'"
+                    :placeholder="isLoadingRepositories ? 'Loading...' : 'Search repository...'"
+                    :display-value="(repo: Repository) => repo?.name || ''"
                   />
+                  <button
+                    v-if="sourceControlId && selectedSourceControl?.installation_id"
+                    type="button"
+                    class="mr-1 flex h-6 items-center rounded px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
+                    :disabled="isRefreshingRepositories || isLoadingRepositories"
+                    @click.stop="refreshRepositories"
+                  >
+                    <Icon
+                      name="lucide:refresh-cw"
+                      class="h-3 w-3"
+                      :class="{ 'animate-spin': isRefreshingRepositories }"
+                    />
+                  </button>
                   <ComboboxTrigger class="flex items-center justify-center">
                     <Icon name="lucide:chevron-down" class="h-4 w-4 opacity-50" />
                   </ComboboxTrigger>
