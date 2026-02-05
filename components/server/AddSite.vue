@@ -149,6 +149,7 @@ const advancedOptions = ref({
   create_queue: false,
 })
 
+// Base schema - type-specific validation is done in validate()
 const schema = z.object({
   address: z.string().min(1, 'Domain is required'),
   type: z.enum(['laravel', 'wordpress', 'generic']),
@@ -160,10 +161,36 @@ const schema = z.object({
   repository_branch: z.string().optional(),
 })
 
+// Check if source control is required based on site type
+// Laravel always requires source control, Generic can work without
+const requiresSourceControl = computed(() => {
+  return siteType.value === 'laravel'
+})
+
+// Check if source control is optional (available but not required)
+const supportsSourceControl = computed(() => {
+  return siteType.value === 'generic'
+})
+
 const canSubmit = computed(() => {
   if (isLoading.value) return false
   if (address.value.trim().length === 0) return false
   if (phpVersion.value.length === 0) return false
+
+  // Laravel sites MUST have source control configured
+  if (requiresSourceControl.value) {
+    if (sourceControls.value.length === 0) return false // No git providers connected
+    if (!sourceControlId.value) return false
+    if (!sourceControlRepositoriesId.value) return false
+    if (!repositoryBranch.value) return false
+  }
+
+  // Generic sites with source control selected must have complete config
+  if (supportsSourceControl.value && sourceControlId.value) {
+    if (!sourceControlRepositoriesId.value) return false
+    if (!repositoryBranch.value) return false
+  }
+
   return true
 })
 
@@ -325,6 +352,9 @@ const handleDomainChange = (value: string | number) => {
 }
 
 const validate = () => {
+  // Reset errors
+  errors.value = {}
+
   const result = schema.safeParse({
     address: address.value.trim(),
     type: siteType.value,
@@ -335,6 +365,7 @@ const validate = () => {
     source_control_repositories_id: sourceControlRepositoriesId.value || undefined,
     repository_branch: repositoryBranch.value || undefined,
   })
+
   if (!result.success) {
     const fieldErrors = result.error.flatten().fieldErrors
     errors.value = {
@@ -343,7 +374,43 @@ const validate = () => {
     }
     return null
   }
-  errors.value = {}
+
+  // Laravel sites MUST have source control
+  if (requiresSourceControl.value) {
+    if (sourceControls.value.length === 0) {
+      // This shouldn't happen since canSubmit blocks it, but just in case
+      toast.error('Please connect a Git provider in settings first')
+      return null
+    }
+    if (!sourceControlId.value) {
+      errors.value.source_control_id = 'Git provider is required for Laravel sites'
+    }
+    if (!sourceControlRepositoriesId.value) {
+      errors.value.source_control_repositories_id = 'Repository is required for Laravel sites'
+    }
+    if (!repositoryBranch.value?.trim()) {
+      errors.value.repository_branch = 'Branch is required for Laravel sites'
+    }
+
+    if (Object.keys(errors.value).some(k => errors.value[k])) {
+      return null
+    }
+  }
+
+  // Generic sites with partial source control config
+  if (supportsSourceControl.value && sourceControlId.value) {
+    if (!sourceControlRepositoriesId.value) {
+      errors.value.source_control_repositories_id = 'Please select a repository'
+    }
+    if (!repositoryBranch.value?.trim()) {
+      errors.value.repository_branch = 'Please specify a branch'
+    }
+
+    if (Object.keys(errors.value).some(k => errors.value[k])) {
+      return null
+    }
+  }
+
   return result.data
 }
 
@@ -386,8 +453,18 @@ const onSubmit = async () => {
     resetForm()
     resetAdvancedOptions()
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'An error occurred')
+    const err = error as { data?: { message?: string, errors?: Record<string, string[]> } }
+    // Handle validation errors with field-specific messages
+    if (err.data?.errors) {
+      // Map backend errors to frontend errors (take first error message for each field)
+      errors.value = Object.entries(err.data.errors).reduce((acc, [field, messages]) => {
+        acc[field] = messages[0] || ''
+        return acc
+      }, {} as Record<string, string>)
+      toast.error(err.data?.message || 'Validation failed')
+    } else {
+      toast.error(err.data?.message || 'An error occurred')
+    }
   } finally {
     isLoading.value = false
   }
@@ -494,6 +571,7 @@ watch(isOpen, (open) => {
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.php_version" class="text-sm text-destructive">{{ errors.php_version }}</p>
           </div>
 
           <div class="space-y-2">
@@ -508,10 +586,24 @@ watch(isOpen, (open) => {
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p v-if="errors.type" class="text-sm text-destructive">{{ errors.type }}</p>
           </div>
         </div>
 
         <!-- Source Control Section -->
+        <!-- Show message if no source controls connected for Laravel/Generic sites -->
+        <div v-if="sourceControls.length === 0 && siteType !== 'wordpress'" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+          <div class="flex items-start gap-3">
+            <Icon name="lucide:alert-triangle" class="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <div class="space-y-1">
+              <p class="text-sm font-medium text-amber-800 dark:text-amber-200">No Git Provider Connected</p>
+              <p class="text-sm text-amber-700 dark:text-amber-300">
+                Connect a Git provider (GitHub, GitLab, or Bitbucket) in settings to deploy {{ siteType === 'laravel' ? 'Laravel' : 'Generic PHP' }} applications from a repository.
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div v-if="sourceControls.length > 0 && siteType !== 'wordpress'" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
@@ -529,6 +621,7 @@ watch(isOpen, (open) => {
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <p v-if="errors.source_control_id" class="text-sm text-destructive">{{ errors.source_control_id }}</p>
             </div>
 
             <div class="space-y-2">
@@ -592,6 +685,7 @@ watch(isOpen, (open) => {
                   </ComboboxContent>
                 </ComboboxPortal>
               </ComboboxRoot>
+              <p v-if="errors.source_control_repositories_id" class="text-sm text-destructive">{{ errors.source_control_repositories_id }}</p>
             </div>
           </div>
 
@@ -602,6 +696,7 @@ watch(isOpen, (open) => {
               v-model="repositoryBranch"
               placeholder="main"
             />
+            <p v-if="errors.repository_branch" class="text-sm text-destructive">{{ errors.repository_branch }}</p>
           </div>
         </div>
 
