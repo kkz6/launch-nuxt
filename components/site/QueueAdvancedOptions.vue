@@ -49,7 +49,7 @@ const runOnMaintenance = computed({
 
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="sm:max-w-2xl" @interact-outside.prevent>
+    <DialogContent class="sm:max-w-2xl">
       <DialogHeader>
         <DialogTitle>Advanced Options</DialogTitle>
         <DialogDescription>

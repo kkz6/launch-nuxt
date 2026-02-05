@@ -251,10 +251,7 @@ watch(isOpen, (open) => {
       </Button>
     </DialogTrigger>
 
-    <DialogContent
-      class="sm:max-w-3xl"
-      @interact-outside="(e: Event) => e.preventDefault()"
-    >
+    <DialogContent class="sm:max-w-3xl">
       <DialogHeader>
         <DialogTitle>Create Server</DialogTitle>
         <DialogDescription>
@@ -480,10 +477,7 @@ watch(isOpen, (open) => {
 
   <!-- Advanced Options Dialog -->
   <Dialog v-model:open="isAdvancedOpen">
-    <DialogContent
-      class="border-2 border-border/50 sm:max-w-2xl"
-      @interact-outside="(e: Event) => e.preventDefault()"
-    >
+    <DialogContent class="border-2 border-border/50 sm:max-w-2xl">
       <DialogHeader>
         <DialogTitle>Advanced Options</DialogTitle>
         <DialogDescription>
