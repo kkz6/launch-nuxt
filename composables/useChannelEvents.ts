@@ -272,3 +272,27 @@ export const useServerEvents = (
     onEvent,
   )
 }
+
+/**
+ * Composable to subscribe to PHP extension events
+ *
+ * @param serverId - The server ID
+ * @param onEvent - Callback to run when a PHP extension event is received
+ *
+ * Events:
+ * - php.extension_installed: Extension was installed successfully
+ * - php.extension_uninstalled: Extension was uninstalled successfully
+ */
+export const usePhpExtensionEvents = (
+  serverId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const serverIdValue = computed(() => unref(serverId))
+  const channel = computed(() => `server.${serverIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['php.extension_installed', 'php.extension_uninstalled'],
+    onEvent,
+  )
+}

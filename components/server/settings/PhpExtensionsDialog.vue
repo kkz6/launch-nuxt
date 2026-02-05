@@ -2,6 +2,7 @@
 import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
+import { Input } from '~/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -19,10 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
+import { usePhpExtensionEvents } from '~/composables/useChannelEvents'
 
 interface PhpExtension {
   value: string
   label: string
+  description?: string
   status: string
   is_installed: boolean
   is_pending: boolean
@@ -61,12 +64,22 @@ const emit = defineEmits<{
 
 const open = defineModel<boolean>('open', { required: true })
 
+const searchQuery = ref('')
 const loadingStates = ref<Record<string, boolean>>({})
 const confirmDialog = ref<{
   open: boolean
   action: 'install' | 'uninstall'
   extension: PhpExtension | null
 }>({ open: false, action: 'install', extension: null })
+
+// Listen for WebSocket events to refresh data when extension operations complete
+usePhpExtensionEvents(
+  computed(() => props.serverId),
+  () => {
+    // Refresh extensions data when install/uninstall completes
+    emit('updated')
+  },
+)
 
 // Format PHP version from "php84" or "8.4" to "8.4"
 const formatPhpVersion = (version: string): string => {
@@ -124,90 +137,147 @@ const confirmAction = () => {
 
 const extensions = computed(() => props.service.details?.extensions || [])
 const pendingCount = computed(() => extensions.value.filter(e => e.is_pending).length)
+
+// Filter and separate extensions
+const filteredExtensions = computed(() => {
+  const query = searchQuery.value.toLowerCase()
+  return extensions.value.filter(ext =>
+    ext.label.toLowerCase().includes(query) ||
+    ext.value.toLowerCase().includes(query) ||
+    (ext.description?.toLowerCase().includes(query))
+  )
+})
+
+const installedExtensions = computed(() =>
+  filteredExtensions.value.filter(e => e.is_installed || e.is_pending)
+)
+
+const availableExtensions = computed(() =>
+  filteredExtensions.value.filter(e => !e.is_installed && !e.is_pending)
+)
 </script>
 
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="sm:max-w-lg">
+    <DialogContent class="sm:max-w-2xl">
       <DialogHeader>
         <DialogTitle class="flex items-center gap-2">
           <Icon name="lucide:package" class="h-5 w-5" />
           PHP {{ formatPhpVersion(service.details?.version || service.key) }} Extensions
         </DialogTitle>
         <DialogDescription>
-          Install or remove PHP extensions.
+          Manage PHP extensions for this version.
           <span v-if="pendingCount > 0" class="ml-1 text-amber-600 dark:text-amber-400">
-            {{ pendingCount }} in progress...
+            {{ pendingCount }} operation{{ pendingCount > 1 ? 's' : '' }} in progress...
           </span>
         </DialogDescription>
       </DialogHeader>
 
-      <div class="grid max-h-[400px] gap-2 overflow-y-auto pr-1">
-        <div
-          v-for="ext in extensions"
-          :key="ext.value"
-          :class="[
-            'flex items-center justify-between rounded-lg border p-3',
-            'dark:bg-[#1C1C1C] dark:border-[#2B2B2B]',
-            ext.is_pending && 'opacity-70',
-          ]"
-        >
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium">{{ ext.label }}</span>
-              <!-- Status Badge -->
-              <Badge v-if="ext.is_pending" variant="secondary" class="gap-1 text-xs">
-                <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin" />
-                {{ ext.status === 'installing' ? 'Installing' : 'Removing' }}
-              </Badge>
-              <Badge v-else-if="ext.is_installed" class="gap-1 bg-emerald-600 text-xs">
-                <Icon name="lucide:check" class="h-3 w-3" />
-                Installed
-              </Badge>
-              <Badge v-else-if="ext.status === 'failed'" variant="destructive" class="gap-1 text-xs">
-                <Icon name="lucide:x" class="h-3 w-3" />
-                Failed
-              </Badge>
-            </div>
-          </div>
+      <!-- Search -->
+      <div class="relative">
+        <Icon name="lucide:search" class="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          v-model="searchQuery"
+          placeholder="Search extensions..."
+          class="pl-9"
+        />
+      </div>
 
-          <div class="ml-3 flex flex-shrink-0 items-center gap-2">
-            <Button
-              v-if="ext.is_installed"
-              variant="ghost"
-              size="sm"
-              class="h-8 w-8 p-0 text-red-500 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20"
-              :disabled="loadingStates[ext.value] || ext.is_pending"
-              @click="confirmDialog = { open: true, action: 'uninstall', extension: ext }"
+      <div class="max-h-[450px] space-y-4 overflow-y-auto pr-1">
+        <!-- Installed Extensions -->
+        <div v-if="installedExtensions.length > 0">
+          <h3 class="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Icon name="lucide:check-circle" class="h-4 w-4 text-emerald-500" />
+            Installed ({{ installedExtensions.length }})
+          </h3>
+          <div class="grid gap-2">
+            <div
+              v-for="ext in installedExtensions"
+              :key="ext.value"
+              :class="[
+                'flex items-center justify-between rounded-lg border bg-emerald-50/50 p-3 dark:bg-emerald-950/20',
+                'dark:border-emerald-900/30',
+                ext.is_pending && 'opacity-70',
+              ]"
             >
-              <Icon
-                v-if="loadingStates[ext.value] && ext.status === 'uninstalling'"
-                name="lucide:loader-2"
-                class="h-4 w-4 animate-spin"
-              />
-              <Icon v-else name="lucide:trash-2" class="h-4 w-4" />
-            </Button>
-            <Button
-              v-else
-              variant="outline"
-              size="sm"
-              class="h-8 text-xs"
-              :disabled="loadingStates[ext.value] || ext.is_pending"
-              @click="confirmDialog = { open: true, action: 'install', extension: ext }"
-            >
-              <Icon
-                v-if="loadingStates[ext.value] && ext.status === 'installing'"
-                name="lucide:loader-2"
-                class="mr-1 h-4 w-4 animate-spin"
-              />
-              <Icon v-else name="lucide:download" class="mr-1 h-3.5 w-3.5" />
-              Install
-            </Button>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium">{{ ext.label }}</span>
+                  <Badge v-if="ext.is_pending" variant="secondary" class="gap-1 text-xs">
+                    <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin" />
+                    {{ ext.status === 'installing' ? 'Installing' : 'Removing' }}
+                  </Badge>
+                  <Badge v-else-if="ext.status === 'failed'" variant="destructive" class="gap-1 text-xs">
+                    <Icon name="lucide:x" class="h-3 w-3" />
+                    Failed
+                  </Badge>
+                </div>
+                <p v-if="ext.description" class="mt-0.5 text-xs text-muted-foreground">
+                  {{ ext.description }}
+                </p>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                class="ml-3 h-8 w-8 shrink-0 p-0 text-red-500 hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-950/30"
+                :disabled="loadingStates[ext.value] || ext.is_pending"
+                @click="confirmDialog = { open: true, action: 'uninstall', extension: ext }"
+              >
+                <Icon
+                  v-if="loadingStates[ext.value]"
+                  name="lucide:loader-2"
+                  class="h-4 w-4 animate-spin"
+                />
+                <Icon v-else name="lucide:trash-2" class="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        <div v-if="extensions.length === 0" class="py-8 text-center text-muted-foreground">
-          No extensions available
+        <!-- Available Extensions -->
+        <div v-if="availableExtensions.length > 0">
+          <h3 class="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Icon name="lucide:download" class="h-4 w-4" />
+            Available ({{ availableExtensions.length }})
+          </h3>
+          <div class="grid gap-2">
+            <div
+              v-for="ext in availableExtensions"
+              :key="ext.value"
+              class="flex items-center justify-between rounded-lg border p-3 dark:bg-[#1C1C1C] dark:border-[#2B2B2B]"
+            >
+              <div class="min-w-0 flex-1">
+                <span class="text-sm font-medium">{{ ext.label }}</span>
+                <p v-if="ext.description" class="mt-0.5 text-xs text-muted-foreground">
+                  {{ ext.description }}
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                class="ml-3 h-8 shrink-0 text-xs"
+                :disabled="loadingStates[ext.value]"
+                @click="confirmDialog = { open: true, action: 'install', extension: ext }"
+              >
+                <Icon
+                  v-if="loadingStates[ext.value]"
+                  name="lucide:loader-2"
+                  class="mr-1.5 h-3.5 w-3.5 animate-spin"
+                />
+                <Icon v-else name="lucide:plus" class="mr-1.5 h-3.5 w-3.5" />
+                Install
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="filteredExtensions.length === 0" class="py-8 text-center text-muted-foreground">
+          <Icon name="lucide:package-x" class="mx-auto mb-2 h-8 w-8 opacity-50" />
+          <p v-if="searchQuery">No extensions match "{{ searchQuery }}"</p>
+          <p v-else>No extensions available</p>
         </div>
       </div>
     </DialogContent>
@@ -222,11 +292,11 @@ const pendingCount = computed(() => extensions.value.filter(e => e.is_pending).l
         </AlertDialogTitle>
         <AlertDialogDescription>
           <template v-if="confirmDialog.action === 'install'">
-            Are you sure you want to install <strong>{{ confirmDialog.extension?.label }}</strong> extension?
+            Are you sure you want to install <strong>{{ confirmDialog.extension?.label }}</strong>?
             This will restart PHP-FPM.
           </template>
           <template v-else>
-            Are you sure you want to uninstall <strong>{{ confirmDialog.extension?.label }}</strong> extension?
+            Are you sure you want to uninstall <strong>{{ confirmDialog.extension?.label }}</strong>?
             This action cannot be undone and will restart PHP-FPM.
           </template>
         </AlertDialogDescription>
