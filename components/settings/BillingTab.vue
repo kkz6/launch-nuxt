@@ -93,11 +93,7 @@ const handleCheckout = async (planId: string, isAnnual: boolean) => {
       body: { annual: isAnnual, plan: planId },
     })
     const url = response.data?.url || (response as any).url
-    if (window.LemonSqueezy) {
-      window.LemonSqueezy.Url.Open(url)
-    } else {
-      window.open(url, '_blank')
-    }
+    window.location.href = url
     isModalOpen.value = false
   } catch {
     toast.error('Failed to generate checkout URL')
@@ -155,31 +151,13 @@ const resumeSubscription = async () => {
 
 const updatePaymentMethod = () => {
   if (currentSubscription.value?.payment_method_url) {
-    if (window.LemonSqueezy) {
-      window.LemonSqueezy.Url.Open(currentSubscription.value.payment_method_url)
-    } else {
-      window.open(currentSubscription.value.payment_method_url, '_blank')
-    }
+    window.open(currentSubscription.value.payment_method_url, '_blank')
   }
 }
 
 onMounted(() => {
   fetchBillingData()
-  if (window.createLemonSqueezy) {
-    window.createLemonSqueezy()
-  }
 })
-
-declare global {
-  interface Window {
-    LemonSqueezy?: {
-      Url: {
-        Open: (url: string) => void
-      }
-    }
-    createLemonSqueezy?: () => void
-  }
-}
 </script>
 
 <template>
