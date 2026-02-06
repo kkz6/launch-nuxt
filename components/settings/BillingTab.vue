@@ -52,6 +52,7 @@ const serverCount = ref(0)
 const receipts = ref<Receipt[]>([])
 const isLoading = ref(true)
 const isModalOpen = ref(false)
+const pricingModal = ref<{ resetLoading: () => void } | null>(null)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 const currentSubscription = computed(() =>
@@ -95,8 +96,11 @@ const handleCheckout = async (planId: string, isAnnual: boolean) => {
     const url = response.data?.url || (response as any).url
     window.location.href = url
     isModalOpen.value = false
-  } catch {
-    toast.error('Failed to generate checkout URL')
+  } catch (error: unknown) {
+    const errorData = error as { data?: { message?: string } }
+    const message = errorData?.data?.message || 'Failed to generate checkout URL'
+    toast.error(message)
+    pricingModal.value?.resetLoading()
   }
 }
 
@@ -348,6 +352,7 @@ onMounted(() => {
     </template>
 
     <BillingPricingModal
+      ref="pricingModal"
       v-model:is-open="isModalOpen"
       :plans="subscriptionPlans"
       :current-plan-id="currentSubscription?.plan?.id"

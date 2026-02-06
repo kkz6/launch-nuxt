@@ -51,6 +51,12 @@ const handleSelectPlan = (planId: string) => {
   emit('selectPlan', planId, isAnnual.value)
 }
 
+const resetLoading = () => {
+  isLoading.value = null
+}
+
+defineExpose({ resetLoading })
+
 const currentPlan = computed(() => props.plans.find(p => p.id === props.currentPlanId))
 </script>
 
