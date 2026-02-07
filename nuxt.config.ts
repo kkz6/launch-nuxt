@@ -37,7 +37,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080/api",
-      wsBase: process.env.NUXT_PUBLIC_WS_BASE || "ws://localhost:8080",
+      wsBase: process.env.NUXT_PUBLIC_WS_BASE || "ws://localhost:8080/api",
     },
   },
 
@@ -52,7 +52,7 @@ export default defineNuxtConfig({
         { name: "viewport", content: "width=device-width, initial-scale=1" },
       ],
       link: [
-        { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
+        { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         {
           rel: "preconnect",
