@@ -84,6 +84,7 @@ onMounted(async () => {
     <!-- Tab Content -->
     <div v-if="activeTab === 'general'" class="space-y-4">
       <SiteDeployBlock v-if="site.type !== 'wordpress'" :server="server" :site="site" />
+      <SiteLoadBalancedBanner :site="site" />
       <SiteOverview :server="server" :site="site" />
       <SiteLaravelFeatures
         v-if="site.type === 'laravel'"
