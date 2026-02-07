@@ -116,7 +116,7 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 
 // Form values
 const address = ref('')
-const siteType = ref<'laravel' | 'wordpress' | 'generic'>('laravel')
+const siteType = ref<'laravel' | 'wordpress' | 'generic' | 'phpmyadmin'>('laravel')
 const phpVersion = ref('')
 const webFolder = ref('/public')
 const zeroDowntimeDeployment = ref(false)
@@ -128,6 +128,7 @@ const applicationTypes: Record<string, string> = {
   laravel: 'Laravel',
   wordpress: 'WordPress',
   generic: 'Generic PHP',
+  phpmyadmin: 'phpMyAdmin',
 }
 
 // Get selected repository display name
@@ -592,7 +593,7 @@ watch(isOpen, (open) => {
 
         <!-- Source Control Section -->
         <!-- Show message if no source controls connected for Laravel/Generic sites -->
-        <div v-if="sourceControls.length === 0 && siteType !== 'wordpress'" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+        <div v-if="sourceControls.length === 0 && siteType !== 'wordpress' && siteType !== 'phpmyadmin'" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
           <div class="flex items-start gap-3">
             <Icon name="lucide:alert-triangle" class="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-400" />
             <div class="space-y-1">
@@ -604,7 +605,7 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <div v-if="sourceControls.length > 0 && siteType !== 'wordpress'" class="space-y-4">
+        <div v-if="sourceControls.length > 0 && siteType !== 'wordpress' && siteType !== 'phpmyadmin'" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="source_control">Git Provider</Label>
@@ -700,7 +701,7 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <div v-if="siteType !== 'wordpress'" class="space-y-4">
+        <div v-if="siteType !== 'wordpress' && siteType !== 'phpmyadmin'" class="space-y-4">
           <div class="space-y-2">
             <Label for="web_folder">Web Folder</Label>
             <Input
