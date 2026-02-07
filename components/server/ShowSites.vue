@@ -171,9 +171,17 @@ const formatDate = (date: string): string => {
                   :class="getStatusColor(site)"
                 />
               </div>
-              <p class="text-sm text-muted-foreground truncate">
-                {{ getSiteTypeLabel(site.type) }}
-              </p>
+              <div class="flex items-center gap-1.5">
+                <p class="text-sm text-muted-foreground truncate">
+                  {{ getSiteTypeLabel(site.type) }}
+                </p>
+                <span
+                  v-if="site.load_balanced_upstream_id"
+                  class="inline-flex shrink-0 items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
+                >
+                  LB
+                </span>
+              </div>
             </div>
           </div>
 

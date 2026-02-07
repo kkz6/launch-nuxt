@@ -224,16 +224,31 @@ watch([() => route.path, () => route.query.tab, () => route.query.subtab], () =>
 }, { immediate: true });
 
 
-// Server detail tabs
-const serverDetailTabs = [
-  { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
-  { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
-  { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
-  { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
-  { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
-  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
-  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
-];
+// Server detail tabs (conditionally show upstreams for load balancer servers)
+const isLoadBalancerServer = computed(() => serverType.value === 'loadbalancer');
+
+const serverDetailTabs = computed(() => {
+  const baseTabs = [
+    { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
+  ];
+
+  if (isLoadBalancerServer.value) {
+    baseTabs.push(
+      { value: "upstreams", label: "Upstreams", query: "upstreams", icon: "lucide:git-fork" },
+    );
+  }
+
+  baseTabs.push(
+    { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
+    { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
+    { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
+    { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
+    { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
+    { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+  );
+
+  return baseTabs;
+});
 
 // Advanced sub-tabs (second level)
 const advancedSubTabs = [
@@ -307,6 +322,7 @@ const serverIp = ref<string | null>(null);
 const serverConnected = ref(false);
 const serverProvider = ref<string | null>(null);
 const serverStatus = ref<string | null>(null);
+const serverType = ref<string | null>(null);
 const serverProvisionCommand = ref<string | null>(null);
 const showProvisionDialog = ref(false);
 
@@ -368,12 +384,13 @@ watch([serverId, siteId], async ([sId, stId]) => {
   if (sId && !stId) {
     // Server detail page only
     try {
-      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; provision_command?: string } }>(`/servers/${sId}`);
+      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`);
       serverName.value = response.data.name;
       serverIp.value = response.data.public_ipv4;
       serverConnected.value = response.data.connected;
       serverProvider.value = response.data.provider;
       serverStatus.value = response.data.status;
+      serverType.value = response.data.type;
       serverProvisionCommand.value = response.data.provision_command || null;
     } catch {
       serverName.value = null;
@@ -385,7 +402,7 @@ watch([serverId, siteId], async ([sId, stId]) => {
     // Site detail page - fetch both server and site
     try {
       const [serverRes, siteRes] = await Promise.all([
-        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; provision_command?: string } }>(`/servers/${sId}`),
+        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`),
         $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`),
       ]);
       serverName.value = serverRes.data.name;
@@ -393,6 +410,7 @@ watch([serverId, siteId], async ([sId, stId]) => {
       serverConnected.value = serverRes.data.connected;
       serverProvider.value = serverRes.data.provider;
       serverStatus.value = serverRes.data.status;
+      serverType.value = serverRes.data.type;
       serverProvisionCommand.value = serverRes.data.provision_command || null;
       siteAddress.value = siteRes.data.address;
       siteType.value = siteRes.data.type;
@@ -405,6 +423,7 @@ watch([serverId, siteId], async ([sId, stId]) => {
     serverName.value = null;
     serverProvider.value = null;
     serverStatus.value = null;
+    serverType.value = null;
     serverProvisionCommand.value = null;
     siteAddress.value = null;
     siteType.value = null;
@@ -877,6 +896,9 @@ onMounted(fetchTeams);
                 :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
               />
               {{ serverName || 'Loading...' }}
+            </span>
+            <span v-if="isLoadBalancerServer" class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
+              Load Balancer
             </span>
             <span v-if="serverProvider" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
               {{ providerLabels[serverProvider] || serverProvider }}

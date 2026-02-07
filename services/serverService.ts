@@ -11,6 +11,10 @@ import type {
   ConnectedServerProvider,
   Task,
   ProvisionStatus,
+  LoadBalancerUpstream,
+  LoadBalancerBackend,
+  UpstreamHealthResponse,
+  CheckDomainResponse,
 } from "~/types";
 import type { ApiResponse } from "~/composables/useApi";
 
@@ -306,6 +310,132 @@ export const serverService = {
     delete: (serverId: string, keyId: string) => {
       const { delete: del } = useApi();
       return del<ApiResponse<null>>(`/servers/${serverId}/ssh-keys/${keyId}`);
+    },
+  },
+
+  // Load Balancer
+  loadBalancer: {
+    checkDomain: (serverId: string, address: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<CheckDomainResponse>>(
+        `/servers/${serverId}/upstreams/check-domain?address=${encodeURIComponent(address)}`
+      );
+    },
+
+    // Upstreams
+    upstreams: {
+      list: (serverId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<LoadBalancerUpstream[]>>(
+          `/servers/${serverId}/upstreams`
+        );
+      },
+      get: (serverId: string, upstreamId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<LoadBalancerUpstream>>(
+          `/servers/${serverId}/upstreams/${upstreamId}`
+        );
+      },
+      create: (
+        serverId: string,
+        data: {
+          name: string;
+          address: string;
+          port?: number;
+          tls_setting?: string;
+          lb_policy: string;
+          health_check_path?: string;
+          health_check_interval?: string;
+          health_check_timeout?: string;
+          auto_add_existing_sites?: boolean;
+        }
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<LoadBalancerUpstream>>(
+          `/servers/${serverId}/upstreams`,
+          data
+        );
+      },
+      update: (
+        serverId: string,
+        upstreamId: string,
+        data: {
+          name?: string;
+          lb_policy?: string;
+          health_check_path?: string;
+          health_check_interval?: string;
+          health_check_timeout?: string;
+        }
+      ) => {
+        const { put } = useApi();
+        return put<ApiResponse<LoadBalancerUpstream>>(
+          `/servers/${serverId}/upstreams/${upstreamId}`,
+          data
+        );
+      },
+      delete: (serverId: string, upstreamId: string) => {
+        const { delete: del } = useApi();
+        return del<ApiResponse<null>>(
+          `/servers/${serverId}/upstreams/${upstreamId}`
+        );
+      },
+      health: (serverId: string, upstreamId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<UpstreamHealthResponse>>(
+          `/servers/${serverId}/upstreams/${upstreamId}/health`
+        );
+      },
+      triggerHealthCheck: (serverId: string, upstreamId: string) => {
+        const { post } = useApi();
+        return post<ApiResponse<null>>(
+          `/servers/${serverId}/upstreams/${upstreamId}/health-check`
+        );
+      },
+    },
+
+    // Backends
+    backends: {
+      list: (serverId: string, upstreamId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<LoadBalancerBackend[]>>(
+          `/servers/${serverId}/upstreams/${upstreamId}/backends`
+        );
+      },
+      add: (
+        serverId: string,
+        upstreamId: string,
+        data: { site_id: string; port?: number }
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<LoadBalancerBackend>>(
+          `/servers/${serverId}/upstreams/${upstreamId}/backends`,
+          data
+        );
+      },
+      update: (
+        serverId: string,
+        upstreamId: string,
+        backendId: string,
+        data: { port?: number; is_down?: boolean }
+      ) => {
+        const { put } = useApi();
+        return put<ApiResponse<LoadBalancerBackend>>(
+          `/servers/${serverId}/upstreams/${upstreamId}/backends/${backendId}`,
+          data
+        );
+      },
+      remove: (serverId: string, upstreamId: string, backendId: string) => {
+        const { delete: del } = useApi();
+        return del<ApiResponse<null>>(
+          `/servers/${serverId}/upstreams/${upstreamId}/backends/${backendId}`
+        );
+      },
+      toggleDown: (serverId: string, upstreamId: string, backendId: string) => {
+        const { post } = useApi();
+        return post<ApiResponse<LoadBalancerBackend>>(
+          `/servers/${serverId}/upstreams/${upstreamId}/backends/${backendId}/toggle-down`
+        );
+      },
     },
   },
 };

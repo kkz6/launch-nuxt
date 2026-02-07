@@ -274,6 +274,51 @@ export const useServerEvents = (
 }
 
 /**
+ * Composable to subscribe to load balancer upstream and backend events
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a load balancer event is received
+ *
+ * Events:
+ * - upstream.created: New upstream was created
+ * - upstream.updated: Upstream was updated
+ * - upstream.deleted: Upstream was deleted
+ * - upstream.installed: Upstream Caddyfile installed on LB server
+ * - upstream.install_failed: Upstream Caddyfile installation failed
+ * - backend.added: Backend added to an upstream
+ * - backend.removed: Backend removed from an upstream
+ * - backend.updated: Backend was updated
+ * - backend.marked_down: Backend marked as down
+ * - backend.marked_up: Backend marked as up
+ * - backend.health_changed: Backend health status changed
+ */
+export const useLoadBalancerEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    [
+      'upstream.created',
+      'upstream.updated',
+      'upstream.deleted',
+      'upstream.installed',
+      'upstream.install_failed',
+      'backend.added',
+      'backend.removed',
+      'backend.updated',
+      'backend.marked_down',
+      'backend.marked_up',
+      'backend.health_changed',
+    ],
+    onEvent,
+  )
+}
+
+/**
  * Composable to subscribe to PHP extension events
  *
  * @param serverId - The server ID
