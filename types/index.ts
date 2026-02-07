@@ -168,6 +168,7 @@ export interface Server {
   name_with_ip?: string;
   sites_count?: number;
   services_count?: number;
+  upstreams_count?: number;
 }
 
 export interface Site extends InstallationStatus {
@@ -209,6 +210,7 @@ export interface Site extends InstallationStatus {
   shared_directories: string[];
   writeable_directories: string[];
   shared_files: string[];
+  load_balanced_upstream_id?: string | null;
   port?: number | null;
   progress?: number | null;
   hook_before_updating_repository?: string;
@@ -559,6 +561,71 @@ export interface RegisterData {
 export interface AuthResponse {
   token: string;
   user: User;
+}
+
+// Load Balancer types
+export interface LoadBalancerUpstream {
+  id: string;
+  server_id: string;
+  team_id: string;
+  name: string;
+  address: string;
+  port: number;
+  tls_setting: string;
+  lb_policy: string;
+  lb_policy_label: string;
+  health_check_path: string;
+  health_check_interval: string;
+  health_check_timeout: string;
+  installed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+  backends?: LoadBalancerBackend[];
+}
+
+export interface LoadBalancerBackend {
+  id: string;
+  upstream_id: string;
+  site_id: string;
+  server_id: string;
+  port: number;
+  is_down: boolean;
+  health_status: string;
+  last_health_check_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpstreamHealthResponse {
+  upstream_id: string;
+  address: string;
+  total_backends: number;
+  healthy_backends: number;
+  backends: BackendHealthStatus[];
+}
+
+export interface BackendHealthStatus {
+  backend_id: string;
+  server_id: string;
+  site_id: string;
+  port: number;
+  is_down: boolean;
+  health_status: string;
+  last_health_check_at?: string | null;
+}
+
+export interface CheckDomainResponse {
+  address: string;
+  exists: boolean;
+  sites?: DomainCheckSite[];
+  warning?: string;
+}
+
+export interface DomainCheckSite {
+  id: string;
+  server_id: string;
+  address: string;
+  type: string;
 }
 
 // API Response types
