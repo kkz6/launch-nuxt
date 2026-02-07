@@ -103,7 +103,16 @@ interface Repository {
   ssh_url?: string
 }
 
+interface SiteTypeOption {
+  value: string
+  label: string
+  default_web_folder: string
+  requires_git: boolean
+  supports_git: boolean
+}
+
 const phpVersions = ref<PhpVersion[]>([])
+const siteTypes = ref<SiteTypeOption[]>([])
 const sourceControls = ref<SourceControl[]>([])
 const repositories = ref<Repository[]>([])
 const isLoadingRepositories = ref(false)
@@ -116,7 +125,7 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 
 // Form values
 const address = ref('')
-const siteType = ref<'laravel' | 'wordpress' | 'generic' | 'phpmyadmin'>('laravel')
+const siteType = ref('laravel')
 const phpVersion = ref('')
 const webFolder = ref('/public')
 const zeroDowntimeDeployment = ref(false)
@@ -124,12 +133,10 @@ const sourceControlId = ref('')
 const sourceControlRepositoriesId = ref('')
 const repositoryBranch = ref('main')
 
-const applicationTypes: Record<string, string> = {
-  laravel: 'Laravel',
-  wordpress: 'WordPress',
-  generic: 'Generic PHP',
-  phpmyadmin: 'phpMyAdmin',
-}
+// Get selected site type option
+const selectedSiteType = computed(() => {
+  return siteTypes.value.find(st => st.value === siteType.value)
+})
 
 // Get selected repository display name
 const selectedRepository = computed(() => {
@@ -153,7 +160,7 @@ const advancedOptions = ref({
 // Base schema - type-specific validation is done in validate()
 const schema = z.object({
   address: z.string().min(1, 'Domain is required'),
-  type: z.enum(['laravel', 'wordpress', 'generic']),
+  type: z.string().min(1, 'Site type is required'),
   php_version: z.string().min(1, 'PHP version is required'),
   web_folder: z.string().default('/public'),
   zero_downtime_deployment: z.boolean().default(false),
@@ -163,14 +170,15 @@ const schema = z.object({
 })
 
 // Check if source control is required based on site type
-// Laravel always requires source control, Generic can work without
 const requiresSourceControl = computed(() => {
-  return siteType.value === 'laravel'
+  const st = selectedSiteType.value
+  return st ? st.requires_git && st.value === 'laravel' : false
 })
 
 // Check if source control is optional (available but not required)
 const supportsSourceControl = computed(() => {
-  return siteType.value === 'generic'
+  const st = selectedSiteType.value
+  return st ? st.supports_git && !requiresSourceControl.value : false
 })
 
 const canSubmit = computed(() => {
@@ -209,12 +217,14 @@ const resetForm = () => {
 
 const fetchOptions = async () => {
   try {
-    const [phpData, scData] = await Promise.all([
+    const [phpData, scData, siteTypeData] = await Promise.all([
       $api<{ data: PhpVersion[] }>(`/servers/${props.serverId}/php-versions`),
       $api<{ data: SourceControl[] }>('/source-controls'),
+      $api<{ data: { site_types: SiteTypeOption[] } }>('/sites/create-options'),
     ])
     phpVersions.value = phpData.data
     sourceControls.value = scData.data || []
+    siteTypes.value = siteTypeData.data?.site_types || []
 
     if (phpVersions.value.length > 0) {
       const defaultVersion = phpVersions.value.find(v => v.is_default)
@@ -486,6 +496,13 @@ const resetAdvancedOptions = () => {
   }
 }
 
+watch(siteType, () => {
+  const st = selectedSiteType.value
+  if (st) {
+    webFolder.value = st.default_web_folder === '/' ? '/' : `/${st.default_web_folder}`
+  }
+})
+
 watch(isOpen, (open) => {
   if (open) {
     fetchOptions()
@@ -582,8 +599,8 @@ watch(isOpen, (open) => {
                 <SelectValue placeholder="Select site type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="(label, value) in applicationTypes" :key="value" :value="value">
-                  {{ label }}
+                <SelectItem v-for="st in siteTypes" :key="st.value" :value="st.value">
+                  {{ st.label }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -593,19 +610,19 @@ watch(isOpen, (open) => {
 
         <!-- Source Control Section -->
         <!-- Show message if no source controls connected for Laravel/Generic sites -->
-        <div v-if="sourceControls.length === 0 && siteType !== 'wordpress' && siteType !== 'phpmyadmin'" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+        <div v-if="sourceControls.length === 0 && selectedSiteType?.supports_git" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
           <div class="flex items-start gap-3">
             <Icon name="lucide:alert-triangle" class="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-400" />
             <div class="space-y-1">
               <p class="text-sm font-medium text-amber-800 dark:text-amber-200">No Git Provider Connected</p>
               <p class="text-sm text-amber-700 dark:text-amber-300">
-                Connect a Git provider (GitHub, GitLab, or Bitbucket) in settings to deploy {{ siteType === 'laravel' ? 'Laravel' : 'Generic PHP' }} applications from a repository.
+                Connect a Git provider (GitHub, GitLab, or Bitbucket) in settings to deploy {{ selectedSiteType?.label }} applications from a repository.
               </p>
             </div>
           </div>
         </div>
 
-        <div v-if="sourceControls.length > 0 && siteType !== 'wordpress' && siteType !== 'phpmyadmin'" class="space-y-4">
+        <div v-if="sourceControls.length > 0 && selectedSiteType?.supports_git" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="source_control">Git Provider</Label>
@@ -701,7 +718,7 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <div v-if="siteType !== 'wordpress' && siteType !== 'phpmyadmin'" class="space-y-4">
+        <div v-if="selectedSiteType?.supports_git" class="space-y-4">
           <div class="space-y-2">
             <Label for="web_folder">Web Folder</Label>
             <Input
