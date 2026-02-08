@@ -317,7 +317,7 @@ onMounted(fetchBackups)
             <TooltipProvider v-if="row.latest_job">
               <Tooltip>
                 <TooltipTrigger as-child>
-                  <Badge :class="[getStatusConfig(row.latest_job.status).class, 'cursor-help']">
+                  <Badge variant="outline" :class="[getStatusConfig(row.latest_job.status).class, 'cursor-help']">
                     <Icon
                       :name="getStatusConfig(row.latest_job.status).icon"
                       :class="['mr-1 h-3 w-3', row.latest_job.status === 'running' && 'animate-spin']"
