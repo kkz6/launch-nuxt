@@ -446,18 +446,24 @@ watch([serverId, siteId], async ([sId, stId]) => {
     siteAddress.value = null;
     siteType.value = null;
   } else if (sId && stId) {
-    // Site detail page - fetch server and site data independently
-    // Server data refresh runs in background (it's likely already loaded from server page)
+    // Site detail page - fetch both server and site
     try {
-      $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`)
-        .then(res => { applyServerData(res.data); })
-        .catch(() => {});
-
-      const siteRes = await $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`);
+      const [serverRes, siteRes] = await Promise.all([
+        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`),
+        $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`),
+      ]);
+      serverName.value = serverRes.data.name;
+      serverIp.value = serverRes.data.public_ipv4;
+      serverConnected.value = serverRes.data.connected;
+      serverProvider.value = serverRes.data.provider;
+      serverStatus.value = serverRes.data.status;
+      serverType.value = serverRes.data.type;
+      serverProvisionCommand.value = serverRes.data.provision_command || null;
       siteAddress.value = siteRes.data.address;
       siteType.value = siteRes.data.type;
       siteUrl.value = siteRes.data.url;
     } catch {
+      serverName.value = null;
       siteAddress.value = null;
     }
   } else {

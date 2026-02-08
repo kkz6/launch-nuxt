@@ -95,28 +95,7 @@ watch(() => route.query.tab, (newTab) => {
 const fetchSites = async () => {
   try {
     const sitesData = await serverService.sites.list(serverId.value);
-    if (sites.value.length > 0) {
-      // Merge updates in-place to avoid full re-renders
-      const newMap = new Map(sitesData.data.map((s: Site) => [s.id, s]));
-
-      for (const site of sites.value) {
-        const updated = newMap.get(site.id);
-        if (updated) Object.assign(site, updated);
-      }
-
-      const toRemove = sites.value.filter(s => !newMap.has(s.id));
-      for (const site of toRemove) {
-        const idx = sites.value.indexOf(site);
-        if (idx !== -1) sites.value.splice(idx, 1);
-      }
-
-      const existingIds = new Set(sites.value.map(s => s.id));
-      for (const site of sitesData.data) {
-        if (!existingIds.has(site.id)) sites.value.push(site);
-      }
-    } else {
-      sites.value = sitesData.data;
-    }
+    sites.value = sitesData.data;
   } catch {
     // Silent fail on refresh
   }
