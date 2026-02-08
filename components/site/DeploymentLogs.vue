@@ -41,14 +41,14 @@ const description = computed(() => {
         View Logs
       </Button>
     </SheetTrigger>
-    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none">
+    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none">
       <SheetHeader class="shrink-0">
         <SheetTitle>Deployment Logs</SheetTitle>
         <SheetDescription v-if="description">
           {{ description }}
         </SheetDescription>
       </SheetHeader>
-      <div class="mt-4 flex-1 min-h-0 overflow-hidden">
+      <div class="mt-4 flex flex-col flex-1 min-h-0">
         <ServerLogViewer
           v-if="isOpen"
           :server-id="serverId"
