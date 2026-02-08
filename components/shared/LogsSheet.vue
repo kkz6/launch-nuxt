@@ -96,14 +96,14 @@ const entityId = computed(() => {
     </DropdownMenu>
 
     <Sheet v-model:open="isSheetOpen">
-      <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-4xl">
+      <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col">
         <SheetHeader>
           <SheetTitle>{{ selectedLog?.name || 'Logs' }}</SheetTitle>
           <SheetDescription>
             {{ type === 'site' ? 'Site' : 'Server' }} logs for {{ selectedLog?.name }}
           </SheetDescription>
         </SheetHeader>
-        <div class="mt-4">
+        <div class="mt-4 flex-1 min-h-0 flex flex-col">
           <ServerLogViewer
             v-if="isSheetOpen && selectedLog"
             :key="`${selectedLog.software}-${entityId}`"
@@ -111,9 +111,8 @@ const entityId = computed(() => {
             :entity="type"
             :entity-id="entityId"
             :software="selectedLog.software"
+            :route="selectedLog.show_route"
             no-timestamp
-            hide-options
-            container-class-name="h-[calc(100vh-16rem)]"
           />
         </div>
       </SheetContent>

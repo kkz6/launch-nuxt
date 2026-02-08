@@ -16,24 +16,25 @@ interface Props {
   entity: string
   entityId: string
   software?: string
+  route?: string
   typeSwitcher?: boolean
   noTimestamp?: boolean
   hideOptions?: boolean
   containerClassName?: string
-  darkTheme?: boolean
 }
 
 interface LogLine {
   timestamp: Date | null
   message: string
+  rawLine: string
   type: 'info' | 'success' | 'warning' | 'error' | 'debug'
+  html?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   typeSwitcher: false,
   noTimestamp: false,
   hideOptions: false,
-  darkTheme: false,
 })
 
 const config = useRuntimeConfig()
@@ -53,7 +54,9 @@ const search = ref('')
 const typeFilter = ref<string[]>([])
 const scrollRef = ref<HTMLDivElement | null>(null)
 const isLoading = ref(false)
+const wsOpen = ref(false)
 const logType = ref('output')
+const showTimestamp = ref(!props.noTimestamp)
 
 const lineOptions = [
   { value: '50', label: '50 lines' },
@@ -70,18 +73,65 @@ const priorities = [
   { label: 'Error', value: 'error' },
 ]
 
+const statusColorClass = (status: number): string => {
+  if (status >= 500) return 'text-red-400'
+  if (status >= 400) return 'text-yellow-400'
+  if (status >= 300) return 'text-blue-400'
+  if (status >= 200) return 'text-green-400'
+  return 'text-zinc-300'
+}
+
+const escapeHtml = (str: string): string => {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+const formatCaddyAccessLog = (parsed: Record<string, any>): string | null => {
+  if (parsed.msg !== 'handled request') return null
+
+  const status = parsed.resp_headers?.['Status'] || parsed.status
+  const method = parsed.request?.method || ''
+  const uri = parsed.request?.uri || ''
+  const duration = parsed.duration != null ? `${(parsed.duration * 1000).toFixed(2)}ms` : ''
+  const clientIp = parsed.request?.client_ip || parsed.request?.remote_ip || ''
+
+  if (!method || !uri) return null
+
+  const statusNum = typeof status === 'number' ? status : parseInt(status, 10)
+  const statusClass = statusColorClass(statusNum)
+
+  const parts = [
+    `<span class="${statusClass} font-semibold">${statusNum || '???'}</span>`,
+    `<span class="text-zinc-100">${escapeHtml(method)}</span>`,
+    `<span class="text-zinc-300">${escapeHtml(uri)}</span>`,
+  ]
+  if (duration) parts.push(`<span class="text-zinc-500">${escapeHtml(duration)}</span>`)
+  if (clientIp) parts.push(`<span class="text-zinc-500">${escapeHtml(clientIp)}</span>`)
+
+  return parts.join(' ')
+}
+
+const getLogTypeFromJson = (parsed: Record<string, any>): LogLine['type'] => {
+  const level = parsed.level?.toLowerCase?.()
+  if (level === 'error') return 'error'
+  if (level === 'warn' || level === 'warning') return 'warning'
+  if (level === 'debug') return 'debug'
+  if (level === 'info') return 'info'
+  return 'info'
+}
+
 const getLogType = (message: string): LogLine['type'] => {
-  const lowerMessage = message.toLowerCase()
-  if (lowerMessage.includes('error') || lowerMessage.includes('fail') || lowerMessage.includes('exception')) {
+  const lower = message.toLowerCase()
+
+  if (/\berror\b/.test(lower) || /\bfail(?:ed|ure)?\b/.test(lower) || /\bexception\b/.test(lower)) {
     return 'error'
   }
-  if (lowerMessage.includes('warn')) {
+  if (/\bwarn(?:ing)?\b/.test(lower)) {
     return 'warning'
   }
-  if (lowerMessage.includes('success') || lowerMessage.includes('complete')) {
+  if (/\bsuccess(?:ful(?:ly)?)?\b/.test(lower) || /\bcomplete[d]?\b/.test(lower)) {
     return 'success'
   }
-  if (lowerMessage.includes('debug')) {
+  if (/\bdebug\b/.test(lower)) {
     return 'debug'
   }
   return 'info'
@@ -89,28 +139,91 @@ const getLogType = (message: string): LogLine['type'] => {
 
 const parseLogs = (raw: string): LogLine[] => {
   if (!raw) return []
-  return raw.split('\n').filter(Boolean)
-    // Filter out internal LAUNCH markers
+  return raw.split('\n').filter(line => line.trim())
     .filter(line => !line.includes('::LAUNCH::'))
     .map((line) => {
-      // Strip ANSI codes first
       const cleanLine = stripAnsi(line)
 
-      const timestampMatch = cleanLine.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[^\]]*)\]?\s*/)
+      // Try JSON parsing first
+      if (cleanLine.trimStart().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(cleanLine)
+          const logTypeResult = getLogTypeFromJson(parsed)
+
+          // Try to format as Caddy access log
+          const formatted = formatCaddyAccessLog(parsed)
+          if (formatted) {
+            return {
+              timestamp: parsed.ts ? new Date(parsed.ts * 1000) : null,
+              message: cleanLine,
+              rawLine: cleanLine,
+              type: logTypeResult,
+              html: formatted,
+            }
+          }
+
+          // Other JSON logs — show the msg field if available
+          const msg = parsed.msg || parsed.message || cleanLine
+          return {
+            timestamp: parsed.ts ? new Date(parsed.ts * 1000) : null,
+            message: msg,
+            rawLine: cleanLine,
+            type: logTypeResult,
+          }
+        } catch {
+          // Not valid JSON, fall through
+        }
+      }
+
+      // Standard text log parsing
+      const timestampMatch = cleanLine.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\]?\s*/)
       let timestamp: Date | null = null
       let message = cleanLine
 
       if (timestampMatch) {
-        timestamp = new Date(timestampMatch[1])
+        timestamp = new Date(timestampMatch[1].replace(',', '.'))
         message = cleanLine.slice(timestampMatch[0].length)
+      }
+
+      // MySQL error log: "0 [System] [MY-013172] [Server] Message..."
+      const mysqlMatch = message.match(/^\d+\s+\[(System|Warning|Error|Note)\]\s+(\[MY-\d+\]\s+\[\w+\]\s+)(.*)/)
+      if (mysqlMatch) {
+        const levelMap: Record<string, LogLine['type']> = { System: 'info', Warning: 'warning', Error: 'error', Note: 'debug' }
+        return {
+          timestamp,
+          message: mysqlMatch[3],
+          rawLine: cleanLine,
+          type: levelMap[mysqlMatch[1]] || 'info',
+        }
+      }
+
+      // Supervisor log: "2026-01-29 06:30:30,178 WARN message..."
+      const supervisorMatch = message.match(/^(INFO|WARN|CRIT|DEBUG)\s+(.*)/)
+      if (supervisorMatch) {
+        const levelMap: Record<string, LogLine['type']> = { INFO: 'info', WARN: 'warning', CRIT: 'error', DEBUG: 'debug' }
+        return {
+          timestamp,
+          message: `${supervisorMatch[1]} ${supervisorMatch[2]}`,
+          rawLine: cleanLine,
+          type: levelMap[supervisorMatch[1]] || 'info',
+        }
       }
 
       return {
         timestamp,
         message,
+        rawLine: cleanLine,
         type: getLogType(message),
       }
     })
+}
+
+const typeColorMap: Record<string, string> = {
+  error: 'text-red-400',
+  warning: 'text-yellow-400',
+  success: 'text-green-400',
+  debug: 'text-blue-400',
+  info: 'text-zinc-300',
 }
 
 const scrollToBottom = () => {
@@ -127,7 +240,10 @@ const handleScroll = () => {
 
 const handleDownload = () => {
   const logContent = filteredLogs.value
-    .map(({ timestamp, message }) => `${timestamp?.toISOString() || 'No timestamp'} ${message}`)
+    .map(({ timestamp, message, rawLine }) => {
+      const ts = timestamp?.toISOString() || 'No timestamp'
+      return rawLine !== message ? `${ts} ${rawLine}` : `${ts} ${message}`
+    })
     .join('\n')
 
   const blob = new Blob([logContent], { type: 'text/plain' })
@@ -141,25 +257,6 @@ const handleDownload = () => {
   document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
-
-const typeColorMap = computed(() => {
-  if (props.darkTheme) {
-    return {
-      error: 'text-red-400',
-      warning: 'text-yellow-400',
-      success: 'text-green-400',
-      debug: 'text-blue-400',
-      info: 'text-zinc-300',
-    }
-  }
-  return {
-    error: 'text-red-500',
-    warning: 'text-yellow-500',
-    success: 'text-green-500',
-    debug: 'text-blue-500',
-    info: 'text-muted-foreground',
-  }
-})
 
 // WebSocket connection
 let ws: WebSocket | null = null
@@ -192,7 +289,9 @@ const connectWebSocket = async () => {
   if (logType.value) {
     params.set('type', logType.value)
   }
-  if (props.software) {
+  if (props.route) {
+    params.set('route', props.route)
+  } else if (props.software) {
     params.set('software', props.software)
   }
 
@@ -211,6 +310,7 @@ const connectWebSocket = async () => {
   }
 
   ws.onopen = () => {
+    wsOpen.value = true
     resetTimeout()
   }
 
@@ -221,11 +321,13 @@ const connectWebSocket = async () => {
   }
 
   ws.onerror = () => {
+    wsOpen.value = false
     isLoading.value = false
     if (noDataTimeout) clearTimeout(noDataTimeout)
   }
 
   ws.onclose = () => {
+    wsOpen.value = false
     isLoading.value = false
     if (noDataTimeout) clearTimeout(noDataTimeout)
   }
@@ -258,11 +360,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div :class="hideOptions ? 'h-full flex flex-col' : 'flex flex-col gap-4'">
-    <div :class="hideOptions ? 'h-full flex flex-col' : 'rounded-lg'">
-      <div :class="hideOptions ? 'h-full flex flex-col' : 'space-y-4'">
-        <div v-if="!hideOptions" class="flex flex-wrap items-start justify-between gap-4 sm:items-center">
-          <div class="flex flex-wrap gap-4">
+  <div class="flex flex-col flex-1 min-h-0" :class="hideOptions ? '' : 'gap-4'">
+    <div class="flex flex-col flex-1 min-h-0" :class="hideOptions ? '' : 'rounded-lg'">
+      <div class="flex flex-col flex-1 min-h-0" :class="hideOptions ? '' : 'space-y-4'">
+        <div v-if="!hideOptions" class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-3">
             <Select v-model="linesString">
               <SelectTrigger class="w-[130px]">
                 <SelectValue placeholder="Lines" />
@@ -278,11 +380,11 @@ onUnmounted(() => {
               v-model="search"
               type="search"
               placeholder="Search logs..."
-              class="inline-flex h-9 w-full text-sm placeholder-gray-400 sm:w-auto"
+              class="inline-flex h-10 w-full text-sm placeholder-gray-400 sm:w-auto"
             />
           </div>
 
-          <div class="flex flex-wrap gap-4">
+          <div class="flex flex-wrap items-center gap-3">
             <Tabs v-if="typeSwitcher" v-model="logType">
               <TabsList>
                 <TabsTrigger value="output">Output</TabsTrigger>
@@ -290,9 +392,19 @@ onUnmounted(() => {
               </TabsList>
             </Tabs>
 
-            <Button variant="outline" size="sm" :disabled="filteredLogs.length === 0" @click="handleDownload">
-              <Icon name="lucide:download" class="mr-2 h-4 w-4" />
-              Download
+            <Button
+              variant="outline"
+              size="icon"
+              class="h-10 w-10"
+              :class="showTimestamp ? '' : 'opacity-50'"
+              title="Toggle timestamps"
+              @click="showTimestamp = !showTimestamp"
+            >
+              <Icon name="lucide:clock" class="h-4 w-4" />
+            </Button>
+
+            <Button variant="outline" size="icon" class="h-10 w-10" title="Download logs" :disabled="filteredLogs.length === 0" @click="handleDownload">
+              <Icon name="lucide:download" class="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -300,17 +412,16 @@ onUnmounted(() => {
         <div
           ref="scrollRef"
           :class="[
-            hideOptions ? 'flex-1 min-h-0' : 'h-[500px]',
-            'relative overflow-y-auto rounded-md border bg-background p-4',
-            containerClassName
+            'flex-1 min-h-0 relative overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950 p-4 text-zinc-300',
+            containerClassName || 'h-[500px]'
           ]"
           @scroll="handleScroll"
         >
-          <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-background/80">
-            <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin" />
+          <div v-if="isLoading || (wsOpen && filteredLogs.length === 0)" class="absolute inset-0 flex items-center justify-center bg-zinc-950/80">
+            <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-zinc-400" />
           </div>
 
-          <div v-if="filteredLogs.length === 0 && !isLoading" class="flex h-full items-center justify-center text-muted-foreground">
+          <div v-else-if="filteredLogs.length === 0" class="flex h-full items-center justify-center text-zinc-500">
             No logs found
           </div>
 
@@ -319,11 +430,13 @@ onUnmounted(() => {
               v-for="(log, index) in filteredLogs"
               :key="index"
               class="flex gap-2"
+              :title="log.rawLine !== log.message ? log.rawLine : undefined"
             >
-              <span v-if="!noTimestamp && log.timestamp" class="shrink-0 text-muted-foreground">
+              <span v-if="showTimestamp && log.timestamp" class="shrink-0 text-zinc-500">
                 {{ log.timestamp.toLocaleTimeString() }}
               </span>
-              <span :class="typeColorMap[log.type]" class="whitespace-pre-wrap break-all">{{ log.message }}</span>
+              <span v-if="log.html" class="whitespace-pre-wrap break-all" v-html="log.html" />
+              <span v-else :class="typeColorMap[log.type]" class="whitespace-pre-wrap break-all">{{ log.message }}</span>
             </div>
           </div>
         </div>

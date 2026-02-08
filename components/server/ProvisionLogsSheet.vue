@@ -132,8 +132,7 @@ const completedCount = computed(() => {
             :entity-id="provisionStatus.latest_task.id"
             :no-timestamp="true"
             hide-options
-            dark-theme
-            container-class-name="!bg-zinc-900 !border-0 !rounded-lg"
+            container-class-name="!border-0 !rounded-lg"
           />
         </div>
 

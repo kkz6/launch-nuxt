@@ -86,6 +86,7 @@ onMounted(fetchLogs)
           :entity="type"
           :entity-id="type === 'site' ? (siteId || '') : serverId"
           :software="selectedLog.software"
+          :route="selectedLog.show_route"
           no-timestamp
           hide-options
         />

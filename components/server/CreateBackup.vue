@@ -202,12 +202,12 @@ const onSubmit = async () => {
   }
 }
 
-watch(open, (isOpen) => {
+watch(open, async (isOpen) => {
   if (isOpen) {
-    fetchOptions()
+    await fetchOptions()
     resetForm()
   }
-})
+}, { immediate: true })
 </script>
 
 <template>
