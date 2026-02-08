@@ -90,8 +90,13 @@ watch(isEditDialogOpen, (open) => {
   }
 })
 
-// Subscribe to real-time cron events
-useServerModelEvents('cron', serverId.value, fetchData)
+// Debounced refetch for WebSocket events
+let cronFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
+useServerModelEvents('cron', serverId.value, () => {
+  if (cronFetchTimeout) clearTimeout(cronFetchTimeout)
+  cronFetchTimeout = setTimeout(() => fetchData(), 300)
+})
 
 onMounted(fetchData)
 </script>

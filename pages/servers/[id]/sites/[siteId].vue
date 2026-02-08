@@ -23,11 +23,14 @@ const isTerminalOpen = useState('serverTerminalOpen', () => false)
 const { user } = useAuth()
 const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
-// Subscribe to real-time deployment events
+// Debounced refetch for WebSocket events
+let siteFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
 useDeploymentEvents(teamId, (data) => {
   // Refresh site data when deployment completes for this site
   if (data.site_id === siteId.value && (data.status === 'finished' || data.status === 'failed')) {
-    fetchSite()
+    if (siteFetchTimeout) clearTimeout(siteFetchTimeout)
+    siteFetchTimeout = setTimeout(() => fetchSite(), 300)
   }
 })
 

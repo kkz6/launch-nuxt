@@ -17,10 +17,13 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 const { user } = useAuth()
 const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
-// Subscribe to real-time LB events
+// Debounced refetch for WebSocket events
+let upstreamFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
 useLoadBalancerEvents(teamId, (data) => {
   if (data.server_id === props.server.id) {
-    fetchUpstreams()
+    if (upstreamFetchTimeout) clearTimeout(upstreamFetchTimeout)
+    upstreamFetchTimeout = setTimeout(() => fetchUpstreams(), 300)
   }
 })
 

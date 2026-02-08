@@ -145,11 +145,39 @@ const formatDate = (date: string): string => {
   }
 };
 
-const fetchServers = async () => {
-  isLoading.value = true;
+const fetchServers = async (silent = false) => {
+  if (!silent) isLoading.value = true;
   try {
     const response = await serverService.list();
-    servers.value = response.data;
+    if (silent && servers.value.length > 0) {
+      // Merge updates in-place to avoid full re-renders and animation restarts
+      const newMap = new Map(response.data.map((s: Server) => [s.id, s]));
+
+      // Update existing servers in-place
+      for (const server of servers.value) {
+        const updated = newMap.get(server.id);
+        if (updated) {
+          Object.assign(server, updated);
+        }
+      }
+
+      // Remove deleted servers
+      const toRemove = servers.value.filter(s => !newMap.has(s.id));
+      for (const server of toRemove) {
+        const idx = servers.value.indexOf(server);
+        if (idx !== -1) servers.value.splice(idx, 1);
+      }
+
+      // Add new servers
+      const existingIds = new Set(servers.value.map(s => s.id));
+      for (const server of response.data) {
+        if (!existingIds.has(server.id)) {
+          servers.value.push(server);
+        }
+      }
+    } else {
+      servers.value = response.data;
+    }
   } catch {
     // Handle error silently
   } finally {
@@ -157,10 +185,12 @@ const fetchServers = async () => {
   }
 };
 
-// Subscribe to real-time server events
+// Debounced silent refetch for WebSocket events
+let serverFetchTimeout: ReturnType<typeof setTimeout> | null = null;
+
 useServerEvents(teamId, () => {
-  // Refetch servers list when any server event is received
-  fetchServers();
+  if (serverFetchTimeout) clearTimeout(serverFetchTimeout);
+  serverFetchTimeout = setTimeout(() => fetchServers(true), 300);
 });
 
 // Auto-close provision dialogs when selected server's status changes
@@ -187,7 +217,11 @@ const cacheServerForNavbar = (server: Server) => {
   navbarServerCache.value = server;
 };
 
-onMounted(fetchServers);
+onMounted(() => fetchServers());
+
+onUnmounted(() => {
+  if (serverFetchTimeout) clearTimeout(serverFetchTimeout);
+});
 </script>
 
 <template>
@@ -229,7 +263,7 @@ onMounted(fetchServers);
           <!-- Provisioning progress bar -->
           <div
             v-if="server.status === 'provisioning'"
-            class="pointer-events-none absolute inset-0 animate-pulse rounded-lg bg-green-500/20"
+            class="pointer-events-none absolute inset-y-0 left-0 rounded-lg bg-green-500/20 transition-[width] duration-700 ease-out"
             :style="{ width: `${server.progress || 0}%` }"
           />
 
