@@ -56,6 +56,7 @@ const description = computed(() => {
           :entity-id="taskId"
           :no-timestamp="true"
           hide-options
+          container-class-name="h-full rounded-b-lg"
         />
       </div>
     </SheetContent>
