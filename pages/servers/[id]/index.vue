@@ -16,6 +16,8 @@ const server = ref<Server | null>(null);
 const sites = ref<Site[]>([]);
 const isLoading = ref(true);
 
+const isLoadBalancer = computed(() => server.value?.type === 'loadbalancer');
+
 // Shared terminal state with navbar
 const isTerminalOpen = useState('serverTerminalOpen', () => false);
 
@@ -25,8 +27,7 @@ const teamId = computed(() => user.value?.current_team_id?.toString() || '');
 
 // Subscribe to real-time site events
 useSiteEvents(teamId, (data) => {
-  // Only refresh if the event is for this server
-  // server_id can be at data.server_id or data.site.server_id depending on event type
+  if (isLoadBalancer.value) return;
   const eventServerId = data.server_id || data.site?.server_id;
   if (eventServerId === serverId.value) {
     fetchSites();
@@ -35,8 +36,7 @@ useSiteEvents(teamId, (data) => {
 
 // Subscribe to real-time deployment events
 useDeploymentEvents(teamId, (data) => {
-  // Check if this deployment is for a site on this server
-  // Also check data.site.server_id in case it's included
+  if (isLoadBalancer.value) return;
   const siteExists = sites.value.some(site => site.id === data.site_id);
   const eventServerId = data.site?.server_id;
   if (siteExists || eventServerId === serverId.value) {
@@ -48,7 +48,7 @@ useDeploymentEvents(teamId, (data) => {
 const validTabs = ["sites", "upstreams", "metrics", "databases", "networks", "daemons", "schedulers", "advanced"];
 const validSubTabs = ["general", "backups", "ssh-keys", "packages", "php", "services"];
 
-// Get initial tab from query params or default to "sites"
+// Get initial tab from query params or default based on server type
 const getInitialTab = () => {
   const tabFromQuery = route.query.tab as string;
   return validTabs.includes(tabFromQuery) ? tabFromQuery : "sites";
@@ -87,13 +87,20 @@ const fetchSites = async () => {
 
 onMounted(async () => {
   try {
-    const [serverData, sitesData] = await Promise.all([
-      serverService.get(serverId.value),
-      serverService.sites.list(serverId.value),
-    ]);
+    const serverData = await serverService.get(serverId.value);
     server.value = serverData.data;
-    sites.value = sitesData.data;
     useHead({ title: server.value?.name || "Server" });
+
+    // Set default tab based on server type (after server data is loaded)
+    if (server.value?.type === 'loadbalancer' && !route.query.tab) {
+      activeTab.value = 'upstreams';
+    }
+
+    // Only fetch sites for non-load-balancer servers
+    if (server.value?.type !== 'loadbalancer') {
+      const sitesData = await serverService.sites.list(serverId.value);
+      sites.value = sitesData.data;
+    }
   } catch {
     navigateTo("/servers");
   } finally {

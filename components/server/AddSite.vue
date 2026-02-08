@@ -38,12 +38,9 @@ import {
 
 interface Props {
   serverId: string
-  serverType?: string
 }
 
 const props = defineProps<Props>()
-
-const isLoadBalancer = computed(() => props.serverType === 'loadbalancer')
 const emit = defineEmits<{
   created: []
 }>()
@@ -187,10 +184,6 @@ const supportsSourceControl = computed(() => {
 const canSubmit = computed(() => {
   if (isLoading.value) return false
   if (address.value.trim().length === 0) return false
-
-  // Load balancer only needs address
-  if (isLoadBalancer.value) return true
-
   if (phpVersion.value.length === 0) return false
 
   // Laravel sites MUST have source control configured
@@ -223,9 +216,6 @@ const resetForm = () => {
 }
 
 const fetchOptions = async () => {
-  // Load balancer only needs domain - no PHP, source control, or database options
-  if (isLoadBalancer.value) return
-
   try {
     const [phpData, scData, siteTypeData] = await Promise.all([
       $api<{ data: PhpVersion[] }>(`/servers/${props.serverId}/php-versions`),
@@ -375,21 +365,6 @@ const handleDomainChange = (value: string | number) => {
 const validate = () => {
   // Reset errors
   errors.value = {}
-
-  // Load balancer only needs address
-  if (isLoadBalancer.value) {
-    const trimmedAddress = address.value.trim()
-    if (!trimmedAddress) {
-      errors.value.address = 'Domain is required'
-      return null
-    }
-    return {
-      address: trimmedAddress,
-      type: 'generic',
-      php_version: '',
-      web_folder: '/',
-    }
-  }
 
   const result = schema.safeParse({
     address: address.value.trim(),
@@ -559,7 +534,7 @@ watch(isOpen, (open) => {
       <DialogHeader>
         <DialogTitle>Add New Site</DialogTitle>
         <DialogDescription>
-          {{ isLoadBalancer ? 'Add a domain to this load balancer' : 'Create a new website on this server' }}
+          Create a new website on this server
         </DialogDescription>
       </DialogHeader>
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
@@ -601,7 +576,7 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <div v-if="!isLoadBalancer" class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-4">
           <div class="space-y-2">
             <Label for="php_version">PHP Version</Label>
             <Select v-model="phpVersion">
@@ -633,9 +608,9 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <!-- Source Control Section (not for load balancers) -->
+        <!-- Source Control Section -->
         <!-- Show message if no source controls connected for Laravel/Generic sites -->
-        <div v-if="!isLoadBalancer && sourceControls.length === 0 && selectedSiteType?.supports_git" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
+        <div v-if="sourceControls.length === 0 && selectedSiteType?.supports_git" class="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950">
           <div class="flex items-start gap-3">
             <Icon name="lucide:alert-triangle" class="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-400" />
             <div class="space-y-1">
@@ -647,7 +622,7 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <div v-if="!isLoadBalancer && sourceControls.length > 0 && selectedSiteType?.supports_git" class="space-y-4">
+        <div v-if="sourceControls.length > 0 && selectedSiteType?.supports_git" class="space-y-4">
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <Label for="source_control">Git Provider</Label>
@@ -743,7 +718,7 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <div v-if="!isLoadBalancer && selectedSiteType?.supports_git" class="space-y-4">
+        <div v-if="selectedSiteType?.supports_git" class="space-y-4">
           <div class="space-y-2">
             <Label for="web_folder">Web Folder</Label>
             <Input
@@ -764,8 +739,8 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <DialogFooter class="mt-4" :class="isLoadBalancer ? 'sm:justify-end' : 'sm:justify-between'">
-          <Button v-if="!isLoadBalancer" type="button" variant="outline" @click="isAdvancedOpen = true">
+        <DialogFooter class="mt-4 sm:justify-between">
+          <Button type="button" variant="outline" @click="isAdvancedOpen = true">
             <Settings class="mr-2 h-4 w-4" />
             Advanced Options
           </Button>

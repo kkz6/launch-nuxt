@@ -228,13 +228,15 @@ watch([() => route.path, () => route.query.tab, () => route.query.subtab], () =>
 const isLoadBalancerServer = computed(() => serverType.value === 'loadbalancer');
 
 const serverDetailTabs = computed(() => {
-  const baseTabs = [
-    { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
-  ];
+  const baseTabs: { value: string; label: string; query: string; icon: string }[] = [];
 
   if (isLoadBalancerServer.value) {
     baseTabs.push(
       { value: "upstreams", label: "Upstreams", query: "upstreams", icon: "lucide:git-fork" },
+    );
+  } else {
+    baseTabs.push(
+      { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
     );
   }
 
@@ -954,7 +956,7 @@ onMounted(fetchTeams);
             <Terminal class="mr-2 h-4 w-4" />
             Terminal
           </Button>
-          <ServerAddSite v-if="serverId" :server-id="serverId" :server-type="serverType || ''" />
+          <ServerAddSite v-if="serverId && !isLoadBalancerServer" :server-id="serverId" />
         </div>
       </div>
       <nav
