@@ -954,7 +954,7 @@ onMounted(fetchTeams);
             <Terminal class="mr-2 h-4 w-4" />
             Terminal
           </Button>
-          <ServerAddSite v-if="serverId" :server-id="serverId" />
+          <ServerAddSite v-if="serverId" :server-id="serverId" :server-type="serverType || ''" />
         </div>
       </div>
       <nav
