@@ -7,6 +7,9 @@ const TEAM_ID_KEY = "current_team_id";
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
 
+// Prevent multiple concurrent redirects to login
+let isRedirectingToLogin = false;
+
 // Standard API response wrapper
 export interface ApiResponse<T> {
   success: boolean;
@@ -42,6 +45,15 @@ interface RequestOptions {
   headers?: Record<string, string>;
   query?: Record<string, unknown>;
 }
+
+// Safely redirect to login once, preventing concurrent navigations
+const redirectToLogin = () => {
+  if (isRedirectingToLogin || import.meta.server) return;
+  isRedirectingToLogin = true;
+  navigateTo("/login", { replace: true });
+  // Reset after navigation settles
+  setTimeout(() => { isRedirectingToLogin = false; }, 1000);
+};
 
 /**
  * Core API composable with token management and refresh logic
@@ -138,9 +150,7 @@ export const useApi = () => {
       } catch {
         // Refresh failed, clear tokens and redirect to login
         clearTokens();
-        if (import.meta.client) {
-          navigateTo("/login");
-        }
+        redirectToLogin();
         return null;
       } finally {
         isRefreshing = false;
@@ -313,7 +323,7 @@ export function useApiQuery<T>(
     onResponseError({ response }) {
       if (response.status === 401) {
         clearTokens();
-        navigateTo("/login");
+        redirectToLogin();
       }
 
       // Handle team-related errors
