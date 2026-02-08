@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Badge } from '~/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import type { Database, StorageProviderRecord } from '~/types'
 
 interface BackupJob {
@@ -191,6 +192,14 @@ const getStatusConfig = (status: string) => {
   return configs[status] || configs.pending
 }
 
+const formatSize = (bytes: number) => {
+  if (bytes === 0) return '-'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+}
+
 const hasProviders = computed(() => storageProvidersList.value.length > 0)
 
 const columns = [
@@ -305,13 +314,41 @@ onMounted(fetchBackups)
           </template>
 
           <template #cell-status="{ row }">
-            <Badge v-if="getLatestJobStatus(row)" :class="getStatusConfig(getLatestJobStatus(row)!).class">
-              <Icon
-                :name="getStatusConfig(getLatestJobStatus(row)!).icon"
-                :class="['mr-1 h-3 w-3', getLatestJobStatus(row) === 'running' && 'animate-spin']"
-              />
-              {{ getStatusConfig(getLatestJobStatus(row)!).label }}
-            </Badge>
+            <TooltipProvider v-if="row.latest_job">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <Badge :class="[getStatusConfig(row.latest_job.status).class, 'cursor-help']">
+                    <Icon
+                      :name="getStatusConfig(row.latest_job.status).icon"
+                      :class="['mr-1 h-3 w-3', row.latest_job.status === 'running' && 'animate-spin']"
+                    />
+                    {{ getStatusConfig(row.latest_job.status).label }}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent class="max-w-xs">
+                  <div class="space-y-1.5 text-sm">
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      <span class="text-muted-foreground">Status:</span>
+                      <span :class="row.latest_job.status === 'finished' ? 'text-green-500' : row.latest_job.status === 'failed' ? 'text-red-500' : ''">
+                        {{ getStatusConfig(row.latest_job.status).label }}
+                      </span>
+                      <span class="text-muted-foreground">Size:</span>
+                      <span>{{ formatSize(row.latest_job.size) }}</span>
+                      <span class="text-muted-foreground">Retention:</span>
+                      <span>{{ row.retention }} backups</span>
+                      <span class="text-muted-foreground">Provider:</span>
+                      <span>{{ getProviderName(row.storage_provider_id) }}</span>
+                    </div>
+                    <p v-if="row.latest_job.error" class="border-t pt-1.5 text-xs text-red-500">
+                      {{ row.latest_job.error }}
+                    </p>
+                    <p class="border-t pt-1.5 text-xs text-muted-foreground">
+                      Last run: <SharedDateTooltip :date="row.latest_job.created_at" />
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             <span v-else class="text-sm text-muted-foreground">-</span>
           </template>
         </SharedDataTable>
