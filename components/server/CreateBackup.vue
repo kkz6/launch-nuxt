@@ -195,7 +195,7 @@ watch(open, (isOpen) => {
   if (isOpen) {
     resetForm()
   }
-})
+}, { immediate: true })
 </script>
 
 <template>
