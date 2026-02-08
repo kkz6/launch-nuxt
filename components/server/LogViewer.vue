@@ -141,6 +141,7 @@ const parseLogs = (raw: string): LogLine[] => {
   if (!raw) return []
   return raw.split('\n').filter(line => line.trim())
     .filter(line => !line.includes('::LAUNCH::'))
+    .filter(line => !/^tail: (?:cannot open '.*' for reading: No such file or directory|no files remaining)$/.test(line.trim()))
     .map((line) => {
       const cleanLine = stripAnsi(line)
 
@@ -417,7 +418,7 @@ onUnmounted(() => {
           ]"
           @scroll="handleScroll"
         >
-          <div v-if="isLoading || (wsOpen && filteredLogs.length === 0)" class="absolute inset-0 flex items-center justify-center bg-zinc-950/80">
+          <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-zinc-950/80">
             <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-zinc-400" />
           </div>
 
