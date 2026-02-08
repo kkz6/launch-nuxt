@@ -41,7 +41,7 @@ const description = computed(() => {
         View Logs
       </Button>
     </SheetTrigger>
-    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none">
+    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none">
       <SheetHeader class="shrink-0">
         <SheetTitle>Deployment Logs</SheetTitle>
         <SheetDescription v-if="description">
