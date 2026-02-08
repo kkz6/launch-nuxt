@@ -85,26 +85,52 @@ const fetchSites = async () => {
   }
 };
 
+// Use cached server data from index page if available
+const navbarServerCache = useState<Server | null>('navbarServerCache', () => null);
+
 onMounted(async () => {
   try {
-    const serverData = await serverService.get(serverId.value);
-    server.value = serverData.data;
-    useHead({ title: server.value?.name || "Server" });
+    // Use cached data for instant render, fetch fresh data in background
+    const cached = navbarServerCache.value;
+    if (cached && cached.id === serverId.value) {
+      server.value = cached;
+      navbarServerCache.value = null;
+      useHead({ title: server.value.name || "Server" });
 
-    // Set default tab based on server type (after server data is loaded)
-    if (server.value?.type === 'loadbalancer' && !route.query.tab) {
-      activeTab.value = 'upstreams';
-    }
+      if (server.value.type === 'loadbalancer' && !route.query.tab) {
+        activeTab.value = 'upstreams';
+      }
 
-    // Only fetch sites for non-load-balancer servers
-    if (server.value?.type !== 'loadbalancer') {
-      const sitesData = await serverService.sites.list(serverId.value);
-      sites.value = sitesData.data;
+      isLoading.value = false;
+
+      // Fetch fresh data and sites in parallel in background
+      const promises: Promise<void>[] = [
+        serverService.get(serverId.value).then(res => { server.value = res.data; }),
+      ];
+      if (server.value.type !== 'loadbalancer') {
+        promises.push(serverService.sites.list(serverId.value).then(res => { sites.value = res.data; }));
+      }
+      await Promise.all(promises);
+    } else {
+      // Direct navigation - no cache, fetch everything
+      const serverData = await serverService.get(serverId.value);
+      server.value = serverData.data;
+      useHead({ title: server.value?.name || "Server" });
+
+      if (server.value?.type === 'loadbalancer' && !route.query.tab) {
+        activeTab.value = 'upstreams';
+      }
+
+      isLoading.value = false;
+
+      // Fetch sites after showing the page
+      if (server.value?.type !== 'loadbalancer') {
+        const sitesData = await serverService.sites.list(serverId.value);
+        sites.value = sitesData.data;
+      }
     }
   } catch {
     navigateTo("/servers");
-  } finally {
-    isLoading.value = false;
   }
 });
 </script>

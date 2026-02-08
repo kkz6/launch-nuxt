@@ -4,6 +4,12 @@ import { toast } from "vue-sonner";
 import { useServerEvents } from "~/composables/useChannelEvents";
 import type { Server } from "~/types";
 import { serverService } from "~/services/serverService";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 
 definePageMeta({
   layout: "default",
@@ -74,6 +80,15 @@ const getProviderIcon = (provider: string): string => {
   if (name.includes("google") || name.includes("gcp")) return "simple-icons:googlecloud";
   if (name.includes("azure")) return "simple-icons:microsoftazure";
   return "lucide:server";
+};
+
+const getServerIcon = (server: Server): string => {
+  if (server.type === "loadbalancer") return "lucide:network";
+  return getProviderIcon(server.provider);
+};
+
+const isNonDefaultType = (server: Server): boolean => {
+  return !!server.type && server.type !== "php";
 };
 
 const getStatusColor = (status: string): string => {
@@ -152,6 +167,12 @@ watch(servers, (newServers) => {
   }
 })
 
+// Cache server data for Navbar when navigating to detail page
+const navbarServerCache = useState<Server | null>('navbarServerCache', () => null);
+const cacheServerForNavbar = (server: Server) => {
+  navbarServerCache.value = server;
+};
+
 onMounted(fetchServers);
 </script>
 
@@ -182,6 +203,7 @@ onMounted(fetchServers);
         :to="server.status === 'running' ? `/servers/${server.id}` : '#'"
         class="group"
         :class="{ 'pointer-events-none': server.status !== 'running' }"
+        @click="cacheServerForNavbar(server)"
       >
         <div
           class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
@@ -205,10 +227,70 @@ onMounted(fetchServers);
             <div class="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
           </div>
 
+          <!-- Info icon - top right -->
+          <TooltipProvider v-if="server.status === 'running'" :delay-duration="0">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  type="button"
+                  class="pointer-events-auto absolute right-3 top-3 z-10 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground/50 hover:text-muted-foreground hover:bg-muted transition-colors cursor-help"
+                  @click.prevent.stop
+                >
+                  <Icon name="lucide:info" class="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="left" class="max-w-xs">
+                <div class="space-y-2 text-xs">
+                  <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
+                    <template v-if="server.type_label">
+                      <span class="text-muted-foreground">Type</span>
+                      <span>{{ server.type_label }}</span>
+                    </template>
+                    <template v-if="server.operating_system_label">
+                      <span class="text-muted-foreground">OS</span>
+                      <span>{{ server.operating_system_label }}</span>
+                    </template>
+                    <template v-if="server.cpu_cores">
+                      <span class="text-muted-foreground">CPU</span>
+                      <span>{{ server.cpu_cores }} cores</span>
+                    </template>
+                    <template v-if="server.memory_in_mb">
+                      <span class="text-muted-foreground">Memory</span>
+                      <span>{{ server.memory_in_mb }} MB</span>
+                    </template>
+                    <template v-if="server.storage_in_gb">
+                      <span class="text-muted-foreground">Storage</span>
+                      <span>{{ server.storage_in_gb }} GB</span>
+                    </template>
+                    <template v-if="server.ssh_port">
+                      <span class="text-muted-foreground">SSH Port</span>
+                      <span>{{ server.ssh_port }}</span>
+                    </template>
+                    <template v-if="server.username">
+                      <span class="text-muted-foreground">User</span>
+                      <span>{{ server.username }}</span>
+                    </template>
+                    <span class="text-muted-foreground">Connected</span>
+                    <span :class="server.connected ? 'text-green-500' : 'text-red-500'">
+                      {{ server.connected ? 'Yes' : 'No' }}
+                    </span>
+                    <template v-if="server.services_count">
+                      <span class="text-muted-foreground">Services</span>
+                      <span>{{ server.services_count }}</span>
+                    </template>
+                  </div>
+                  <p v-if="server.provisioned_at" class="border-t pt-1.5 text-muted-foreground">
+                    Provisioned {{ formatDate(server.provisioned_at) }}
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           <div class="relative flex items-start gap-3">
             <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
               <Icon
-                :name="getProviderIcon(server.provider)"
+                :name="getServerIcon(server)"
                 class="h-5 w-5 text-muted-foreground"
               />
             </div>
@@ -221,7 +303,11 @@ onMounted(fetchServers);
                 />
               </div>
               <p class="text-sm text-muted-foreground truncate">
-                {{ server.provider_label || server.provider }}
+                <span>{{ server.provider_label || server.provider }}</span>
+                <template v-if="isNonDefaultType(server)">
+                  <span class="mx-1">·</span>
+                  <span>{{ server.type_label || server.type }}</span>
+                </template>
               </p>
               <p v-if="server.public_ipv4" class="text-sm text-muted-foreground truncate">
                 {{ server.public_ipv4 }}

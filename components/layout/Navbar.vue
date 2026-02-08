@@ -409,21 +409,34 @@ const siteDetailTabs = computed(() => {
   return allSiteDetailTabs;
 });
 
+// Shared cache from server index page (populated on click before navigation)
+const navbarServerCache = useState<{ id: string; name: string; public_ipv4: string; connected: boolean; provider: string; provider_label?: string; status: string; type: string; provision_command?: string } | null>('navbarServerCache', () => null);
+
+const applyServerData = (data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string }) => {
+  serverName.value = data.name;
+  serverIp.value = data.public_ipv4;
+  serverConnected.value = data.connected;
+  serverProvider.value = data.provider;
+  serverStatus.value = data.status;
+  serverType.value = data.type;
+  serverProvisionCommand.value = data.provision_command || null;
+};
+
 // Fetch server info when on server or site detail page
 watch([serverId, siteId], async ([sId, stId]) => {
   if (sId && !stId) {
-    // Server detail page only
-    try {
-      const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`);
-      serverName.value = response.data.name;
-      serverIp.value = response.data.public_ipv4;
-      serverConnected.value = response.data.connected;
-      serverProvider.value = response.data.provider;
-      serverStatus.value = response.data.status;
-      serverType.value = response.data.type;
-      serverProvisionCommand.value = response.data.provision_command || null;
-    } catch {
-      serverName.value = null;
+    // Server detail page - use cache if available, otherwise fetch
+    const cached = navbarServerCache.value;
+    if (cached && cached.id === sId) {
+      applyServerData(cached);
+      // Don't clear cache here - let the page consume it too
+    } else {
+      try {
+        const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`);
+        applyServerData(response.data);
+      } catch {
+        serverName.value = null;
+      }
     }
     // Clear site data
     siteAddress.value = null;
@@ -541,6 +554,8 @@ const showDnsTabs = computed(() => {
   if (!isSubscribed.value) return false;
   return isDnsDetailPage.value;
 });
+
+const isServerDataLoaded = computed(() => serverType.value !== null);
 
 const showServerTabs = computed(() => {
   if (!isSubscribed.value) return false;
@@ -919,23 +934,31 @@ onMounted(fetchTeams);
             Servers
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
-          <div class="flex items-center gap-2">
-            <span class="relative flex items-center gap-1.5 text-sm font-medium">
-              <span
-                class="h-2 w-2 rounded-full"
-                :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
-              />
-              {{ serverName || 'Loading...' }}
-            </span>
-            <span v-if="isLoadBalancerServer" class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
-              Load Balancer
-            </span>
-            <span v-if="serverProvider" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
-              {{ providerLabels[serverProvider] || serverProvider }}
-            </span>
-          </div>
+          <template v-if="isServerDataLoaded">
+            <div class="flex items-center gap-2">
+              <span class="relative flex items-center gap-1.5 text-sm font-medium">
+                <span
+                  class="h-2 w-2 rounded-full"
+                  :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
+                />
+                {{ serverName }}
+              </span>
+              <span v-if="isLoadBalancerServer" class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
+                Load Balancer
+              </span>
+              <span v-if="serverProvider" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+                {{ providerLabels[serverProvider] || serverProvider }}
+              </span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="flex items-center gap-2">
+              <div class="h-4 w-32 animate-pulse rounded bg-muted" />
+              <div class="h-5 w-16 animate-pulse rounded bg-muted" />
+            </div>
+          </template>
         </div>
-        <div class="flex items-center gap-2">
+        <div v-if="isServerDataLoaded" class="flex items-center gap-2">
           <SharedLogsSheet v-if="serverId" :server-id="serverId" type="server" />
           <Button
             v-if="showProvisionButton"
@@ -960,6 +983,7 @@ onMounted(fetchTeams);
         </div>
       </div>
       <nav
+        v-if="isServerDataLoaded"
         ref="serverNavRef"
         class="relative -mb-px flex gap-1 overflow-x-auto"
         :class="{ '-mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-border mb-0': isAdvancedTabActive }"
@@ -984,6 +1008,9 @@ onMounted(fetchTeams);
           class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
           :style="{ left: `${serverIndicatorLeft}px`, width: `${serverIndicatorWidth}px` }"
         />
+      </nav>
+      <nav v-else class="relative -mb-px flex gap-1 overflow-x-auto">
+        <div v-for="i in 6" :key="i" class="h-9 w-20 animate-pulse rounded bg-muted px-3 py-2" />
       </nav>
       <!-- Advanced Sub-tabs -->
       <nav v-if="isAdvancedTabActive" ref="advancedNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">

@@ -7,6 +7,7 @@ useHead({
 </script>
 
 <template>
+  <NuxtLoadingIndicator color="hsl(var(--primary))" :height="2" />
   <NuxtLayout>
     <NuxtPage />
   </NuxtLayout>
