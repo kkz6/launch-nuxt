@@ -307,34 +307,41 @@ watch(open, async (isOpen) => {
           />
         </div>
 
-        <!-- Notifications -->
-        <div class="space-y-3">
-          <Label>Notifications</Label>
-          <div class="space-y-2">
-            <div class="flex items-center space-x-2">
-              <Checkbox
-                id="notification_on_failure"
-                v-model="notificationOnFailure"
-              />
-              <Label for="notification_on_failure" class="font-normal">Notify on failure</Label>
-            </div>
-            <div class="flex items-center space-x-2">
-              <Checkbox
-                id="notification_on_success"
-                v-model="notificationOnSuccess"
-              />
-              <Label for="notification_on_success" class="font-normal">Notify on success</Label>
+        <!-- Notifications & Enabled -->
+        <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-3">
+            <Label>Notifications</Label>
+            <div class="space-y-2">
+              <div class="flex items-center space-x-2">
+                <Checkbox
+                  id="notification_on_failure"
+                  :checked="notificationOnFailure"
+                  @update:checked="(val: boolean) => notificationOnFailure = val"
+                />
+                <Label for="notification_on_failure" class="font-normal">Notify on failure</Label>
+              </div>
+              <div class="flex items-center space-x-2">
+                <Checkbox
+                  id="notification_on_success"
+                  :checked="notificationOnSuccess"
+                  @update:checked="(val: boolean) => notificationOnSuccess = val"
+                />
+                <Label for="notification_on_success" class="font-normal">Notify on success</Label>
+              </div>
             </div>
           </div>
-        </div>
 
-        <!-- Enabled -->
-        <div class="flex items-center space-x-2">
-          <Checkbox
-            id="enabled"
-            v-model="enabled"
-          />
-          <Label for="enabled" class="font-normal">Enable backup</Label>
+          <div class="space-y-3">
+            <Label>Status</Label>
+            <div class="flex items-center space-x-2">
+              <Checkbox
+                id="enabled"
+                :checked="enabled"
+                @update:checked="(val: boolean) => enabled = val"
+              />
+              <Label for="enabled" class="font-normal">Enable backup</Label>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
