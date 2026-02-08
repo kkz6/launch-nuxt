@@ -60,7 +60,7 @@ watch(
   }
 )
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
   document.documentElement.classList.remove('modal-open')
   document.body.classList.remove('modal-open')
   document.body.removeAttribute('data-scroll-y')
@@ -80,79 +80,111 @@ const connectionStatusColor = computed(() => {
 </script>
 
 <template>
-  <div>
-    <!-- Backdrop blur when terminal is open -->
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity duration-300"
-    />
+  <Teleport to="body">
+    <Transition name="fade">
+      <div
+        v-if="isOpen"
+        class="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm transition-opacity duration-300"
+        @click="emit('close')"
+      />
+    </Transition>
 
-    <div
-      class="fixed inset-x-0 bottom-0 z-50 transform border-t border-zinc-800 bg-zinc-900 transition-transform duration-300 ease-in-out"
-      :class="isOpen ? 'translate-y-0' : 'translate-y-full'"
-      :style="{ height: `${height}px` }"
-    >
-      <!-- Header -->
-      <div class="flex h-10 items-center justify-between border-b border-zinc-800 px-4">
-        <div class="flex items-center gap-2 text-zinc-300">
-          <Icon name="lucide:terminal" class="h-4 w-4" />
-          <h3 class="text-sm font-medium">{{ site.address }}</h3>
-          <span class="text-xs text-zinc-500">—</span>
-          <span class="font-mono text-xs text-zinc-500">
-            {{ (site as any).app_directory }}
-          </span>
-        </div>
-
-        <div class="flex items-center gap-3">
-          <div class="flex items-center gap-2 text-xs text-zinc-500">
-            <Icon name="lucide:circle" class="h-2 w-2" :class="connectionStatusColor" />
-            <span class="capitalize">{{ connectionStatus }}</span>
-            <span class="text-zinc-600">•</span>
-            <span class="font-mono">launcher</span>
+    <Transition name="slide-up">
+      <div
+        v-if="isOpen"
+        class="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-lg border-t border-zinc-800 bg-zinc-900 transition-[height] duration-300 ease-in-out"
+        :style="{ height: `${height}px` }"
+      >
+        <!-- Header -->
+        <div class="flex h-10 flex-shrink-0 items-center justify-between border-b border-zinc-800 px-4">
+          <div class="flex items-center gap-2 text-zinc-300">
+            <Icon name="lucide:terminal" class="h-4 w-4" />
+            <h3 class="text-sm font-medium">{{ site.address }}</h3>
+            <span class="text-xs text-zinc-500">—</span>
+            <span class="font-mono text-xs text-zinc-500">
+              {{ (site as any).app_directory }}
+            </span>
           </div>
 
-          <div class="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-              title="Clear terminal"
-              @click="clearTerminal"
-            >
-              <Icon name="lucide:rotate-ccw" class="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-              @click="toggleMaximize"
-            >
-              <Icon v-if="isMaximized" name="lucide:minimize-2" class="h-3 w-3" />
-              <Icon v-else name="lucide:maximize-2" class="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-              @click="emit('close')"
-            >
-              <Icon name="lucide:x" class="h-3 w-3" />
-            </Button>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 text-xs text-zinc-500">
+              <Icon name="lucide:circle" class="h-2 w-2" :class="connectionStatusColor" />
+              <span class="capitalize">{{ connectionStatus }}</span>
+              <span class="text-zinc-600">•</span>
+              <span class="font-mono">launcher</span>
+            </div>
+
+            <div class="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
+                title="Clear terminal"
+                @click="clearTerminal"
+              >
+                <Icon name="lucide:rotate-ccw" class="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
+                @click="toggleMaximize"
+              >
+                <Icon v-if="isMaximized" name="lucide:minimize-2" class="h-3 w-3" />
+                <Icon v-else name="lucide:maximize-2" class="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
+                @click="emit('close')"
+              >
+                <Icon name="lucide:x" class="h-3 w-3" />
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Terminal content -->
-      <div class="overflow-hidden bg-black" :style="{ height: `${height - 40}px` }">
-        <SiteTerminal
-          v-if="isOpen"
-          ref="terminalRef"
-          :server-id="server.id"
-          :site-id="site.id"
-          :is-maximized="isMaximized"
-          @connection-status-change="onConnectionStatusChange"
-        />
+        <!-- Terminal content -->
+        <div class="flex-1 overflow-hidden bg-black">
+          <SiteTerminal
+            v-if="isOpen"
+            ref="terminalRef"
+            :server-id="server.id"
+            :site-id="site.id"
+            :is-maximized="isMaximized"
+            @connection-status-change="onConnectionStatusChange"
+          />
+        </div>
       </div>
-    </div>
-  </div>
+    </Transition>
+  </Teleport>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
+}
+
+.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+}
+</style>

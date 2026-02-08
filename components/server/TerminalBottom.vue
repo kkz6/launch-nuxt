@@ -149,7 +149,7 @@ onBeforeUnmount(() => {
     <Transition name="slide-up">
       <div
         v-if="isOpen"
-        class="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-lg border-t border-zinc-800 bg-zinc-900"
+        class="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-lg border-t border-zinc-800 bg-zinc-900 transition-[height] duration-300 ease-in-out"
         :style="{ height: `${height}px` }"
       >
         <!-- Header -->

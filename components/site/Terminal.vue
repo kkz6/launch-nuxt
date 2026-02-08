@@ -25,6 +25,8 @@ const connectionStatus = ref<'connecting' | 'connected' | 'disconnected'>('conne
 const { token } = useAuth()
 const { getCurrentTeamId } = useApi()
 
+let cleanupFn: (() => void) | null = null
+
 const sendResize = (cols: number, rows: number, ws: WebSocket) => {
   if (ws.readyState === WebSocket.OPEN) {
     const resizeMessage = JSON.stringify({
@@ -126,6 +128,7 @@ const initializeTerminal = () => {
     })
 
     ws.onopen = () => {
+      if (wsRef.value !== ws) return
       connectionStatus.value = 'connected'
       term.write('\x1b[32m✅ Connected\x1b[0m\r\n')
       setTimeout(() => {
@@ -138,11 +141,6 @@ const initializeTerminal = () => {
       try {
         if (typeof event.data === 'string') {
           term.write(event.data)
-          setTimeout(() => {
-            if (term && typeof term.scrollToBottom === 'function') {
-              term.scrollToBottom()
-            }
-          }, 10)
         }
       } catch (error) {
         console.error('Terminal write error:', error)
@@ -151,11 +149,13 @@ const initializeTerminal = () => {
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error)
+      if (wsRef.value !== ws) return
       connectionStatus.value = 'disconnected'
       term.write('\r\n\x1b[31m❌ Connection failed\x1b[0m\r\n')
     }
 
     ws.onclose = (event) => {
+      if (wsRef.value !== ws) return
       connectionStatus.value = 'disconnected'
       if (event.code !== 1000 && event.code !== 1001) {
         term.write(`\r\n\x1b[31m⚠️ Connection lost (${event.code})\x1b[0m\r\n`)
@@ -184,20 +184,7 @@ const initializeTerminal = () => {
 
   window.addEventListener('resize', handleResize)
 
-  const resizeObserver = new ResizeObserver((entries) => {
-    const entry = entries[0]
-    if (entry && terminalInstance.value) {
-      const newHeight = entry.contentRect.height
-      const currentHeight = terminalInstance.value.element?.getBoundingClientRect().height || 0
-
-      if (newHeight > currentHeight + 50) {
-        setTimeout(() => {
-          if (terminalInstance.value) {
-            terminalInstance.value.scrollToBottom()
-          }
-        }, 150)
-      }
-    }
+  const resizeObserver = new ResizeObserver(() => {
     handleResize()
   })
 
@@ -214,20 +201,12 @@ const initializeTerminal = () => {
 
   container.addEventListener('clearTerminal', handleClearTerminal)
 
-  onUnmounted(() => {
+  cleanupFn = () => {
     clearTimeout(resizeTimer)
     window.removeEventListener('resize', handleResize)
     resizeObserver.disconnect()
     container.removeEventListener('clearTerminal', handleClearTerminal)
-
-    if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
-      wsRef.value.close()
-    }
-
-    if (terminalInstance.value) {
-      terminalInstance.value.dispose()
-    }
-  })
+  }
 }
 
 watch(
@@ -248,6 +227,24 @@ watch(connectionStatus, (status) => {
 })
 
 onMounted(initializeTerminal)
+
+onUnmounted(() => {
+  if (cleanupFn) {
+    cleanupFn()
+    cleanupFn = null
+  }
+
+  const oldWs = wsRef.value
+  wsRef.value = null
+  if (oldWs && oldWs.readyState === WebSocket.OPEN) {
+    oldWs.close()
+  }
+
+  if (terminalInstance.value) {
+    terminalInstance.value.dispose()
+    terminalInstance.value = null
+  }
+})
 
 const clearTerminal = () => {
   if (termRef.value) {
