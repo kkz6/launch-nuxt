@@ -107,6 +107,15 @@ const getProviderIcon = (providerName: string): string => {
   return 'lucide:globe';
 };
 
+const getProviderColor = (providerName: string): string => {
+  const name = providerName.toLowerCase();
+  if (name.includes('cloudflare')) return '#F38020';
+  if (name.includes('route53') || name.includes('aws')) return '#FF9900';
+  if (name.includes('digitalocean')) return '#0080FF';
+  if (name.includes('godaddy')) return '#00A63F';
+  return '#6B7280';
+};
+
 onMounted(fetchDomains);
 </script>
 
@@ -139,10 +148,13 @@ onMounted(fetchDomains);
       >
         <div class="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50">
           <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div
+              class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
+              :style="{ '--brand-color': getProviderColor(getProviderInfo(domain).label) }"
+            >
               <Icon
                 :name="getProviderIcon(getProviderInfo(domain).label)"
-                class="h-5 w-5 text-muted-foreground"
+                class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
               />
             </div>
             <div class="flex-1 min-w-0">
@@ -171,3 +183,13 @@ onMounted(fetchDomains);
     </div>
   </div>
 </template>
+
+<style scoped>
+.group:hover .brand-icon-bg {
+  background-color: var(--brand-color);
+}
+
+.group:hover .brand-icon {
+  color: white;
+}
+</style>

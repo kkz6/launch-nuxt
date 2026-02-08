@@ -72,6 +72,18 @@ const getSiteTypeLabel = (type: string): string => {
   return types[type] || type;
 };
 
+const getSiteTypeColor = (type: string): string => {
+  const t = type?.toLowerCase() || "";
+  if (t.includes("laravel")) return "#FF2D20";
+  if (t.includes("wordpress")) return "#21759B";
+  if (t.includes("nuxt")) return "#00DC82";
+  if (t.includes("next")) return "#171717";
+  if (t.includes("node")) return "#5FA04E";
+  if (t.includes("python") || t.includes("django")) return "#3776AB";
+  if (t.includes("ruby") || t.includes("rails")) return "#CC342D";
+  return "#777BB4";
+};
+
 const getStatusColor = (site: Site): string => {
   if (site.installation_failed_at || site.uninstallation_failed_at) {
     return "bg-red-500";
@@ -157,10 +169,13 @@ const formatDate = (date: string): string => {
           </button>
 
           <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div
+              class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
+              :style="{ '--brand-color': getSiteTypeColor(site.type) }"
+            >
               <Icon
                 :name="getSiteTypeIcon(site.type)"
-                class="h-5 w-5 text-muted-foreground"
+                class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
               />
             </div>
             <div class="flex-1 min-w-0">
@@ -210,3 +225,13 @@ const formatDate = (date: string): string => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.group:hover .brand-icon-bg {
+  background-color: var(--brand-color);
+}
+
+.group:hover .brand-icon {
+  color: white;
+}
+</style>
