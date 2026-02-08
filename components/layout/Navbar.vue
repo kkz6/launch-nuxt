@@ -395,6 +395,7 @@ const siteTypeLabels: Record<string, string> = {
   laravel: "Laravel",
   wordpress: "WordPress",
   generic: "Generic PHP",
+  phpmyadmin: "phpMyAdmin",
 };
 
 // Computed site tabs based on site type
@@ -402,6 +403,9 @@ const siteDetailTabs = computed(() => {
   if (!siteType.value) return allSiteDetailTabs;
   if (siteType.value === 'wordpress') {
     return allSiteDetailTabs.filter((t) => !['deployments', 'queues'].includes(t.value));
+  }
+  if (siteType.value === 'phpmyadmin') {
+    return allSiteDetailTabs.filter((t) => !['deployments', 'queues', 'redirects', 'commands'].includes(t.value));
   }
   if (siteType.value === 'generic') {
     return allSiteDetailTabs.filter((t) => !['queues'].includes(t.value));
@@ -1090,7 +1094,7 @@ onMounted(fetchTeams);
             Terminal
           </Button>
           <SiteDeployApplication
-            v-if="serverId && siteId && siteType !== 'wordpress'"
+            v-if="serverId && siteId && siteType && !['wordpress', 'phpmyadmin'].includes(siteType)"
             :server-id="serverId"
             :site-id="siteId"
             :is-deploying="isDeploying"

@@ -83,7 +83,7 @@ onMounted(async () => {
   <div v-else-if="site && server" class="pb-10">
     <!-- Tab Content -->
     <div v-if="activeTab === 'general'" class="space-y-4">
-      <SiteDeployBlock v-if="site.type !== 'wordpress'" :server="server" :site="site" />
+      <SiteDeployBlock v-if="!['wordpress', 'phpmyadmin'].includes(site.type)" :server="server" :site="site" />
       <SiteLoadBalancedBanner :site="site" />
       <SiteOverview :server="server" :site="site" />
       <SiteLaravelFeatures

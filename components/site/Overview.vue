@@ -12,6 +12,7 @@ const applicationTypes: Record<string, string> = {
   laravel: 'Laravel',
   wordpress: 'WordPress',
   generic: 'Generic PHP',
+  phpmyadmin: 'phpMyAdmin',
 }
 
 const phpVersions: Record<string, string> = {
@@ -26,6 +27,7 @@ const applicationIcons: Record<string, string> = {
   laravel: 'logos:laravel',
   wordpress: 'logos:wordpress-icon',
   generic: 'logos:php',
+  phpmyadmin: 'simple-icons:phpmyadmin',
 }
 </script>
 
