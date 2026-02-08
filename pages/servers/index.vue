@@ -87,6 +87,20 @@ const getServerIcon = (server: Server): string => {
   return getProviderIcon(server.provider);
 };
 
+const getProviderColor = (server: Server): string => {
+  if (server.type === "loadbalancer") return "#6366f1";
+  if (server.type === "docker") return "#2496ED";
+  const name = server.provider?.toLowerCase() || "";
+  if (name.includes("digitalocean")) return "#0080FF";
+  if (name.includes("hetzner")) return "#D50C2D";
+  if (name.includes("linode")) return "#00A95C";
+  if (name.includes("vultr")) return "#007BFC";
+  if (name.includes("aws")) return "#FF9900";
+  if (name.includes("google") || name.includes("gcp")) return "#4285F4";
+  if (name.includes("azure")) return "#0078D4";
+  return "#6B7280";
+};
+
 const isNonDefaultType = (server: Server): boolean => {
   return !!server.type && server.type !== "php";
 };
@@ -288,10 +302,13 @@ onMounted(fetchServers);
           </TooltipProvider>
 
           <div class="relative flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div
+              class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
+              :style="{ '--brand-color': getProviderColor(server) }"
+            >
               <Icon
                 :name="getServerIcon(server)"
-                class="h-5 w-5 text-muted-foreground"
+                class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
               />
             </div>
             <div class="flex-1 min-w-0">
@@ -395,5 +412,13 @@ onMounted(fetchServers);
 
 .animate-shimmer {
   animation: shimmer 2s infinite;
+}
+
+.group:hover .brand-icon-bg {
+  background-color: var(--brand-color);
+}
+
+.group:hover .brand-icon {
+  color: white;
 }
 </style>
