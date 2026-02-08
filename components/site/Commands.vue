@@ -44,10 +44,12 @@ const fetchCommands = async () => {
   }
 }
 
-// Subscribe to real-time command events
-useSiteCommandEvents(props.siteId, (data) => {
-  // Refresh commands when any command event is received
-  fetchCommands()
+// Debounced refetch for WebSocket events
+let commandFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
+useSiteCommandEvents(props.siteId, () => {
+  if (commandFetchTimeout) clearTimeout(commandFetchTimeout)
+  commandFetchTimeout = setTimeout(() => fetchCommands(), 300)
 })
 
 const deleteCommand = async (command: Command) => {

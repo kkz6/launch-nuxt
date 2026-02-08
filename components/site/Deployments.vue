@@ -17,11 +17,14 @@ const props = defineProps<Props>()
 const { user } = useAuth()
 const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
-// Subscribe to real-time deployment events
+// Debounced refetch for WebSocket events
+let deployFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
 useDeploymentEvents(teamId, (data) => {
   // Only refresh if the event is for this site
   if (data.site_id === props.siteId) {
-    fetchDeployments()
+    if (deployFetchTimeout) clearTimeout(deployFetchTimeout)
+    deployFetchTimeout = setTimeout(() => fetchDeployments(), 300)
   }
 })
 

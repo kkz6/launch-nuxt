@@ -139,8 +139,13 @@ watch(isEditDialogOpen, (open) => {
 
 const hasStatusInfo = computed(() => daemons.value.some((d) => d.last_status_check !== null))
 
-// Subscribe to real-time daemon events
-useServerModelEvents('daemon', serverId.value, fetchData)
+// Debounced refetch for WebSocket events
+let daemonFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
+useServerModelEvents('daemon', serverId.value, () => {
+  if (daemonFetchTimeout) clearTimeout(daemonFetchTimeout)
+  daemonFetchTimeout = setTimeout(() => fetchData(), 300)
+})
 
 onMounted(fetchData)
 </script>

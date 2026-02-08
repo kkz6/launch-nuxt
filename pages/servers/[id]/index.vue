@@ -25,12 +25,20 @@ const isTerminalOpen = useState('serverTerminalOpen', () => false);
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || '');
 
+// Debounced silent refetch for WebSocket events
+let sitesFetchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const debouncedFetchSites = () => {
+  if (sitesFetchTimeout) clearTimeout(sitesFetchTimeout);
+  sitesFetchTimeout = setTimeout(() => fetchSites(), 300);
+};
+
 // Subscribe to real-time site events
 useSiteEvents(teamId, (data) => {
   if (isLoadBalancer.value) return;
   const eventServerId = data.server_id || data.site?.server_id;
   if (eventServerId === serverId.value) {
-    fetchSites();
+    debouncedFetchSites();
   }
 });
 
@@ -40,7 +48,7 @@ useDeploymentEvents(teamId, (data) => {
   const siteExists = sites.value.some(site => site.id === data.site_id);
   const eventServerId = data.site?.server_id;
   if (siteExists || eventServerId === serverId.value) {
-    fetchSites();
+    debouncedFetchSites();
   }
 });
 

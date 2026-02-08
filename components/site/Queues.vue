@@ -91,9 +91,12 @@ const fetchQueues = async () => {
   }
 }
 
-// Subscribe to real-time queue events
+// Debounced refetch for WebSocket events
+let queueFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
 useSiteQueueEvents(props.siteId, () => {
-  fetchQueues()
+  if (queueFetchTimeout) clearTimeout(queueFetchTimeout)
+  queueFetchTimeout = setTimeout(() => fetchQueues(), 300)
 })
 
 const restartQueue = async (queue: Queue) => {

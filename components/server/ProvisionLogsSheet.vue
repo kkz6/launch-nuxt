@@ -30,15 +30,29 @@ const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 // Subscribe to server and task events for auto-refresh
 const serverId = computed(() => props.server?.id || '')
 
-const fetchProvisionStatus = async () => {
+const fetchProvisionStatus = async (silent = false) => {
   if (!props.server) return
 
-  isLoading.value = true
+  if (!silent) isLoading.value = true
   try {
     const response = await serverService.getProvisionStatus(props.server.id)
-    provisionStatus.value = response.data
+    if (silent && provisionStatus.value?.steps && response.data?.steps) {
+      // Merge steps in-place to avoid flickering re-renders
+      const newSteps = response.data.steps
+      for (let i = 0; i < newSteps.length; i++) {
+        if (i < provisionStatus.value.steps.length) {
+          Object.assign(provisionStatus.value.steps[i], newSteps[i])
+        } else {
+          provisionStatus.value.steps.push(newSteps[i])
+        }
+      }
+      // Update latest_task reference
+      provisionStatus.value.latest_task = response.data.latest_task
+    } else {
+      provisionStatus.value = response.data
+    }
   } catch {
-    provisionStatus.value = null
+    if (!silent) provisionStatus.value = null
   } finally {
     isLoading.value = false
   }
@@ -52,11 +66,14 @@ watch(open, (isOpen) => {
   }
 })
 
-// Subscribe to real-time server events
+// Debounced silent refetch for WebSocket events
+let statusFetchTimeout: ReturnType<typeof setTimeout> | null = null
+
 useServerEvents(teamId, (data) => {
   // Only refresh if the event is for this server and sheet is open
   if (data.server_id === serverId.value && open.value) {
-    fetchProvisionStatus()
+    if (statusFetchTimeout) clearTimeout(statusFetchTimeout)
+    statusFetchTimeout = setTimeout(() => fetchProvisionStatus(true), 300)
   }
 })
 
@@ -199,7 +216,7 @@ const completedCount = computed(() => {
               <!-- Step description -->
               <p
                 :class="[
-                  'flex-auto py-0.5 text-sm leading-5',
+                  'flex-auto py-0.5 text-sm leading-5 transition-colors duration-300',
                   step.status === 'completed'
                     ? 'text-foreground'
                     : step.status === 'current'
