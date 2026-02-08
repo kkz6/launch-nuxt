@@ -215,7 +215,7 @@ onMounted(fetchSettings)
       <!-- General Settings -->
       <form class="space-y-6" @submit.prevent="onSubmit">
         <div class="grid grid-cols-2 gap-6">
-          <FormField v-slot="{ componentField }" name="php_version">
+          <FormField v-if="site.type !== 'phpmyadmin'" v-slot="{ componentField }" name="php_version">
             <FormItem>
               <FormLabel>PHP Version</FormLabel>
               <Select v-bind="componentField">
@@ -238,7 +238,7 @@ onMounted(fetchSettings)
             </FormItem>
           </FormField>
 
-          <FormField v-if="site.type !== 'wordpress'" v-slot="{ componentField }" name="web_folder">
+          <FormField v-if="!['wordpress', 'phpmyadmin'].includes(site.type)" v-slot="{ componentField }" name="web_folder">
             <FormItem>
               <FormLabel>Web Folder</FormLabel>
               <FormControl>
@@ -318,20 +318,22 @@ onMounted(fetchSettings)
       </div>
 
       <!-- Deployment Settings -->
-      <Separator />
-      <div class="space-y-4">
-        <div>
-          <h3 class="text-lg font-medium">Deployment Settings</h3>
-          <p class="text-sm text-muted-foreground">
-            Configure deployment hooks and zero-downtime settings
-          </p>
+      <template v-if="site.type !== 'phpmyadmin'">
+        <Separator />
+        <div class="space-y-4">
+          <div>
+            <h3 class="text-lg font-medium">Deployment Settings</h3>
+            <p class="text-sm text-muted-foreground">
+              Configure deployment hooks and zero-downtime settings
+            </p>
+          </div>
+          <SiteDeploymentSettings
+            :server-id="serverId"
+            :site="site"
+            @updated="emit('updated')"
+          />
         </div>
-        <SiteDeploymentSettings
-          :server-id="serverId"
-          :site="site"
-          @updated="emit('updated')"
-        />
-      </div>
+      </template>
 
       <!-- Delete Site -->
       <Separator />

@@ -178,7 +178,7 @@ export interface Site extends InstallationStatus {
   source_control_id: string;
   address: string;
   name: string;
-  type: "laravel" | "wordpress" | "generic";
+  type: "laravel" | "wordpress" | "generic" | "phpmyadmin";
   typeData?: Record<string, never> | null;
   aliases?: Record<string, never> | null;
   tls_setting: string;
