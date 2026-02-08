@@ -241,10 +241,10 @@ onMounted(fetchBackups)
     <!-- Edit Backup Dialog -->
     <ServerCreateBackup
       v-if="selectedBackupForEdit"
+      v-model:open="isEditDialogOpen"
       :server-id="serverId"
       :backup="selectedBackupForEdit"
-      :open="isEditDialogOpen"
-      @update:open="(val) => { isEditDialogOpen = val; if (!val) selectedBackupForEdit = null }"
+      @update:open="(val: boolean) => { if (!val) selectedBackupForEdit = null }"
       @created="fetchBackups"
     />
 
