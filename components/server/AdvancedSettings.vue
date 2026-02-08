@@ -16,6 +16,6 @@ defineProps<Props>()
     <ServerSettingsSshKeys v-if="activeSubTab === 'ssh-keys'" :server-id="server.id" />
     <ServerSettingsPackages v-if="activeSubTab === 'packages'" :server-id="server.id" />
     <ServerSettingsPhp v-if="activeSubTab === 'php'" :server-id="server.id" />
-    <ServerSettingsServices v-if="activeSubTab === 'services'" :server-id="server.id" />
+    <ServerSettingsServices v-if="activeSubTab === 'services'" :server-id="server.id" :server-type="server.type" />
   </div>
 </template>

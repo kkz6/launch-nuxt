@@ -47,9 +47,12 @@ interface Service {
 
 interface Props {
   serverId: string
+  serverType?: string
 }
 
 const props = defineProps<Props>()
+
+const isLoadBalancer = computed(() => props.serverType === 'loadbalancer')
 
 const services = ref<Service[]>([])
 const isLoading = ref(true)
@@ -291,7 +294,7 @@ onMounted(fetchServices)
           <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
           Refresh
         </Button>
-        <Button @click="isInstallDialogOpen = true">
+        <Button v-if="!isLoadBalancer" @click="isInstallDialogOpen = true">
           <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
           Install Service
         </Button>
@@ -313,7 +316,7 @@ onMounted(fetchServices)
             <p class="mb-8 max-w-md text-muted-foreground">
               Services like databases, caching systems, and runtimes help power your applications.
             </p>
-            <Button size="lg" @click="isInstallDialogOpen = true">
+            <Button v-if="!isLoadBalancer" size="lg" @click="isInstallDialogOpen = true">
               <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
               Install Your First Service
             </Button>

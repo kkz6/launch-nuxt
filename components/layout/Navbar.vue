@@ -240,7 +240,15 @@ const serverDetailTabs = computed(() => {
 
   baseTabs.push(
     { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
-    { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
+  );
+
+  if (!isLoadBalancerServer.value) {
+    baseTabs.push(
+      { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
+    );
+  }
+
+  baseTabs.push(
     { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
     { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
     { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
@@ -250,15 +258,35 @@ const serverDetailTabs = computed(() => {
   return baseTabs;
 });
 
-// Advanced sub-tabs (second level)
-const advancedSubTabs = [
-  { value: "general", label: "General", query: "general", icon: "lucide:info" },
-  { value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" },
-  { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: "lucide:key" },
-  { value: "packages", label: "Packages", query: "packages", icon: "lucide:package" },
-  { value: "php", label: "PHP", query: "php", icon: "lucide:code" },
-  { value: "services", label: "Services", query: "services", icon: "lucide:cog" },
-];
+// Advanced sub-tabs (second level) - filtered by server type
+const advancedSubTabs = computed(() => {
+  const tabs = [
+    { value: "general", label: "General", query: "general", icon: "lucide:info" },
+  ];
+
+  if (!isLoadBalancerServer.value) {
+    tabs.push(
+      { value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" },
+    );
+  }
+
+  tabs.push(
+    { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: "lucide:key" },
+  );
+
+  if (!isLoadBalancerServer.value) {
+    tabs.push(
+      { value: "packages", label: "Packages", query: "packages", icon: "lucide:package" },
+      { value: "php", label: "PHP", query: "php", icon: "lucide:code" },
+    );
+  }
+
+  tabs.push(
+    { value: "services", label: "Services", query: "services", icon: "lucide:cog" },
+  );
+
+  return tabs;
+});
 
 // Site detail tabs (base - filtered based on site type)
 const allSiteDetailTabs = [
