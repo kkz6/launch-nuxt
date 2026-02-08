@@ -27,6 +27,9 @@ const connectionStatus = ref<'connecting' | 'connected' | 'disconnected'>('conne
 const { token } = useAuth()
 const { getCurrentTeamId } = useApi()
 
+// Cleanup function for the current terminal instance
+let cleanupFn: (() => void) | null = null
+
 const sendResize = (cols: number, rows: number, ws: WebSocket) => {
   if (ws.readyState === WebSocket.OPEN) {
     const resizeMessage = JSON.stringify({
@@ -38,7 +41,29 @@ const sendResize = (cols: number, rows: number, ws: WebSocket) => {
   }
 }
 
+const cleanupTerminal = () => {
+  if (cleanupFn) {
+    cleanupFn()
+    cleanupFn = null
+  }
+
+  // Detach old WebSocket before closing so its onclose doesn't update status
+  const oldWs = wsRef.value
+  wsRef.value = null
+  if (oldWs && oldWs.readyState === WebSocket.OPEN) {
+    oldWs.close()
+  }
+
+  if (terminalInstance.value) {
+    terminalInstance.value.dispose()
+    terminalInstance.value = null
+  }
+  fitAddonInstance.value = null
+}
+
 const initializeTerminal = () => {
+  cleanupTerminal()
+
   if (!termRef.value) return
 
   const container = termRef.value
@@ -127,6 +152,7 @@ const initializeTerminal = () => {
     })
 
     ws.onopen = () => {
+      if (wsRef.value !== ws) return
       connectionStatus.value = 'connected'
       setTimeout(() => {
         fitAddon.fit()
@@ -146,11 +172,13 @@ const initializeTerminal = () => {
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error)
+      if (wsRef.value !== ws) return
       connectionStatus.value = 'disconnected'
       term.write('\r\n\x1b[31m❌ Connection failed\x1b[0m\r\n')
     }
 
     ws.onclose = (event) => {
+      if (wsRef.value !== ws) return
       connectionStatus.value = 'disconnected'
       if (event.code !== 1000 && event.code !== 1001) {
         term.write(`\r\n\x1b[31m⚠️ Connection lost (${event.code})\x1b[0m\r\n`)
@@ -185,33 +213,18 @@ const initializeTerminal = () => {
 
   resizeObserver.observe(container)
 
-  onUnmounted(() => {
+  // Store cleanup for this instance's listeners
+  cleanupFn = () => {
     clearTimeout(resizeTimer)
     window.removeEventListener('resize', handleResize)
     resizeObserver.disconnect()
-
-    if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
-      wsRef.value.close()
-    }
-
-    if (terminalInstance.value) {
-      terminalInstance.value.dispose()
-    }
-  })
+  }
 }
 
 // Reconnect when username changes
 watch(
   () => props.username,
   () => {
-    // Close existing connection
-    if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
-      wsRef.value.close()
-    }
-    if (terminalInstance.value) {
-      terminalInstance.value.dispose()
-    }
-    // Reinitialize
     nextTick(initializeTerminal)
   }
 )
@@ -236,13 +249,11 @@ watch(connectionStatus, (status) => {
 
 onMounted(initializeTerminal)
 
+onUnmounted(() => {
+  cleanupTerminal()
+})
+
 const reconnect = () => {
-  if (wsRef.value && wsRef.value.readyState === WebSocket.OPEN) {
-    wsRef.value.close()
-  }
-  if (terminalInstance.value) {
-    terminalInstance.value.dispose()
-  }
   nextTick(initializeTerminal)
 }
 
