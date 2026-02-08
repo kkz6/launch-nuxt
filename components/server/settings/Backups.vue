@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Badge } from '~/components/ui/badge'
+import type { Database, StorageProviderRecord } from '~/types'
 
 interface BackupJob {
   id: string
@@ -36,11 +37,6 @@ interface Backup {
   latest_job?: BackupJob
 }
 
-interface StorageProvider {
-  id: string
-  label: string
-}
-
 interface Props {
   serverId: string
 }
@@ -50,7 +46,9 @@ const props = defineProps<Props>()
 const { open: openSettings } = useSettingsSheet()
 
 const backups = ref<Backup[]>([])
-const storageProviders = ref<Record<string, string>>({})
+const databases = ref<Database[]>([])
+const storageProvidersList = ref<StorageProviderRecord[]>([])
+const storageProvidersMap = ref<Record<string, string>>({})
 const isLoading = ref(true)
 const loadingActions = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
@@ -65,18 +63,20 @@ const selectedBackupForEdit = ref<Backup | null>(null)
 
 const fetchBackups = async () => {
   try {
-    const [backupsData, providersData] = await Promise.all([
+    const [backupsData, providersData, dbData] = await Promise.all([
       $api<{ data: Backup[] }>(`/servers/${props.serverId}/backups`),
-      $api<{ data: StorageProvider[] }>('/storage-providers'),
+      $api<{ data: StorageProviderRecord[] }>('/storage-providers'),
+      $api<{ data: Database[] }>(`/servers/${props.serverId}/databases`),
     ])
     backups.value = backupsData.data || []
+    storageProvidersList.value = providersData.data || []
+    databases.value = dbData.data || []
 
-    // Convert providers array to map
     const providersMap: Record<string, string> = {}
-    for (const provider of providersData.data || []) {
-      providersMap[provider.id] = provider.label
+    for (const provider of storageProvidersList.value) {
+      providersMap[String(provider.id)] = provider.label
     }
-    storageProviders.value = providersMap
+    storageProvidersMap.value = providersMap
   } catch {
     toast.error('Failed to load backups')
   } finally {
@@ -150,7 +150,7 @@ const openEdit = (backup: Backup) => {
 }
 
 const getProviderName = (providerId: string) => {
-  return storageProviders.value[providerId] || 'Unknown'
+  return storageProvidersMap.value[providerId] || 'Unknown'
 }
 
 const getBackupSource = (backup: Backup) => {
@@ -191,7 +191,7 @@ const getStatusConfig = (status: string) => {
   return configs[status] || configs.pending
 }
 
-const hasProviders = computed(() => Object.keys(storageProviders.value).length > 0)
+const hasProviders = computed(() => storageProvidersList.value.length > 0)
 
 const columns = [
   { key: 'provider', label: 'Provider', width: '25%' },
@@ -244,6 +244,8 @@ onMounted(fetchBackups)
       v-model:open="isEditDialogOpen"
       :server-id="serverId"
       :backup="selectedBackupForEdit"
+      :databases="databases"
+      :storage-providers="storageProvidersList"
       @update:open="(val: boolean) => { if (!val) selectedBackupForEdit = null }"
       @created="fetchBackups"
     />
@@ -284,7 +286,7 @@ onMounted(fetchBackups)
           empty-description="Create a backup configuration to automatically backup your databases and files."
         >
           <template #empty>
-            <ServerCreateBackup :server-id="serverId" @created="fetchBackups" />
+            <ServerCreateBackup :server-id="serverId" :databases="databases" :storage-providers="storageProvidersList" @created="fetchBackups" />
           </template>
 
           <template #cell-provider="{ row }">
@@ -315,7 +317,7 @@ onMounted(fetchBackups)
         </SharedDataTable>
 
         <div v-if="backups.length > 0" class="mt-6">
-          <ServerCreateBackup :server-id="serverId" @created="fetchBackups" />
+          <ServerCreateBackup :server-id="serverId" :databases="databases" :storage-providers="storageProvidersList" @created="fetchBackups" />
         </div>
       </template>
     </template>
