@@ -46,10 +46,14 @@ interface Backup {
 interface Props {
   serverId: string
   backup?: Backup
+  databases?: Database[]
+  storageProviders?: StorageProviderRecord[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   backup: undefined,
+  databases: () => [],
+  storageProviders: () => [],
 })
 
 const emit = defineEmits<{
@@ -60,8 +64,6 @@ const open = defineModel<boolean>('open', { default: false })
 
 const isEditing = computed(() => !!props.backup)
 const isLoading = ref(false)
-const databases = ref<Database[]>([])
-const storageProviders = ref<StorageProviderRecord[]>([])
 const errors = ref<Record<string, string>>({})
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -112,19 +114,6 @@ const resetForm = () => {
   notificationOnSuccess.value = props.backup?.notification_on_success ?? false
   enabled.value = props.backup?.enabled ?? true
   errors.value = {}
-}
-
-const fetchOptions = async () => {
-  try {
-    const [dbData, storageData] = await Promise.all([
-      $api<{ data: Database[] }>(`/servers/${props.serverId}/databases`),
-      $api<{ data: StorageProviderRecord[] }>('/storage-providers'),
-    ])
-    databases.value = dbData.data || []
-    storageProviders.value = storageData.data || []
-  } catch {
-    // Silent fail
-  }
 }
 
 const toggleDatabase = (dbId: string) => {
@@ -202,12 +191,11 @@ const onSubmit = async () => {
   }
 }
 
-watch(open, async (isOpen) => {
+watch(open, (isOpen) => {
   if (isOpen) {
-    await fetchOptions()
     resetForm()
   }
-}, { immediate: true })
+})
 </script>
 
 <template>
@@ -235,7 +223,7 @@ watch(open, async (isOpen) => {
               <SelectValue placeholder="Select storage provider" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem v-for="provider in storageProviders" :key="provider.id" :value="String(provider.id)">
+              <SelectItem v-for="provider in props.storageProviders" :key="provider.id" :value="String(provider.id)">
                 {{ provider.label }}
               </SelectItem>
             </SelectContent>
@@ -255,10 +243,10 @@ watch(open, async (isOpen) => {
         </div>
 
         <!-- Databases -->
-        <div v-if="databases.length > 0" class="space-y-2">
+        <div v-if="props.databases.length > 0" class="space-y-2">
           <Label>Databases to Include</Label>
           <div class="grid grid-cols-2 gap-2 rounded-lg border p-3">
-            <div v-for="db in databases" :key="db.id" class="flex items-center space-x-2">
+            <div v-for="db in props.databases" :key="db.id" class="flex items-center space-x-2">
               <Checkbox
                 :id="`db-${db.id}`"
                 :checked="selectedDatabases.includes(db.id)"
@@ -267,7 +255,7 @@ watch(open, async (isOpen) => {
               <Label :for="`db-${db.id}`" class="font-normal">{{ db.name }}</Label>
             </div>
           </div>
-          <p v-if="databases.length === 0" class="text-xs text-muted-foreground">No databases available</p>
+          <p v-if="props.databases.length === 0" class="text-xs text-muted-foreground">No databases available</p>
         </div>
 
         <!-- Schedule -->
