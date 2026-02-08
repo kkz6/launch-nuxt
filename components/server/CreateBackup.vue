@@ -315,16 +315,14 @@ watch(open, async (isOpen) => {
               <div class="flex items-center space-x-2">
                 <Checkbox
                   id="notification_on_failure"
-                  :checked="notificationOnFailure"
-                  @update:checked="(val: boolean) => notificationOnFailure = val"
+                  v-model="notificationOnFailure"
                 />
                 <Label for="notification_on_failure" class="font-normal">Notify on failure</Label>
               </div>
               <div class="flex items-center space-x-2">
                 <Checkbox
                   id="notification_on_success"
-                  :checked="notificationOnSuccess"
-                  @update:checked="(val: boolean) => notificationOnSuccess = val"
+                  v-model="notificationOnSuccess"
                 />
                 <Label for="notification_on_success" class="font-normal">Notify on success</Label>
               </div>
@@ -336,8 +334,7 @@ watch(open, async (isOpen) => {
             <div class="flex items-center space-x-2">
               <Checkbox
                 id="enabled"
-                :checked="enabled"
-                @update:checked="(val: boolean) => enabled = val"
+                v-model="enabled"
               />
               <Label for="enabled" class="font-normal">Enable backup</Label>
             </div>
