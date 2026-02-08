@@ -107,12 +107,12 @@ onMounted(fetchData)
 
     <!-- Log Viewer Dialog -->
     <Dialog v-model:open="isLogDialogOpen">
-      <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-7xl">
-        <DialogHeader>
+      <DialogContent class="h-[85vh] sm:max-w-7xl flex flex-col overflow-hidden">
+        <DialogHeader class="shrink-0">
           <DialogTitle class="text-xl">Scheduler Logs</DialogTitle>
           <DialogDescription>{{ selectedSchedulerForLogs?.command }}</DialogDescription>
         </DialogHeader>
-        <div class="flex flex-col gap-4 pt-2.5">
+        <div class="flex flex-col flex-1 min-h-0 pt-2.5">
           <ServerLogViewer
             v-if="isLogDialogOpen && selectedSchedulerForLogs"
             :server-id="server.id"
@@ -120,6 +120,7 @@ onMounted(fetchData)
             :entity-id="selectedSchedulerForLogs.id"
             type-switcher
             no-timestamp
+            container-class-name="h-full"
           />
         </div>
       </DialogContent>
