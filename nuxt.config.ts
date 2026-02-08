@@ -29,6 +29,10 @@ export default defineNuxtConfig({
     configPath: "tailwind.config.ts",
   },
 
+  icon: {
+    provider: "iconify",
+  },
+
   typescript: {
     strict: true,
     typeCheck: true,
