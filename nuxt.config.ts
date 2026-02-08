@@ -39,6 +39,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    backendBase: process.env.NUXT_BACKEND_BASE || "http://localhost:8080",
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080/api",
       wsBase: process.env.NUXT_PUBLIC_WS_BASE || "ws://localhost:8080/api",

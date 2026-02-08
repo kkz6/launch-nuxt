@@ -24,6 +24,8 @@ const props = defineProps<Props>()
 
 const open = defineModel<boolean>('open', { default: false })
 
+const isDev = import.meta.dev
+
 const provisionScript = ref('')
 const provisionScriptLoading = ref(false)
 const provisionScriptError = ref('')
@@ -133,8 +135,8 @@ watch(showScriptContent, (isOpen) => {
           </p>
         </div>
 
-        <!-- Collapsible Script Content -->
-        <Collapsible v-model:open="showScriptContent" class="space-y-2">
+        <!-- Collapsible Script Content (only visible in development) -->
+        <Collapsible v-if="isDev" v-model:open="showScriptContent" class="space-y-2">
           <div class="flex items-center justify-between">
             <Label>Script Content (for local development)</Label>
             <CollapsibleTrigger as-child>
