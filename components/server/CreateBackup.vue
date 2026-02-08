@@ -249,8 +249,8 @@ watch(open, (isOpen) => {
             <div v-for="db in props.databases" :key="db.id" class="flex items-center space-x-2">
               <Checkbox
                 :id="`db-${db.id}`"
-                :checked="selectedDatabases.includes(db.id)"
-                @update:checked="toggleDatabase(db.id)"
+                :model-value="selectedDatabases.includes(db.id)"
+                @update:model-value="toggleDatabase(db.id)"
               />
               <Label :for="`db-${db.id}`" class="font-normal">{{ db.name }}</Label>
             </div>
