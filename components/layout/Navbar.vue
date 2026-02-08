@@ -597,6 +597,12 @@ const onScriptCreated = () => {
   scriptsRefreshKey.value++;
 };
 
+// Sites refresh trigger (when a site is created from navbar)
+const sitesRefreshKey = useState('sitesRefreshKey', () => 0);
+const onSiteCreated = () => {
+  sitesRefreshKey.value++;
+};
+
 // Terminal state (shared with server detail page)
 const isTerminalOpen = useState('serverTerminalOpen', () => false);
 const openTerminal = () => {
@@ -979,7 +985,7 @@ onMounted(fetchTeams);
             <Terminal class="mr-2 h-4 w-4" />
             Terminal
           </Button>
-          <ServerAddSite v-if="serverId && !isLoadBalancerServer" :server-id="serverId" />
+          <ServerAddSite v-if="serverId && !isLoadBalancerServer" :server-id="serverId" @created="onSiteCreated" />
         </div>
       </div>
       <nav

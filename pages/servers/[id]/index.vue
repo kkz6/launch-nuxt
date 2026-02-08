@@ -44,6 +44,14 @@ useDeploymentEvents(teamId, (data) => {
   }
 });
 
+// Watch for refresh trigger from navbar (e.g., after site creation)
+const sitesRefreshKey = useState('sitesRefreshKey', () => 0);
+watch(sitesRefreshKey, () => {
+  if (!isLoadBalancer.value) {
+    fetchSites();
+  }
+});
+
 // Valid tab values
 const validTabs = ["sites", "upstreams", "metrics", "databases", "networks", "daemons", "schedulers", "advanced"];
 const validSubTabs = ["general", "backups", "ssh-keys", "packages", "php", "services"];
