@@ -87,6 +87,13 @@ const fetchBillingData = async () => {
   }
 }
 
+const nuxtApp = useNuxtApp()
+const dodoCheckout = nuxtApp.$dodoCheckout as {
+  open: (url: string, onEvent?: (event: { event_type: string; data?: Record<string, unknown> }) => void) => void
+  close: () => void
+  isOpen: () => boolean
+} | undefined
+
 const handleCheckout = async (planId: string, isAnnual: boolean) => {
   try {
     const response = await $api<{ data: { url: string } }>('/billing/generate-checkout-url', {
@@ -94,8 +101,29 @@ const handleCheckout = async (planId: string, isAnnual: boolean) => {
       body: { annual: isAnnual, plan: planId },
     })
     const url = response.data?.url || (response as any).url
-    window.location.href = url
     isModalOpen.value = false
+
+    // Open checkout as overlay instead of redirecting
+    if (dodoCheckout) {
+      dodoCheckout.open(url, (event) => {
+        if (event.event_type === 'checkout.status') {
+          const message = event.data?.message as { status?: string } | undefined
+          const status = message?.status
+          if (status === 'succeeded') {
+            dodoCheckout.close()
+            toast.success('Subscription activated successfully!')
+            fetchBillingData()
+          } else if (status === 'failed') {
+            toast.error('Payment failed. Please try again.')
+          }
+        }
+      })
+    } else {
+      // Fallback to redirect if overlay SDK not available
+      window.location.href = url
+    }
+
+    pricingModal.value?.resetLoading()
   } catch (error: unknown) {
     const errorData = error as { data?: { message?: string } }
     const message = errorData?.data?.message || 'Failed to generate checkout URL'
