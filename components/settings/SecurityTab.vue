@@ -74,8 +74,17 @@ onMounted(fetchServers)
   <div class="divide-y">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!-- Passkeys Section -->
+    <!-- Active Sessions Section -->
     <div class="px-6 pb-6">
+      <h3 class="mb-1 text-base font-semibold">Active Sessions</h3>
+      <p class="mb-4 text-sm text-muted-foreground">
+        Manage your active sessions across devices. Revoke access to devices you no longer use.
+      </p>
+      <SettingsSessions />
+    </div>
+
+    <!-- Passkeys Section -->
+    <div class="px-6 py-6">
       <h3 class="mb-1 text-base font-semibold">Passkeys</h3>
       <p class="mb-4 text-sm text-muted-foreground">
         Use passkeys for passwordless authentication.
@@ -90,6 +99,15 @@ onMounted(fetchServers)
         Add an extra layer of security to your account.
       </p>
       <SettingsTwoFactor />
+    </div>
+
+    <!-- Personal Access Tokens Section -->
+    <div class="px-6 py-6">
+      <h3 class="mb-1 text-base font-semibold">Personal Access Tokens</h3>
+      <p class="mb-4 text-sm text-muted-foreground">
+        Tokens for CLI and API authentication. Treat them like passwords.
+      </p>
+      <SettingsPersonalAccessTokens />
     </div>
 
     <!-- Server Security Audit Section -->
