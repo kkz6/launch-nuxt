@@ -39,6 +39,7 @@ interface Subscription {
 interface Receipt {
   order_number: string
   ordered_at: string
+  currency: string
   discount: number
   subtotal: number
   total: number
@@ -65,6 +66,15 @@ const isEnding = computed(() => Boolean(currentSubscription.value?.ends_at))
 // Format price from cents to dollars
 const formatPrice = (cents: number) => (cents / 100).toFixed(2)
 
+// Format currency amount with symbol
+const formatCurrency = (amount: number, currency: string) => {
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)
+  } catch {
+    return `${amount.toFixed(2)}`
+  }
+}
+
 const fetchBillingData = async () => {
   try {
     const response = await $api<{
@@ -89,9 +99,7 @@ const fetchBillingData = async () => {
 
 const nuxtApp = useNuxtApp()
 const dodoCheckout = nuxtApp.$dodoCheckout as {
-  open: (url: string, onEvent?: (event: { event_type: string; data?: Record<string, unknown> }) => void) => void
-  close: () => void
-  isOpen: () => boolean
+  open: (url: string) => void
 } | undefined
 
 const handleCheckout = async (planId: string, isAnnual: boolean) => {
@@ -103,27 +111,11 @@ const handleCheckout = async (planId: string, isAnnual: boolean) => {
     const url = response.data?.url || (response as any).url
     isModalOpen.value = false
 
-    // Open checkout as overlay instead of redirecting
     if (dodoCheckout) {
-      dodoCheckout.open(url, (event) => {
-        if (event.event_type === 'checkout.status') {
-          const message = event.data?.message as { status?: string } | undefined
-          const status = message?.status
-          if (status === 'succeeded') {
-            dodoCheckout.close()
-            toast.success('Subscription activated successfully!')
-            fetchBillingData()
-          } else if (status === 'failed') {
-            toast.error('Payment failed. Please try again.')
-          }
-        }
-      })
+      dodoCheckout.open(url)
     } else {
-      // Fallback to redirect if overlay SDK not available
       window.location.href = url
     }
-
-    pricingModal.value?.resetLoading()
   } catch (error: unknown) {
     const errorData = error as { data?: { message?: string } }
     const message = errorData?.data?.message || 'Failed to generate checkout URL'
@@ -361,10 +353,10 @@ onMounted(() => {
             <div class="col-span-2 text-right">
               <p class="font-medium">
                 <span v-if="receipt.discount > 0" class="mr-1.5 text-sm text-muted-foreground line-through">
-                  ${{ (receipt.total + receipt.discount).toFixed(2) }}
+                  {{ formatCurrency(receipt.total + receipt.discount, receipt.currency) }}
                 </span>
-                ${{ receipt.total }}
-                <span class="text-sm font-normal text-muted-foreground">USD</span>
+                {{ formatCurrency(receipt.total, receipt.currency) }}
+                <span class="text-sm font-normal text-muted-foreground">{{ receipt.currency }}</span>
               </p>
             </div>
             <div class="col-span-1 flex justify-end">
