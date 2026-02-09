@@ -6,17 +6,6 @@ import { Label } from '~/components/ui/label'
 import { Textarea } from '~/components/ui/textarea'
 import { Switch } from '~/components/ui/switch'
 import { Separator } from '~/components/ui/separator'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '~/components/ui/alert-dialog'
 import type { Server } from '~/types'
 
 interface Props {
@@ -30,11 +19,7 @@ const description = ref(props.server.description || '')
 const autoUpdate = ref(props.server.auto_update === 'true' || props.server.auto_update === '1')
 const isLoading = ref(false)
 const deleteLoading = ref(false)
-const archiveLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
-const showArchiveConfirm = ref(false)
-const auditLoading = ref(false)
-const auditEmail = ref('')
 const siteCount = ref(0)
 
 const canDelete = computed(() => siteCount.value === 0)
@@ -65,51 +50,6 @@ const updateServer = async () => {
     toast.error(err.data?.message || 'Failed to update server')
   } finally {
     isLoading.value = false
-  }
-}
-
-const archiveServer = async () => {
-  archiveLoading.value = true
-  try {
-    await $api(`/servers/${props.server.id}/archive`, {
-      method: 'POST',
-    })
-    toast.success('Server is being archived. Access will be revoked shortly.')
-    showArchiveConfirm.value = false
-    navigateTo('/servers')
-  } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Unable to archive server')
-  } finally {
-    archiveLoading.value = false
-  }
-}
-
-const runVulnerabilityAudit = async () => {
-  if (!confirmationDialog.value) return
-
-  const result = await confirmationDialog.value.show({
-    title: 'Start Security Audit',
-    description: 'This will run a comprehensive security audit on your server. The results will be sent to your email when completed.',
-    confirmText: 'Start Audit',
-    cancelText: 'Cancel',
-  })
-
-  if (!result.ok) return
-
-  auditLoading.value = true
-  try {
-    const response = await $api<{ message: string }>(`/servers/${props.server.id}/vulnerability-audit`, {
-      method: 'POST',
-      body: auditEmail.value ? { email: auditEmail.value } : {},
-    })
-    toast.success(response.message || 'Vulnerability audit has been queued successfully')
-    auditEmail.value = ''
-  } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to start vulnerability audit')
-  } finally {
-    auditLoading.value = false
   }
 }
 
@@ -193,121 +133,6 @@ const deleteServer = async () => {
           Save Changes
         </Button>
       </div>
-    </div>
-
-    <Separator />
-
-    <!-- Archive Server -->
-    <div class="space-y-4">
-      <div>
-        <h3 class="text-lg font-medium">Archive Server</h3>
-        <p class="text-sm text-muted-foreground">
-          Archive this server to remove access from the application while preserving
-          the server data. You can unarchive it later to restore access.
-        </p>
-      </div>
-
-      <div v-if="siteCount > 0" class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
-        <div class="space-y-1">
-          <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
-            Server has active sites
-          </p>
-          <p class="text-sm text-blue-700 dark:text-blue-300">
-            This server has {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }}.
-            Archiving will not affect the sites, but you won't be able to manage them through the dashboard.
-          </p>
-        </div>
-      </div>
-
-      <AlertDialog v-model:open="showArchiveConfirm">
-        <AlertDialogTrigger as-child>
-          <Button
-            variant="outline"
-            class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
-          >
-            Archive Server
-          </Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent class="max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Archive Server</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to archive "{{ server.name }}"?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div class="space-y-4 py-2">
-            <p class="text-sm text-muted-foreground">
-              This will revoke access keys and remove the server from your dashboard.
-              <template v-if="siteCount > 0">
-                The {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }} will continue running
-                but cannot be managed.
-              </template>
-              You can unarchive it later by running the provision script again.
-            </p>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              :disabled="archiveLoading"
-              class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
-              @click="archiveServer"
-            >
-              <Icon v-if="archiveLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-              {{ archiveLoading ? 'Archiving...' : 'Yes, archive server' }}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-
-    <Separator />
-
-    <!-- Security Vulnerability Audit -->
-    <div class="space-y-4">
-      <div>
-        <h3 class="flex items-center gap-2 text-lg font-medium">
-          <Icon name="lucide:shield" class="h-5 w-5" />
-          Security Vulnerability Audit
-        </h3>
-        <p class="text-sm text-muted-foreground">
-          Run a comprehensive security audit on your server to identify potential
-          vulnerabilities and security issues.
-        </p>
-      </div>
-
-      <form class="space-y-4" @submit.prevent="runVulnerabilityAudit">
-        <div class="space-y-2">
-          <Label for="audit-email">Email Address (Optional)</Label>
-          <Input
-            id="audit-email"
-            v-model="auditEmail"
-            type="email"
-            placeholder="Leave empty to use your account email"
-          />
-        </div>
-
-        <div class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
-              What will be audited?
-            </p>
-            <ul class="list-inside list-disc space-y-1 text-sm text-blue-700 dark:text-blue-300">
-              <li>Security updates and patches</li>
-              <li>SSH configuration and security settings</li>
-              <li>User accounts and password policies</li>
-              <li>Network security and firewall settings</li>
-              <li>File permissions and SUID/SGID files</li>
-              <li>Running services and processes</li>
-              <li>System logs for security events</li>
-            </ul>
-          </div>
-        </div>
-
-        <Button type="submit" :disabled="auditLoading">
-          <Icon v-if="auditLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          {{ auditLoading ? 'Running Security Audit...' : 'Start Security Audit' }}
-        </Button>
-      </form>
     </div>
 
     <Separator />
