@@ -1,4 +1,4 @@
-import type { User, LoginCredentials, RegisterData } from '~/types'
+import type { User, LoginCredentials, RegisterData, UserSession } from '~/types'
 import type { ApiResponse } from '~/composables/useApi'
 
 export interface LoginResponse {
@@ -134,6 +134,22 @@ export const authService = {
   refreshToken: (refreshToken: string) => {
     const { post } = useApi()
     return post<ApiResponse<RefreshTokenResponse>>('/auth/refresh', { refresh_token: refreshToken })
+  },
+
+  // Session management
+  sessions: {
+    list: () => {
+      const { get } = useApi()
+      return get<ApiResponse<UserSession[]>>('/user/sessions')
+    },
+    revoke: (id: string) => {
+      const { delete: del } = useApi()
+      return del<ApiResponse<null>>(`/user/sessions/${id}`)
+    },
+    revokeOthers: () => {
+      const { delete: del } = useApi()
+      return del<ApiResponse<{ revoked_count: number }>>('/user/sessions')
+    },
   },
 
   // Two-factor authentication

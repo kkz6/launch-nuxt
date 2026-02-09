@@ -385,16 +385,17 @@ export interface Service {
   updated_at: string;
 }
 
-export interface ApiToken {
-  id: number;
+export interface PersonalAccessToken {
+  id: string;
   name: string;
   abilities: string[];
-  last_used_ago: string | null;
   last_used_at: string | null;
+  expires_at: string | null;
   created_at: string | null;
-  updated_at: string | null;
-  tokeneable_id: number;
-  tokeneable_type: string;
+}
+
+export interface PersonalAccessTokenCreated extends PersonalAccessToken {
+  plain_text_token: string;
 }
 
 export interface NotificationChannel {
@@ -523,6 +524,7 @@ export interface Passkey {
 }
 
 export interface UserSession {
+  id: string;
   agent: {
     browser: string;
     is_desktop: boolean;
