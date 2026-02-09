@@ -36,12 +36,12 @@ const errors = ref<Record<string, string>>({})
 
 // Form values
 const email = ref('')
-const role = ref('viewer')
+const role = ref('member')
 
 const roles = [
+  { value: 'admin', label: 'Admin' },
   { value: 'editor', label: 'Editor' },
-  { value: 'developer', label: 'Developer' },
-  { value: 'viewer', label: 'Viewer' },
+  { value: 'member', label: 'Member' },
 ]
 
 const schema = z.object({
