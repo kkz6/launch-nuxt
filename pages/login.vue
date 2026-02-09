@@ -116,7 +116,7 @@ watch(showPasswordField, (show) => {
 <template>
   <div>
     <div class="mb-8 flex items-center">
-      <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+      <NuxtLink to="/" class="text-2xl font-bold">launchctl</NuxtLink>
     </div>
 
     <h3 class="mb-2 text-lg font-semibold text-foreground">Sign in to your account</h3>

@@ -105,7 +105,7 @@ const handleSubmit = async () => {
 
     <div v-else class="w-full max-w-md px-6">
       <div class="mb-8 flex items-center">
-        <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
+        <NuxtLink to="/" class="text-2xl font-bold">launchctl</NuxtLink>
       </div>
 
       <h3 class="mb-2 text-lg font-semibold text-foreground">

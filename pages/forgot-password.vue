@@ -48,14 +48,14 @@ const handleSubmit = async () => {
 
 <template>
   <div>
-    <Alert v-if="status" class="mb-6">
-      <Icon name="lucide:info" class="h-4 w-4" />
+    <div class="mb-8 flex items-center">
+      <NuxtLink to="/" class="text-2xl font-bold">launchctl</NuxtLink>
+    </div>
+
+    <Alert v-if="status" class="mb-6 flex items-start gap-3">
+      <Icon name="lucide:circle-check" class="h-4 w-4 mt-0.5 shrink-0 text-green-600" />
       <AlertDescription>{{ status }}</AlertDescription>
     </Alert>
-
-    <div class="mb-8 flex items-center">
-      <NuxtLink to="/" class="text-2xl font-bold">Launch</NuxtLink>
-    </div>
 
     <h3 class="mb-2 text-lg font-semibold text-foreground">
       Forgot your password?
