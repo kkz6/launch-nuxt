@@ -105,10 +105,10 @@ const isNonDefaultType = (server: Server): boolean => {
   return !!server.type && server.type !== "php";
 };
 
-const getStatusColor = (status: string): string => {
-  switch (status) {
+const getStatusColor = (server: Server): string => {
+  switch (server.status) {
     case "running":
-      return "bg-green-500";
+      return server.connected ? "bg-green-500" : "bg-red-500";
     case "provisioning":
     case "new":
     case "starting":
@@ -350,7 +350,7 @@ onUnmounted(() => {
                 <h3 class="font-semibold truncate">{{ server.name }}</h3>
                 <span
                   class="h-2 w-2 shrink-0 rounded-full"
-                  :class="getStatusColor(server.status)"
+                  :class="getStatusColor(server)"
                 />
               </div>
               <p class="text-sm text-muted-foreground truncate">
