@@ -1,7 +1,4 @@
 import { DodoPayments } from 'dodopayments-checkout'
-import type { CheckoutEvent } from 'dodopayments-checkout'
-
-let currentEventHandler: ((event: CheckoutEvent) => void) | null = null
 
 export default defineNuxtPlugin(() => {
   const config = useRuntimeConfig()
@@ -9,28 +6,15 @@ export default defineNuxtPlugin(() => {
 
   DodoPayments.Initialize({
     mode: isTestMode ? 'test' : 'live',
-    displayType: 'overlay',
-    onEvent: (event: CheckoutEvent) => {
-      if (currentEventHandler) {
-        currentEventHandler(event)
-      }
-    },
+    displayType: 'redirect',
   })
 
   return {
     provide: {
       dodoCheckout: {
-        open: (checkoutUrl: string, onEvent?: (event: CheckoutEvent) => void) => {
-          currentEventHandler = onEvent || null
-          DodoPayments.Checkout.open({
-            checkoutUrl,
-            options: {
-              manualRedirect: !!onEvent,
-            },
-          })
+        open: (checkoutUrl: string) => {
+          DodoPayments.Checkout.open({ checkoutUrl })
         },
-        close: () => DodoPayments.Checkout.close(),
-        isOpen: () => DodoPayments.Checkout.isOpen(),
       },
     },
   }
