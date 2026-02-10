@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
+import { authService } from '~/services/authService'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 
-const { user } = useAuth()
+const { user, fetchUser } = useAuth()
 
 const isLoading = ref(false)
 const enabling = ref(false)
@@ -21,39 +22,6 @@ const twoFactorEnabled = computed(() => {
   return !enabling.value && user.value?.two_factor_enabled
 })
 
-const showQrCode = async () => {
-  try {
-    const response = await $api<{ svg: string }>('/user/two-factor-qr-code')
-    qrCode.value = response.svg
-  } catch {
-    toast.error('Failed to load QR code')
-  }
-}
-
-const showSetupKey = async () => {
-  try {
-    const response = await $api<{ secretKey: string }>('/user/two-factor-secret-key')
-    setupKey.value = response.secretKey
-  } catch {
-    toast.error('Failed to load setup key')
-  }
-}
-
-const toggleRecoveryCodes = async () => {
-  if (showingRecoveryCodes.value) {
-    showingRecoveryCodes.value = false
-    recoveryCodes.value = []
-  } else {
-    try {
-      const response = await $api<string[]>('/user/two-factor-recovery-codes')
-      recoveryCodes.value = response
-      showingRecoveryCodes.value = true
-    } catch {
-      toast.error('Failed to load recovery codes')
-    }
-  }
-}
-
 const enableTwoFactorAuthentication = async () => {
   if (!confirmationDialog.value) return
 
@@ -63,18 +31,17 @@ const enableTwoFactorAuthentication = async () => {
     confirmText: 'Enable',
     cancelText: 'Cancel',
     hasInput: true,
+    inputType: 'password',
     helpText: 'Enter your password:',
   })
 
-  if (!result.ok) return
+  if (!result.ok || !result.value) return
 
   enabling.value = true
   try {
-    await $api('/user/two-factor-authentication', {
-      method: 'POST',
-      body: { password: result.value },
-    })
-    await Promise.all([showQrCode(), showSetupKey()])
+    const response = await authService.twoFactor.enable(result.value)
+    qrCode.value = response.data.qr_code_url
+    setupKey.value = response.data.secret_key
     confirming.value = true
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
@@ -92,16 +59,15 @@ const confirmTwoFactorAuthentication = async () => {
 
   isLoading.value = true
   try {
-    await $api('/user/confirmed-two-factor-authentication', {
-      method: 'POST',
-      body: { code: otpCode.value },
-    })
-    toast.success('Two-factor authentication enabled successfully')
-    confirming.value = false
+    const response = await authService.twoFactor.confirm(otpCode.value)
+    recoveryCodes.value = response.data.recovery_codes || []
+    showingRecoveryCodes.value = true
     qrCode.value = null
     setupKey.value = null
     otpCode.value = ''
-    window.location.reload()
+    await fetchUser()
+    confirming.value = false
+    toast.success('Two-factor authentication enabled successfully')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.error(err.data?.message || 'Invalid code. Please try again.')
@@ -115,10 +81,11 @@ const regenerateRecoveryCodes = async () => {
 
   const result = await confirmationDialog.value.show({
     title: 'Regenerate Recovery Codes',
-    description: 'Please confirm your password to regenerate recovery codes.',
+    description: 'This will invalidate your existing recovery codes. Please confirm your password.',
     confirmText: 'Regenerate',
     cancelText: 'Cancel',
     hasInput: true,
+    inputType: 'password',
     helpText: 'Enter your password:',
   })
 
@@ -126,14 +93,9 @@ const regenerateRecoveryCodes = async () => {
 
   isLoading.value = true
   try {
-    await $api('/user/two-factor-recovery-codes', {
-      method: 'POST',
-      body: { password: result.value },
-    })
-    if (showingRecoveryCodes.value) {
-      const response = await $api<string[]>('/user/two-factor-recovery-codes')
-      recoveryCodes.value = response
-    }
+    const response = await authService.twoFactor.regenerateRecoveryCodes()
+    recoveryCodes.value = response.data.recovery_codes || []
+    showingRecoveryCodes.value = true
     toast.success('Recovery codes regenerated successfully')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
@@ -153,28 +115,30 @@ const disableTwoFactorAuthentication = async () => {
     cancelText: 'Cancel',
     destructive: true,
     hasInput: true,
+    inputType: 'password',
     helpText: 'Enter your password:',
   })
 
-  if (!result.ok) return
+  if (!result.ok || !result.value) return
 
   disabling.value = true
   try {
-    await $api('/user/two-factor-authentication', {
-      method: 'DELETE',
-      body: { password: result.value },
-    })
-    toast.success('Two-factor authentication disabled')
+    await authService.twoFactor.disable(result.value)
     confirming.value = false
     recoveryCodes.value = []
     showingRecoveryCodes.value = false
-    window.location.reload()
+    await fetchUser()
+    toast.success('Two-factor authentication disabled')
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
     toast.error(err.data?.message || 'Failed to disable two-factor authentication')
   } finally {
     disabling.value = false
   }
+}
+
+const toggleRecoveryCodes = () => {
+  showingRecoveryCodes.value = !showingRecoveryCodes.value
 }
 </script>
 
@@ -205,11 +169,7 @@ const disableTwoFactorAuthentication = async () => {
         </p>
 
         <div class="flex flex-col items-start gap-4">
-          <!-- eslint-disable-next-line vue/no-v-html -->
-          <div
-            class="w-fit max-w-[160px] rounded-lg bg-white p-2 [&>svg]:h-auto [&>svg]:max-w-[140px] [&>svg]:w-full"
-            v-html="qrCode"
-          />
+          <img :src="qrCode" alt="QR Code" class="rounded-lg" width="200" height="200" />
           <span v-if="setupKey" class="text-sm text-muted-foreground">
             Setup Key: <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">{{ setupKey }}</code>
           </span>
@@ -263,7 +223,7 @@ const disableTwoFactorAuthentication = async () => {
         <Button type="button" variant="outline" size="sm" :disabled="isLoading" @click="regenerateRecoveryCodes">
           Regenerate Codes
         </Button>
-        <Button type="button" variant="outline" size="sm" @click="toggleRecoveryCodes">
+        <Button v-if="recoveryCodes.length > 0" type="button" variant="outline" size="sm" @click="toggleRecoveryCodes">
           {{ showingRecoveryCodes ? 'Hide Codes' : 'Show Codes' }}
         </Button>
       </template>

@@ -63,9 +63,17 @@ const handlePasswordSubmit = async () => {
   errors.value = {}
 
   try {
-    await login({ email: email.value, password: password.value })
+    const result = await login({ email: email.value, password: password.value })
+
+    // If 2FA is required, store the challenge token and redirect
+    if (result.two_factor_required && result.challenge_token) {
+      sessionStorage.setItem('2fa_challenge_token', result.challenge_token)
+      navigateTo('/two-factor-challenge')
+      return
+    }
+
     toast.success('Signed in successfully')
-    redirectAfterLogin(!!user.value?.onboarded)
+    redirectAfterLogin(!!result.user?.onboarded)
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'data' in error) {
       const fetchError = error as { data?: { message?: string; errors?: Record<string, string[]> } }
