@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { AnimatePresence, Motion } from 'motion-v'
+import { base64UrlToArrayBuffer, arrayBufferToBase64Url } from '~/utils/webauthn'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
@@ -23,10 +24,15 @@ const passwordInputRef = ref<{ $el: HTMLInputElement } | null>(null)
 const errors = ref<Record<string, string>>({})
 const loading = ref(false)
 const showPasswordField = ref(false)
-const emailSubmitted = ref(false)
 const userHasPasskeys = ref(false)
 const showPasskeyOption = ref(false)
 const passkeyLoading = ref(false)
+
+const { login, checkUserStatus, isLoading: authLoading, user } = useAuth()
+
+const redirectAfterLogin = (onboarded: boolean) => {
+  navigateTo(onboarded ? '/dashboard' : '/onboarding')
+}
 
 const handleEmailSubmit = async () => {
   if (!email.value) return
@@ -42,9 +48,8 @@ const handleEmailSubmit = async () => {
       return
     }
 
-    userHasPasskeys.value = status.has_two_factor
-    showPasskeyOption.value = status.has_two_factor
-    emailSubmitted.value = true
+    userHasPasskeys.value = status.has_passkeys
+    showPasskeyOption.value = status.has_passkeys
     showPasswordField.value = true
   } catch {
     errors.value = { email: 'An error occurred. Please try again.' }
@@ -53,8 +58,6 @@ const handleEmailSubmit = async () => {
   }
 }
 
-const { login, checkUserStatus, isLoading: authLoading, user } = useAuth()
-
 const handlePasswordSubmit = async () => {
   loading.value = true
   errors.value = {}
@@ -62,13 +65,7 @@ const handlePasswordSubmit = async () => {
   try {
     await login({ email: email.value, password: password.value })
     toast.success('Signed in successfully')
-
-    // Redirect to onboarding if user hasn't completed it, otherwise dashboard
-    if (!user.value?.onboarded) {
-      navigateTo('/onboarding')
-    } else {
-      navigateTo('/dashboard')
-    }
+    redirectAfterLogin(!!user.value?.onboarded)
   } catch (error: unknown) {
     if (error && typeof error === 'object' && 'data' in error) {
       const fetchError = error as { data?: { message?: string; errors?: Record<string, string[]> } }
@@ -87,7 +84,6 @@ const handlePasswordSubmit = async () => {
 }
 
 const handleChangeEmail = () => {
-  emailSubmitted.value = false
   showPasswordField.value = false
   password.value = ''
   userHasPasskeys.value = false
@@ -97,15 +93,71 @@ const handleChangeEmail = () => {
 
 const handlePasskeyLogin = async () => {
   passkeyLoading.value = true
-  // TODO: Implement passkey authentication
-  toast.info('Passkey authentication coming soon')
-  passkeyLoading.value = false
+  errors.value = {}
+
+  try {
+    const { post, setTokens } = useApi()
+    const { setUser, isInitialized } = useAuth()
+
+    const optionsResponse = await post<{ publicKey: PublicKeyCredentialRequestOptions }>(
+      '/auth/passkey/login/options',
+      email.value ? { email: email.value } : {},
+    )
+
+    const publicKey = optionsResponse.publicKey
+    publicKey.challenge = base64UrlToArrayBuffer(publicKey.challenge as unknown as string)
+
+    if (publicKey.allowCredentials) {
+      publicKey.allowCredentials = publicKey.allowCredentials.map((cred) => ({
+        ...cred,
+        id: base64UrlToArrayBuffer(cred.id as unknown as string),
+      }))
+    }
+
+    const credential = (await navigator.credentials.get({ publicKey })) as PublicKeyCredential
+    if (!credential) throw new Error('Failed to get credential')
+
+    const assertion = credential.response as AuthenticatorAssertionResponse
+    const authResponse = await post<{
+      user: import('~/types').User
+      access_token: string
+      refresh_token: string
+      expires_in: number
+      token_type: string
+    }>('/auth/passkey/login/verify', {
+      id: credential.id,
+      rawId: arrayBufferToBase64Url(credential.rawId),
+      type: credential.type,
+      response: {
+        clientDataJSON: arrayBufferToBase64Url(assertion.clientDataJSON),
+        authenticatorData: arrayBufferToBase64Url(assertion.authenticatorData),
+        signature: arrayBufferToBase64Url(assertion.signature),
+        userHandle: assertion.userHandle ? arrayBufferToBase64Url(assertion.userHandle) : null,
+      },
+    })
+
+    setTokens(authResponse.access_token, authResponse.refresh_token)
+    setUser(authResponse.user)
+    isInitialized.value = true
+
+    toast.success('Signed in successfully')
+    redirectAfterLogin(authResponse.user.onboarded)
+  } catch (error: unknown) {
+    if (error instanceof DOMException && error.name === 'NotAllowedError') {
+      toast.error('Passkey authentication was cancelled.')
+    } else if (error && typeof error === 'object' && 'data' in error) {
+      const fetchError = error as { data?: { message?: string } }
+      toast.error(fetchError.data?.message || 'Passkey authentication failed.')
+    } else {
+      toast.error('Passkey authentication failed. Please try again.')
+    }
+  } finally {
+    passkeyLoading.value = false
+  }
 }
 
-// Focus password input when it appears
 watch(showPasswordField, (show) => {
   if (show) {
-    // Wait for animation to complete before focusing
     setTimeout(() => {
       passwordInputRef.value?.$el?.focus()
     }, 250)
@@ -157,6 +209,27 @@ watch(showPasswordField, (show) => {
               {{ loading ? 'Checking...' : 'Continue' }}
             </Button>
           </form>
+
+          <div class="relative my-2">
+            <div class="absolute inset-0 flex items-center">
+              <Separator class="w-full" />
+            </div>
+            <div class="relative flex justify-center text-xs uppercase">
+              <span class="bg-background px-2 text-muted-foreground">Or</span>
+            </div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            class="w-full"
+            :disabled="passkeyLoading || loading"
+            @click="handlePasskeyLogin"
+          >
+            <Icon v-if="passkeyLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+            <Icon v-else name="lucide:fingerprint" class="mr-2 h-4 w-4" />
+            {{ passkeyLoading ? 'Authenticating...' : 'Sign in with Passkey' }}
+          </Button>
         </Motion>
 
         <!-- Password Form -->
