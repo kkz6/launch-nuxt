@@ -55,7 +55,7 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
 }
 
 /* Progress bar at bottom */
-[data-sonner-toast]::before {
+[data-sonner-toast]::after {
   content: '';
   position: absolute;
   bottom: 0;
@@ -67,25 +67,26 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
   animation: toast-progress linear forwards;
   animation-duration: var(--toast-duration, 4000ms);
   background: hsl(var(--muted-foreground) / 0.3);
+  z-index: 2;
 }
 
 /* Success progress bar */
-[data-sonner-toast][data-type="success"]::before {
+[data-sonner-toast][data-type="success"]::after {
   background: hsl(152 76% 52% / 0.6);
 }
 
 /* Error progress bar */
-[data-sonner-toast][data-type="error"]::before {
+[data-sonner-toast][data-type="error"]::after {
   background: hsl(0 84% 60% / 0.6);
 }
 
 /* Warning progress bar */
-[data-sonner-toast][data-type="warning"]::before {
+[data-sonner-toast][data-type="warning"]::after {
   background: hsl(38 92% 50% / 0.6);
 }
 
 /* Info progress bar */
-[data-sonner-toast][data-type="info"]::before {
+[data-sonner-toast][data-type="info"]::after {
   background: hsl(217 91% 60% / 0.6);
 }
 
@@ -99,7 +100,7 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
 }
 
 /* Pause progress on hover */
-[data-sonner-toast]:hover::before {
+[data-sonner-toast]:hover::after {
   animation-play-state: paused;
 }
 
