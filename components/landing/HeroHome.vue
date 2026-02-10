@@ -3,9 +3,11 @@ const { isAuthenticated } = useAuth()
 
 const features = [
   { icon: 'lucide:server', label: 'Server Management' },
-  { icon: 'lucide:globe', label: 'Site Deployments' },
+  { icon: 'lucide:rocket', label: 'Zero-Downtime Deploys' },
   { icon: 'lucide:database', label: 'Database Control' },
   { icon: 'lucide:shield', label: 'SSL Certificates' },
+  { icon: 'lucide:container', label: 'Docker & Compose' },
+  { icon: 'lucide:network', label: 'Load Balancers' },
 ]
 
 const providers = [
@@ -92,72 +94,173 @@ const providers = [
               <div class="ml-4 flex-1">
                 <div class="mx-auto flex max-w-md items-center gap-2 rounded-md bg-background px-3 py-1.5 text-xs text-muted-foreground">
                   <Icon name="lucide:lock" class="h-3 w-3" />
-                  app.launchctl.dev/servers
+                  app.launchctl.dev/dashboard
                 </div>
               </div>
             </div>
 
             <!-- Dashboard content preview -->
-            <div class="p-6">
-              <!-- Nav preview -->
-              <div class="mb-6 flex items-center justify-between">
-                <span class="text-lg font-bold">launchctl</span>
-                <div class="flex items-center gap-4">
-                  <div class="h-8 w-24 rounded bg-muted" />
-                  <div class="h-8 w-8 rounded-full bg-muted" />
+            <div class="text-left">
+              <!-- Top navbar row -->
+              <div class="flex h-12 items-center justify-between border-b px-4 lg:px-6">
+                <span class="text-base font-bold">launchctl</span>
+                <div class="flex items-center gap-1">
+                  <div class="h-7 w-7 rounded-full bg-muted" />
+                  <Icon name="lucide:chevron-down" class="h-3 w-3 text-muted-foreground" />
                 </div>
               </div>
 
-              <!-- Tabs preview -->
-              <div class="mb-6 flex gap-6 border-b">
-                <span class="border-b-2 border-foreground pb-2 text-sm font-medium">Servers</span>
-                <span class="pb-2 text-sm text-muted-foreground">Domains</span>
+              <!-- Tab navigation row -->
+              <div class="border-b px-4 lg:px-6">
+                <div class="flex gap-5">
+                  <div class="flex items-center gap-1.5 border-b-2 border-foreground py-2.5">
+                    <Icon name="lucide:layout-dashboard" class="h-3.5 w-3.5" />
+                    <span class="text-xs font-medium">Dashboard</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 py-2.5 text-muted-foreground">
+                    <Icon name="lucide:server" class="h-3.5 w-3.5" />
+                    <span class="text-xs font-medium">Servers</span>
+                  </div>
+                  <div class="hidden items-center gap-1.5 py-2.5 text-muted-foreground sm:flex">
+                    <Icon name="lucide:globe" class="h-3.5 w-3.5" />
+                    <span class="text-xs font-medium">Domains</span>
+                  </div>
+                  <div class="hidden items-center gap-1.5 py-2.5 text-muted-foreground sm:flex">
+                    <Icon name="lucide:scroll-text" class="h-3.5 w-3.5" />
+                    <span class="text-xs font-medium">Scripts</span>
+                  </div>
+                </div>
               </div>
 
-              <!-- Server cards preview -->
-              <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <div class="rounded-lg border bg-card p-4">
-                  <div class="mb-3 flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                      <Icon name="simple-icons:digitalocean" class="h-5 w-5 text-blue-500" />
-                    </div>
-                    <div>
-                      <div class="flex items-center gap-2">
-                        <span class="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span class="text-sm font-medium">Production</span>
-                      </div>
-                      <span class="text-xs text-muted-foreground">159.89.214.52</span>
-                    </div>
+              <!-- Page content -->
+              <div class="p-4 lg:p-6">
+                <!-- Greeting -->
+                <h2 class="mb-5 text-base font-semibold lg:text-lg">Good morning, Alex</h2>
+
+                <!-- Servers section -->
+                <div class="mb-5">
+                  <div class="mb-2.5 flex items-center justify-between">
+                    <span class="text-xs font-medium text-muted-foreground">Servers</span>
+                    <span class="text-xs text-muted-foreground">View all</span>
                   </div>
-                  <div class="flex gap-2">
-                    <span class="rounded bg-muted px-2 py-0.5 text-xs">Ubuntu 22.04</span>
-                    <span class="rounded bg-muted px-2 py-0.5 text-xs">4 Sites</span>
+                  <div class="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+                    <!-- Production -->
+                    <div class="rounded-lg border bg-card p-2.5 transition-colors">
+                      <div class="flex items-center gap-2">
+                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+                          <Icon name="simple-icons:digitalocean" class="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-1.5">
+                            <span class="truncate text-xs font-medium">Production</span>
+                            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                          </div>
+                          <p class="text-[10px] text-muted-foreground">4 sites</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Staging -->
+                    <div class="rounded-lg border bg-card p-2.5 transition-colors">
+                      <div class="flex items-center gap-2">
+                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+                          <Icon name="simple-icons:hetzner" class="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-1.5">
+                            <span class="truncate text-xs font-medium">Staging</span>
+                            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                          </div>
+                          <p class="text-[10px] text-muted-foreground">2 sites</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Docker -->
+                    <div class="hidden rounded-lg border bg-card p-2.5 transition-colors sm:block">
+                      <div class="flex items-center gap-2">
+                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+                          <Icon name="simple-icons:vultr" class="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-1.5">
+                            <span class="truncate text-xs font-medium">Docker-01</span>
+                            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                          </div>
+                          <p class="text-[10px] text-muted-foreground">6 services</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Load Balancer -->
+                    <div class="hidden rounded-lg border bg-card p-2.5 transition-colors lg:block">
+                      <div class="flex items-center gap-2">
+                        <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded bg-muted">
+                          <Icon name="simple-icons:amazonaws" class="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex items-center gap-1.5">
+                            <span class="truncate text-xs font-medium">LB-Primary</span>
+                            <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                          </div>
+                          <p class="text-[10px] text-muted-foreground">3 upstreams</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                <div class="rounded-lg border bg-card p-4">
-                  <div class="mb-3 flex items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-rose-500/10">
-                      <Icon name="simple-icons:hetzner" class="h-5 w-5 text-rose-500" />
-                    </div>
-                    <div>
-                      <div class="flex items-center gap-2">
-                        <span class="h-2 w-2 rounded-full bg-emerald-500" />
-                        <span class="text-sm font-medium">Staging</span>
+                <!-- Recent Activity -->
+                <div>
+                  <div class="mb-2.5">
+                    <span class="text-xs font-medium text-muted-foreground">Recent Activity</span>
+                  </div>
+                  <div class="rounded-lg border bg-card">
+                    <!-- Row 1 -->
+                    <div class="flex items-center gap-3 border-b px-3 py-2.5">
+                      <span class="h-2 w-2 shrink-0 rounded-full bg-green-500" />
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-xs font-medium">api.example.com</span>
+                          <span class="text-[10px] text-muted-foreground">/</span>
+                          <span class="text-[10px] text-muted-foreground">Production</span>
+                        </div>
+                        <p class="truncate text-[10px] text-muted-foreground">fix: update auth middleware</p>
                       </div>
-                      <span class="text-xs text-muted-foreground">168.119.45.123</span>
+                      <code class="hidden rounded bg-muted px-1 py-0.5 font-mono text-[9px] text-muted-foreground sm:block">a3f8c2d</code>
+                      <div class="hidden h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[8px] font-medium sm:flex">AK</div>
+                      <span class="shrink-0 text-[10px] text-muted-foreground">2m ago</span>
                     </div>
-                  </div>
-                  <div class="flex gap-2">
-                    <span class="rounded bg-muted px-2 py-0.5 text-xs">Ubuntu 22.04</span>
-                    <span class="rounded bg-muted px-2 py-0.5 text-xs">2 Sites</span>
-                  </div>
-                </div>
-
-                <div class="hidden rounded-lg border border-dashed bg-card/50 p-4 lg:block">
-                  <div class="flex h-full flex-col items-center justify-center">
-                    <Icon name="lucide:plus" class="mb-2 h-6 w-6 text-muted-foreground" />
-                    <span class="text-sm text-muted-foreground">Add Server</span>
+                    <!-- Row 2 -->
+                    <div class="flex items-center gap-3 border-b px-3 py-2.5">
+                      <span class="h-2 w-2 shrink-0 rounded-full animate-pulse bg-blue-500" />
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-xs font-medium">dashboard.app.io</span>
+                          <span class="text-[10px] text-muted-foreground">/</span>
+                          <span class="text-[10px] text-muted-foreground">Staging</span>
+                        </div>
+                        <p class="truncate text-[10px] text-muted-foreground">feat: add dark mode toggle</p>
+                      </div>
+                      <code class="hidden rounded bg-muted px-1 py-0.5 font-mono text-[9px] text-muted-foreground sm:block">e7b1f09</code>
+                      <div class="hidden h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[8px] font-medium sm:flex">JD</div>
+                      <span class="shrink-0 text-[10px] text-muted-foreground">just now</span>
+                    </div>
+                    <!-- Row 3 -->
+                    <div class="flex items-center gap-3 px-3 py-2.5">
+                      <span class="h-2 w-2 shrink-0 rounded-full bg-green-500" />
+                      <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5">
+                          <span class="text-xs font-medium">shop.example.com</span>
+                          <span class="text-[10px] text-muted-foreground">/</span>
+                          <span class="text-[10px] text-muted-foreground">Production</span>
+                        </div>
+                        <p class="truncate text-[10px] text-muted-foreground">chore: bump dependencies</p>
+                      </div>
+                      <code class="hidden rounded bg-muted px-1 py-0.5 font-mono text-[9px] text-muted-foreground sm:block">c4d92e1</code>
+                      <div class="hidden h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-[8px] font-medium sm:flex">AK</div>
+                      <span class="shrink-0 text-[10px] text-muted-foreground">15m ago</span>
+                    </div>
                   </div>
                 </div>
               </div>

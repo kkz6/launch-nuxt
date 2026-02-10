@@ -55,6 +55,14 @@ export default defineNuxtConfig({
       meta: [
         { charset: "utf-8" },
         { name: "viewport", content: "width=device-width, initial-scale=1" },
+        {
+          name: "description",
+          content:
+            "Deploy and manage servers without the complexity. One platform for provisioning, deploying, databases, SSL, and monitoring.",
+        },
+        { property: "og:site_name", content: "launchctl" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:site", content: "@gigcodes" },
       ],
       link: [
         { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
