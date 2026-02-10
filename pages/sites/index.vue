@@ -72,6 +72,9 @@ const isAccessible = (site: Site) => {
   return Boolean(site.installed_at) && !site.uninstallation_requested_at;
 };
 
+// Cache site data for Navbar when navigating to detail page
+const { cacheSite } = useNavbarCache();
+
 const formatDate = (date: string): string => {
   try {
     return formatDistanceToNow(new Date(date), { addSuffix: true });
@@ -119,6 +122,7 @@ onMounted(async () => {
         :to="isAccessible(site) ? `/servers/${site.server_id}/sites/${site.id}` : '#'"
         class="group"
         :class="{ 'pointer-events-none': !isAccessible(site) }"
+        @click="cacheSite(site)"
       >
         <div
           class="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"

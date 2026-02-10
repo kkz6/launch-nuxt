@@ -206,14 +206,15 @@ onMounted(fetchSettings)
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div class="mb-4">
-      <h3 class="text-lg font-semibold">Site Settings</h3>
-      <p class="text-sm text-muted-foreground">Configure your site settings</p>
-    </div>
-
     <div class="space-y-6">
       <!-- General Settings (hidden for phpmyadmin since no configurable fields) -->
-      <form v-if="site.type !== 'phpmyadmin'" class="space-y-6" @submit.prevent="onSubmit">
+      <template v-if="site.type !== 'phpmyadmin'">
+        <div>
+          <h3 class="text-lg font-semibold">Site Settings</h3>
+          <p class="text-sm text-muted-foreground">Configure your site settings</p>
+        </div>
+
+        <form class="space-y-6" @submit.prevent="onSubmit">
         <div class="grid grid-cols-2 gap-6">
           <FormField v-slot="{ componentField }" name="php_version">
             <FormItem>
@@ -298,10 +299,11 @@ onMounted(fetchSettings)
           <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
           Update Settings
         </Button>
-      </form>
+        </form>
+        <Separator />
+      </template>
 
       <!-- SSL Settings -->
-      <Separator />
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-medium">SSL Settings</h3>

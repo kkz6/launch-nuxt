@@ -212,10 +212,7 @@ watch(servers, (newServers) => {
 })
 
 // Cache server data for Navbar when navigating to detail page
-const navbarServerCache = useState<Server | null>('navbarServerCache', () => null);
-const cacheServerForNavbar = (server: Server) => {
-  navbarServerCache.value = server;
-};
+const { cacheServer } = useNavbarCache();
 
 onMounted(() => fetchServers());
 
@@ -251,7 +248,7 @@ onUnmounted(() => {
         :to="server.status === 'running' ? `/servers/${server.id}` : '#'"
         class="group"
         :class="{ 'pointer-events-none': server.status !== 'running' }"
-        @click="cacheServerForNavbar(server)"
+        @click="cacheServer(server)"
       >
         <div
           class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"

@@ -102,15 +102,14 @@ const fetchSites = async () => {
 };
 
 // Use cached server data from index page if available
-const navbarServerCache = useState<Server | null>('navbarServerCache', () => null);
+const { consumeCachedServer } = useNavbarCache();
 
 onMounted(async () => {
   try {
     // Use cached data for instant render, fetch fresh data in background
-    const cached = navbarServerCache.value;
-    if (cached && cached.id === serverId.value) {
+    const cached = consumeCachedServer(serverId.value);
+    if (cached) {
       server.value = cached;
-      navbarServerCache.value = null;
       useHead({ title: server.value.name || "Server" });
 
       if (server.value.type === 'loadbalancer' && !route.query.tab) {
