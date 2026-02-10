@@ -7,9 +7,9 @@ export default defineNuxtRouteMiddleware(async (to) => {
   if (!serverId) return
 
   // Check shared cache first (populated when clicking from server list)
-  const navbarServerCache = useState<{ id: string; status: string } | null>('navbarServerCache', () => null)
-  const cached = navbarServerCache.value
-  if (cached && cached.id === serverId) {
+  const { getCachedServer } = useNavbarCache()
+  const cached = getCachedServer(serverId)
+  if (cached) {
     if (cached.status !== 'running') {
       return navigateTo('/servers')
     }

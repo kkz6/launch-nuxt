@@ -413,8 +413,7 @@ const siteDetailTabs = computed(() => {
   return allSiteDetailTabs;
 });
 
-// Shared cache from server index page (populated on click before navigation)
-const navbarServerCache = useState<{ id: string; name: string; public_ipv4: string; connected: boolean; provider: string; provider_label?: string; status: string; type: string; provision_command?: string } | null>('navbarServerCache', () => null);
+const { getCachedServer, getCachedSite } = useNavbarCache();
 
 const applyServerData = (data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string }) => {
   serverName.value = data.name;
@@ -430,10 +429,9 @@ const applyServerData = (data: { name: string; public_ipv4: string; connected: b
 watch([serverId, siteId], async ([sId, stId]) => {
   if (sId && !stId) {
     // Server detail page - use cache if available, otherwise fetch
-    const cached = navbarServerCache.value;
-    if (cached && cached.id === sId) {
+    const cached = getCachedServer(sId);
+    if (cached) {
       applyServerData(cached);
-      // Don't clear cache here - let the page consume it too
     } else {
       try {
         const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`);
@@ -446,19 +444,20 @@ watch([serverId, siteId], async ([sId, stId]) => {
     siteAddress.value = null;
     siteType.value = null;
   } else if (sId && stId) {
-    // Site detail page - fetch both server and site
+    // Apply site cache immediately for instant tab filtering
+    const cachedSite = getCachedSite(stId);
+    if (cachedSite) {
+      siteAddress.value = cachedSite.address;
+      siteType.value = cachedSite.type;
+    }
+
+    // Fetch full data from API
     try {
       const [serverRes, siteRes] = await Promise.all([
         $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`),
         $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`),
       ]);
-      serverName.value = serverRes.data.name;
-      serverIp.value = serverRes.data.public_ipv4;
-      serverConnected.value = serverRes.data.connected;
-      serverProvider.value = serverRes.data.provider;
-      serverStatus.value = serverRes.data.status;
-      serverType.value = serverRes.data.type;
-      serverProvisionCommand.value = serverRes.data.provision_command || null;
+      applyServerData(serverRes.data);
       siteAddress.value = siteRes.data.address;
       siteType.value = siteRes.data.type;
       siteUrl.value = siteRes.data.url;
