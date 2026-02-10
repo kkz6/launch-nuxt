@@ -38,8 +38,8 @@ export const useWebSocket = () => {
     // Don't connect if no token
     if (!token.value) return
 
-    // Don't reconnect if already connected
-    if (ws.value?.readyState === WebSocket.OPEN) return
+    // Don't reconnect if already connected or connecting
+    if (ws.value?.readyState === WebSocket.OPEN || ws.value?.readyState === WebSocket.CONNECTING) return
 
     // Close existing connection if any
     if (ws.value) {
