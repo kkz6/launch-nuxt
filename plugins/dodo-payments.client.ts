@@ -6,7 +6,6 @@ export default defineNuxtPlugin(() => {
 
   DodoPayments.Initialize({
     mode: isTestMode ? 'test' : 'live',
-    displayType: 'redirect',
   })
 
   return {
