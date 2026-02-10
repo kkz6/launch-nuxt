@@ -212,10 +212,10 @@ onMounted(fetchSettings)
     </div>
 
     <div class="space-y-6">
-      <!-- General Settings -->
-      <form class="space-y-6" @submit.prevent="onSubmit">
+      <!-- General Settings (hidden for phpmyadmin since no configurable fields) -->
+      <form v-if="site.type !== 'phpmyadmin'" class="space-y-6" @submit.prevent="onSubmit">
         <div class="grid grid-cols-2 gap-6">
-          <FormField v-if="site.type !== 'phpmyadmin'" v-slot="{ componentField }" name="php_version">
+          <FormField v-slot="{ componentField }" name="php_version">
             <FormItem>
               <FormLabel>PHP Version</FormLabel>
               <Select v-bind="componentField">
@@ -238,7 +238,7 @@ onMounted(fetchSettings)
             </FormItem>
           </FormField>
 
-          <FormField v-if="!['wordpress', 'phpmyadmin'].includes(site.type)" v-slot="{ componentField }" name="web_folder">
+          <FormField v-if="!['wordpress'].includes(site.type)" v-slot="{ componentField }" name="web_folder">
             <FormItem>
               <FormLabel>Web Folder</FormLabel>
               <FormControl>
