@@ -62,7 +62,7 @@ const registerPasskey = async () => {
   error.value = null
 
   try {
-    const optionsResponse = await $api<{ publicKey: PublicKeyCredentialCreationOptions }>('/user/passkeys/register-options', {
+    const optionsResponse = await $api<{ publicKey: PublicKeyCredentialCreationOptions }>('/user/passkeys/register/options', {
       method: 'POST',
       body: { name: passkeyName.value || 'My Passkey' },
     })
@@ -88,7 +88,7 @@ const registerPasskey = async () => {
 
     const response = credential.response as AuthenticatorAttestationResponse
 
-    await $api('/user/passkeys', {
+    await $api('/user/passkeys/register', {
       method: 'POST',
       body: {
         name: passkeyName.value || 'My Passkey',
