@@ -5,6 +5,7 @@ defineProps<{
   title?: string
 }>()
 
+const { isAuthenticated, isInitialized } = useAuth()
 const colorMode = useColorMode()
 
 // Set initial color mode class
@@ -19,6 +20,7 @@ onMounted(() => {
 
 <template>
   <div
+    v-if="isInitialized && isAuthenticated"
     id="app-container"
     class="relative flex min-h-screen w-full flex-col bg-background"
   >

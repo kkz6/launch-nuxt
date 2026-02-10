@@ -2,11 +2,13 @@ import type { User, LoginCredentials, RegisterData, UserSession } from '~/types'
 import type { ApiResponse } from '~/composables/useApi'
 
 export interface LoginResponse {
-  user: User
-  access_token: string
-  refresh_token: string
-  expires_in: number
-  token_type: string
+  two_factor_required: boolean
+  challenge_token?: string
+  user?: User
+  access_token?: string
+  refresh_token?: string
+  expires_in?: number
+  token_type?: string
 }
 
 export interface CheckUserStatusResponse {
@@ -15,13 +17,6 @@ export interface CheckUserStatusResponse {
   has_two_factor: boolean
   has_passkeys: boolean
   passkey_count: number
-}
-
-export interface TwoFactorChallengeResponse {
-  user: User
-  access_token: string
-  refresh_token: string
-  expires_in: number
 }
 
 export interface RefreshTokenResponse {
@@ -157,15 +152,15 @@ export const authService = {
   // Two-factor authentication
   twoFactor: {
     /**
-     * Enable 2FA - get QR code
+     * Enable 2FA - requires password, returns QR code and secret key
      */
-    enable: () => {
+    enable: (password: string) => {
       const { post } = useApi()
-      return post<ApiResponse<{ qr_code: string; secret: string }>>('/auth/two-factor/enable')
+      return post<ApiResponse<{ qr_code_url: string; secret_key: string }>>('/auth/two-factor/enable', { password })
     },
 
     /**
-     * Confirm 2FA with code
+     * Confirm 2FA with code - returns recovery codes
      */
     confirm: (code: string) => {
       const { post } = useApi()
@@ -173,25 +168,39 @@ export const authService = {
     },
 
     /**
-     * Disable 2FA
+     * Disable 2FA - requires password
      */
     disable: (password: string) => {
-      const { post } = useApi()
-      return post<ApiResponse<null>>('/auth/two-factor/disable', { password })
+      const { fetch } = useApi()
+      return fetch<ApiResponse<null>>('/auth/two-factor/disable', { method: 'DELETE', body: { password } })
     },
 
     /**
-     * Verify 2FA challenge during login
+     * Verify 2FA challenge during login — returns auth tokens on success
      */
-    challenge: (data: { code?: string; recovery_code?: string }) => {
+    challenge: (data: { challenge_token: string; code?: string; recovery_code?: string }) => {
       const { post } = useApi()
-      return post<ApiResponse<TwoFactorChallengeResponse>>('/auth/two-factor/challenge', data)
+      return post<ApiResponse<{
+        user: User
+        access_token: string
+        refresh_token: string
+        expires_in: number
+        token_type: string
+      }>>('/auth/two-factor/challenge', data)
     },
 
     /**
-     * Get new recovery codes
+     * Get remaining recovery code count
      */
-    recoveryCodes: () => {
+    recoveryCodeCount: () => {
+      const { get } = useApi()
+      return get<ApiResponse<{ remaining_count: number }>>('/auth/two-factor/recovery-codes')
+    },
+
+    /**
+     * Regenerate recovery codes - returns new plaintext codes
+     */
+    regenerateRecoveryCodes: () => {
       const { post } = useApi()
       return post<ApiResponse<{ recovery_codes: string[] }>>('/auth/two-factor/recovery-codes')
     },

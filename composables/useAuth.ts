@@ -94,18 +94,24 @@ export const useAuth = () => {
   };
 
   /**
-   * Login with email and password
+   * Login with email and password.
+   * If 2FA is enabled, returns { two_factor_required: true, challenge_token } without tokens.
    */
   const login = async (credentials: { email: string; password: string }) => {
     isLoading.value = true;
     try {
       const response = await authService.login(credentials);
 
-      // Store tokens
-      setTokens(response.data.access_token, response.data.refresh_token);
+      // If 2FA is required, don't store tokens — just return the challenge data
+      if (response.data.two_factor_required) {
+        return response.data;
+      }
+
+      // Store tokens (guaranteed present when two_factor_required is false)
+      setTokens(response.data.access_token!, response.data.refresh_token!);
 
       // Set user state
-      setUser(response.data.user);
+      setUser(response.data.user ?? null);
 
       // Mark as initialized
       isInitialized.value = true;
@@ -130,10 +136,10 @@ export const useAuth = () => {
       const response = await authService.register(data);
 
       // Store tokens
-      setTokens(response.data.access_token, response.data.refresh_token);
+      setTokens(response.data.access_token!, response.data.refresh_token!);
 
       // Set user state
-      setUser(response.data.user);
+      setUser(response.data.user ?? null);
 
       // Mark as initialized
       isInitialized.value = true;

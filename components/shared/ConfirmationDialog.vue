@@ -22,6 +22,7 @@ interface ConfirmationOptions {
   inputVerificationText?: string
   helpText?: string
   hasInput?: boolean
+  inputType?: string
   checkbox?: {
     label: string
     checked: boolean
@@ -141,6 +142,7 @@ defineExpose({ show })
               v-if="options.inputVerificationText || options.hasInput"
               id="verification"
               v-model="verifiedText"
+              :type="options.inputType || 'text'"
               :placeholder="options.inputVerificationText ? 'Type to confirm...' : ''"
               class="w-full"
               @keyup="handleKeyUp"
