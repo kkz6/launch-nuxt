@@ -46,7 +46,6 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
 <style>
 /* Base toast styles */
 [data-sonner-toast] {
-  --toast-bg-opacity: 1;
   padding: 12px 14px !important;
   gap: 10px !important;
   overflow: hidden;
@@ -55,65 +54,47 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
   position: relative;
 }
 
-/* Progress background overlay that fades out */
+/* Progress bar at bottom */
 [data-sonner-toast]::before {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
   pointer-events: none;
-  animation: toast-bg-fade linear forwards;
+  transform-origin: left;
+  animation: toast-progress linear forwards;
   animation-duration: var(--toast-duration, 4000ms);
+  background: hsl(var(--muted-foreground) / 0.3);
 }
 
-/* Default/loading toast bg */
-[data-sonner-toast]::before {
-  background: hsl(var(--muted) / 0.5);
-}
-
-/* Success toast - green tint */
+/* Success progress bar */
 [data-sonner-toast][data-type="success"]::before {
-  background: linear-gradient(to right, hsl(152 76% 52% / 0.25), hsl(152 76% 52% / 0.12));
+  background: hsl(152 76% 52% / 0.6);
 }
 
-/* Error toast - red tint */
+/* Error progress bar */
 [data-sonner-toast][data-type="error"]::before {
-  background: linear-gradient(to right, hsl(0 84% 60% / 0.25), hsl(0 84% 60% / 0.12));
+  background: hsl(0 84% 60% / 0.6);
 }
 
-/* Warning toast - amber tint */
+/* Warning progress bar */
 [data-sonner-toast][data-type="warning"]::before {
-  background: linear-gradient(to right, hsl(38 92% 50% / 0.25), hsl(38 92% 50% / 0.12));
+  background: hsl(38 92% 50% / 0.6);
 }
 
-/* Info toast - blue tint */
+/* Info progress bar */
 [data-sonner-toast][data-type="info"]::before {
-  background: linear-gradient(to right, hsl(217 91% 60% / 0.25), hsl(217 91% 60% / 0.12));
+  background: hsl(217 91% 60% / 0.6);
 }
 
-/* Dark mode adjustments */
-.dark [data-sonner-toast][data-type="success"]::before {
-  background: linear-gradient(to right, hsl(152 76% 52% / 0.20), hsl(152 76% 52% / 0.08));
-}
-
-.dark [data-sonner-toast][data-type="error"]::before {
-  background: linear-gradient(to right, hsl(0 84% 60% / 0.20), hsl(0 84% 60% / 0.08));
-}
-
-.dark [data-sonner-toast][data-type="warning"]::before {
-  background: linear-gradient(to right, hsl(38 92% 50% / 0.20), hsl(38 92% 50% / 0.08));
-}
-
-.dark [data-sonner-toast][data-type="info"]::before {
-  background: linear-gradient(to right, hsl(217 91% 60% / 0.20), hsl(217 91% 60% / 0.08));
-}
-
-@keyframes toast-bg-fade {
+@keyframes toast-progress {
   from {
-    opacity: 1;
+    transform: scaleX(1);
   }
   to {
-    opacity: 0;
+    transform: scaleX(0);
   }
 }
 

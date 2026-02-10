@@ -13,6 +13,8 @@ export interface CheckUserStatusResponse {
   user_exists: boolean
   requires_verification: boolean
   has_two_factor: boolean
+  has_passkeys: boolean
+  passkey_count: number
 }
 
 export interface TwoFactorChallengeResponse {
