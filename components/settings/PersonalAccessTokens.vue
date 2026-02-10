@@ -4,6 +4,7 @@ import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import { PinInput, PinInputGroup, PinInputSeparator, PinInputSlot } from '~/components/ui/pin-input'
 import {
   Dialog,
   DialogContent,
@@ -15,13 +16,19 @@ import {
 } from '~/components/ui/dialog'
 import type { PersonalAccessToken, PersonalAccessTokenCreated } from '~/types'
 
+const { user } = useAuth()
+
 const tokens = ref<PersonalAccessToken[]>([])
 const isLoading = ref(false)
 const isCreateDialogOpen = ref(false)
 const tokenName = ref('')
+const twoFactorCode = ref<number[]>([])
+const twoFactorError = ref('')
 const createdToken = ref<PersonalAccessTokenCreated | null>(null)
 const copied = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+
+const hasTwoFactor = computed(() => user.value?.two_factor_enabled)
 
 const fetchTokens = async () => {
   isLoading.value = true
@@ -35,23 +42,43 @@ const fetchTokens = async () => {
   }
 }
 
-const createToken = async () => {
+const createToken = async (codeValue?: string) => {
   if (!tokenName.value.trim()) {
     toast.error('Please enter a token name')
     return
   }
 
+  const code = codeValue ?? twoFactorCode.value.join('')
+
+  if (hasTwoFactor.value && code.length !== 6) {
+    return
+  }
+
   isLoading.value = true
+  twoFactorError.value = ''
   try {
+    const body: Record<string, string> = { name: tokenName.value }
+    if (hasTwoFactor.value) {
+      body.code = code
+    }
+
     const response = await $api<{ data: PersonalAccessTokenCreated }>('/user/tokens', {
       method: 'POST',
-      body: { name: tokenName.value },
+      body,
     })
     createdToken.value = response.data
     tokenName.value = ''
+    twoFactorCode.value = []
     isCreateDialogOpen.value = false
     await fetchTokens()
-  } catch {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'data' in error) {
+      const fetchError = error as { data?: { errors?: Record<string, string[]> } }
+      if (fetchError.data?.errors?.code) {
+        twoFactorError.value = fetchError.data.errors.code[0]
+        return
+      }
+    }
     toast.error('Failed to create token')
   } finally {
     isLoading.value = false
@@ -161,7 +188,7 @@ onMounted(fetchTokens)
       <div class="text-sm text-muted-foreground">
         {{ tokens.length === 0 ? 'No tokens created' : `${tokens.length} token${tokens.length === 1 ? '' : 's'}` }}
       </div>
-      <Dialog v-model:open="isCreateDialogOpen">
+      <Dialog v-model:open="isCreateDialogOpen" @update:open="(open: boolean) => { if (!open) { twoFactorCode = []; twoFactorError = '' } }">
         <DialogTrigger as-child>
           <Button size="sm" :disabled="isLoading">
             <Icon name="lucide:plus" class="mr-1 block size-4" />
@@ -175,7 +202,7 @@ onMounted(fetchTokens)
               Tokens are used to authenticate CLI tools and API integrations.
             </DialogDescription>
           </DialogHeader>
-          <form class="space-y-4" @submit.prevent="createToken">
+          <form class="space-y-4" @submit.prevent="createToken()">
             <div class="space-y-2">
               <Label for="token-name">Token Name</Label>
               <Input
@@ -184,6 +211,28 @@ onMounted(fetchTokens)
                 placeholder="e.g., CI/CD Pipeline, CLI"
                 autofocus
               />
+            </div>
+            <div v-if="hasTwoFactor" class="space-y-2">
+              <Label>Authentication Code</Label>
+              <div class="flex justify-center">
+                <PinInput
+                  v-model="twoFactorCode"
+                  type="number"
+                  :length="6"
+                  @complete="(digits: number[]) => createToken(digits.join(''))"
+                >
+                  <PinInputGroup>
+                    <PinInputSlot v-for="(_, index) in 3" :key="index" :index="index" />
+                  </PinInputGroup>
+                  <PinInputSeparator />
+                  <PinInputGroup>
+                    <PinInputSlot v-for="(_, index) in 3" :key="index + 3" :index="index + 3" />
+                  </PinInputGroup>
+                </PinInput>
+              </div>
+              <p v-if="twoFactorError" class="text-center text-sm text-destructive">
+                {{ twoFactorError }}
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" @click="isCreateDialogOpen = false">
