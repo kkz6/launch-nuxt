@@ -48,7 +48,6 @@ interface SiteDeploymentFields {
   hook_after_updating_repository?: string
   hook_before_making_current?: string
   hook_after_making_current?: string
-  deploy_notification_email?: string
   deployment_releases_retention?: number
   queue_deployments?: boolean
 }
@@ -63,7 +62,6 @@ const deploymentSchema = toTypedSchema(
     hook_after_updating_repository: z.string().optional(),
     hook_before_making_current: z.string().optional(),
     hook_after_making_current: z.string().optional(),
-    deploy_notification_email: z.string().email().optional().or(z.literal('')),
     queue_deployments: z.boolean().optional(),
   })
 )
@@ -79,7 +77,6 @@ const getInitialValues = () => {
     hook_before_making_current: site.hook_before_making_current || '',
     hook_after_making_current: site.hook_after_making_current || '',
     hook_after_updating_repository: site.hook_after_updating_repository || '',
-    deploy_notification_email: site.deploy_notification_email || '',
     queue_deployments: site.queue_deployments || false,
   }
 }
@@ -164,20 +161,6 @@ const onSubmit = handleSubmit(async (values) => {
       </DialogHeader>
 
       <form class="w-full space-y-4" @submit.prevent="onSubmit">
-        <!-- General Deployment Settings -->
-        <FormField v-slot="{ componentField }" name="deploy_notification_email">
-          <FormItem>
-            <FormLabel>Deployment Notification Email</FormLabel>
-            <FormControl>
-              <Input type="email" placeholder="notifications@example.com" v-bind="componentField" />
-            </FormControl>
-            <FormDescription>
-              Receive email notifications when deployments complete or fail
-            </FormDescription>
-            <FormMessage />
-          </FormItem>
-        </FormField>
-
         <div class="flex items-center justify-between rounded-lg border p-4">
           <div class="space-y-0.5">
             <Label>Queue Deployments</Label>
