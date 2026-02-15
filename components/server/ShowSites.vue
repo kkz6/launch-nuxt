@@ -6,6 +6,7 @@ import type { Server, Site } from "~/types";
 interface Props {
   sites: Site[];
   server: Server;
+  isLoading?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -130,8 +131,15 @@ const formatDate = (date: string): string => {
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
+    <div v-if="isLoading" class="flex items-center justify-center py-12">
+      <Icon
+        name="lucide:loader-2"
+        class="h-8 w-8 animate-spin text-muted-foreground"
+      />
+    </div>
+
     <div
-      v-if="sites?.length === 0"
+      v-else-if="sites?.length === 0"
       class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4 rounded-lg border bg-card"
     >
       <Icon name="lucide:globe" class="h-16 w-16 text-muted-foreground" />
