@@ -116,7 +116,6 @@ const editorKey = computed(() => `${props.lineNumbers}-${props.foldGutter}-${col
   display: none !important;
 }
 .no-line-numbers .cm-gutters {
-  border-right: none !important;
-  background: transparent !important;
+  display: none !important;
 }
 </style>
