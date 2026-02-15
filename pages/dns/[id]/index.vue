@@ -124,8 +124,9 @@ const deleteRecord = async (record: DnsRecord) => {
       });
       records.value = records.value.filter((r) => r.id !== record.id);
       toast.success("Record deleted");
-    } catch {
-      toast.error("Failed to delete record");
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string } };
+      toast.error(err.data?.message || "Failed to delete record");
     }
   }
 };
