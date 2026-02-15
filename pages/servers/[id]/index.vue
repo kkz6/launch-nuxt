@@ -15,6 +15,7 @@ const serverId = computed(() => route.params.id as string);
 const server = ref<Server | null>(null);
 const sites = ref<Site[]>([]);
 const isLoading = ref(true);
+const isSitesLoading = ref(true);
 
 const isLoadBalancer = computed(() => server.value?.type === 'loadbalancer');
 
@@ -123,7 +124,9 @@ onMounted(async () => {
         serverService.get(serverId.value).then(res => { server.value = res.data; }),
       ];
       if (server.value.type !== 'loadbalancer') {
-        promises.push(serverService.sites.list(serverId.value).then(res => { sites.value = res.data; }));
+        promises.push(serverService.sites.list(serverId.value).then(res => { sites.value = res.data; isSitesLoading.value = false; }));
+      } else {
+        isSitesLoading.value = false;
       }
       await Promise.all(promises);
     } else {
@@ -143,6 +146,7 @@ onMounted(async () => {
         const sitesData = await serverService.sites.list(serverId.value);
         sites.value = sitesData.data;
       }
+      isSitesLoading.value = false;
     }
   } catch {
     navigateTo("/servers");
@@ -161,7 +165,7 @@ onMounted(async () => {
   <div v-else-if="server" class="pb-10">
     <!-- Tab Content -->
     <div v-if="activeTab === 'sites'">
-      <ServerShowSites :sites="sites" :server="server" @deleted="fetchSites" />
+      <ServerShowSites :sites="sites" :server="server" :is-loading="isSitesLoading" @deleted="fetchSites" />
     </div>
 
     <div v-else-if="activeTab === 'upstreams'">
