@@ -22,10 +22,11 @@ onMounted(() => {
   <div
     v-if="isInitialized && isAuthenticated"
     id="app-container"
-    class="relative flex min-h-screen w-full flex-col bg-background"
+    class="relative flex h-screen w-full flex-col overflow-hidden bg-background"
   >
+    <LayoutPlatformUpdateBanner />
     <LayoutNavbar />
-    <main class="w-full flex-1 px-4 pt-4 pb-10 lg:px-8">
+    <main class="w-full flex-1 overflow-y-auto px-4 pt-4 pb-10 lg:px-8">
       <slot />
     </main>
     <Toaster position="bottom-center" :close-button="true" :duration="4000" />

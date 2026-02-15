@@ -344,3 +344,26 @@ export const usePhpExtensionEvents = (
     onEvent,
   )
 }
+
+/**
+ * Composable to subscribe to platform update events
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a platform update event is received
+ *
+ * Events:
+ * - platform_update.status_changed: A server's update status changed (pending, running, completed, failed)
+ */
+export const usePlatformUpdateEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['platform_update.status_changed'],
+    onEvent,
+  )
+}

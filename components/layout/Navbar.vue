@@ -756,7 +756,7 @@ onMounted(fetchTeams);
 
 <template>
   <nav
-    class="sticky top-0 z-40 w-full border-b border-divider bg-background/70 backdrop-blur-lg"
+    class="z-40 w-full shrink-0 border-b border-divider bg-background/70 backdrop-blur-lg"
   >
     <SharedConfirmationDialog ref="confirmationDialog" />
 

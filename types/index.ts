@@ -630,6 +630,32 @@ export interface DomainCheckSite {
   type: string;
 }
 
+// Platform Update types
+export interface PlatformUpdate {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  severity: "info" | "warning" | "critical";
+  server_types?: string[];
+  status_counts?: Record<string, number>;
+  created_at?: string;
+}
+
+export interface PlatformUpdateDetail extends PlatformUpdate {
+  server_statuses: ServerUpdateStatus[];
+}
+
+export interface ServerUpdateStatus {
+  id: string;
+  server_id: string;
+  server_name: string;
+  status: "pending" | "running" | "completed" | "failed" | "skipped";
+  task_id?: string;
+  error_message?: string;
+  completed_at?: string;
+}
+
 // API Response types
 export interface ApiError {
   message: string;
