@@ -237,8 +237,6 @@ const onSubmit = handleSubmit(async (values) => {
             :model-value="values.hook_before_updating_repository || ''"
             class="h-36"
             placeholder="# Commands to run before git pull"
-            :line-numbers="false"
-            :fold-gutter="false"
             @update:model-value="(val: string) => setValues({ hook_before_updating_repository: val })"
           />
           <p class="text-sm text-muted-foreground">
@@ -252,8 +250,6 @@ const onSubmit = handleSubmit(async (values) => {
             :model-value="values.hook_after_updating_repository || ''"
             class="h-36"
             placeholder="composer install --no-dev"
-            :line-numbers="false"
-            :fold-gutter="false"
             @update:model-value="(val: string) => setValues({ hook_after_updating_repository: val })"
           />
           <p class="text-sm text-muted-foreground">
@@ -267,8 +263,6 @@ const onSubmit = handleSubmit(async (values) => {
             :model-value="values.hook_before_making_current || ''"
             class="h-36"
             placeholder="php artisan migrate --force"
-            :line-numbers="false"
-            :fold-gutter="false"
             @update:model-value="(val: string) => setValues({ hook_before_making_current: val })"
           />
           <p class="text-sm text-muted-foreground">
@@ -282,8 +276,6 @@ const onSubmit = handleSubmit(async (values) => {
             :model-value="values.hook_after_making_current || ''"
             class="h-36"
             placeholder="php artisan cache:clear"
-            :line-numbers="false"
-            :fold-gutter="false"
             @update:model-value="(val: string) => setValues({ hook_after_making_current: val })"
           />
           <p class="text-sm text-muted-foreground">
