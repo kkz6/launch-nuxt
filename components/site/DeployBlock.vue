@@ -14,7 +14,7 @@ const showLogs = ref(false)
 
 const statusConfig: Record<string, { variant: 'success' | 'destructive' | 'secondary' | 'warning'; label: string; icon: string }> = {
   pending: { variant: 'warning', label: 'Deploying', icon: 'lucide:loader-2' },
-  installing: { variant: 'warning', label: 'Installing', icon: 'lucide:loader-2' },
+  installing: { variant: 'warning', label: 'Deploying', icon: 'lucide:loader-2' },
   running: { variant: 'warning', label: 'Running', icon: 'lucide:loader-2' },
   finished: { variant: 'success', label: 'Success', icon: 'lucide:check' },
   completed: { variant: 'success', label: 'Success', icon: 'lucide:check' },
