@@ -102,6 +102,7 @@ const editorKey = computed(() => `${props.lineNumbers}-${props.foldGutter}-${col
 <style>
 .cm-editor {
   height: 100%;
+  outline: none !important;
 }
 .cm-scroller {
   overflow: auto;
