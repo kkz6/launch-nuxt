@@ -18,8 +18,7 @@ import { Label } from '~/components/ui/label'
 interface DatabaseUser {
   id: string
   name: string
-  password?: string
-  databaseIds?: string[]
+  database_ids?: string[]
 }
 
 interface Props {
@@ -42,8 +41,8 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 
 // Form values
 const name = ref(props.user?.name ?? '')
-const password = ref(props.user?.password ?? '')
-const selectedDatabases = ref<string[]>(props.user?.databaseIds ?? [])
+const password = ref('')
+const selectedDatabases = ref<string[]>(props.user?.database_ids ?? [])
 
 const generatePassword = () => {
   const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
@@ -52,21 +51,33 @@ const generatePassword = () => {
     .join('')
 }
 
-const schema = z.object({
-  name: z
-    .string()
-    .min(1, 'Username is required')
-    .max(32)
-    .refine((value) => !/\s/.test(value), {
-      message: 'Username cannot contain spaces',
-    })
-    .refine((value) => /^[a-zA-Z0-9_]+$/.test(value), {
-      message: 'Username can only contain letters, numbers, and underscores',
-    }),
+const nameSchema = z
+  .string()
+  .min(1, 'Username is required')
+  .max(32)
+  .refine((value) => !/\s/.test(value), {
+    message: 'Username cannot contain spaces',
+  })
+  .refine((value) => /^[a-zA-Z0-9_]+$/.test(value), {
+    message: 'Username can only contain letters, numbers, and underscores',
+  })
+
+const databasesSchema = z.array(z.string()).refine((value) => value.length > 0, {
+  message: 'At least one database must be selected',
+})
+
+const createSchema = z.object({
+  name: nameSchema,
   password: z.string().min(1, 'Password is required'),
-  databases: z.array(z.string()).refine((value) => value.length > 0, {
-    message: 'At least one database must be selected',
+  databases: databasesSchema,
+})
+
+const updateSchema = z.object({
+  name: nameSchema,
+  password: z.string().refine((val) => val === '' || val.length >= 8, {
+    message: 'Password must be at least 8 characters',
   }),
+  databases: databasesSchema,
 })
 
 const isUpdate = computed(() => Boolean(props.user))
@@ -75,15 +86,15 @@ const isRootUser = computed(() => props.user?.name === 'root')
 const canSubmit = computed(() => {
   if (isLoading.value) return false
   if (name.value.trim().length === 0) return false
-  if (password.value.length === 0) return false
+  if (!isUpdate.value && password.value.length === 0) return false
   if (selectedDatabases.value.length === 0 && !isRootUser.value) return false
   return true
 })
 
 const resetForm = () => {
   name.value = props.user?.name ?? ''
-  password.value = props.user?.password ?? ''
-  selectedDatabases.value = props.user?.databaseIds ?? []
+  password.value = ''
+  selectedDatabases.value = props.user?.database_ids ?? []
   showPassword.value = false
   errors.value = {}
 }
@@ -97,6 +108,7 @@ const toggleDatabase = (databaseId: string, checked: boolean) => {
 }
 
 const validate = () => {
+  const schema = isUpdate.value ? updateSchema : createSchema
   const result = schema.safeParse({
     name: name.value.trim(),
     password: password.value,
@@ -138,9 +150,13 @@ const onSubmit = async () => {
   isLoading.value = true
   try {
     if (isUpdate.value && props.user) {
+      const body: Record<string, unknown> = { databases: data.databases }
+      if (data.password) {
+        body.password = data.password
+      }
       await $api(`/servers/${props.serverId}/database-users/${props.user.id}`, {
-        method: 'PATCH',
-        body: data,
+        method: 'PUT',
+        body,
       })
       toast.success('Database user updated successfully')
       emit('updated')
@@ -203,7 +219,7 @@ watch(isOpen, (open) => {
 
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <Label for="password">Password</Label>
+            <Label for="password">{{ isUpdate ? 'New Password' : 'Password' }}</Label>
             <Button
               type="button"
               variant="link"
@@ -220,7 +236,7 @@ watch(isOpen, (open) => {
               id="password"
               v-model="password"
               :type="showPassword ? 'text' : 'password'"
-              placeholder="Enter password"
+              :placeholder="isUpdate ? 'Leave blank to keep current password' : 'Enter password'"
               autocomplete="new-password"
               class="pr-10"
             />
