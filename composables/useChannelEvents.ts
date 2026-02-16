@@ -346,6 +346,32 @@ export const usePhpExtensionEvents = (
 }
 
 /**
+ * Composable to subscribe to service events (install, remove, status changes)
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a service event is received
+ *
+ * Events:
+ * - service.installed: Service was installed successfully
+ * - service.removed: Service was removed successfully
+ * - service.status_changed: Service status changed (e.g., uninstalling)
+ * - service.operation: Service operation completed (start, stop, restart)
+ */
+export const useServiceEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['service.installed', 'service.removed', 'service.status_changed', 'service.operation'],
+    onEvent,
+  )
+}
+
+/**
  * Composable to subscribe to platform update events
  *
  * @param teamId - The team ID

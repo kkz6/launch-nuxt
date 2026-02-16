@@ -118,8 +118,9 @@ const handleInstall = async () => {
   isInstalling.value = true
 
   try {
-    await $api(`/servers/${props.serverId}/services/${selectedVersion.value}`, {
+    await $api(`/servers/${props.serverId}/services`, {
       method: 'POST',
+      body: { software: selectedVersion.value },
     })
     toast.success('Service installation initiated')
     emit('installed')

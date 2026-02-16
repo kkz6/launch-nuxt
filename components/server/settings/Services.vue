@@ -163,10 +163,11 @@ const uninstallPhpVersion = async (service: Service) => {
 
   loadingAction.value = { software: service.software, action: 'uninstall' }
   try {
-    await $api(`/servers/${props.serverId}/php/${service.id}`, {
-      method: 'DELETE',
+    await $api(`/servers/${props.serverId}/services/${service.id}`, {
+      method: 'POST',
+      body: { operation: 'remove' },
     })
-    toast.success('PHP version uninstalled')
+    toast.success('PHP version removal initiated')
     fetchServices()
   } catch {
     toast.error('Failed to uninstall PHP version')
@@ -186,6 +187,17 @@ const {
 } = useServiceStatus({
   serverId: props.serverId,
   interval: 5,
+})
+
+// Listen for service broadcast events (install, remove, status changes)
+const { user } = useAuth()
+const teamId = computed(() => user.value?.current_team_id?.toString() || '')
+
+useServiceEvents(teamId, (data) => {
+  const eventServerId = data.server_id
+  if (eventServerId === props.serverId) {
+    fetchServices()
+  }
 })
 
 // Get live status for a service
@@ -298,6 +310,8 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
     case 'unknown':
       return 'warning'
     case 'pending':
+    case 'installing':
+    case 'uninstalling':
       return 'warning'
     case 'installed':
       return 'default'
