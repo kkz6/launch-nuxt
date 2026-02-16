@@ -10,11 +10,19 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '~/components/ui/sheet'
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
+import type { LogInfo } from '~/types'
 
 interface ServiceStatusDetails {
   pid?: string
@@ -63,6 +71,32 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 // Status dialog state
 const isStatusDialogOpen = ref(false)
 const selectedServiceForStatus = ref<Service | null>(null)
+
+// Log sheet state
+const logsByService = ref<Map<string, LogInfo>>(new Map())
+const isLogSheetOpen = ref(false)
+const selectedLog = ref<LogInfo | null>(null)
+
+const fetchLogs = async () => {
+  try {
+    const data = await $api<{ data: LogInfo[] }>(`/servers/${props.serverId}/logs`)
+    const map = new Map<string, LogInfo>()
+    for (const log of data.data || []) {
+      map.set(log.software, log)
+    }
+    logsByService.value = map
+  } catch {
+    // Silent fail - logs are optional
+  }
+}
+
+const openLogSheet = (service: Service) => {
+  const log = logsByService.value.get(service.software)
+  if (log) {
+    selectedLog.value = log
+    isLogSheetOpen.value = true
+  }
+}
 
 // PHP dialog states
 const isExtensionsDialogOpen = ref(false)
@@ -343,7 +377,10 @@ const sortedServices = computed(() =>
   [...services.value].sort((a, b) => a.name.localeCompare(b.name))
 )
 
-onMounted(fetchServices)
+onMounted(() => {
+  fetchServices()
+  fetchLogs()
+})
 </script>
 
 <template>
@@ -469,10 +506,8 @@ onMounted(fetchServices)
           <div v-else class="overflow-hidden rounded-lg border">
             <!-- Table Header -->
             <div class="hidden border-b bg-muted/50 px-6 py-3 md:grid md:grid-cols-12 md:gap-4">
-              <div class="col-span-3 text-sm font-medium text-muted-foreground">Service</div>
-              <div class="col-span-2 text-sm font-medium text-muted-foreground">Status</div>
-              <div class="col-span-2 text-sm font-medium text-muted-foreground">Memory</div>
-              <div class="col-span-2 text-sm font-medium text-muted-foreground">Uptime</div>
+              <div class="col-span-5 text-sm font-medium text-muted-foreground">Service</div>
+              <div class="col-span-4 text-sm font-medium text-muted-foreground">Status</div>
               <div class="col-span-3 text-right text-sm font-medium text-muted-foreground">Actions</div>
             </div>
 
@@ -540,6 +575,10 @@ onMounted(fetchServices)
                             <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
+                          <DropdownMenuItem v-if="logsByService.has(service.software)" @click="openLogSheet(service)">
+                            <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
+                            View Logs
+                          </DropdownMenuItem>
                           <template v-if="service.type === 'php'">
                             <DropdownMenuSeparator />
                             <DropdownMenuItem @click="openOpcacheDialog(service)">
@@ -570,21 +609,48 @@ onMounted(fetchServices)
                     </div>
                   </div>
                   <div class="flex flex-wrap items-center gap-2">
-                    <Badge :variant="getStatusVariant(getDisplayStatus(service).status)">
-                      {{ getDisplayStatus(service).label }}
-                    </Badge>
-                    <span v-if="getDisplayStatus(service).memory" class="text-xs text-muted-foreground">
-                      {{ getDisplayStatus(service).memory }}
-                    </span>
-                    <span v-if="getDisplayStatus(service).uptime" class="text-xs text-muted-foreground">
-                      {{ getDisplayStatus(service).uptime }}
-                    </span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <Badge :variant="getStatusVariant(getDisplayStatus(service).status)" class="cursor-help">
+                            {{ getDisplayStatus(service).label }}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent class="max-w-xs">
+                          <div class="space-y-1.5 text-sm">
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              <span class="text-muted-foreground">Status:</span>
+                              <span :class="getDisplayStatus(service).status === 'running' ? 'text-green-500' : 'text-red-500'">
+                                {{ getDisplayStatus(service).label }}
+                              </span>
+                              <template v-if="getDisplayStatus(service).pid">
+                                <span class="text-muted-foreground">PID:</span>
+                                <span>{{ getDisplayStatus(service).pid }}</span>
+                              </template>
+                              <template v-if="getDisplayStatus(service).memory">
+                                <span class="text-muted-foreground">Memory:</span>
+                                <span>{{ getDisplayStatus(service).memory }}</span>
+                              </template>
+                              <template v-if="getDisplayStatus(service).uptime">
+                                <span class="text-muted-foreground">Uptime:</span>
+                                <span>{{ getDisplayStatus(service).uptime }}</span>
+                              </template>
+                              <span class="text-muted-foreground">Version:</span>
+                              <span>{{ service.version }}</span>
+                            </div>
+                            <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
+                              Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
 
                 <!-- Desktop Layout -->
                 <div class="hidden items-center gap-4 md:grid md:grid-cols-12">
-                  <div class="col-span-3 flex items-center gap-3">
+                  <div class="col-span-5 flex items-center gap-3">
                     <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
                       <img
                         :src="getServiceImagePath(service)"
@@ -609,36 +675,43 @@ onMounted(fetchServices)
                     </div>
                   </div>
 
-                  <div class="col-span-2">
-                    <div class="flex items-center gap-2">
-                      <Badge :variant="getStatusVariant(getDisplayStatus(service).status)">
-                        {{ getDisplayStatus(service).label }}
-                      </Badge>
-                      <TooltipProvider v-if="getDisplayStatus(service).pid">
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <span class="text-xs text-muted-foreground">
-                              PID {{ getDisplayStatus(service).pid }}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Process ID</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                  </div>
-
-                  <div class="col-span-2">
-                    <span v-if="getDisplayStatus(service).memory" class="text-sm">
-                      {{ getDisplayStatus(service).memory }}
-                    </span>
-                    <span v-else class="text-sm text-muted-foreground">—</span>
-                  </div>
-
-                  <div class="col-span-2">
-                    <span v-if="getDisplayStatus(service).uptime" class="text-sm">
-                      {{ getDisplayStatus(service).uptime }}
-                    </span>
-                    <span v-else class="text-sm text-muted-foreground">—</span>
+                  <div class="col-span-4">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger as-child>
+                          <Badge :variant="getStatusVariant(getDisplayStatus(service).status)" class="cursor-help">
+                            {{ getDisplayStatus(service).label }}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent class="max-w-xs">
+                          <div class="space-y-1.5 text-sm">
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                              <span class="text-muted-foreground">Status:</span>
+                              <span :class="getDisplayStatus(service).status === 'running' ? 'text-green-500' : 'text-red-500'">
+                                {{ getDisplayStatus(service).label }}
+                              </span>
+                              <template v-if="getDisplayStatus(service).pid">
+                                <span class="text-muted-foreground">PID:</span>
+                                <span>{{ getDisplayStatus(service).pid }}</span>
+                              </template>
+                              <template v-if="getDisplayStatus(service).memory">
+                                <span class="text-muted-foreground">Memory:</span>
+                                <span>{{ getDisplayStatus(service).memory }}</span>
+                              </template>
+                              <template v-if="getDisplayStatus(service).uptime">
+                                <span class="text-muted-foreground">Uptime:</span>
+                                <span>{{ getDisplayStatus(service).uptime }}</span>
+                              </template>
+                              <span class="text-muted-foreground">Version:</span>
+                              <span>{{ service.version }}</span>
+                            </div>
+                            <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
+                              Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
+                            </p>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
 
                   <div class="col-span-3 flex items-center justify-end gap-2">
@@ -670,6 +743,10 @@ onMounted(fetchServices)
                         <DropdownMenuItem @click="openStatusDialog(service)">
                           <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
                           View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem v-if="logsByService.has(service.software)" @click="openLogSheet(service)">
+                          <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
+                          View Logs
                         </DropdownMenuItem>
                         <template v-if="service.type === 'php'">
                           <DropdownMenuSeparator />
@@ -705,5 +782,27 @@ onMounted(fetchServices)
           </div>
         </template>
       </div>
+
+    <!-- Log Viewer Sheet -->
+    <Sheet v-model:open="isLogSheetOpen">
+      <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col">
+        <SheetHeader>
+          <SheetTitle>{{ selectedLog?.name || 'Logs' }}</SheetTitle>
+          <SheetDescription>Service logs</SheetDescription>
+        </SheetHeader>
+        <div class="mt-4 flex-1 min-h-0 flex flex-col">
+          <ServerLogViewer
+            v-if="isLogSheetOpen && selectedLog"
+            :key="selectedLog.software"
+            :server-id="serverId"
+            entity="server"
+            :entity-id="serverId"
+            :software="selectedLog.software"
+            :route="selectedLog.show_route"
+            no-timestamp
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
   </div>
 </template>
