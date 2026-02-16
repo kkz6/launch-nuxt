@@ -967,7 +967,6 @@ onMounted(fetchTeams);
           </template>
         </div>
         <div v-if="isServerDataLoaded" class="flex items-center gap-2">
-          <SharedLogsSheet v-if="serverId" :server-id="serverId" type="server" />
           <Button
             v-if="showProvisionButton"
             variant="outline"
@@ -987,7 +986,7 @@ onMounted(fetchTeams);
             <Terminal class="mr-2 h-4 w-4" />
             Terminal
           </Button>
-          <ServerAddSite v-if="serverId && !isLoadBalancerServer" :server-id="serverId" @created="onSiteCreated" />
+          <ServerAddSite v-if="serverId && !isLoadBalancerServer && isServerTabActive('sites')" :server-id="serverId" @created="onSiteCreated" />
         </div>
       </div>
       <nav
