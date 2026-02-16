@@ -35,8 +35,10 @@ const deleteSite = async (site: Site) => {
     await $api(`/servers/${props.server.id}/sites/${site.id}`, {
       method: 'DELETE',
     });
-    toast.success('Site deleted successfully');
-    emit('deleted');
+    // Immediately update the local site to show "Uninstalling" status
+    site.uninstallation_requested_at = new Date().toISOString();
+    site.uninstallation_failed_at = null;
+    toast.success('Site deletion initiated');
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
     toast.error(err.data?.message || 'Failed to delete site');
@@ -86,24 +88,27 @@ const getSiteTypeColor = (type: string): string => {
 };
 
 const getStatusColor = (site: Site): string => {
-  if (site.installation_failed_at || site.uninstallation_failed_at) {
+  if (site.uninstallation_requested_at && !site.uninstallation_failed_at) {
+    return "bg-yellow-500";
+  }
+  if (site.uninstallation_failed_at || site.installation_failed_at) {
     return "bg-red-500";
   }
-  if (site.uninstallation_requested_at || !site.installed_at) {
+  if (!site.installed_at) {
     return "bg-yellow-500";
   }
   return "bg-green-500";
 };
 
 const getStatusLabel = (site: Site): { text: string; loading: boolean } => {
-  if (site.installation_failed_at) {
-    return { text: "Installation failed", loading: false };
+  if (site.uninstallation_requested_at && !site.uninstallation_failed_at) {
+    return { text: "Uninstalling", loading: true };
   }
   if (site.uninstallation_failed_at) {
     return { text: "Uninstallation failed", loading: false };
   }
-  if (site.uninstallation_requested_at) {
-    return { text: "Uninstalling", loading: true };
+  if (site.installation_failed_at) {
+    return { text: "Installation failed", loading: false };
   }
   if (site.installed_at) {
     return { text: "Installed", loading: false };
@@ -164,9 +169,9 @@ const formatDate = (date: string): string => {
             'opacity-60': !isAccessible(site),
           }"
         >
-          <!-- Delete button for failed installations -->
+          <!-- Delete button for failed or uninstalling sites -->
           <button
-            v-if="site.installation_failed_at"
+            v-if="(site.installation_failed_at || site.uninstallation_failed_at) && !site.uninstallation_requested_at"
             type="button"
             class="pointer-events-auto absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             :disabled="isDeleting === site.id"
