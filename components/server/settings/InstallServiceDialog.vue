@@ -165,8 +165,8 @@ const getServiceImagePath = (type: string, apiPath?: string) => {
 </script>
 
 <template>
+  <SharedConfirmationDialog ref="confirmationDialog" />
   <Dialog v-model:open="open">
-    <SharedConfirmationDialog ref="confirmationDialog" />
     <DialogContent class="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[480px]">
       <DialogHeader class="border-b px-6 pb-4 pt-6">
         <DialogTitle>Install Service</DialogTitle>

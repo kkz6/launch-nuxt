@@ -64,6 +64,117 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 const isStatusDialogOpen = ref(false)
 const selectedServiceForStatus = ref<Service | null>(null)
 
+// PHP dialog states
+const isExtensionsDialogOpen = ref(false)
+const isOpcacheDialogOpen = ref(false)
+const selectedPhpService = ref<any>(null)
+
+const fetchPhpVersionData = async (service: Service): Promise<any | null> => {
+  try {
+    const response = await $api<any[] | { data: any[] }>(`/servers/${props.serverId}/php`)
+    const phpVersions = Array.isArray(response) ? response : (response.data || [])
+    return phpVersions.find((v: any) => v.details?.id === service.id) || null
+  } catch {
+    toast.error('Failed to load PHP data')
+    return null
+  }
+}
+
+const openExtensionsDialog = async (service: Service) => {
+  const match = await fetchPhpVersionData(service)
+  if (match) {
+    selectedPhpService.value = match
+    isExtensionsDialogOpen.value = true
+  }
+}
+
+const openOpcacheDialog = async (service: Service) => {
+  const match = await fetchPhpVersionData(service)
+  if (match) {
+    selectedPhpService.value = match
+    isOpcacheDialogOpen.value = true
+  }
+}
+
+const setPhpDefault = async (service: Service) => {
+  if (!confirmationDialog.value) return
+
+  const { ok } = await confirmationDialog.value.show({
+    title: `Set ${service.name} as default`,
+    description: 'This will make this version the default CLI PHP version.',
+    confirmText: 'Set Default',
+    cancelText: 'Cancel',
+  })
+
+  if (!ok) return
+
+  loadingAction.value = { software: service.software, action: 'default' }
+  try {
+    await $api(`/servers/${props.serverId}/php/${service.software}/default`, {
+      method: 'POST',
+    })
+    toast.success('Default PHP version updated')
+    fetchServices()
+  } catch {
+    toast.error('Failed to set default PHP version')
+  } finally {
+    loadingAction.value = null
+  }
+}
+
+const patchPhpVersion = async (service: Service) => {
+  if (!confirmationDialog.value) return
+
+  const { ok } = await confirmationDialog.value.show({
+    title: `Patch ${service.name}`,
+    description: 'This will update PHP to the latest patch version.',
+    confirmText: 'Patch',
+    cancelText: 'Cancel',
+  })
+
+  if (!ok) return
+
+  loadingAction.value = { software: service.software, action: 'patch' }
+  try {
+    await $api(`/servers/${props.serverId}/php/${service.software}/patch`, {
+      method: 'POST',
+    })
+    toast.success('PHP patch initiated')
+    fetchServices()
+  } catch {
+    toast.error('Failed to patch PHP version')
+  } finally {
+    loadingAction.value = null
+  }
+}
+
+const uninstallPhpVersion = async (service: Service) => {
+  if (!confirmationDialog.value) return
+
+  const { ok } = await confirmationDialog.value.show({
+    title: `Uninstall ${service.name}`,
+    description: 'Are you sure? This will remove this PHP version and all its configurations.',
+    confirmText: 'Uninstall',
+    cancelText: 'Cancel',
+    destructive: true,
+  })
+
+  if (!ok) return
+
+  loadingAction.value = { software: service.software, action: 'uninstall' }
+  try {
+    await $api(`/servers/${props.serverId}/php/${service.id}`, {
+      method: 'DELETE',
+    })
+    toast.success('PHP version uninstalled')
+    fetchServices()
+  } catch {
+    toast.error('Failed to uninstall PHP version')
+  } finally {
+    loadingAction.value = null
+  }
+}
+
 // WebSocket for real-time status updates
 const {
   services: liveStatuses,
@@ -232,6 +343,24 @@ onMounted(fetchServices)
       @installed="fetchServices"
     />
 
+    <!-- PHP Extensions Dialog -->
+    <ServerSettingsPhpExtensionsDialog
+      v-if="selectedPhpService"
+      v-model:open="isExtensionsDialogOpen"
+      :server-id="serverId"
+      :service="selectedPhpService"
+      @updated="fetchServices"
+    />
+
+    <!-- PHP OPcache Dialog -->
+    <ServerSettingsPhpOpcacheDialog
+      v-if="selectedPhpService"
+      v-model:open="isOpcacheDialogOpen"
+      :server-id="serverId"
+      :service="selectedPhpService"
+      @updated="fetchServices"
+    />
+
     <!-- Service Status Dialog -->
     <ServerSettingsServiceStatusDialog
       v-if="selectedServiceForStatus"
@@ -353,7 +482,17 @@ onMounted(fetchServices)
                         >
                       </div>
                       <div class="min-w-0">
-                        <div class="truncate font-medium">{{ service.name }}</div>
+                        <div class="flex items-center gap-1.5">
+                          <span class="truncate font-medium">{{ service.name }}</span>
+                          <TooltipProvider v-if="service.type === 'php' && service.is_default">
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Icon name="lucide:star" class="h-3.5 w-3.5 shrink-0 fill-yellow-500 text-yellow-500" />
+                              </TooltipTrigger>
+                              <TooltipContent>Default CLI version</TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                         <div class="font-mono text-xs text-muted-foreground">v{{ service.version }}</div>
                       </div>
                     </div>
@@ -387,6 +526,31 @@ onMounted(fetchServices)
                             <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
+                          <template v-if="service.type === 'php'">
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem @click="openOpcacheDialog(service)">
+                              <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
+                              OPcache
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="openExtensionsDialog(service)">
+                              <Icon name="lucide:package" class="mr-2 h-4 w-4" />
+                              Extensions
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem v-if="!service.is_default" @click="setPhpDefault(service)">
+                              <Icon name="lucide:star" class="mr-2 h-4 w-4" />
+                              Set as Default
+                            </DropdownMenuItem>
+                            <DropdownMenuItem @click="patchPhpVersion(service)">
+                              <Icon name="lucide:wrench" class="mr-2 h-4 w-4" />
+                              Patch Version
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem class="text-destructive focus:text-destructive" @click="uninstallPhpVersion(service)">
+                              <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+                              Uninstall
+                            </DropdownMenuItem>
+                          </template>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -416,7 +580,17 @@ onMounted(fetchServices)
                       >
                     </div>
                     <div class="min-w-0">
-                      <div class="truncate font-medium">{{ service.name }}</div>
+                      <div class="flex items-center gap-1.5">
+                        <span class="truncate font-medium">{{ service.name }}</span>
+                        <TooltipProvider v-if="service.type === 'php' && service.is_default">
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Icon name="lucide:star" class="h-3.5 w-3.5 shrink-0 fill-yellow-500 text-yellow-500" />
+                            </TooltipTrigger>
+                            <TooltipContent>Default CLI version</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                       <div class="text-xs text-muted-foreground">v{{ service.version }}</div>
                     </div>
                   </div>
@@ -483,6 +657,31 @@ onMounted(fetchServices)
                           <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
+                        <template v-if="service.type === 'php'">
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem @click="openOpcacheDialog(service)">
+                            <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
+                            OPcache
+                          </DropdownMenuItem>
+                          <DropdownMenuItem @click="openExtensionsDialog(service)">
+                            <Icon name="lucide:package" class="mr-2 h-4 w-4" />
+                            Extensions
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem v-if="!service.is_default" @click="setPhpDefault(service)">
+                            <Icon name="lucide:star" class="mr-2 h-4 w-4" />
+                            Set as Default
+                          </DropdownMenuItem>
+                          <DropdownMenuItem @click="patchPhpVersion(service)">
+                            <Icon name="lucide:wrench" class="mr-2 h-4 w-4" />
+                            Patch Version
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem class="text-destructive focus:text-destructive" @click="uninstallPhpVersion(service)">
+                            <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+                            Uninstall
+                          </DropdownMenuItem>
+                        </template>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>

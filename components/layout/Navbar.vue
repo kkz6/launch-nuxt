@@ -279,7 +279,6 @@ const advancedSubTabs = computed(() => {
   if (!isLoadBalancerServer.value) {
     tabs.push(
       { value: "packages", label: "Packages", query: "packages", icon: "lucide:package" },
-      { value: "php", label: "PHP", query: "php", icon: "lucide:code" },
     );
   }
 
