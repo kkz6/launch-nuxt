@@ -63,7 +63,7 @@ watch(sitesRefreshKey, () => {
 
 // Valid tab values
 const validTabs = ["sites", "upstreams", "metrics", "databases", "networks", "daemons", "schedulers", "advanced"];
-const validSubTabs = ["general", "backups", "ssh-keys", "packages", "php", "services"];
+const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services"];
 
 // Get initial tab from query params or default based on server type
 const getInitialTab = () => {
