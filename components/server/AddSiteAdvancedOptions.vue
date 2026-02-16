@@ -99,6 +99,15 @@ const databaseUserId = computed({
 
 const hasDatabases = computed(() => Object.keys(props.databases || {}).length > 0)
 const hasDatabaseUsers = computed(() => Object.keys(props.databaseUsers || {}).length > 0)
+
+const showPassword = ref(false)
+
+const generatePassword = () => {
+  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  databaseUserPassword.value = Array.from(crypto.getRandomValues(new Uint32Array(32)))
+    .map((x) => charset[x % charset.length])
+    .join('')
+}
 </script>
 
 <template>
@@ -194,13 +203,39 @@ const hasDatabaseUsers = computed(() => Object.keys(props.databaseUsers || {}).l
                 />
               </div>
               <div class="space-y-2">
-                <Label for="database_user_password">Password</Label>
-                <Input
-                  id="database_user_password"
-                  v-model="databaseUserPassword"
-                  type="password"
-                  placeholder="Enter password"
-                />
+                <div class="flex items-center justify-between">
+                  <Label for="database_user_password">Password</Label>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    class="h-auto p-0 text-xs"
+                    @click="generatePassword()"
+                  >
+                    <Icon name="lucide:braces" class="mr-1 h-3 w-3" />
+                    Generate Password
+                  </Button>
+                </div>
+                <div class="relative">
+                  <Input
+                    id="database_user_password"
+                    v-model="databaseUserPassword"
+                    :type="showPassword ? 'text' : 'password'"
+                    placeholder="Enter password"
+                    autocomplete="new-password"
+                    class="pr-10"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    class="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    @click="showPassword = !showPassword"
+                  >
+                    <Icon v-if="showPassword" name="lucide:eye-off" class="h-4 w-4" />
+                    <Icon v-else name="lucide:eye" class="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -250,8 +285,8 @@ const hasDatabaseUsers = computed(() => Object.keys(props.databaseUsers || {}).l
       </div>
 
       <DialogFooter class="mt-6">
-        <Button variant="outline" @click="isOpen = false">
-          Close
+        <Button @click="isOpen = false">
+          Save
         </Button>
       </DialogFooter>
     </DialogContent>

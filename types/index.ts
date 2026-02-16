@@ -364,11 +364,11 @@ export interface Database extends InstallationStatus {
 
 export interface DatabaseUser extends InstallationStatus {
   id: string;
+  server_id: string;
   name: string;
+  host: string;
   status: string;
-  password: string;
-  update_url: string;
-  databaseIds: string[];
+  database_ids: string[];
 }
 
 export interface Service {
