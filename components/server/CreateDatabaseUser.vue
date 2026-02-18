@@ -273,9 +273,9 @@ watch(isOpen, (open) => {
             >
               <Checkbox
                 :id="`db-${id}`"
-                :checked="selectedDatabases.includes(String(id))"
+                :model-value="isRootUser ? true : selectedDatabases.includes(String(id))"
                 :disabled="isRootUser"
-                @update:checked="toggleDatabase(String(id), $event as boolean)"
+                @update:model-value="(val: boolean | 'indeterminate') => { if (!isRootUser && typeof val === 'boolean') toggleDatabase(String(id), val) }"
               />
               <Label :for="`db-${id}`" class="font-normal cursor-pointer">
                 {{ dbName }}
