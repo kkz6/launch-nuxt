@@ -366,6 +366,7 @@ export interface DatabaseUser extends InstallationStatus {
   id: string;
   server_id: string;
   name: string;
+  password: string | null;
   host: string;
   status: string;
   database_ids: string[];

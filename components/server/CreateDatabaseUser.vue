@@ -18,6 +18,7 @@ import { Label } from '~/components/ui/label'
 interface DatabaseUser {
   id: string
   name: string
+  password?: string | null
   database_ids?: string[]
 }
 
@@ -41,7 +42,7 @@ const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/C
 
 // Form values
 const name = ref(props.user?.name ?? '')
-const password = ref('')
+const password = ref(props.user?.password ?? '')
 const selectedDatabases = ref<string[]>(props.user?.database_ids ?? [])
 
 const generatePassword = () => {
@@ -93,7 +94,7 @@ const canSubmit = computed(() => {
 
 const resetForm = () => {
   name.value = props.user?.name ?? ''
-  password.value = ''
+  password.value = props.user?.password ?? ''
   selectedDatabases.value = props.user?.database_ids ?? []
   showPassword.value = false
   errors.value = {}
