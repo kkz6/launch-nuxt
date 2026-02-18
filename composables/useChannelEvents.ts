@@ -156,6 +156,7 @@ export const useDeploymentEvents = (
   return useChannelEvents(
     channel,
     [
+      'deployment.started',
       'deployment.progress',
       'deployment.finished',
       'deployment.failed',
