@@ -96,7 +96,10 @@ const fetchDomainData = async () => {
     }>(`/dns/domains/${domainId.value}`);
     domain.value = response.data.domain;
     records.value = response.data.records || [];
-    recordTypes.value = response.data.recordTypes || [];
+    const rawTypes = response.data.recordTypes || [];
+    recordTypes.value = rawTypes.map((t: any) =>
+      typeof t === "string" ? t : t.value
+    );
     useHead({ title: `DNS - ${domain.value?.address || "Domain"}` });
   } catch {
     toast.error("Failed to load domain data");

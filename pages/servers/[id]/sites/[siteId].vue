@@ -27,8 +27,8 @@ const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 let siteFetchTimeout: ReturnType<typeof setTimeout> | null = null
 
 useDeploymentEvents(teamId, (data) => {
-  // Refresh site data when deployment completes for this site
-  if (data.site_id === siteId.value && (data.status === 'finished' || data.status === 'failed')) {
+  // Refresh site data when deployment starts or completes for this site
+  if (data.site_id === siteId.value) {
     if (siteFetchTimeout) clearTimeout(siteFetchTimeout)
     siteFetchTimeout = setTimeout(() => fetchSite(), 300)
   }
