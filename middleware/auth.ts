@@ -24,9 +24,11 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   // Check subscription status - redirect non-subscribed users to dashboard
+  // Allow /settings/billing for payment return redirects
   const isSubscribed = user.value?.current_team?.is_subscribed ?? true;
+  const allowedPaths = ['/dashboard', '/settings/billing'];
 
-  if (!isSubscribed && to.path !== '/dashboard') {
+  if (!isSubscribed && !allowedPaths.includes(to.path)) {
     return navigateTo('/dashboard');
   }
 });

@@ -31,4 +31,5 @@ onMounted(() => {
     </main>
     <Toaster position="bottom-center" :close-button="true" :duration="4000" />
   </div>
+  <slot v-else />
 </template>
