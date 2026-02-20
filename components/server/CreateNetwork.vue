@@ -17,7 +17,7 @@ import type { FirewallRule } from '~/types'
 
 interface Props {
   serverId: string
-  firewallRule?: FirewallRule
+  firewallRule?: FirewallRule | null
 }
 
 const props = defineProps<Props>()
@@ -37,10 +37,31 @@ const actions: Record<string, string> = {
 }
 
 // Form values
-const name = ref(props.firewallRule?.name || '')
-const action = ref<'allow' | 'deny'>((props.firewallRule?.action as 'allow' | 'deny') || 'allow')
-const port = ref(props.firewallRule?.port || '')
-const fromIpv4 = ref(props.firewallRule?.from_ipv4 || '')
+const name = ref('')
+const action = ref<'allow' | 'deny'>('allow')
+const port = ref('')
+const fromIpv4 = ref('')
+
+const isEditMode = computed(() => !!props.firewallRule)
+
+const isSSHRule = computed(() => {
+  if (!props.firewallRule) return false
+  return props.firewallRule.name.toLowerCase() === 'ssh' || props.firewallRule.port === '22'
+})
+
+const hasPortChanged = computed(() => {
+  if (!props.firewallRule) return false
+  return port.value.trim() !== props.firewallRule.port
+})
+
+const hasRuleChanged = computed(() => {
+  if (!props.firewallRule) return false
+  return (
+    port.value.trim() !== props.firewallRule.port ||
+    action.value !== props.firewallRule.action ||
+    (fromIpv4.value.trim() || null) !== (props.firewallRule.from_ipv4 || null)
+  )
+})
 
 const schema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
@@ -80,33 +101,66 @@ const validate = () => {
   return result.data
 }
 
+const updateServerSSHPort = async (newPort: string) => {
+  try {
+    await $api(`/servers/${props.serverId}`, {
+      method: 'PATCH',
+      body: { ssh_port: parseInt(newPort, 10) },
+    })
+  } catch {
+    toast.error('Failed to update server SSH port. Please update it manually in server settings.')
+  }
+}
+
 const onSubmit = async () => {
   const data = validate()
   if (!data) return
 
   if (!confirmationDialog.value) return
 
+  // Build confirmation message
+  let description = isEditMode.value
+    ? 'Are you sure you want to update this firewall rule?'
+    : 'Are you sure you want to create this firewall rule?'
+
+  if (isEditMode.value && isSSHRule.value && hasPortChanged.value) {
+    description = `You are changing the SSH port from ${props.firewallRule!.port} to ${port.value.trim()}. The server's SSH connection port will also be updated. Make sure the server's SSH daemon is already configured to listen on port ${port.value.trim()} before proceeding.`
+  }
+
   const result = await confirmationDialog.value.show({
-    title: props.firewallRule ? 'Update Network Rule' : 'Create Network Rule',
-    description: props.firewallRule
-      ? 'Are you sure you want to update this firewall rule?'
-      : 'Are you sure you want to create this firewall rule?',
-    confirmText: props.firewallRule ? 'Update' : 'Create',
+    title: isEditMode.value ? 'Update Network Rule' : 'Create Network Rule',
+    description,
+    confirmText: isEditMode.value ? 'Update' : 'Create',
     cancelText: 'Cancel',
+    destructive: isEditMode.value && isSSHRule.value && hasPortChanged.value,
   })
 
-  if (!result.ok) {
-    toast.info('Cancelled')
-    return
-  }
+  if (!result.ok) return
 
   isLoading.value = true
   try {
-    if (props.firewallRule) {
-      await $api(`/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`, {
-        method: 'PATCH',
-        body: data,
-      })
+    if (isEditMode.value && props.firewallRule) {
+      if (hasRuleChanged.value) {
+        // Port, action, or IP changed — create new rule first, then delete old
+        await $api(`/servers/${props.serverId}/firewall-rules`, {
+          method: 'POST',
+          body: data,
+        })
+        await $api(`/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`, {
+          method: 'DELETE',
+        })
+
+        // Update server SSH port if this is the SSH rule and port changed
+        if (isSSHRule.value && hasPortChanged.value) {
+          await updateServerSSHPort(data.port)
+        }
+      } else {
+        // Only name changed — patch
+        await $api(`/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`, {
+          method: 'PATCH',
+          body: { name: data.name },
+        })
+      }
       toast.success('Firewall rule updated successfully')
       emit('updated')
     } else {
@@ -128,9 +182,13 @@ const onSubmit = async () => {
 }
 
 watch(isOpen, (open) => {
-  if (!open) {
+  if (open) {
     resetForm()
   }
+})
+
+defineExpose({
+  open: () => { isOpen.value = true },
 })
 </script>
 
@@ -149,6 +207,21 @@ watch(isOpen, (open) => {
       <DialogHeader>
         <DialogTitle>{{ firewallRule ? 'Update' : 'Create' }} Network Rule</DialogTitle>
       </DialogHeader>
+
+      <!-- SSH port warning -->
+      <div
+        v-if="isEditMode && isSSHRule && hasPortChanged"
+        class="rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+      >
+        <div class="flex items-start gap-2">
+          <Icon name="lucide:triangle-alert" class="mt-0.5 h-4 w-4 shrink-0" />
+          <p>
+            Changing the SSH port will also update the server's stored SSH port.
+            Ensure the server's SSH daemon is already listening on the new port before saving.
+          </p>
+        </div>
+      </div>
+
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
           <Label for="name">Name</Label>
