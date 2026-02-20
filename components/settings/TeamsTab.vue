@@ -20,6 +20,13 @@ interface TeamMember {
   role: string
 }
 
+interface TeamInvitation {
+  id: string
+  email: string
+  role: string
+  created_at: string
+}
+
 interface Team {
   id: string
   name: string
@@ -30,6 +37,7 @@ interface Team {
 const { user } = useAuth()
 
 const members = ref<TeamMember[]>([])
+const invitations = ref<TeamInvitation[]>([])
 const currentTeam = ref<Team | null>(null)
 const isLoading = ref(true)
 const isInviteOpen = ref(false)
@@ -66,16 +74,30 @@ const fetchTeamMembers = async () => {
     const teamId = user.value?.current_team_id
     if (!teamId) return
 
-    const [teamResponse, membersResponse] = await Promise.all([
+    const [teamResponse, membersResponse, invitationsResponse] = await Promise.all([
       $api<{ data: Team }>(`/teams/${teamId}`),
       $api<{ data: TeamMember[] }>(`/teams/${teamId}/members`),
+      $api<{ data: TeamInvitation[] }>(`/teams/${teamId}/invitations`).catch(() => ({ data: [] as TeamInvitation[] })),
     ])
     currentTeam.value = teamResponse.data
     members.value = membersResponse.data
+    invitations.value = invitationsResponse.data
   } catch {
     toast.error('Failed to load team members')
   } finally {
     isLoading.value = false
+  }
+}
+
+const cancelInvitation = async (invitationId: string) => {
+  try {
+    await $api(`/teams/${currentTeam.value?.id}/invitations/${invitationId}`, {
+      method: 'DELETE',
+    })
+    invitations.value = invitations.value.filter((i) => i.id !== invitationId)
+    toast.success('Invitation cancelled')
+  } catch {
+    toast.error('Failed to cancel invitation')
   }
 }
 
@@ -166,6 +188,43 @@ onMounted(fetchTeamMembers)
                 </SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pending Invitations -->
+      <div v-if="invitations.length > 0" class="px-6 pb-6">
+        <Separator class="mb-6" />
+        <h3 class="mb-4 text-base font-semibold">Pending Invitations</h3>
+        <div class="space-y-1">
+          <div
+            v-for="invitation in invitations"
+            :key="invitation.id"
+            class="flex items-center justify-between rounded-lg border p-3"
+          >
+            <div class="flex items-center gap-3">
+              <Avatar class="h-8 w-8">
+                <AvatarFallback class="text-xs">
+                  {{ invitation.email[0].toUpperCase() }}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <span class="text-sm font-medium">{{ invitation.email }}</span>
+                <div class="flex items-center gap-1.5">
+                  <Badge variant="secondary" class="text-xs capitalize">{{ invitation.role }}</Badge>
+                  <span class="text-xs text-muted-foreground">Pending</span>
+                </div>
+              </div>
+            </div>
+            <Button
+              v-if="isOwner"
+              variant="ghost"
+              size="sm"
+              class="text-destructive hover:text-destructive"
+              @click="cancelInvitation(invitation.id)"
+            >
+              Cancel
+            </Button>
           </div>
         </div>
       </div>

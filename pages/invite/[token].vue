@@ -31,10 +31,10 @@ const invitationLoading = ref(true);
 // Fetch invitation details
 onMounted(async () => {
   try {
-    const response = await $api<{ email: string }>(
+    const response = await $api<{ data: { email: string; team_name: string } }>(
       `/auth/invitations/${token.value}`
     );
-    email.value = response.email;
+    email.value = response.data.email;
   } catch {
     toast.error("Invalid or expired invitation");
     navigateTo("/login");

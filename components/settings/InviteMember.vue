@@ -58,7 +58,7 @@ const canSubmit = computed(() => {
 
 const resetForm = () => {
   email.value = ''
-  role.value = 'viewer'
+  role.value = 'member'
   errors.value = {}
 }
 
