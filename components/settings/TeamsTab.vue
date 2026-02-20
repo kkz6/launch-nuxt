@@ -89,6 +89,22 @@ const fetchTeamMembers = async () => {
   }
 }
 
+const resendingId = ref<string | null>(null)
+
+const resendInvitation = async (invitationId: string) => {
+  resendingId.value = invitationId
+  try {
+    await $api(`/teams/${currentTeam.value?.id}/invitations/${invitationId}/resend`, {
+      method: 'POST',
+    })
+    toast.success('Invitation resent')
+  } catch {
+    toast.error('Failed to resend invitation')
+  } finally {
+    resendingId.value = null
+  }
+}
+
 const cancelInvitation = async (invitationId: string) => {
   try {
     await $api(`/teams/${currentTeam.value?.id}/invitations/${invitationId}`, {
@@ -216,15 +232,30 @@ onMounted(fetchTeamMembers)
                 </div>
               </div>
             </div>
-            <Button
-              v-if="isOwner"
-              variant="ghost"
-              size="sm"
-              class="text-destructive hover:text-destructive"
-              @click="cancelInvitation(invitation.id)"
-            >
-              Cancel
-            </Button>
+            <div v-if="isOwner" class="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                :disabled="resendingId === invitation.id"
+                @click="resendInvitation(invitation.id)"
+              >
+                <Icon
+                  v-if="resendingId === invitation.id"
+                  name="lucide:loader-2"
+                  class="mr-1 h-3.5 w-3.5 animate-spin"
+                />
+                <Icon v-else name="lucide:send" class="mr-1 h-3.5 w-3.5" />
+                Resend
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="text-destructive hover:text-destructive"
+                @click="cancelInvitation(invitation.id)"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </div>
       </div>
