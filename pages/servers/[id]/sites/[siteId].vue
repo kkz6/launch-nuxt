@@ -98,7 +98,7 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'deployments'">
-      <SiteDeployments :server-id="server.id" :site-id="site.id" :site="site" />
+      <SiteDeployments :server-id="server.id" :site-id="site.id" :site="site" @update:site="site = $event" />
     </div>
 
     <div v-else-if="activeTab === 'files'">

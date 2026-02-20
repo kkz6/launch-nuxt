@@ -12,6 +12,9 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const emit = defineEmits<{
+  'update:site': [site: Site]
+}>()
 
 // Get current team for WebSocket channel
 const { user } = useAuth()
@@ -55,15 +58,19 @@ const hasActiveDeployment = computed(() => {
   return deployments.value.some(d => d.status === 'pending' || d.status === 'installing')
 })
 
-const firstFinishedIndex = computed(() => {
-  return deployments.value.findIndex(d => d.status === 'finished')
+const secondFinishedIndex = computed(() => {
+  let count = 0
+  return deployments.value.findIndex((d) => {
+    if (d.status === 'finished') count++
+    return count === 2
+  })
 })
 
 const canRollback = (deployment: Deployment, index: number) => {
   if (!props.site.zero_downtime_deployment) return false
   if (deployment.status !== 'finished') return false
-  // Can't rollback to the most recent finished deployment
-  if (index === firstFinishedIndex.value) return false
+  // Only allow rollback to the second most recent finished deployment (the last successful one before current)
+  if (index !== secondFinishedIndex.value) return false
   return true
 }
 
@@ -114,6 +121,34 @@ const deployWebhookUrl = computed(() => {
   return `${config.public.apiBase}/sites/${props.siteId}/deploy/${props.site.deploy_token}`
 })
 
+const isRegenerating = ref(false)
+
+const handleRegenerateToken = async () => {
+  if (!confirmationDialog.value) return
+
+  const result = await confirmationDialog.value.show({
+    title: 'Regenerate deploy token?',
+    description: 'This will invalidate the current webhook URL. Any CI/CD pipelines using the old URL will stop working.',
+    confirmText: 'Regenerate',
+    cancelText: 'Cancel',
+  })
+
+  if (!result.ok) return
+
+  isRegenerating.value = true
+  try {
+    const data = await $api<{ data: Site }>(`/servers/${props.serverId}/sites/${props.siteId}/deploy-token/regenerate`, {
+      method: 'POST',
+    })
+    emit('update:site', data.data)
+    toast.success('Deploy token regenerated')
+  } catch {
+    toast.error('Failed to regenerate deploy token')
+  } finally {
+    isRegenerating.value = false
+  }
+}
+
 const copyToClipboard = (text: string) => {
   if (typeof window !== 'undefined') {
     window.navigator.clipboard.writeText(text)
@@ -150,6 +185,19 @@ onMounted(fetchDeployments)
           </code>
           <Button variant="ghost" size="sm" @click="copyToClipboard(deployWebhookUrl)">
             <Icon name="lucide:copy" class="block size-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            :disabled="isRegenerating"
+            @click="handleRegenerateToken"
+          >
+            <Icon
+              v-if="isRegenerating"
+              name="lucide:loader-2"
+              class="block size-4 animate-spin"
+            />
+            <Icon v-else name="lucide:refresh-cw" class="block size-4" />
           </Button>
         </div>
       </div>
