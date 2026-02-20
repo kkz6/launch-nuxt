@@ -10,12 +10,9 @@ const props = defineProps<Props>()
 
 const firewallRules = ref<FirewallRule[]>([])
 const isLoading = ref(true)
+const editingRule = ref<FirewallRule | null>(null)
+const editDialogRef = ref<{ open: () => void } | null>(null)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
-
-const networkActions: Record<string, string> = {
-  allow: 'Allow',
-  deny: 'Deny',
-}
 
 const fetchData = async () => {
   try {
@@ -28,15 +25,31 @@ const fetchData = async () => {
   }
 }
 
+const isSSHRule = (rule: FirewallRule) => {
+  return rule.name.toLowerCase() === 'ssh' || rule.port === '22'
+}
+
+const editRule = (rule: FirewallRule) => {
+  editingRule.value = { ...rule }
+  nextTick(() => editDialogRef.value?.open())
+}
+
 const deleteRule = async (rule: FirewallRule) => {
   if (!confirmationDialog.value) return
 
+  const sshRule = isSSHRule(rule)
+
   const result = await confirmationDialog.value.show({
     title: 'Delete Firewall Rule',
-    description: `Are you sure you want to delete "${rule.name}"?`,
+    description: `Are you sure you want to delete the firewall rule "${rule.name}"? This will remove the rule from the server.`,
     confirmText: 'Delete',
     cancelText: 'Cancel',
     destructive: true,
+    inputVerificationText: rule.name,
+    helpText: 'Type the rule name to confirm:',
+    ...(sshRule
+      ? { warning: 'This is the SSH firewall rule. Deleting it will block all SSH connections and you may permanently lose access to this server.' }
+      : {}),
   })
 
   if (result.ok) {
@@ -52,12 +65,27 @@ const deleteRule = async (rule: FirewallRule) => {
   }
 }
 
+const onRuleUpdated = () => {
+  editingRule.value = null
+  fetchData()
+}
+
 onMounted(fetchData)
 </script>
 
 <template>
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!-- Hidden edit dialog -->
+    <ServerCreateNetwork
+      ref="editDialogRef"
+      :server-id="serverId"
+      :firewall-rule="editingRule"
+      @updated="onRuleUpdated"
+    >
+      <span class="hidden" />
+    </ServerCreateNetwork>
 
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
@@ -81,7 +109,7 @@ onMounted(fetchData)
           { key: 'from_ipv4', label: 'From IP', width: '25%', hideOnMobile: true },
         ]"
         :actions="[
-          { label: 'Edit', icon: 'lucide:pencil', onClick: (rule: FirewallRule) => {} },
+          { label: 'Edit', icon: 'lucide:pencil', onClick: editRule },
           { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteRule, destructive: true },
         ]"
         empty-title="No firewall rules found"

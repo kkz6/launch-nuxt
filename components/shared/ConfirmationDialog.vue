@@ -19,6 +19,7 @@ interface ConfirmationOptions {
   confirmText?: string
   cancelText?: string
   destructive?: boolean
+  warning?: string
   inputVerificationText?: string
   helpText?: string
   hasInput?: boolean
@@ -111,6 +112,16 @@ defineExpose({ show })
       <AlertDialogHeader>
         <AlertDialogTitle>{{ options.title }}</AlertDialogTitle>
         <AlertDialogDescription>{{ options.description }}</AlertDialogDescription>
+
+        <div
+          v-if="options.warning"
+          class="mt-3 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive dark:border-destructive/40 dark:bg-destructive/10 dark:text-red-400"
+        >
+          <div class="flex items-start gap-2">
+            <Icon name="lucide:triangle-alert" class="mt-0.5 h-4 w-4 shrink-0" />
+            <p>{{ options.warning }}</p>
+          </div>
+        </div>
 
         <section v-if="options.inputVerificationText || options.hasInput || options.checkbox" class="pt-4 text-sm">
           <div class="grid w-full items-center gap-3">
