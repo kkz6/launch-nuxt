@@ -228,7 +228,7 @@ const mobileClass = computed(() => {
               <span class="shrink-0 text-sm font-medium text-muted-foreground">
                 {{ column.label }}
               </span>
-              <div class="flex-1 text-right text-sm font-medium">
+              <div class="min-w-0 flex-1 text-right text-sm font-medium break-all">
                 <slot
                   :name="`cell-${String(column.key)}`"
                   :row="item"
