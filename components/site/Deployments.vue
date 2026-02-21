@@ -118,7 +118,8 @@ const getCommitHeading = (message: string | undefined): string => {
 
 const deployWebhookUrl = computed(() => {
   const config = useRuntimeConfig()
-  return `${config.public.apiBase}/sites/${props.siteId}/deploy/${props.site.deploy_token}`
+  const baseUrl = config.public.apiBase.replace(/\/api\/?$/, '')
+  return `${baseUrl}/deploy/${props.siteId}/${props.site.deploy_token}`
 })
 
 const isRegenerating = ref(false)
