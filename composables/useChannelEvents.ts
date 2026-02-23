@@ -73,8 +73,7 @@ export const useChannelEvents = (
           onEvent(eventData)
         } else if (channelParts[0] === 'team' && eventData.team_id === channelParts[1]) {
           onEvent(eventData)
-        } else {
-          // For other channels or when no filtering needed
+        } else if (channelParts[0] === 'deployment' && eventData.deployment_id === channelParts[1]) {
           onEvent(eventData)
         }
       })
@@ -172,19 +171,39 @@ export const useDeploymentEvents = (
 /**
  * Composable to subscribe to site queue events
  *
- * @param siteId - The site ID
+ * @param teamId - The team ID
  * @param onEvent - Callback to run when a queue event is received
  */
 export const useSiteQueueEvents = (
-  siteId: string | Ref<string>,
+  teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
 ) => {
-  const siteIdValue = computed(() => unref(siteId))
-  const channel = computed(() => `site.${siteIdValue.value}`)
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
 
   return useChannelEvents(
     channel,
-    ['queue.created', 'queue.updated', 'queue.deleted', 'queue.restarted'],
+    ['queue.installed', 'queue.uninstalled', 'queue.restarted', 'queues.synced', 'queues.restarted'],
+    onEvent,
+  )
+}
+
+/**
+ * Composable to subscribe to daemon events
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a daemon event is received
+ */
+export const useDaemonEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['daemon.installed', 'daemon.uninstalled', 'daemon.restarted', 'daemons.synced'],
     onEvent,
   )
 }

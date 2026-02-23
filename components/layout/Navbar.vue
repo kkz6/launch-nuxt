@@ -368,9 +368,9 @@ const teamId = computed(() => user.value?.current_team_id?.toString() || '');
 useDeploymentEvents(teamId, (data) => {
   // Update deployment status for current site
   if (data.site_id === siteId.value) {
-    if (data.status === 'installing') {
+    if (data.status === 'pending' || data.status === 'installing') {
       isDeploying.value = true;
-    } else if (data.status === 'finished' || data.status === 'failed') {
+    } else if (data.status === 'finished' || data.status === 'failed' || data.status === 'timeout') {
       isDeploying.value = false;
     }
   }
@@ -1095,6 +1095,7 @@ onMounted(fetchTeams);
             :server-id="serverId"
             :site-id="siteId"
             :is-deploying="isDeploying"
+            @deployed="isDeploying = true"
           />
         </div>
       </div>

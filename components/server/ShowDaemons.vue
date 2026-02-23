@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
+import { useDaemonEvents } from '~/composables/useChannelEvents'
 import type { QueueDaemon, Server } from '~/types'
 
 interface Props {
@@ -19,6 +20,8 @@ const serverId = computed(() => props.server.id)
 
 const daemons = ref<QueueDaemon[]>([])
 const isLoading = ref(true)
+const restartingId = ref<string | null>(null)
+const isSyncing = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 // Log viewer state
@@ -89,38 +92,29 @@ const restartDaemon = async (daemon: QueueDaemon) => {
   })
 
   if (result.ok) {
+    restartingId.value = daemon.id
     try {
       await $api(`/servers/${serverId.value}/daemons/${daemon.id}/restart`, {
         method: 'POST',
       })
       toast.success('Daemon restart initiated')
-      fetchData()
     } catch {
       toast.error('Failed to restart daemon')
+      restartingId.value = null
     }
   }
 }
 
 const syncStatus = async () => {
-  if (!confirmationDialog.value) return
-
-  const result = await confirmationDialog.value.show({
-    title: 'Sync Daemon Status',
-    description: 'This will check the status of all daemons on the server.',
-    confirmText: 'Sync',
-    cancelText: 'Cancel',
-  })
-
-  if (result.ok) {
-    try {
-      await $api(`/servers/${serverId.value}/daemons/sync`, {
-        method: 'POST',
-      })
-      toast.success('Daemon sync initiated')
-      fetchData()
-    } catch {
-      toast.error('Failed to sync daemon status')
-    }
+  isSyncing.value = true
+  try {
+    await $api(`/servers/${serverId.value}/daemons/sync`, {
+      method: 'POST',
+    })
+    toast.success('Syncing daemon status...')
+  } catch {
+    toast.error('Failed to sync daemon status')
+    isSyncing.value = false
   }
 }
 
@@ -139,12 +133,22 @@ watch(isEditDialogOpen, (open) => {
 
 const hasStatusInfo = computed(() => daemons.value.some((d) => d.last_status_check !== null))
 
+// Get current team for WebSocket channel
+const { user } = useAuth()
+const teamId = computed(() => user.value?.current_team_id?.toString() || '')
+
 // Debounced refetch for WebSocket events
 let daemonFetchTimeout: ReturnType<typeof setTimeout> | null = null
 
-useServerModelEvents('daemon', serverId.value, () => {
-  if (daemonFetchTimeout) clearTimeout(daemonFetchTimeout)
-  daemonFetchTimeout = setTimeout(() => fetchData(), 300)
+useDaemonEvents(teamId, (data) => {
+  if (data.server_id === serverId.value) {
+    if (daemonFetchTimeout) clearTimeout(daemonFetchTimeout)
+    daemonFetchTimeout = setTimeout(() => {
+      fetchData()
+      restartingId.value = null
+      isSyncing.value = false
+    }, 300)
+  }
 })
 
 onMounted(fetchData)
@@ -180,9 +184,9 @@ onMounted(fetchData)
         <p class="text-sm text-muted-foreground">Manage background processes on this server</p>
       </div>
       <div class="flex items-center gap-2">
-        <Button v-if="daemons.length > 0" variant="outline" size="sm" @click="syncStatus">
-          <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-          Sync Status
+        <Button v-if="daemons.length > 0" variant="outline" size="sm" :disabled="isSyncing" @click="syncStatus">
+          <Icon name="lucide:refresh-cw" :class="['mr-2 h-4 w-4', isSyncing && 'animate-spin']" />
+          {{ isSyncing ? 'Syncing...' : 'Sync Status' }}
         </Button>
         <ServerCreateDaemon v-if="daemons.length > 0" :server="server" @created="fetchData" />
       </div>
@@ -206,15 +210,31 @@ onMounted(fetchData)
           }] : []),
           { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' as const },
         ]"
-        :actions="[
-          { label: 'View Logs', icon: 'lucide:scroll-text', onClick: viewLogs },
-          { label: 'Restart', icon: 'lucide:rotate-ccw', onClick: restartDaemon },
-          { label: 'Edit', icon: 'lucide:pencil', onClick: editDaemon },
-          { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteDaemon, destructive: true },
-        ]"
         empty-title="No daemons found"
         empty-icon="lucide:activity"
       >
+        <template #actions="{ item }">
+          <Button variant="ghost" size="icon" title="View Logs" @click="viewLogs(item)">
+            <Icon name="lucide:scroll-text" class="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Restart" :disabled="restartingId === item.id" @click="restartDaemon(item)">
+            <Icon v-if="restartingId === item.id" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+            <Icon v-else name="lucide:rotate-ccw" class="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title="Edit" @click="editDaemon(item)">
+            <Icon name="lucide:pencil" class="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Delete"
+            class="hover:bg-destructive/90 hover:text-white"
+            @click="deleteDaemon(item)"
+          >
+            <Icon name="lucide:trash-2" class="h-4 w-4" />
+          </Button>
+        </template>
+
         <template #empty>
           <ServerCreateDaemon :server="server" @created="fetchData" />
         </template>

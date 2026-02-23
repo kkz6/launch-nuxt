@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
+import { useSiteQueueEvents } from '~/composables/useChannelEvents'
 import type { Site } from '~/types'
 
 interface Queue {
@@ -52,6 +53,8 @@ const queues = ref<Queue[]>([])
 const isLoading = ref(true)
 const selectedQueue = ref<Queue | null>(null)
 const isEditDialogOpen = ref(false)
+const restartingId = ref<string | null>(null)
+const isSyncing = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
 // Log viewer state
@@ -91,12 +94,22 @@ const fetchQueues = async () => {
   }
 }
 
+// Get current team for WebSocket channel
+const { user } = useAuth()
+const teamId = computed(() => user.value?.current_team_id?.toString() || '')
+
 // Debounced refetch for WebSocket events
 let queueFetchTimeout: ReturnType<typeof setTimeout> | null = null
 
-useSiteQueueEvents(props.siteId, () => {
-  if (queueFetchTimeout) clearTimeout(queueFetchTimeout)
-  queueFetchTimeout = setTimeout(() => fetchQueues(), 300)
+useSiteQueueEvents(teamId, (data) => {
+  if (data.site_id === props.siteId) {
+    if (queueFetchTimeout) clearTimeout(queueFetchTimeout)
+    queueFetchTimeout = setTimeout(() => {
+      fetchQueues()
+      restartingId.value = null
+      isSyncing.value = false
+    }, 300)
+  }
 })
 
 const restartQueue = async (queue: Queue) => {
@@ -110,14 +123,15 @@ const restartQueue = async (queue: Queue) => {
   })
 
   if (result.ok) {
+    restartingId.value = queue.id
     try {
       await $api(`/servers/${props.serverId}/sites/${props.siteId}/queues/${queue.id}/restart`, {
         method: 'POST',
       })
       toast.success('Queue restart initiated')
-      fetchQueues()
     } catch {
       toast.error('Failed to restart queue')
+      restartingId.value = null
     }
   }
 }
@@ -147,25 +161,15 @@ const deleteQueue = async (queue: Queue) => {
 }
 
 const syncStatus = async () => {
-  if (!confirmationDialog.value) return
-
-  const result = await confirmationDialog.value.show({
-    title: 'Sync Queue Status',
-    description: 'This will check the status of all queue workers on the server.',
-    confirmText: 'Sync',
-    cancelText: 'Cancel',
-  })
-
-  if (result.ok) {
-    try {
-      await $api(`/servers/${props.serverId}/sites/${props.siteId}/queues/sync`, {
-        method: 'POST',
-      })
-      toast.success('Queue sync initiated')
-      fetchQueues()
-    } catch {
-      toast.error('Failed to sync queue status')
-    }
+  isSyncing.value = true
+  try {
+    await $api(`/servers/${props.serverId}/sites/${props.siteId}/queues/sync`, {
+      method: 'POST',
+    })
+    toast.success('Syncing queue status...')
+  } catch {
+    toast.error('Failed to sync queue status')
+    isSyncing.value = false
   }
 }
 
@@ -205,9 +209,9 @@ onMounted(fetchQueues)
       </div>
       <div class="flex items-center gap-2">
         <SiteAutoRestartQueue :server-id="serverId" :site-id="siteId" :auto-restart-queue="autoRestartQueue" />
-        <Button v-if="queues.length > 0" variant="outline" size="sm" @click="syncStatus">
-          <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-          Sync
+        <Button v-if="queues.length > 0" variant="outline" size="sm" :disabled="isSyncing" @click="syncStatus">
+          <Icon name="lucide:refresh-cw" :class="['mr-2 h-4 w-4', isSyncing && 'animate-spin']" />
+          {{ isSyncing ? 'Syncing...' : 'Sync' }}
         </Button>
         <SiteCreateQueue v-if="queues.length > 0" :server-id="serverId" :site-id="siteId" :site="site" @created="fetchQueues" />
       </div>
@@ -284,8 +288,9 @@ onMounted(fetchQueues)
           <Button variant="ghost" size="icon" title="View Logs" @click="viewLogs(item)">
             <Icon name="lucide:scroll-text" class="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" title="Restart" @click="restartQueue(item)">
-            <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
+          <Button variant="ghost" size="icon" title="Restart" :disabled="restartingId === item.id" @click="restartQueue(item)">
+            <Icon v-if="restartingId === item.id" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+            <Icon v-else name="lucide:rotate-ccw" class="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" title="Edit" @click="editQueue(item)">
             <Icon name="lucide:pencil" class="h-4 w-4" />
