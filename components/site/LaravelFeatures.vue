@@ -60,6 +60,15 @@ const features = computed<Feature[]>(() => {
       pending: pendingFeatures.includes('queue'),
       alwaysVisible: true,
     },
+    {
+      id: 'horizon',
+      name: 'Horizon',
+      description: 'Monitor and manage Laravel queues with Horizon',
+      icon: 'lucide:activity',
+      enabled: isFeatureEnabled('horizon'),
+      pending: pendingFeatures.includes('horizon'),
+      alwaysVisible: true,
+    },
   ]
 })
 
