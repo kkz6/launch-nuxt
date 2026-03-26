@@ -132,7 +132,7 @@ const handleToggle = (feature: Feature) => {
   }
 }
 
-const handleConfirm = (options: { delete_queues?: boolean; configure_env?: boolean }) => {
+const handleConfirm = (options: { delete_queues?: boolean; configure_env?: boolean; update_caddyfile?: boolean }) => {
   toggleFeature(confirmDialog.value.featureId, confirmDialog.value.action, options)
 }
 

@@ -24,11 +24,12 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  confirm: [options: { delete_queues?: boolean; configure_env?: boolean }]
+  confirm: [options: { delete_queues?: boolean; configure_env?: boolean; update_caddyfile?: boolean }]
 }>()
 
 const deleteQueues = ref(true)
 const configureEnv = ref(true)
+const updateCaddyfile = ref(true)
 
 const dialogTitle = computed(() => {
   return `${props.action === 'enable' ? 'Enable' : 'Disable'} ${props.featureName}`
@@ -59,8 +60,12 @@ const showConfigureEnvOption = computed(() => {
   return props.featureId === 'reverb' && props.action === 'enable'
 })
 
+const showUpdateCaddyfileOption = computed(() => {
+  return props.featureId === 'reverb' && props.action === 'enable'
+})
+
 function handleConfirm() {
-  const options: { delete_queues?: boolean; configure_env?: boolean } = {}
+  const options: { delete_queues?: boolean; configure_env?: boolean; update_caddyfile?: boolean } = {}
 
   if (showDeleteQueuesOption.value) {
     options.delete_queues = deleteQueues.value
@@ -68,6 +73,10 @@ function handleConfirm() {
 
   if (showConfigureEnvOption.value) {
     options.configure_env = configureEnv.value
+  }
+
+  if (showUpdateCaddyfileOption.value) {
+    options.update_caddyfile = updateCaddyfile.value
   }
 
   emit('confirm', options)
@@ -87,7 +96,7 @@ function handleClose(open: boolean) {
         <AlertDialogDescription>{{ dialogDescription }}</AlertDialogDescription>
       </AlertDialogHeader>
 
-      <div v-if="showDeleteQueuesOption || showConfigureEnvOption" class="space-y-3 py-2">
+      <div v-if="showDeleteQueuesOption || showConfigureEnvOption || showUpdateCaddyfileOption" class="space-y-3 py-2">
         <div v-if="showDeleteQueuesOption" class="flex items-center gap-2">
           <Checkbox
             id="delete-queues"
@@ -107,6 +116,17 @@ function handleClose(open: boolean) {
           />
           <Label for="configure-env" class="text-sm font-normal">
             Configure .env variables (sets BROADCAST_CONNECTION=reverb and generates Reverb keys)
+          </Label>
+        </div>
+
+        <div v-if="showUpdateCaddyfileOption" class="flex items-center gap-2">
+          <Checkbox
+            id="update-caddyfile"
+            :checked="updateCaddyfile"
+            @update:checked="updateCaddyfile = !!$event"
+          />
+          <Label for="update-caddyfile" class="text-sm font-normal">
+            Update Caddyfile (adds WebSocket reverse proxy for Reverb)
           </Label>
         </div>
       </div>
