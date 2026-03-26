@@ -220,6 +220,7 @@ export interface Site extends InstallationStatus {
   features?: string[];
   enabled_features?: string[];
   pending_features?: string[];
+  queue_count?: number;
   url: string;
   created_at: string;
   updated_at: string;

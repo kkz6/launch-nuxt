@@ -2,6 +2,7 @@
 import { toast } from 'vue-sonner'
 import { Switch } from '~/components/ui/switch'
 import { Label } from '~/components/ui/label'
+import FeatureConfirmationDialog from '~/components/site/FeatureConfirmationDialog.vue'
 import type { Site } from '~/types'
 
 interface Props {
@@ -23,7 +24,12 @@ interface Feature {
   enabled: boolean
   pending: boolean
   alwaysVisible: boolean
+  canToggle: boolean
+  needsConfirmation: boolean
 }
+
+// Features that require a confirmation dialog before toggling
+const confirmationFeatures = ['horizon', 'reverb', 'inertia']
 
 const isFeatureEnabled = (featureName: string): boolean => {
   const enabledFeatures = props.site.enabled_features || []
@@ -40,6 +46,7 @@ const isFeatureEnabled = (featureName: string): boolean => {
 
 const features = computed<Feature[]>(() => {
   const pendingFeatures = props.site.pending_features || []
+  const detectedFeatures = props.site.features || []
 
   return [
     {
@@ -50,6 +57,8 @@ const features = computed<Feature[]>(() => {
       enabled: isFeatureEnabled('scheduler'),
       pending: pendingFeatures.includes('scheduler'),
       alwaysVisible: true,
+      canToggle: true,
+      needsConfirmation: false,
     },
     {
       id: 'queue',
@@ -59,27 +68,79 @@ const features = computed<Feature[]>(() => {
       enabled: isFeatureEnabled('queue'),
       pending: pendingFeatures.includes('queue'),
       alwaysVisible: true,
+      canToggle: true,
+      needsConfirmation: false,
     },
     {
       id: 'horizon',
-      name: 'Horizon',
-      description: 'Monitor and manage Laravel queues with Horizon',
-      icon: 'lucide:activity',
+      name: 'Laravel Horizon',
+      description: 'Beautiful dashboard for Redis queues',
+      icon: 'lucide:bar-chart-3',
       enabled: isFeatureEnabled('horizon'),
       pending: pendingFeatures.includes('horizon'),
-      alwaysVisible: true,
+      alwaysVisible: detectedFeatures.includes('horizon'),
+      canToggle: true,
+      needsConfirmation: true,
+    },
+    {
+      id: 'inertia',
+      name: 'Inertia.js SSR',
+      description: 'Server-side rendering for Inertia.js',
+      icon: 'lucide:layers',
+      enabled: isFeatureEnabled('inertia'),
+      pending: pendingFeatures.includes('inertia'),
+      alwaysVisible: detectedFeatures.includes('inertia'),
+      canToggle: true,
+      needsConfirmation: true,
+    },
+    {
+      id: 'reverb',
+      name: 'Laravel Reverb',
+      description: 'Real-time WebSocket server for Laravel',
+      icon: 'lucide:radio',
+      enabled: isFeatureEnabled('reverb'),
+      pending: pendingFeatures.includes('reverb'),
+      alwaysVisible: detectedFeatures.includes('reverb'),
+      canToggle: true,
+      needsConfirmation: true,
     },
   ]
 })
 
 const visibleFeatures = computed(() => features.value.filter((f) => f.alwaysVisible))
 
-const toggleFeature = async (featureId: string, currentlyEnabled: boolean) => {
-  const action = currentlyEnabled ? 'disable' : 'enable'
+// Confirmation dialog state
+const confirmDialog = ref({
+  open: false,
+  featureId: '',
+  featureName: '',
+  action: 'enable' as 'enable' | 'disable',
+})
 
+const handleToggle = (feature: Feature) => {
+  const action = feature.enabled ? 'disable' : 'enable'
+
+  if (feature.needsConfirmation && confirmationFeatures.includes(feature.id)) {
+    confirmDialog.value = {
+      open: true,
+      featureId: feature.id,
+      featureName: feature.name,
+      action,
+    }
+  } else {
+    toggleFeature(feature.id, action, {})
+  }
+}
+
+const handleConfirm = (options: { delete_queues?: boolean; configure_env?: boolean }) => {
+  toggleFeature(confirmDialog.value.featureId, confirmDialog.value.action, options)
+}
+
+const toggleFeature = async (featureId: string, action: 'enable' | 'disable', options: Record<string, unknown>) => {
   try {
     await $api(`/servers/${props.serverId}/sites/${props.site.id}/features/${featureId}/${action}`, {
       method: 'POST',
+      body: options,
     })
     toast.success(`Feature ${action}d successfully`)
     emit('updated')
@@ -125,12 +186,22 @@ const toggleFeature = async (featureId: string, currentlyEnabled: boolean) => {
           </div>
         </div>
         <Switch
+          v-if="feature.canToggle"
           :id="`${feature.id}-toggle`"
           :model-value="feature.enabled"
           :disabled="feature.pending"
-          @update:model-value="toggleFeature(feature.id, feature.enabled)"
+          @update:model-value="handleToggle(feature)"
         />
       </div>
     </div>
+
+    <FeatureConfirmationDialog
+      v-model:open="confirmDialog.open"
+      :feature-id="confirmDialog.featureId"
+      :feature-name="confirmDialog.featureName"
+      :action="confirmDialog.action"
+      :queue-count="site.queue_count ?? 0"
+      @confirm="handleConfirm"
+    />
   </div>
 </template>
