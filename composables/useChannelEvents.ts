@@ -16,7 +16,10 @@ interface ChannelEventData {
 }
 
 interface ChannelEventHandler {
-  (data: ChannelEventData): void
+  // The event name is passed alongside the payload so consumers can branch
+  // (e.g. distinguish deployment.started from deployment.finished without
+  // having to inspect a status field that some events don't include).
+  (data: ChannelEventData, event: string): void
 }
 
 /**
@@ -68,13 +71,13 @@ export const useChannelEvents = (
         // Filter by channel context (site_id, server_id, or team_id)
         const channelParts = channelValue.value.split('.')
         if (channelParts[0] === 'site' && eventData.site_id === channelParts[1]) {
-          onEvent(eventData)
+          onEvent(eventData, event)
         } else if (channelParts[0] === 'server' && eventData.server_id === channelParts[1]) {
-          onEvent(eventData)
+          onEvent(eventData, event)
         } else if (channelParts[0] === 'team' && eventData.team_id === channelParts[1]) {
-          onEvent(eventData)
+          onEvent(eventData, event)
         } else if (channelParts[0] === 'deployment' && eventData.deployment_id === channelParts[1]) {
-          onEvent(eventData)
+          onEvent(eventData, event)
         }
       })
       unsubscribes.push(unsub)

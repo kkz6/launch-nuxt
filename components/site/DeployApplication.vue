@@ -19,6 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '~/components/ui/tooltip'
+import type { Deployment } from '~/types'
 
 interface Props {
   serverId: string
@@ -32,8 +33,11 @@ const props = withDefaults(defineProps<Props>(), {
   isDeploying: false,
 })
 
+// `deployed` carries the freshly-created deployment so parents can update
+// site.latest_deployment optimistically rather than waiting for the
+// WebSocket broadcast → debounced refetch (≈500ms of stale UI otherwise).
 const emit = defineEmits<{
-  deployed: []
+  deployed: [deployment: Deployment]
 }>()
 
 const isOpen = ref(false)
@@ -47,11 +51,12 @@ watch(() => props.isDeploying, (val) => {
 const deploy = async () => {
   isLoading.value = true
   try {
-    await $api(`/servers/${props.serverId}/sites/${props.siteId}/deploy`, {
-      method: 'POST',
-    })
+    const res = await $api<{ data: Deployment }>(
+      `/servers/${props.serverId}/sites/${props.siteId}/deploy`,
+      { method: 'POST' },
+    )
     toast.info('Deployment started')
-    emit('deployed')
+    emit('deployed', res.data)
     isOpen.value = false
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }

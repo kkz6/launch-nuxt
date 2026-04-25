@@ -20,14 +20,66 @@ const emit = defineEmits<{
 const { user } = useAuth()
 const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
-// Debounced refetch for WebSocket events
-let deployFetchTimeout: ReturnType<typeof setTimeout> | null = null
+// Terminal events trigger a single full refetch (commit data, finished_at,
+// task_id all need the canonical server response). Non-terminal events
+// (deployment.started, deployment.progress, rollback.started) are applied
+// in-place from the event payload — saves a network round-trip per event.
+const TERMINAL_DEPLOYMENT_EVENTS = new Set([
+  'deployment.finished',
+  'deployment.failed',
+  'deployment.timeout',
+  'deployment.rollback.completed',
+  'deployment.rollback.failed',
+])
 
-useDeploymentEvents(teamId, (data) => {
-  // Only refresh if the event is for this site
-  if (data.site_id === props.siteId) {
-    if (deployFetchTimeout) clearTimeout(deployFetchTimeout)
-    deployFetchTimeout = setTimeout(() => fetchDeployments(), 300)
+// Debounced refetch for terminal events.
+let deployFetchTimeout: ReturnType<typeof setTimeout> | null = null
+const scheduleRefetch = () => {
+  if (deployFetchTimeout) clearTimeout(deployFetchTimeout)
+  deployFetchTimeout = setTimeout(() => fetchDeployments(), 300)
+}
+
+// Synthesise a placeholder deployment from a WebSocket event payload.
+// Used when a `deployment.started` arrives for a deploy we didn't trigger
+// from this tab — we want the row to appear immediately rather than wait
+// for the terminal-event refetch.
+const synthesizePending = (deploymentId: string, status: string): Deployment => ({
+  id: deploymentId,
+  site_id: props.siteId,
+  status,
+  user_id: null,
+  task_id: '',
+  git_hash: '',
+  vcs_data: {} as Deployment['vcs_data'],
+  commit_data: {} as Deployment['commit_data'],
+  user_notified_at: '',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  user: null,
+})
+
+useDeploymentEvents(teamId, (data, event) => {
+  if (data.site_id !== props.siteId) return
+  if (typeof data.deployment_id !== 'string') return
+
+  const isTerminal = TERMINAL_DEPLOYMENT_EVENTS.has(event)
+
+  // Apply the status to the matching row (or prepend a synthesized one).
+  // This keeps the list visually in sync with `deployment.started` and
+  // every `deployment.progress` tick without a refetch per event.
+  if (typeof data.status === 'string') {
+    const idx = deployments.value.findIndex(d => d.id === data.deployment_id)
+    if (idx >= 0) {
+      deployments.value[idx].status = data.status
+    } else if (event === 'deployment.started') {
+      deployments.value.unshift(synthesizePending(data.deployment_id, data.status))
+    }
+  }
+
+  // Terminal events: refetch to pick up commit_data, task_id, finished_at —
+  // fields the broadcast doesn't carry.
+  if (isTerminal) {
+    scheduleRefetch()
   }
 })
 

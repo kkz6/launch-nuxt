@@ -14,6 +14,7 @@ import {
   Terminal,
 } from "lucide-vue-next";
 import { useDeploymentEvents } from "~/composables/useChannelEvents";
+import type { Deployment } from "~/types";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
@@ -360,6 +361,16 @@ const siteAddress = ref<string | null>(null);
 const siteType = ref<string | null>(null);
 const siteUrl = ref<string | null>(null);
 const isDeploying = ref(false);
+
+// Shared bus consumed by the site detail page so that triggering a deploy
+// from the navbar updates the on-page overview card immediately, without
+// waiting for the WebSocket roundtrip + debounced refetch.
+const lastTriggeredDeployment = useState<Deployment | null>('lastTriggeredDeployment', () => null);
+
+const onDeployTriggered = (deployment: Deployment) => {
+  isDeploying.value = true;
+  lastTriggeredDeployment.value = deployment;
+};
 
 // Get current team for WebSocket channel
 const teamId = computed(() => user.value?.current_team_id?.toString() || '');
@@ -1095,7 +1106,7 @@ onMounted(fetchTeams);
             :server-id="serverId"
             :site-id="siteId"
             :is-deploying="isDeploying"
-            @deployed="isDeploying = true"
+            @deployed="onDeployTriggered"
           />
         </div>
       </div>
