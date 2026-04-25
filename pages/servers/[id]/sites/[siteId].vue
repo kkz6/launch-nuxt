@@ -130,6 +130,32 @@ watch(() => route.query.tab, (newTab) => {
   }
 })
 
+// Tab label is shown in the browser tab title alongside the site address.
+// Keep in sync with `allSiteDetailTabs` in components/layout/Navbar.vue.
+const tabLabels: Record<string, string> = {
+  general: 'Overview',
+  deployments: 'Deployments',
+  files: 'Files',
+  queues: 'Queues',
+  redirects: 'Redirects',
+  commands: 'Commands',
+  settings: 'Settings',
+}
+
+// Page title — reactive so it updates when the site loads, when the
+// address changes (e.g. via Settings), and when the user switches tabs.
+// Must be declared at the top of setup; calling useHead inside onMounted
+// loses reactivity and produces a stale title that flashes the previous
+// page's title until the API call finishes.
+useHead({
+  title: () => {
+    const address = site.value?.address
+    const tab = tabLabels[activeTab.value]
+    if (!address) return 'Site'
+    return tab && tab !== tabLabels.general ? `${address} · ${tab}` : address
+  },
+})
+
 const fetchSite = async () => {
   try {
     const siteData = await $api<{ data: Site }>(`/servers/${serverId.value}/sites/${siteId.value}`)
@@ -147,7 +173,6 @@ onMounted(async () => {
     ])
     server.value = serverData.data
     site.value = siteData.data
-    useHead({ title: site.value?.address || 'Site' })
   } catch {
     navigateTo(`/servers/${serverId.value}`)
   } finally {

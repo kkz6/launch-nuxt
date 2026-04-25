@@ -59,6 +59,13 @@ const recordTypes = ref<string[]>([]);
 const isLoading = ref(true);
 const searchQuery = ref("");
 const selectedRecords = ref<Set<string>>(new Set());
+
+// Page title — reactive so it updates when the domain loads. Calling
+// useHead inside fetchDomainData with a static string loses reactivity
+// and causes a stale title flash before the API call resolves.
+useHead({
+  title: () => (domain.value?.address ? `DNS - ${domain.value.address}` : "DNS - Domain"),
+});
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
@@ -100,7 +107,6 @@ const fetchDomainData = async () => {
     recordTypes.value = rawTypes.map((t: any) =>
       typeof t === "string" ? t : t.value
     );
-    useHead({ title: `DNS - ${domain.value?.address || "Domain"}` });
   } catch {
     toast.error("Failed to load domain data");
     navigateTo("/dns");
