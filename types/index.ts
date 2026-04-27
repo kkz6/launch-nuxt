@@ -658,6 +658,20 @@ export interface ServerUpdateStatus {
   completed_at?: string;
 }
 
+// Docker registry credentials (team-level, used at deploy time for `docker login`)
+export type DockerRegistryType = "docker_hub" | "ghcr" | "generic";
+
+export interface DockerRegistry {
+  id: string;
+  name: string;
+  type: DockerRegistryType;
+  type_label: string;
+  url: string;
+  username: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // Docker services (managed Postgres / MySQL / Redis containers on a Docker server)
 export type DockerServiceKind = "postgres" | "mysql" | "redis";
 export type DockerServiceStatus =

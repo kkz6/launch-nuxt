@@ -4,12 +4,23 @@ import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { format } from 'date-fns'
+import { dockerRegistryService } from '~/services/dockerRegistryService'
+import type { DockerRegistry } from '~/types'
 
 // Loading states
 const isGitLoading = ref(true)
 const isServerProvidersLoading = ref(true)
 const isStorageProvidersLoading = ref(true)
 const isDnsProvidersLoading = ref(true)
+const isDockerRegistriesLoading = ref(true)
+
+const dockerRegistries = ref<DockerRegistry[]>([])
+const editingDockerRegistry = ref<DockerRegistry | null>(null)
+const dockerRegistryIcons: Record<string, string> = {
+  docker_hub: 'simple-icons:docker',
+  ghcr: 'simple-icons:github',
+  generic: 'lucide:database',
+}
 
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -289,11 +300,50 @@ const deleteDnsProvider = async (provider: DnsProvider) => {
   }
 }
 
+const fetchDockerRegistries = async () => {
+  try {
+    const response = await dockerRegistryService.list()
+    dockerRegistries.value = response.data ?? []
+  } catch {
+    toast.error('Failed to load docker registries')
+  } finally {
+    isDockerRegistriesLoading.value = false
+  }
+}
+
+const deleteDockerRegistry = async (registry: DockerRegistry) => {
+  if (!confirmationDialog.value) return
+  const result = await confirmationDialog.value.show({
+    title: 'Delete docker registry',
+    description: `Are you sure you want to delete "${registry.name}"? Applications using this credential will fail to pull until reconfigured.`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    destructive: true,
+  })
+  if (!result.ok) return
+  try {
+    await dockerRegistryService.delete(registry.id)
+    dockerRegistries.value = dockerRegistries.value.filter((r) => r.id !== registry.id)
+    toast.success('Docker registry deleted')
+  } catch {
+    toast.error('Failed to delete docker registry')
+  }
+}
+
+const editDockerRegistry = (registry: DockerRegistry) => {
+  editingDockerRegistry.value = registry
+}
+const onDockerRegistryUpdated = () => {
+  editingDockerRegistry.value = null
+  fetchDockerRegistries()
+}
+
 onMounted(() => {
   fetchGitProviders()
   fetchServerProviders()
   fetchStorageProviders()
   fetchDnsProviders()
+  fetchDockerRegistries()
 })
 </script>
 
@@ -363,6 +413,78 @@ onMounted(() => {
           <GitAddProvider :providers="gitProviders" @install="handleInstallApp" />
         </div>
       </template>
+    </div>
+
+    <!-- Docker Registries Section -->
+    <div class="px-6 py-6">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-semibold">Docker Registries</h3>
+          <p class="text-xs text-muted-foreground">
+            Credentials for private image registries (Docker Hub, GHCR, generic). Used at deploy time by the application module.
+          </p>
+        </div>
+        <SettingsAddDockerRegistry @created="fetchDockerRegistries" />
+      </div>
+
+      <div v-if="isDockerRegistriesLoading" class="flex items-center justify-center py-4">
+        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+
+      <template v-else>
+        <div v-if="dockerRegistries.length === 0" class="rounded-lg border p-4">
+          <div class="flex flex-col items-center gap-2 py-2 text-sm text-muted-foreground">
+            <Icon name="simple-icons:docker" class="h-8 w-8" />
+            <span>No docker registries configured.</span>
+          </div>
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="registry in dockerRegistries"
+            :key="registry.id"
+            class="flex items-center justify-between rounded-lg border p-4"
+          >
+            <div class="flex items-center gap-3">
+              <Icon
+                :name="dockerRegistryIcons[registry.type] || 'lucide:database'"
+                class="h-6 w-6 text-muted-foreground"
+              />
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium">{{ registry.name }}</span>
+                  <Badge variant="secondary" class="text-xs">{{ registry.type_label }}</Badge>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                  {{ registry.url }} · {{ registry.username }}
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <Button variant="ghost" size="sm" title="Edit" @click="editDockerRegistry(registry)">
+                <Icon name="lucide:pencil" class="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                @click="deleteDockerRegistry(registry)"
+              >
+                <Icon name="lucide:trash-2" class="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <SettingsEditDockerRegistry
+        v-if="editingDockerRegistry"
+        :open="!!editingDockerRegistry"
+        :registry="editingDockerRegistry"
+        @update:open="(v: boolean) => { if (!v) editingDockerRegistry = null }"
+        @updated="onDockerRegistryUpdated"
+      />
     </div>
 
     <!-- Server Providers Section -->
