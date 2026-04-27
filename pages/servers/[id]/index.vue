@@ -62,7 +62,7 @@ watch(sitesRefreshKey, () => {
 });
 
 // Valid tab values
-const validTabs = ["sites", "upstreams", "metrics", "databases", "networks", "daemons", "schedulers", "advanced"];
+const validTabs = ["sites", "upstreams", "metrics", "databases", "docker-services", "networks", "daemons", "schedulers", "advanced"];
 const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services"];
 
 // Get initial tab from query params or default based on server type
@@ -178,6 +178,10 @@ onMounted(async () => {
 
     <div v-else-if="activeTab === 'databases'">
       <ServerShowDatabases :server-id="server.id" />
+    </div>
+
+    <div v-else-if="activeTab === 'docker-services'">
+      <ServerShowDockerServices :server="server" />
     </div>
 
     <div v-else-if="activeTab === 'networks'">

@@ -227,6 +227,7 @@ watch([() => route.path, () => route.query.tab, () => route.query.subtab], () =>
 
 // Server detail tabs (conditionally show upstreams for load balancer servers)
 const isLoadBalancerServer = computed(() => serverType.value === 'loadbalancer');
+const isDockerServer = computed(() => serverType.value === 'docker');
 
 const serverDetailTabs = computed(() => {
   const baseTabs: { value: string; label: string; query: string; icon: string }[] = [];
@@ -245,9 +246,15 @@ const serverDetailTabs = computed(() => {
     { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
   );
 
-  if (!isLoadBalancerServer.value) {
+  if (!isLoadBalancerServer.value && !isDockerServer.value) {
     baseTabs.push(
       { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
+    );
+  }
+
+  if (isDockerServer.value) {
+    baseTabs.push(
+      { value: "docker-services", label: "Docker Services", query: "docker-services", icon: "lucide:database" },
     );
   }
 
