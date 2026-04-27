@@ -418,6 +418,28 @@ export const usePlatformUpdateEvents = (
 }
 
 /**
+ * Composable to subscribe to docker-app progress events.
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when an app event is received
+ *
+ * Event payload includes server_id, app_id, status, message, timestamp.
+ */
+export const useDockerAppEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['app.progress'],
+    onEvent,
+  )
+}
+
+/**
  * Composable to subscribe to docker-service progress events.
  *
  * @param teamId - The team ID

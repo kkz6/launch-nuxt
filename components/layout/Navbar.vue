@@ -236,6 +236,10 @@ const serverDetailTabs = computed(() => {
     baseTabs.push(
       { value: "upstreams", label: "Upstreams", query: "upstreams", icon: "lucide:git-fork" },
     );
+  } else if (isDockerServer.value) {
+    baseTabs.push(
+      { value: "apps", label: "Applications", query: "apps", icon: "lucide:container" },
+    );
   } else {
     baseTabs.push(
       { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },

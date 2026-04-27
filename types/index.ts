@@ -658,6 +658,72 @@ export interface ServerUpdateStatus {
   completed_at?: string;
 }
 
+// Docker applications (containerised apps on Docker servers)
+export type DockerAppStatus =
+  | "pending"
+  | "deploying"
+  | "running"
+  | "stopped"
+  | "failed";
+
+export type DockerAppRestartPolicy =
+  | "unless-stopped"
+  | "always"
+  | "on-failure"
+  | "no";
+
+export interface DockerApp {
+  id: string;
+  server_id: string;
+  name: string;
+  source: string;
+  image: string;
+  tag: string;
+  image_ref: string;
+  container: string;
+  registry_credential_id?: string;
+  restart_policy: DockerAppRestartPolicy;
+  status: DockerAppStatus;
+  status_label: string;
+  last_error?: string;
+  task_id?: string;
+  deployed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+  env_vars?: DockerAppEnvVar[];
+  ports?: DockerAppPort[];
+  volumes?: DockerAppVolume[];
+  domains?: DockerAppDomain[];
+}
+
+export interface DockerAppEnvVar {
+  id: string;
+  key: string;
+  value?: string;
+  secret: boolean;
+}
+
+export interface DockerAppPort {
+  id: string;
+  host_port: number;
+  container_port: number;
+  protocol: string;
+}
+
+export interface DockerAppVolume {
+  id: string;
+  name: string;
+  host_name: string;
+  mount_path: string;
+}
+
+export interface DockerAppDomain {
+  id: string;
+  domain: string;
+  container_port: number;
+  tls: boolean;
+}
+
 // Docker registry credentials (team-level, used at deploy time for `docker login`)
 export type DockerRegistryType = "docker_hub" | "ghcr" | "generic";
 

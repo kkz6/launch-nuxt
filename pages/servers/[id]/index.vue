@@ -62,7 +62,7 @@ watch(sitesRefreshKey, () => {
 });
 
 // Valid tab values
-const validTabs = ["sites", "upstreams", "metrics", "databases", "docker-services", "networks", "daemons", "schedulers", "advanced"];
+const validTabs = ["sites", "apps", "upstreams", "metrics", "databases", "docker-services", "networks", "daemons", "schedulers", "advanced"];
 const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services"];
 
 // Get initial tab from query params or default based on server type
@@ -115,6 +115,8 @@ onMounted(async () => {
 
       if (server.value.type === 'loadbalancer' && !route.query.tab) {
         activeTab.value = 'upstreams';
+      } else if (server.value.type === 'docker' && !route.query.tab) {
+        activeTab.value = 'apps';
       }
 
       isLoading.value = false;
@@ -123,7 +125,7 @@ onMounted(async () => {
       const promises: Promise<void>[] = [
         serverService.get(serverId.value).then(res => { server.value = res.data; }),
       ];
-      if (server.value.type !== 'loadbalancer') {
+      if (server.value.type !== 'loadbalancer' && server.value.type !== 'docker') {
         promises.push(serverService.sites.list(serverId.value).then(res => { sites.value = res.data; isSitesLoading.value = false; }));
       } else {
         isSitesLoading.value = false;
@@ -137,12 +139,14 @@ onMounted(async () => {
 
       if (server.value?.type === 'loadbalancer' && !route.query.tab) {
         activeTab.value = 'upstreams';
+      } else if (server.value?.type === 'docker' && !route.query.tab) {
+        activeTab.value = 'apps';
       }
 
       isLoading.value = false;
 
       // Fetch sites after showing the page
-      if (server.value?.type !== 'loadbalancer') {
+      if (server.value?.type !== 'loadbalancer' && server.value?.type !== 'docker') {
         const sitesData = await serverService.sites.list(serverId.value);
         sites.value = sitesData.data;
       }
@@ -182,6 +186,10 @@ onMounted(async () => {
 
     <div v-else-if="activeTab === 'docker-services'">
       <ServerShowDockerServices :server="server" />
+    </div>
+
+    <div v-else-if="activeTab === 'apps'">
+      <ServerShowDockerApps :server="server" />
     </div>
 
     <div v-else-if="activeTab === 'networks'">
