@@ -15,6 +15,9 @@ import type {
   LoadBalancerBackend,
   UpstreamHealthResponse,
   CheckDomainResponse,
+  DockerService,
+  DockerServiceKind,
+  DockerServiceLogs,
 } from "~/types";
 import type { ApiResponse } from "~/composables/useApi";
 
@@ -265,6 +268,67 @@ export const serverService = {
     delete: (serverId: string, daemonId: string) => {
       const { delete: del } = useApi();
       return del<ApiResponse<null>>(`/servers/${serverId}/daemons/${daemonId}`);
+    },
+  },
+
+  // Docker Services (managed Postgres / MySQL / Redis containers on a Docker server)
+  dockerServices: {
+    list: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerService[]>>(
+        `/servers/${serverId}/docker-services`
+      );
+    },
+    install: (
+      serverId: string,
+      data: {
+        kind: DockerServiceKind;
+        image?: string;
+        username?: string;
+        password?: string;
+        database_name?: string;
+      }
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerService>>(
+        `/servers/${serverId}/docker-services`,
+        data
+      );
+    },
+    uninstall: (
+      serverId: string,
+      kind: DockerServiceKind,
+      removeData = false
+    ) => {
+      const { delete: del } = useApi();
+      const query = removeData ? "?remove_data=true" : "";
+      return del<ApiResponse<null>>(
+        `/servers/${serverId}/docker-services/${kind}${query}`
+      );
+    },
+    start: (serverId: string, kind: DockerServiceKind) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker-services/${kind}/start`
+      );
+    },
+    stop: (serverId: string, kind: DockerServiceKind) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker-services/${kind}/stop`
+      );
+    },
+    restart: (serverId: string, kind: DockerServiceKind) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker-services/${kind}/restart`
+      );
+    },
+    logs: (serverId: string, kind: DockerServiceKind, tail = 200) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerServiceLogs>>(
+        `/servers/${serverId}/docker-services/${kind}/logs?tail=${tail}`
+      );
     },
   },
 

@@ -416,3 +416,25 @@ export const usePlatformUpdateEvents = (
     onEvent,
   )
 }
+
+/**
+ * Composable to subscribe to docker-service progress events.
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a docker-service event is received
+ *
+ * Event payload includes server_id, docker_service_id, status, message, timestamp.
+ */
+export const useDockerServiceEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['docker_service.progress'],
+    onEvent,
+  )
+}

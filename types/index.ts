@@ -658,6 +658,40 @@ export interface ServerUpdateStatus {
   completed_at?: string;
 }
 
+// Docker services (managed Postgres / MySQL / Redis containers on a Docker server)
+export type DockerServiceKind = "postgres" | "mysql" | "redis";
+export type DockerServiceStatus =
+  | "pending"
+  | "installing"
+  | "running"
+  | "stopped"
+  | "failed";
+
+export interface DockerService {
+  id: string;
+  server_id: string;
+  kind: DockerServiceKind;
+  kind_label: string;
+  status: DockerServiceStatus;
+  status_label: string;
+  image: string;
+  container: string;
+  volume: string;
+  database_name?: string;
+  username?: string;
+  last_error?: string;
+  task_id?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DockerServiceLogs {
+  kind: DockerServiceKind;
+  tail: number;
+  output: string;
+  success: boolean;
+}
+
 // API Response types
 export interface ApiError {
   message: string;
