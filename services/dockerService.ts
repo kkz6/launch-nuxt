@@ -29,6 +29,74 @@ export interface UpdateDockerProjectData {
   description?: string;
 }
 
+// ---- Applications ---------------------------------------------------------
+
+/**
+ * Source type discriminant. Mirrors launch-go's
+ * dockertypes.SourceType — keep these strings in sync.
+ */
+export type DockerSourceType = "image" | "git" | "dockerfile";
+
+/**
+ * Application lifecycle status. Same source-of-truth note as above.
+ */
+export type DockerApplicationStatus =
+  | "idle"
+  | "building"
+  | "running"
+  | "stopped"
+  | "failed";
+
+/**
+ * A docker application as returned by the API. source_config is opaque to
+ * the frontend except for the source-type-specific keys we render in the
+ * General subtab — keep that rendering tolerant of missing keys so a
+ * future backend change doesn't blank the UI.
+ */
+export interface DockerApplication {
+  id: string;
+  team_id: string;
+  server_id: string;
+  project_id: string;
+  name: string;
+  source_type: DockerSourceType;
+  source_config?: Record<string, unknown> | null;
+  build_type?: string | null;
+  build_config?: Record<string, unknown> | null;
+  status: DockerApplicationStatus;
+  container_id?: string | null;
+  last_deployed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Create payload for a docker application. Exactly one of image/git/
+ * dockerfile must match source_type; the backend enforces this.
+ */
+export interface CreateDockerApplicationData {
+  name: string;
+  source_type: DockerSourceType;
+  image?: {
+    image: string;
+    registry_credential_id?: string;
+  };
+  git?: {
+    repo: string;
+    branch: string;
+    source_control_id?: string;
+    build_type?: "nixpacks" | "dockerfile";
+    dockerfile_path?: string;
+  };
+  dockerfile?: {
+    contents: string;
+  };
+}
+
+export interface UpdateDockerApplicationData {
+  name?: string;
+}
+
 /**
  * dockerService groups every API call under /api/servers/:serverId/docker/.
  * Mirrors serverService.ts for consistency — every method takes the
@@ -67,6 +135,54 @@ export const dockerService = {
     delete: (serverId: string, projectId: string) => {
       const { delete: del } = useApi();
       return del(`/servers/${serverId}/docker/projects/${projectId}`);
+    },
+  },
+
+  applications: {
+    list: (serverId: string, projectId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerApplication[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications`,
+      );
+    },
+
+    get: (serverId: string, projectId: string, applicationId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerApplication>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}`,
+      );
+    },
+
+    create: (
+      serverId: string,
+      projectId: string,
+      data: CreateDockerApplicationData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerApplication>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications`,
+        data,
+      );
+    },
+
+    update: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: UpdateDockerApplicationData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerApplication>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}`,
+        data,
+      );
+    },
+
+    delete: (serverId: string, projectId: string, applicationId: string) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}`,
+      );
     },
   },
 };
