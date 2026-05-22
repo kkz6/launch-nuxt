@@ -132,6 +132,11 @@ const resetForm = () => {
 };
 
 const validate = () => {
+  // Coerce optional fields to "none" when they don't apply to the chosen server
+  // type. Keeps the payload aligned with the backend DTO and prevents UI state
+  // from leaking through when the user switches type after editing the field.
+  const rules = getServerTypeRules(serverType.value);
+
   const result = schema.safeParse({
     name: name.value.trim(),
     service_provider: serviceProvider.value,
@@ -140,8 +145,8 @@ const validate = () => {
     plan: plan.value || undefined,
     type: serverType.value,
     operating_system: operatingSystem.value,
-    database: database.value,
-    php: php.value,
+    database: rules.showsDatabase ? database.value : "none",
+    php: rules.showsPhp ? php.value : "none",
     ssh_keys: selectedSshKeys.value,
     ip: ip.value || undefined,
     port: port.value,
@@ -182,8 +187,19 @@ const dbOptions = computed(() => {
   return { ...databaseTypes.value, none: "None" };
 });
 
-const fetchOptions = async () => {
-  isLoadingOptions.value = true;
+// Capability rules per server type (mirrors backend ServerType.GetFeatures()).
+// Drives which optional fields are visible in Advanced Options and what the
+// final payload looks like — see useServerTypeRules.ts.
+const typeRules = computed(() => getServerTypeRules(serverType.value));
+
+// Whether we already have enough data to render the form. Used to skip
+// the full-dialog spinner on subsequent opens — the spinner caused a
+// visible "dialog opens small → resizes large" flicker because the
+// loading state replaced the entire form for ~300-500ms on every click.
+const hasOptions = computed(() => Object.keys(serverTypes.value).length > 0);
+
+const fetchOptions = async (silent = false) => {
+  if (!silent) isLoadingOptions.value = true;
   try {
     const [optionsData, providersData, sshData] = await Promise.all([
       serverService.getCreateOptions(),
@@ -200,11 +216,18 @@ const fetchOptions = async () => {
     serverProviders.value = providersData.data;
     sshKeys.value = sshData.data;
   } catch {
-    toast.error("Failed to load server options");
+    if (!silent) toast.error("Failed to load server options");
   } finally {
     isLoadingOptions.value = false;
   }
 };
+
+// Pre-fetch on mount so by the time the user clicks Create, options are
+// already cached. The dialog component only mounts when the user is on
+// /servers (see Navbar.vue v-if), so this isn't wasted work elsewhere.
+onMounted(() => {
+  fetchOptions(true);
+});
 
 const onSubmit = async () => {
   const data = validate();
@@ -233,21 +256,26 @@ const onSubmit = async () => {
   }
 };
 
-// Fetch options when dialog opens
+// Open behaviour: reset form, then refresh data. If we already have
+// options (from onMounted prefetch or a previous open), refresh silently
+// in the background — the form renders immediately with cached data and
+// the dialog doesn't visibly resize. Only the first open with cold cache
+// shows the spinner.
 watch(isOpen, (open) => {
-  if (open) {
-    resetForm();
-    fetchOptions();
-  }
+  if (!open) return;
+  resetForm();
+  fetchOptions(hasOptions.value);
 });
 </script>
 
 <template>
   <Dialog v-model:open="isOpen">
     <DialogTrigger as-child>
-      <Button>
-        <PlusIcon class="mr-2 h-4 w-4" />
-        Create
+      <!-- On mobile we collapse to an icon-only button so the tabs nav has
+           enough room. The label reappears at sm and up. -->
+      <Button class="px-2.5 sm:px-4" aria-label="Create server">
+        <PlusIcon class="h-4 w-4 sm:mr-2" />
+        <span class="hidden sm:inline">Create</span>
       </Button>
     </DialogTrigger>
 
@@ -259,11 +287,19 @@ watch(isOpen, (open) => {
         </DialogDescription>
       </DialogHeader>
 
-      <div v-if="isLoadingOptions" class="flex items-center justify-center py-8">
+      <!-- Reserve roughly the form's height so the dialog doesn't visibly
+           shrink-then-grow on the very first open if the prefetch hasn't
+           landed yet. After that, hasOptions=true and we skip this state
+           entirely (silent refresh). -->
+      <div
+        v-if="isLoadingOptions"
+        class="flex min-h-[440px] flex-col items-center justify-center gap-3"
+      >
         <Icon
           name="lucide:loader-2"
           class="h-6 w-6 animate-spin text-muted-foreground"
         />
+        <p class="text-sm text-muted-foreground">Loading options...</p>
       </div>
 
       <form
@@ -282,7 +318,9 @@ watch(isOpen, (open) => {
               v-for="(label, key) in serviceProviders"
               :key="key"
               :value="key"
+              class="gap-2"
             >
+              <Icon :name="getProviderIcon(key)" class="h-4 w-4" />
               {{ label }}
             </TabsTrigger>
           </TabsList>
@@ -290,7 +328,10 @@ watch(isOpen, (open) => {
 
         <!-- Server Provider (for cloud providers) -->
         <div v-if="serviceProvider !== 'custom_server'" class="space-y-2">
-          <Label>Server Provider</Label>
+          <Label class="flex items-center gap-2">
+            <Icon name="lucide:key-round" class="h-4 w-4 text-muted-foreground" />
+            Server Provider
+          </Label>
           <Select v-model="serverProviderId">
             <SelectTrigger>
               <SelectValue placeholder="Select a provider account" />
@@ -303,7 +344,10 @@ watch(isOpen, (open) => {
                     :key="provider.id"
                     :value="String(provider.id)"
                   >
-                    {{ provider.profile }} ({{ serviceProviders[provider.provider] }})
+                    <span class="flex items-center gap-2">
+                      <Icon :name="getProviderIcon(provider.provider)" class="h-4 w-4" />
+                      {{ provider.profile }} ({{ serviceProviders[provider.provider] }})
+                    </span>
                   </SelectItem>
                 </template>
                 <SelectLabel v-else class="text-muted-foreground">
@@ -319,7 +363,10 @@ watch(isOpen, (open) => {
 
         <!-- Server Name -->
         <div class="space-y-2">
-          <Label for="name">Name</Label>
+          <Label for="name" class="flex items-center gap-2">
+            <Icon name="lucide:tag" class="h-4 w-4 text-muted-foreground" />
+            Name
+          </Label>
           <Input
             id="name"
             v-model="name"
@@ -336,7 +383,10 @@ watch(isOpen, (open) => {
           class="grid grid-cols-1 gap-3 lg:grid-cols-2"
         >
           <div class="space-y-2">
-            <Label>Plan</Label>
+            <Label class="flex items-center gap-2">
+              <Icon name="lucide:layers" class="h-4 w-4 text-muted-foreground" />
+              Plan
+            </Label>
             <Select v-model="plan">
               <SelectTrigger>
                 <SelectValue placeholder="Select a plan" />
@@ -354,7 +404,10 @@ watch(isOpen, (open) => {
           </div>
 
           <div class="space-y-2">
-            <Label>Region</Label>
+            <Label class="flex items-center gap-2">
+              <Icon name="lucide:globe" class="h-4 w-4 text-muted-foreground" />
+              Region
+            </Label>
             <Select v-model="region">
               <SelectTrigger>
                 <SelectValue placeholder="Select a region" />
@@ -378,7 +431,10 @@ watch(isOpen, (open) => {
           class="grid grid-cols-2 gap-3"
         >
           <div class="space-y-2">
-            <Label for="ip">IP Address</Label>
+            <Label for="ip" class="flex items-center gap-2">
+              <Icon name="lucide:globe-2" class="h-4 w-4 text-muted-foreground" />
+              IP Address
+            </Label>
             <Input
               id="ip"
               v-model="ip"
@@ -386,7 +442,10 @@ watch(isOpen, (open) => {
             />
           </div>
           <div class="space-y-2">
-            <Label for="port">SSH Port</Label>
+            <Label for="port" class="flex items-center gap-2">
+              <Icon name="lucide:plug" class="h-4 w-4 text-muted-foreground" />
+              SSH Port
+            </Label>
             <Input
               id="port"
               v-model="port"
@@ -397,7 +456,10 @@ watch(isOpen, (open) => {
 
         <!-- SSH Keys -->
         <div class="space-y-2">
-          <Label>SSH Keys</Label>
+          <Label class="flex items-center gap-2">
+            <Icon name="lucide:key" class="h-4 w-4 text-muted-foreground" />
+            SSH Keys
+          </Label>
           <div v-if="sshKeys.length === 0" class="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
             No SSH keys available. Add one in Settings.
           </div>
@@ -431,10 +493,16 @@ watch(isOpen, (open) => {
         <!-- Server Type -->
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-2">
-            <Label>Type</Label>
+            <Label class="flex items-center gap-2">
+              <Icon name="lucide:server" class="h-4 w-4 text-muted-foreground" />
+              Type
+            </Label>
             <Select v-model="serverType">
               <SelectTrigger>
-                <SelectValue placeholder="Select type" />
+                <span class="flex items-center gap-2">
+                  <Icon :name="getServerTypeIcon(serverType)" class="h-4 w-4" />
+                  <SelectValue placeholder="Select type" />
+                </span>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -442,10 +510,16 @@ watch(isOpen, (open) => {
                   :key="key"
                   :value="key"
                 >
-                  {{ label }}
+                  <span class="flex items-center gap-2">
+                    <Icon :name="getServerTypeIcon(key)" class="h-4 w-4" />
+                    {{ label }}
+                  </span>
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p class="text-xs text-muted-foreground">
+              {{ typeRules.description }}
+            </p>
           </div>
         </div>
 
@@ -488,11 +562,15 @@ watch(isOpen, (open) => {
       <div class="mt-4 space-y-6">
         <!-- Server Configuration Group -->
         <div class="space-y-4 border-b border-border/50 pb-4">
-          <h3 class="text-sm font-medium text-foreground">
+          <h3 class="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Icon name="lucide:sliders-horizontal" class="h-4 w-4 text-muted-foreground" />
             Server Configuration
           </h3>
           <div class="space-y-2">
-            <Label>Operating System</Label>
+            <Label class="flex items-center gap-2">
+              <Icon name="lucide:disc" class="h-4 w-4 text-muted-foreground" />
+              Operating System
+            </Label>
             <Select v-model="operatingSystem">
               <SelectTrigger>
                 <SelectValue placeholder="Select OS" />
@@ -512,10 +590,16 @@ watch(isOpen, (open) => {
 
         <!-- Software Stack Group -->
         <div class="space-y-4 border-b border-border/50 pb-4">
-          <h3 class="text-sm font-medium text-foreground">Software Stack</h3>
+          <h3 class="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Icon name="lucide:package" class="h-4 w-4 text-muted-foreground" />
+            Software Stack
+          </h3>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div v-if="serverType !== 'database'" class="space-y-2">
-              <Label>PHP Version</Label>
+            <div v-if="typeRules.showsPhp" class="space-y-2">
+              <Label class="flex items-center gap-2">
+                <Icon name="lucide:code-2" class="h-4 w-4 text-muted-foreground" />
+                PHP Version
+              </Label>
               <Select v-model="php">
                 <SelectTrigger>
                   <SelectValue placeholder="Select PHP version" />
@@ -532,8 +616,11 @@ watch(isOpen, (open) => {
               </Select>
             </div>
 
-            <div class="space-y-2">
-              <Label>Database</Label>
+            <div v-if="typeRules.showsDatabase" class="space-y-2">
+              <Label class="flex items-center gap-2">
+                <Icon name="lucide:database" class="h-4 w-4 text-muted-foreground" />
+                Database
+              </Label>
               <Select v-model="database">
                 <SelectTrigger>
                   <SelectValue placeholder="Select database" />
@@ -549,12 +636,20 @@ watch(isOpen, (open) => {
                 </SelectContent>
               </Select>
             </div>
+
+            <p
+              v-if="!typeRules.showsPhp && !typeRules.showsDatabase"
+              class="col-span-full text-sm text-muted-foreground"
+            >
+              {{ typeRules.description }}
+            </p>
           </div>
         </div>
 
         <!-- Agent Configuration Group -->
         <div class="space-y-4">
-          <h3 class="text-sm font-medium text-foreground">
+          <h3 class="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Icon name="lucide:activity" class="h-4 w-4 text-muted-foreground" />
             Agent Configuration
           </h3>
           <div class="flex items-start space-x-3 rounded-md border p-4">

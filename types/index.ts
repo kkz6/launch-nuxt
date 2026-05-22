@@ -292,6 +292,11 @@ export interface ProvisionStatus {
   steps: ProvisionStatusStep[];
   current_step?: ProvisionStatusStep;
   latest_task?: Task;
+  // Set by the backend when server.status is "failed". The UI uses these to
+  // suppress the spinner on a never-resolving "current" step and render an
+  // error banner instead. See BuildProvisionStatus in responses.go.
+  failed?: boolean;
+  error_message?: string;
 }
 
 export interface GitProvider {

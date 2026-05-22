@@ -81,72 +81,106 @@ const handleDelete = async () => {
 </script>
 
 <template>
-  <div class="pointer-events-auto flex items-center">
-    <!-- Primary Provision Button (for custom servers) -->
-    <Button
-      v-if="isCustomServerPending"
-      variant="outline"
-      size="sm"
-      class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
-      @click.prevent="handleProvision"
-    >
-      <Icon name="lucide:terminal" class="h-3 w-3" />
-      Provision
-    </Button>
+  <div class="pointer-events-auto flex items-center gap-1.5">
+    <!-- Failed servers get inline, discoverable actions. View logs is the
+         primary affordance (it opens the friendly error sheet with the
+         Try-again / Manage-credentials buttons), Delete is destructive and
+         confirmed in a dialog. Hiding these behind a dots menu tested badly
+         — users didn't notice them at all. -->
+    <template v-if="server.status === 'failed'">
+      <Button
+        variant="outline"
+        size="sm"
+        class="h-7 gap-1.5 px-2.5 text-xs"
+        @click.prevent="handleViewLogs"
+      >
+        <Icon name="lucide:scroll-text" class="h-3 w-3" />
+        View details
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        class="h-7 gap-1.5 border-destructive/30 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+        @click.prevent="showDeleteDialog = true"
+      >
+        <Icon name="lucide:trash-2" class="h-3 w-3" />
+        Delete
+      </Button>
+    </template>
 
-    <!-- Dropdown Menu -->
-    <DropdownMenu>
-      <DropdownMenuTrigger as-child>
-        <Button
-          variant="outline"
-          size="sm"
-          :class="[
-            'h-7 w-7 p-0',
-            isCustomServerPending ? 'rounded-l-none' : ''
-          ]"
-          @click.prevent
-        >
-          <Icon name="lucide:chevron-down" class="h-3.5 w-3.5" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" class="w-40">
-        <!-- Provision option (shown for non-custom servers or as backup) -->
-        <DropdownMenuItem
-          v-if="isCustomServerPending"
-          @click.prevent="handleProvision"
-        >
-          <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
-          Provision
-        </DropdownMenuItem>
+    <!-- All other transitional states (new, starting, custom-server pending)
+         keep the compact dots menu so the card doesn't grow taller. -->
+    <template v-else>
+      <!-- Primary Provision Button (for custom servers) -->
+      <Button
+        v-if="isCustomServerPending"
+        variant="outline"
+        size="sm"
+        class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
+        @click.prevent="handleProvision"
+      >
+        <Icon name="lucide:terminal" class="h-3 w-3" />
+        Provision
+      </Button>
 
-        <!-- View Logs -->
-        <DropdownMenuItem @click.prevent="handleViewLogs">
-          <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
-          View Logs
-        </DropdownMenuItem>
+      <!-- Dropdown Menu — uses the conventional "more actions" dots icon
+           instead of a generic chevron-down, which read as an "expand row"
+           affordance in user testing. -->
+      <DropdownMenu>
+        <DropdownMenuTrigger as-child>
+          <Button
+            variant="outline"
+            size="sm"
+            :class="[
+              'h-7 w-7 p-0',
+              isCustomServerPending ? 'rounded-l-none' : ''
+            ]"
+            aria-label="More actions"
+            title="More actions"
+            @click.prevent
+          >
+            <Icon name="lucide:more-horizontal" class="h-3.5 w-3.5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" class="w-40">
+          <!-- Provision option (shown for non-custom servers or as backup) -->
+          <DropdownMenuItem
+            v-if="isCustomServerPending"
+            @click.prevent="handleProvision"
+          >
+            <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
+            Provision
+          </DropdownMenuItem>
 
-        <!-- Retry Provision (only for failed servers that connected) -->
-        <DropdownMenuItem
-          v-if="canRetryProvision"
-          @click.prevent="handleRetryProvision"
-        >
-          <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-          Retry Provision
-        </DropdownMenuItem>
+          <!-- View Logs -->
+          <DropdownMenuItem @click.prevent="handleViewLogs">
+            <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
+            View Logs
+          </DropdownMenuItem>
 
-        <DropdownMenuSeparator />
+          <!-- Retry Provision (only for failed servers that connected) -->
+          <DropdownMenuItem
+            v-if="canRetryProvision"
+            @click.prevent="handleRetryProvision"
+          >
+            <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
+            Retry Provision
+          </DropdownMenuItem>
 
-        <!-- Delete -->
-        <DropdownMenuItem
-          :disabled="!canDelete"
-          class="text-destructive focus:text-destructive"
-          @click.prevent="showDeleteDialog = true"
-        >
-          <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          <DropdownMenuSeparator />
+
+          <!-- Delete -->
+          <DropdownMenuItem
+            :disabled="!canDelete"
+            class="text-destructive focus:text-destructive"
+            @click.prevent="showDeleteDialog = true"
+          >
+            <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </template>
 
     <!-- Delete Confirmation Dialog -->
     <AlertDialog v-model:open="showDeleteDialog">

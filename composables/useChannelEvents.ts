@@ -283,17 +283,33 @@ export const useServerEvents = (
   return useChannelEvents(
     channel,
     [
+      // Lifecycle
       'server.created',
       'server.updated',
       'server.deleted',
+      'server.deletion_failed',
+      'server.unarchived',
+      // Cloud-provider create flow (backend: jobs/create_on_provider.go,
+      // jobs/wait_for_server_to_connect.go) — these used to be missing, which
+      // is why a failed DO/AWS create-on-provider didn't reach the UI live.
+      'server.created_on_provider',
+      'server.create_failed',
+      'server.waiting_for_connection',
       'server.connected',
-      'server.provisioned',
+      'server.connection_failed',
+      // Provisioning flow (backend: tasks/provision_*.go, jobs/provision_server.go)
       'server.provisioning',
+      'server.provisioned',
       'server.provision_progress',
       'server.provision_step',
       'server.provision_status',
+      'server.provision_error',
       'server.provision_failed',
+      'server.provision_timeout',
       'server.software_installed',
+      // Cleanup (backend: jobs/cleanup_failed_provisioning.go)
+      'server.provisioning_cleanup_complete',
+      'server.cleanup_failed',
     ],
     onEvent,
   )

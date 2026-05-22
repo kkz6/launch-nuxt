@@ -187,10 +187,20 @@ const fetchOptions = async () => {
   }
 };
 
+const typeRules = computed(() => getServerTypeRules(values.type));
+
 const onSubmit = handleSubmit(async (data) => {
   isLoading.value = true;
   try {
-    const response = await serverService.create(data);
+    // Force inapplicable fields to "none" based on the server type so we never
+    // submit e.g. a PHP version for a docker server.
+    const rules = getServerTypeRules(data.type);
+    const payload = {
+      ...data,
+      database: rules.showsDatabase ? data.database : "none",
+      php: rules.showsPhp ? data.php : "none",
+    };
+    const response = await serverService.create(payload);
     toast.success("Server creation initiated");
     navigateTo(`/servers/${response.data.id}`);
   } catch (error: unknown) {
@@ -463,7 +473,7 @@ onMounted(fetchOptions);
               </Select>
             </div>
 
-            <div v-if="values.type !== 'database'" class="space-y-2">
+            <div v-if="typeRules.showsPhp" class="space-y-2">
               <Label for="php">PHP Version</Label>
               <Select
                 :model-value="values.php"
@@ -484,7 +494,7 @@ onMounted(fetchOptions);
               </Select>
             </div>
 
-            <div class="space-y-2">
+            <div v-if="typeRules.showsDatabase" class="space-y-2">
               <Label for="database">Database</Label>
               <Select
                 :model-value="values.database"
@@ -505,6 +515,13 @@ onMounted(fetchOptions);
                 </SelectContent>
               </Select>
             </div>
+
+            <p
+              v-if="!typeRules.showsPhp && !typeRules.showsDatabase"
+              class="col-span-full text-sm text-muted-foreground"
+            >
+              {{ typeRules.description }}
+            </p>
           </div>
 
           <Separator />
