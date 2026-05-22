@@ -39,7 +39,10 @@ const name = ref("");
 const engine = ref<DockerDatabaseEngine>("postgres");
 const version = ref<string>("");
 const exposeExternalPort = ref(false);
-const externalPort = ref<number | null>(null);
+// Input v-model accepts string | number | undefined, not null — keep
+// the unset state as undefined so the type lines up with the form
+// control's accepted shape.
+const externalPort = ref<number | undefined>(undefined);
 const isSubmitting = ref(false);
 
 const versionsForEngine = computed(() => catalogue.value[engine.value] ?? []);
@@ -61,7 +64,7 @@ const portSuggestions: Record<DockerDatabaseEngine, number> = {
 };
 
 watch(exposeExternalPort, (on) => {
-  if (on && externalPort.value === null) {
+  if (on && externalPort.value === undefined) {
     externalPort.value = portSuggestions[engine.value];
   }
 });
@@ -75,7 +78,7 @@ watch(isOpen, (open) => {
     engine.value = "postgres";
     version.value = catalogue.value.postgres?.[0] ?? "";
     exposeExternalPort.value = false;
-    externalPort.value = null;
+    externalPort.value = undefined;
   }
 });
 

@@ -61,8 +61,10 @@ const save = async () => {
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
   // Light validation — host:container with optional protocol suffix.
+  // The regex lives in useDockerHelpers so a unit test pins the
+  // accepted forms — see tests/composables/useDockerHelpers.test.ts.
   for (const p of ports) {
-    if (!/^\d+:\d+(\/(tcp|udp))?$/.test(p)) {
+    if (!isValidPortMapping(p)) {
       toast.error(`"${p}" doesn't look like host:container`);
       return;
     }

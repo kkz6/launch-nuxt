@@ -37,6 +37,7 @@ type SubTabId = (typeof SUBTABS)[number]["value"];
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   deployments: true,
+  logs: true,
 };
 
 const validIds = SUBTABS.map((s) => s.value);
@@ -179,6 +180,8 @@ const statusBadge = computed(() => {
       v-else-if="subTab === 'deployments'"
       :compose="compose"
     />
+
+    <ComposeLogs v-else-if="subTab === 'logs'" :compose="compose" />
 
     <ServerDockerComingSoon
       v-else-if="!READY_SUBTABS[subTab]"

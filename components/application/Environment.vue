@@ -113,35 +113,15 @@ const removeVar = async (v: DockerEnvVar) => {
   }
 };
 
-// Parse a pasted .env body. Tolerates blank lines, `#` comments, and
-// `export FOO=bar` prefixes which people sometimes paste from shell
-// init files. Skips lines that don't look like KEY=VALUE rather than
-// erroring out — the explicit count in the toast tells the user.
-const parseDotEnv = (text: string): CreateDockerEnvVarData[] => {
-  const out: CreateDockerEnvVarData[] = [];
-  for (const rawLine of text.split(/\r?\n/)) {
-    let line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    if (line.startsWith("export ")) line = line.slice("export ".length).trim();
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
-    let value = line.slice(eq + 1);
-    // Strip surrounding quotes if both ends match.
-    if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
-    ) {
-      value = value.slice(1, -1);
-    }
-    out.push({ key, value, is_secret: false });
-  }
-  return out;
-};
+// parseDotEnv is extracted to useDockerHelpers for unit testing — see
+// tests/composables/useDockerHelpers.test.ts for the supported edge
+// cases. is_secret=false is the safe default; users mark a row secret
+// explicitly with the per-row eye toggle.
+const parseDotEnvForApi = (text: string): CreateDockerEnvVarData[] =>
+  parseDotEnv(text).map(({ key, value }) => ({ key, value, is_secret: false }));
 
 const submitBulk = async () => {
-  const parsed = parseDotEnv(bulkText.value);
+  const parsed = parseDotEnvForApi(bulkText.value);
   if (parsed.length === 0) {
     toast.error("No valid KEY=VALUE lines found");
     return;
