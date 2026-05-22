@@ -178,6 +178,41 @@ export interface UpdateDockerVolumeData {
   host_path?: string;
 }
 
+// ---- Schedules + advanced -------------------------------------------------
+
+export interface DockerSchedule {
+  id: string;
+  application_id: string;
+  cron: string;
+  command: string;
+  last_run_at?: string | null;
+  last_status?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerScheduleData {
+  cron: string;
+  command: string;
+}
+
+export interface UpdateDockerScheduleData {
+  cron?: string;
+  command?: string;
+}
+
+/**
+ * Advanced runtime knobs. All optional; present keys go to
+ * build_config and apply on the next deploy. Empty strings clear.
+ */
+export interface UpdateDockerAdvancedData {
+  cpu_limit?: string;
+  memory_limit?: string;
+  restart_policy?: "no" | "on-failure" | "always" | "unless-stopped";
+  healthcheck_command?: string;
+  extra_ports?: string[];
+}
+
 // ---- Host diagnostic types ------------------------------------------------
 
 /** Output of `docker ps -a --format '{{json .}}'`. */
@@ -587,6 +622,68 @@ export const dockerService = {
       const { delete: del } = useApi();
       return del(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/volumes/${volumeId}`,
+      );
+    },
+
+    // schedules
+    listSchedules: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerSchedule[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/schedules`,
+      );
+    },
+    createSchedule: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: CreateDockerScheduleData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerSchedule>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/schedules`,
+        data,
+      );
+    },
+    updateSchedule: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      scheduleId: string,
+      data: UpdateDockerScheduleData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerSchedule>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/schedules/${scheduleId}`,
+        data,
+      );
+    },
+    deleteSchedule: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      scheduleId: string,
+    ) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/schedules/${scheduleId}`,
+      );
+    },
+
+    // advanced runtime knobs
+    updateAdvanced: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: UpdateDockerAdvancedData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerApplication>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/advanced`,
+        data,
       );
     },
   },
