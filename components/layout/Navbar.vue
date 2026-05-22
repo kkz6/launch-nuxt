@@ -139,7 +139,11 @@ const updateServerIndicator = () => {
     serverIndicatorWidth.value = 0;
     return;
   }
-  const currentTab = (route.query.tab as string) || 'sites';
+  // Default to whichever tab the active server type lists first. Docker
+  // servers default to "projects", load-balancers to "upstreams", PHP to
+  // "sites" — driven entirely by useServerTypeRules.
+  const defaultTab = serverDetailTabs.value[0]?.value ?? 'sites';
+  const currentTab = (route.query.tab as string) || defaultTab;
   if (serverTabRefs.value.has(currentTab)) {
     const tabEl = serverTabRefs.value.get(currentTab);
     if (tabEl && serverNavRef.value) {
@@ -225,68 +229,34 @@ watch([() => route.path, () => route.query.tab, () => route.query.subtab], () =>
 }, { immediate: true });
 
 
-// Server detail tabs (conditionally show upstreams for load balancer servers)
+// Server detail tabs — driven by useServerTypeRules so adding a new server
+// type doesn't require touching this file. Keeps the loadbalancer/docker
+// branches out of the navbar render path. The "isLoadBalancerServer"
+// derived ref is kept for the advanced sub-tabs block below, which still
+// filters by type until that block is similarly composable-driven.
 const isLoadBalancerServer = computed(() => serverType.value === 'loadbalancer');
+const isDockerServer = computed(() => serverType.value === 'docker');
 
-const serverDetailTabs = computed(() => {
-  const baseTabs: { value: string; label: string; query: string; icon: string }[] = [];
+const serverDetailTabs = computed(() => getServerTypeRules(serverType.value).tabs);
 
-  if (isLoadBalancerServer.value) {
-    baseTabs.push(
-      { value: "upstreams", label: "Upstreams", query: "upstreams", icon: "lucide:git-fork" },
-    );
-  } else {
-    baseTabs.push(
-      { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
-    );
-  }
-
-  baseTabs.push(
-    { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
-  );
-
-  if (!isLoadBalancerServer.value) {
-    baseTabs.push(
-      { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
-    );
-  }
-
-  baseTabs.push(
-    { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
-    { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
-    { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
-    { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
-  );
-
-  return baseTabs;
-});
-
-// Advanced sub-tabs (second level) - filtered by server type
+// Advanced sub-tabs (second level) - filtered by server type.
+// - Load balancers: no backups (no app data) and no packages tab (the host
+//   stack is minimal Caddy).
+// - Docker servers: same exclusions. Backups belong inside individual
+//   docker workloads, not the host. Packages aren't user-managed.
 const advancedSubTabs = computed(() => {
+  const isHostManaged = !isLoadBalancerServer.value && !isDockerServer.value;
   const tabs = [
     { value: "general", label: "General", query: "general", icon: "lucide:info" },
   ];
-
-  if (!isLoadBalancerServer.value) {
-    tabs.push(
-      { value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" },
-    );
+  if (isHostManaged) {
+    tabs.push({ value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" });
   }
-
-  tabs.push(
-    { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: "lucide:key" },
-  );
-
-  if (!isLoadBalancerServer.value) {
-    tabs.push(
-      { value: "packages", label: "Packages", query: "packages", icon: "lucide:package" },
-    );
+  tabs.push({ value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: "lucide:key" });
+  if (isHostManaged) {
+    tabs.push({ value: "packages", label: "Packages", query: "packages", icon: "lucide:package" });
   }
-
-  tabs.push(
-    { value: "services", label: "Services", query: "services", icon: "lucide:cog" },
-  );
-
+  tabs.push({ value: "services", label: "Services", query: "services", icon: "lucide:cog" });
   return tabs;
 });
 

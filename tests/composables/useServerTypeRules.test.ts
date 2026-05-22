@@ -150,3 +150,41 @@ describe("getProviderIcon", () => {
     expect(getProviderIcon(undefined)).toBe("lucide:cloud");
   });
 });
+
+describe("tabs per server type", () => {
+  it("docker servers default to Projects and don't carry Sites/Databases/Daemons", () => {
+    // Driving tabs from the composable is what stops Navbar.vue from
+    // showing the PHP-stack tabs on a docker server. Lock the docker tab
+    // set so a refactor doesn't silently regress.
+    const tabs = getServerTypeRules("docker").tabs.map((t) => t.value);
+    expect(tabs[0]).toBe("projects");
+    expect(tabs).toContain("containers");
+    expect(tabs).toContain("traefik");
+    expect(tabs).not.toContain("sites");
+    expect(tabs).not.toContain("databases");
+    expect(tabs).not.toContain("daemons");
+  });
+
+  it("php servers default to Sites and include Databases", () => {
+    const tabs = getServerTypeRules("php").tabs.map((t) => t.value);
+    expect(tabs[0]).toBe("sites");
+    expect(tabs).toContain("databases");
+  });
+
+  it("loadbalancer defaults to Upstreams and skips Sites/Databases", () => {
+    const tabs = getServerTypeRules("loadbalancer").tabs.map((t) => t.value);
+    expect(tabs[0]).toBe("upstreams");
+    expect(tabs).not.toContain("sites");
+    expect(tabs).not.toContain("databases");
+  });
+
+  it("every server type carries Advanced as its final tab", () => {
+    // Advanced is the catch-all for things that don't belong in a primary
+    // tab. If a refactor drops it from any type's list, settings become
+    // unreachable in the navbar.
+    for (const type of ["php", "database", "loadbalancer", "docker"]) {
+      const tabs = getServerTypeRules(type).tabs;
+      expect(tabs[tabs.length - 1].value).toBe("advanced");
+    }
+  });
+});

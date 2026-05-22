@@ -17,7 +17,12 @@ const sites = ref<Site[]>([]);
 const isLoading = ref(true);
 const isSitesLoading = ref(true);
 
-const isLoadBalancer = computed(() => server.value?.type === 'loadbalancer');
+// Sites only exist for PHP-style servers. Load-balancers route via
+// upstreams; docker servers expose Projects/Applications instead. The
+// site-event refetch logic below short-circuits when sites aren't relevant.
+const hasSitesTab = computed(
+  () => server.value?.type !== 'loadbalancer' && server.value?.type !== 'docker',
+);
 
 // Shared terminal state with navbar
 const isTerminalOpen = useState('serverTerminalOpen', () => false);
@@ -36,7 +41,7 @@ const debouncedFetchSites = () => {
 
 // Subscribe to real-time site events
 useSiteEvents(teamId, (data) => {
-  if (isLoadBalancer.value) return;
+  if (!hasSitesTab.value) return;
   const eventServerId = data.server_id || data.site?.server_id;
   if (eventServerId === serverId.value) {
     debouncedFetchSites();
@@ -45,7 +50,7 @@ useSiteEvents(teamId, (data) => {
 
 // Subscribe to real-time deployment events
 useDeploymentEvents(teamId, (data) => {
-  if (isLoadBalancer.value) return;
+  if (!hasSitesTab.value) return;
   const siteExists = sites.value.some(site => site.id === data.site_id);
   const eventServerId = data.site?.server_id;
   if (siteExists || eventServerId === serverId.value) {
@@ -56,19 +61,31 @@ useDeploymentEvents(teamId, (data) => {
 // Watch for refresh trigger from navbar (e.g., after site creation)
 const sitesRefreshKey = useState('sitesRefreshKey', () => 0);
 watch(sitesRefreshKey, () => {
-  if (!isLoadBalancer.value) {
+  if (hasSitesTab.value) {
     fetchSites();
   }
 });
 
-// Valid tab values
-const validTabs = ["sites", "upstreams", "metrics", "databases", "networks", "daemons", "schedulers", "advanced"];
+// Tab validation is driven by the per-server-type rules. The set of valid
+// tabs differs between PHP / load-balancer / docker — single source of
+// truth is useServerTypeRules so this page never drifts from the Navbar.
 const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services"];
 
-// Get initial tab from query params or default based on server type
+const allValidTabs = computed(() =>
+  getServerTypeRules(server.value?.type).tabs.map((t) => t.value),
+);
+
+const defaultTab = computed(
+  () => getServerTypeRules(server.value?.type).tabs[0]?.value ?? "sites",
+);
+
 const getInitialTab = () => {
   const tabFromQuery = route.query.tab as string;
-  return validTabs.includes(tabFromQuery) ? tabFromQuery : "sites";
+  // Until the server type has loaded we accept any non-empty query value
+  // (will be re-validated below once the server data arrives). Falling back
+  // to a hardcoded "sites" used to break first-paint on docker servers.
+  if (!tabFromQuery) return defaultTab.value;
+  return tabFromQuery;
 };
 
 const activeTab = ref(getInitialTab());
@@ -86,12 +103,24 @@ watch(activeTab, (newTab) => {
   });
 });
 
-// Watch for tab changes from URL (navbar navigation)
+// Watch for tab changes from URL (navbar navigation).
 watch(() => route.query.tab, (newTab) => {
-  if (newTab && validTabs.includes(newTab as string)) {
+  if (newTab && allValidTabs.value.includes(newTab as string)) {
     activeTab.value = newTab as string;
   }
 });
+
+// Once we know the server type, snap to that type's default tab if the
+// current activeTab isn't valid for it (e.g. user landed on /?tab=sites
+// for a docker server, where "sites" isn't a valid tab).
+watch(
+  () => server.value?.type,
+  () => {
+    if (!allValidTabs.value.includes(activeTab.value)) {
+      activeTab.value = defaultTab.value;
+    }
+  },
+);
 
 const fetchSites = async () => {
   try {
@@ -113,17 +142,20 @@ onMounted(async () => {
       server.value = cached;
       useHead({ title: server.value.name || "Server" });
 
-      if (server.value.type === 'loadbalancer' && !route.query.tab) {
-        activeTab.value = 'upstreams';
+      if (!route.query.tab) {
+        activeTab.value = defaultTab.value;
       }
 
       isLoading.value = false;
 
-      // Fetch fresh data and sites in parallel in background
+      // Fetch fresh data and sites in parallel in background. Only PHP-type
+      // servers have sites — load-balancers route via upstreams, docker
+      // servers don't have "sites" at all (they have projects).
+      const hasSites = server.value.type !== 'loadbalancer' && server.value.type !== 'docker';
       const promises: Promise<void>[] = [
         serverService.get(serverId.value).then(res => { server.value = res.data; }),
       ];
-      if (server.value.type !== 'loadbalancer') {
+      if (hasSites) {
         promises.push(serverService.sites.list(serverId.value).then(res => { sites.value = res.data; isSitesLoading.value = false; }));
       } else {
         isSitesLoading.value = false;
@@ -135,14 +167,15 @@ onMounted(async () => {
       server.value = serverData.data;
       useHead({ title: server.value?.name || "Server" });
 
-      if (server.value?.type === 'loadbalancer' && !route.query.tab) {
-        activeTab.value = 'upstreams';
+      if (!route.query.tab) {
+        activeTab.value = defaultTab.value;
       }
 
       isLoading.value = false;
 
-      // Fetch sites after showing the page
-      if (server.value?.type !== 'loadbalancer') {
+      // See comment above on which server types have "sites".
+      const hasSites = server.value?.type !== 'loadbalancer' && server.value?.type !== 'docker';
+      if (hasSites) {
         const sitesData = await serverService.sites.list(serverId.value);
         sites.value = sitesData.data;
       }
@@ -190,6 +223,40 @@ onMounted(async () => {
 
     <div v-else-if="activeTab === 'schedulers'">
       <ServerShowSchedulers :server="server" />
+    </div>
+
+    <!--
+      Docker-server tabs. Containers/Volumes/Traefik render placeholder
+      empty states for now — see phase 1 in
+      docs/plans/2026-05-22-docker-server-menus-design.md. The Projects tab
+      is fully wired (create/list/delete).
+    -->
+    <div v-else-if="activeTab === 'projects'">
+      <ServerDockerProjects :server="server" />
+    </div>
+
+    <div v-else-if="activeTab === 'containers'">
+      <ServerDockerComingSoon
+        title="Containers"
+        description="View and manage every container running on this server."
+        icon="lucide:container"
+      />
+    </div>
+
+    <div v-else-if="activeTab === 'volumes'">
+      <ServerDockerComingSoon
+        title="Volumes"
+        description="Browse Docker volumes attached to this host."
+        icon="lucide:hard-drive"
+      />
+    </div>
+
+    <div v-else-if="activeTab === 'traefik'">
+      <ServerDockerComingSoon
+        title="Traefik"
+        description="Live Traefik configuration and dashboard."
+        icon="simple-icons:traefikproxy"
+      />
     </div>
 
     <div v-else-if="activeTab === 'advanced'">
