@@ -129,11 +129,7 @@ onMounted(fetchData);
     </div>
 
     <div v-else-if="activeTab === 'databases'">
-      <ServerDockerComingSoon
-        title="Databases"
-        description="Spin up managed Postgres, MySQL, MariaDB, Redis, or Mongo containers."
-        icon="lucide:database"
-      />
+      <ProjectDatabases :server-id="serverId" :project-id="projectId" />
     </div>
 
     <div v-else-if="activeTab === 'settings'">

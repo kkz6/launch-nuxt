@@ -159,6 +159,50 @@ export interface UpdateDockerComposeData {
   name?: string;
 }
 
+// ---- Managed databases ----------------------------------------------------
+
+export type DockerDatabaseEngine =
+  | "postgres"
+  | "mysql"
+  | "mariadb"
+  | "redis"
+  | "mongo";
+
+export interface DockerDatabaseCredentials {
+  username: string;
+  password: string;
+  database: string;
+}
+
+export interface DockerDatabase {
+  id: string;
+  team_id: string;
+  server_id: string;
+  project_id: string;
+  name: string;
+  engine: DockerDatabaseEngine;
+  engine_version: string;
+  image_tag?: string | null;
+  external_port?: number | null;
+  status: DockerApplicationStatus;
+  /** Present only on get-with-reveal responses. */
+  credentials?: DockerDatabaseCredentials | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerDatabaseData {
+  name: string;
+  engine: DockerDatabaseEngine;
+  version?: string;
+  external_port?: number;
+}
+
+export type DockerDatabaseLifecycleAction = "start" | "stop" | "restart";
+
+/** Engine catalogue returned by /api/docker/databases/engines. */
+export type DockerDatabaseEngineCatalogue = Record<DockerDatabaseEngine, string[]>;
+
 /**
  * Deployment history row for an application or compose stack.
  * target_type discriminates which workload it belongs to; the UI on a
@@ -394,6 +438,72 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerDeployment[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments`,
+      );
+    },
+  },
+
+  databases: {
+    engineCatalogue: () => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDatabaseEngineCatalogue>>(
+        "/docker/databases/engines",
+      );
+    },
+
+    list: (serverId: string, projectId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDatabase[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases`,
+      );
+    },
+
+    /**
+     * Get a database. Pass reveal=true to include the auto-generated
+     * password in the response — the UI shows a deliberate "show
+     * credentials" button so this only happens on explicit intent.
+     */
+    get: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+      opts: { reveal?: boolean } = {},
+    ) => {
+      const { get } = useApi();
+      const query = opts.reveal ? "?reveal=true" : "";
+      return get<ApiResponse<DockerDatabase>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}${query}`,
+      );
+    },
+
+    create: (
+      serverId: string,
+      projectId: string,
+      data: CreateDockerDatabaseData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDatabase>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases`,
+        data,
+      );
+    },
+
+    delete: (serverId: string, projectId: string, databaseId: string) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}`,
+      );
+    },
+
+    lifecycle: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+      action: DockerDatabaseLifecycleAction,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDatabase>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/lifecycle`,
+        { action },
       );
     },
   },
