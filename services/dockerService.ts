@@ -98,6 +98,36 @@ export interface UpdateDockerApplicationData {
 }
 
 /**
+ * Deployment history row for an application or compose stack.
+ * target_type discriminates which workload it belongs to; the UI on a
+ * specific workload already knows the target so we don't render the
+ * field, but the backend persists it (slice 2i will reuse the same
+ * shape for compose deployments).
+ */
+export interface DockerDeployment {
+  id: string;
+  team_id: string;
+  server_id: string;
+  target_type: "application" | "compose";
+  target_id: string;
+  status:
+    | "pending"
+    | "building"
+    | "deploying"
+    | "success"
+    | "failed"
+    | "cancelled";
+  commit_sha?: string | null;
+  commit_msg?: string | null;
+  image_ref?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
  * dockerService groups every API call under /api/servers/:serverId/docker/.
  * Mirrors serverService.ts for consistency — every method takes the
  * server ID first so the routing parent is always explicit at the call site.
@@ -182,6 +212,21 @@ export const dockerService = {
       const { delete: del } = useApi();
       return del(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}`,
+      );
+    },
+
+    deploy: (serverId: string, projectId: string, applicationId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDeployment>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deploy`,
+        {},
+      );
+    },
+
+    listDeployments: (serverId: string, projectId: string, applicationId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDeployment[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deployments`,
       );
     },
   },
