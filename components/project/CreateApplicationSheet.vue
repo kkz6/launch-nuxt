@@ -29,6 +29,10 @@ const isOpen = computed({
 // kind of surprise that breeds bugs.
 const sourceType = ref<DockerSourceType>("image");
 const name = ref("");
+// Internal port — what the container listens on inside docker. Traefik
+// routes here. Default 80 covers most images; user overrides for non-
+// standard images (Node on 3000, Go on 8080, etc.).
+const internalPort = ref<number>(80);
 
 const imageRef = ref(""); // for source_type=image
 const gitRepo = ref(""); // for git
@@ -43,6 +47,7 @@ watch(isOpen, (open) => {
   if (open) {
     sourceType.value = "image";
     name.value = "";
+    internalPort.value = 80;
     imageRef.value = "";
     gitRepo.value = "";
     gitBranch.value = "main";
@@ -59,9 +64,16 @@ const submit = async () => {
     return;
   }
 
+  const port = Number(internalPort.value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    toast.error("Internal port must be between 1 and 65535");
+    return;
+  }
+
   const payload: CreateDockerApplicationData = {
     name: trimmedName,
     source_type: sourceType.value,
+    internal_port: port,
   };
 
   switch (sourceType.value) {
@@ -139,15 +151,31 @@ const submit = async () => {
       </DialogHeader>
 
       <form class="space-y-4" @submit.prevent="submit">
-        <div class="space-y-2">
-          <Label for="app-name">Name</Label>
-          <Input
-            id="app-name"
-            v-model="name"
-            placeholder="e.g. api, web, worker"
-            autocomplete="off"
-            required
-          />
+        <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-2">
+            <Label for="app-name">Name</Label>
+            <Input
+              id="app-name"
+              v-model="name"
+              placeholder="e.g. api, web, worker"
+              autocomplete="off"
+              required
+            />
+          </div>
+          <div class="space-y-2">
+            <Label for="app-port">Internal port</Label>
+            <Input
+              id="app-port"
+              v-model.number="internalPort"
+              type="number"
+              min="1"
+              max="65535"
+              required
+            />
+            <p class="text-xs text-muted-foreground">
+              What your container listens on internally.
+            </p>
+          </div>
         </div>
 
         <div class="space-y-2">

@@ -77,6 +77,8 @@ export interface DockerApplication {
 export interface CreateDockerApplicationData {
   name: string;
   source_type: DockerSourceType;
+  /** Container's internal port. Defaults to 80 server-side. */
+  internal_port?: number;
   image?: {
     image: string;
     registry_credential_id?: string;
@@ -95,6 +97,28 @@ export interface CreateDockerApplicationData {
 
 export interface UpdateDockerApplicationData {
   name?: string;
+}
+
+export interface DockerDomain {
+  id: string;
+  application_id: string;
+  host: string;
+  path?: string | null;
+  https: boolean;
+  certificate_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerDomainData {
+  host: string;
+  path?: string;
+  https?: boolean;
+}
+
+export interface UpdateDockerDomainData {
+  https?: boolean;
+  path?: string;
 }
 
 /**
@@ -227,6 +251,52 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerDeployment[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deployments`,
+      );
+    },
+
+    listDomains: (serverId: string, projectId: string, applicationId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDomain[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains`,
+      );
+    },
+
+    createDomain: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: CreateDockerDomainData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDomain>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains`,
+        data,
+      );
+    },
+
+    updateDomain: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      domainId: string,
+      data: UpdateDockerDomainData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerDomain>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}`,
+        data,
+      );
+    },
+
+    deleteDomain: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      domainId: string,
+    ) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}`,
       );
     },
   },

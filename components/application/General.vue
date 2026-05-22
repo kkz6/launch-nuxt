@@ -115,6 +115,12 @@ const dockerfilePath = computed(
           </dt>
           <dd class="font-medium capitalize">{{ application.source_type }}</dd>
         </div>
+        <div class="space-y-1">
+          <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+            Internal port
+          </dt>
+          <dd class="font-mono text-sm">{{ application.internal_port }}</dd>
+        </div>
 
         <template v-if="application.source_type === 'image'">
           <div class="space-y-1 sm:col-span-2">
