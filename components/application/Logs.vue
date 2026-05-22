@@ -2,8 +2,19 @@
 import { toast } from "vue-sonner";
 import type { DockerApplication } from "~/services/dockerService";
 
+/**
+ * Container-style log stream. Default is application mode; we expose
+ * the target via props so the same component drives the database
+ * subtab and (with composeId set) the compose subtab.
+ */
 interface Props {
-  application: DockerApplication;
+  application?: DockerApplication;
+  /** Override target. When absent we use props.application.id. */
+  applicationId?: string;
+  databaseId?: string;
+  composeId?: string;
+  /** Friendly empty-state copy when the container hasn't started. */
+  emptyStateMessage?: string;
 }
 const props = defineProps<Props>();
 
@@ -28,20 +39,35 @@ const { getCurrentTeamId } = useApi();
 const connect = async () => {
   disconnect();
 
-  // No container yet → no stream. The backend handler will send a
-  // `no_container` event but we should also short-circuit on the client
-  // so the user sees a useful empty state instead of "connected" with
-  // nothing flowing.
-  if (!props.application.container_id) {
-    return;
+  // Decide which target to stream from. Caller passes one of:
+  //   - props.application (the original application-mode shape)
+  //   - props.databaseId / props.composeId for the new modes.
+  // We send the same /docker/applications/logs endpoint with the right
+  // query param — the backend dispatches on which ID is present.
+  let targetParam: { name: string; value: string } | null = null;
+  if (props.databaseId) {
+    targetParam = { name: "databaseId", value: props.databaseId };
+  } else if (props.composeId) {
+    targetParam = { name: "composeId", value: props.composeId };
+  } else if (props.applicationId) {
+    targetParam = { name: "applicationId", value: props.applicationId };
+  } else if (props.application) {
+    // Backwards-compatible default: connect to the application unless
+    // it hasn't deployed yet, in which case fall back to the empty
+    // state (the WS would send `no_container` anyway).
+    if (!props.application.container_id) {
+      return;
+    }
+    targetParam = { name: "applicationId", value: props.application.id };
   }
+  if (!targetParam) return;
 
   isConnecting.value = true;
   await waitForAuth();
 
   const teamId = getCurrentTeamId();
   const params = new URLSearchParams({
-    applicationId: props.application.id,
+    [targetParam.name]: targetParam.value,
     tail: "200",
     token: token.value || "",
   });
@@ -132,11 +158,11 @@ const onScroll = () => {
     el.scrollHeight - el.scrollTop - el.clientHeight < 40;
 };
 
-// Reconnect when the application's container_id changes (a fresh deploy
-// flipped the running container). Watch container_id specifically rather
-// than the whole object so a name rename doesn't reset the stream.
+// Reconnect when the application's container_id changes (a fresh
+// deploy flipped the running container). Only meaningful for
+// application mode — database/compose targets identify by stable IDs.
 watch(
-  () => props.application.container_id,
+  () => props.application?.container_id,
   () => {
     void connect();
   },
@@ -206,14 +232,16 @@ onBeforeUnmount(disconnect);
     </div>
 
     <div
-      v-if="!application.container_id"
+      v-if="application && !application.container_id"
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:scroll" class="h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium">No logs yet</h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Deploy the application first; logs start streaming once a
-        container is running.
+        {{
+          emptyStateMessage ||
+          "Deploy the application first; logs start streaming once a container is running."
+        }}
       </p>
     </div>
 

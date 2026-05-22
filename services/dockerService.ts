@@ -59,6 +59,8 @@ export interface DockerApplication {
   server_id: string;
   project_id: string;
   name: string;
+  /** Port the container listens on internally (Traefik routes here). */
+  internal_port: number;
   source_type: DockerSourceType;
   source_config?: Record<string, unknown> | null;
   build_type?: string | null;
