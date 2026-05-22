@@ -121,6 +121,44 @@ export interface UpdateDockerDomainData {
   path?: string;
 }
 
+// ---- Compose stacks -------------------------------------------------------
+
+export type DockerComposeSourceType = "git" | "raw_yaml";
+
+export interface DockerCompose {
+  id: string;
+  team_id: string;
+  server_id: string;
+  project_id: string;
+  name: string;
+  compose_source_type: DockerComposeSourceType;
+  source_config?: Record<string, unknown> | null;
+  compose_file_path?: string | null;
+  raw_yaml?: string | null;
+  status: DockerApplicationStatus;
+  last_deployed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerComposeData {
+  name: string;
+  compose_source_type: DockerComposeSourceType;
+  git?: {
+    repo: string;
+    branch: string;
+    source_control_id?: string;
+    compose_file_path?: string;
+  };
+  raw_yaml?: {
+    contents: string;
+  };
+}
+
+export interface UpdateDockerComposeData {
+  name?: string;
+}
+
 /**
  * Deployment history row for an application or compose stack.
  * target_type discriminates which workload it belongs to; the UI on a
@@ -297,6 +335,65 @@ export const dockerService = {
       const { delete: del } = useApi();
       return del(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}`,
+      );
+    },
+  },
+
+  composes: {
+    list: (serverId: string, projectId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerCompose[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes`,
+      );
+    },
+
+    get: (serverId: string, projectId: string, composeId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerCompose>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}`,
+      );
+    },
+
+    create: (serverId: string, projectId: string, data: CreateDockerComposeData) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerCompose>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes`,
+        data,
+      );
+    },
+
+    update: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      data: UpdateDockerComposeData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerCompose>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}`,
+        data,
+      );
+    },
+
+    delete: (serverId: string, projectId: string, composeId: string) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}`,
+      );
+    },
+
+    deploy: (serverId: string, projectId: string, composeId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDeployment>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deploy`,
+        {},
+      );
+    },
+
+    listDeployments: (serverId: string, projectId: string, composeId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDeployment[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments`,
       );
     },
   },
