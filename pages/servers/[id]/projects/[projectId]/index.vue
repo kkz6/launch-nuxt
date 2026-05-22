@@ -121,11 +121,7 @@ onMounted(fetchData);
     </div>
 
     <div v-else-if="activeTab === 'applications'">
-      <ServerDockerComingSoon
-        title="Applications"
-        description="Deploy single-container apps from a git repository, Dockerfile, or image."
-        icon="lucide:box"
-      />
+      <ProjectApplications :server-id="serverId" :project-id="projectId" />
     </div>
 
     <div v-else-if="activeTab === 'compose'">
