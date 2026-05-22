@@ -316,6 +316,68 @@ export const useServerEvents = (
 }
 
 /**
+ * Composable to subscribe to docker application lifecycle events.
+ *
+ * Events fire on the team channel. The handler must filter by
+ * application_id (or project_id) since multiple apps' events arrive on
+ * the same channel.
+ *
+ * Events:
+ * - docker.application.created
+ * - docker.application.updated
+ * - docker.application.deleted
+ * - docker.application.deploying  (deploy job started)
+ * - docker.application.deployed   (deploy succeeded, container running)
+ * - docker.application.failed     (deploy failed)
+ */
+export const useDockerApplicationEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    [
+      'docker.application.created',
+      'docker.application.updated',
+      'docker.application.deleted',
+      'docker.application.deploying',
+      'docker.application.deployed',
+      'docker.application.failed',
+    ],
+    onEvent,
+  )
+}
+
+/**
+ * Composable to subscribe to docker project lifecycle events.
+ *
+ * Events:
+ * - docker.project.created
+ * - docker.project.updated
+ * - docker.project.deleted
+ */
+export const useDockerProjectEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    [
+      'docker.project.created',
+      'docker.project.updated',
+      'docker.project.deleted',
+    ],
+    onEvent,
+  )
+}
+
+/**
  * Composable to subscribe to load balancer upstream and backend events
  *
  * @param teamId - The team ID

@@ -42,6 +42,28 @@ watch(subTab, (v) => {
   router.replace({ query: { ...route.query, subtab: v } });
 });
 
+// Header-level "Deploy" button. Flip subtab to Deployments after kick-off
+// so the user lands on the live history table.
+const isDeploying = ref(false);
+const quickDeploy = async () => {
+  if (!app.value) return;
+  isDeploying.value = true;
+  try {
+    await dockerService.applications.deploy(
+      app.value.server_id,
+      app.value.project_id,
+      app.value.id,
+    );
+    subTab.value = "deployments";
+    toast.success("Deployment started");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to start deployment");
+  } finally {
+    isDeploying.value = false;
+  }
+};
+
 // Reload from the route — keeps the back-button working when navigating
 // between sibling applications.
 const fetchApp = async () => {
@@ -66,11 +88,33 @@ const fetchApp = async () => {
 
 onMounted(fetchApp);
 
-// Subtabs that have a real implementation in phase 2a. The rest still
-// render the ComingSoon placeholder until later slices fill them in.
+// Subtabs that have a real implementation in phase 2b/2c. The rest
+// still render the ComingSoon placeholder until later slices fill them
+// in. Bump entries as each subtab goes live so the routing here stays
+// a single source of truth.
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
+  deployments: true,
 };
+
+// Refetch the application when WS events tell us its status changed —
+// the header status badge stays accurate without a manual refresh.
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+
+useDockerApplicationEvents(teamId, (data) => {
+  if (data.application_id !== applicationId.value) return;
+  // Status fields live on the application row; the Deployments tab
+  // owns deployment-history refetches.
+  if (
+    data.status === "running" ||
+    data.status === "failed" ||
+    data.status === "building" ||
+    data.status === "stopped"
+  ) {
+    void fetchApp();
+  }
+});
 </script>
 
 <template>
@@ -87,7 +131,7 @@ const READY_SUBTABS: Record<string, boolean> = {
       Back to project
     </NuxtLink>
 
-    <div class="flex items-start justify-between">
+    <div class="flex items-start justify-between gap-4">
       <div>
         <div class="flex items-center gap-3">
           <h1 class="text-3xl font-semibold">{{ app.name }}</h1>
@@ -111,6 +155,19 @@ const READY_SUBTABS: Record<string, boolean> = {
           Source: {{ app.source_type }}
         </p>
       </div>
+
+      <Button
+        :disabled="app.status === 'building' || isDeploying"
+        @click="quickDeploy"
+      >
+        <Icon
+          v-if="isDeploying || app.status === 'building'"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        <Icon v-else name="lucide:rocket" class="mr-2 h-4 w-4" />
+        {{ app.last_deployed_at ? "Redeploy" : "Deploy" }}
+      </Button>
     </div>
 
     <div class="flex flex-wrap gap-4 border-b">
@@ -134,6 +191,11 @@ const READY_SUBTABS: Record<string, boolean> = {
       v-if="subTab === 'general'"
       :application="app"
       @updated="fetchApp"
+    />
+
+    <ApplicationDeployments
+      v-else-if="subTab === 'deployments'"
+      :application="app"
     />
 
     <ServerDockerComingSoon
