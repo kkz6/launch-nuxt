@@ -125,11 +125,7 @@ onMounted(fetchData);
     </div>
 
     <div v-else-if="activeTab === 'compose'">
-      <ServerDockerComingSoon
-        title="Compose"
-        description="Deploy multi-container stacks from a docker-compose.yml file."
-        icon="lucide:layers"
-      />
+      <ProjectComposes :server-id="serverId" :project-id="projectId" />
     </div>
 
     <div v-else-if="activeTab === 'databases'">
