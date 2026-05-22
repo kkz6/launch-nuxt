@@ -97,6 +97,8 @@ const READY_SUBTABS: Record<string, boolean> = {
   deployments: true,
   domains: true,
   logs: true,
+  environment: true,
+  volumes: true,
 };
 
 // Refetch the application when WS events tell us its status changed —
@@ -204,6 +206,13 @@ useDockerApplicationEvents(teamId, (data) => {
       v-else-if="subTab === 'domains'"
       :application="app"
     />
+
+    <ApplicationEnvironment
+      v-else-if="subTab === 'environment'"
+      :application="app"
+    />
+
+    <ApplicationVolumes v-else-if="subTab === 'volumes'" :application="app" />
 
     <ApplicationLogs v-else-if="subTab === 'logs'" :application="app" />
 

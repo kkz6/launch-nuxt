@@ -121,6 +121,63 @@ export interface UpdateDockerDomainData {
   path?: string;
 }
 
+// ---- App env vars + volumes ----------------------------------------------
+
+export interface DockerEnvVar {
+  id: string;
+  application_id: string;
+  key: string;
+  /** Masked to "********" when is_secret=true on list endpoints. */
+  value: string;
+  is_secret: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerEnvVarData {
+  key: string;
+  value: string;
+  is_secret?: boolean;
+}
+
+export interface UpdateDockerEnvVarData {
+  value?: string;
+  is_secret?: boolean;
+}
+
+/**
+ * Replace-all body for the bulk save endpoint — backs the
+ * paste-a-.env workflow without per-line round-trips.
+ */
+export interface SetDockerEnvVarsData {
+  vars: CreateDockerEnvVarData[];
+}
+
+export type DockerVolumeType = "named" | "bind";
+
+export interface DockerVolume {
+  id: string;
+  application_id: string;
+  name: string;
+  mount_path: string;
+  type: DockerVolumeType;
+  host_path?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerVolumeData {
+  name: string;
+  mount_path: string;
+  type: DockerVolumeType;
+  host_path?: string;
+}
+
+export interface UpdateDockerVolumeData {
+  mount_path?: string;
+  host_path?: string;
+}
+
 // ---- Compose stacks -------------------------------------------------------
 
 export type DockerComposeSourceType = "git" | "raw_yaml";
@@ -379,6 +436,121 @@ export const dockerService = {
       const { delete: del } = useApi();
       return del(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}`,
+      );
+    },
+
+    // env vars
+    listEnvVars: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerEnvVar[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/env-vars`,
+      );
+    },
+
+    createEnvVar: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: CreateDockerEnvVarData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerEnvVar>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/env-vars`,
+        data,
+      );
+    },
+
+    setEnvVars: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: SetDockerEnvVarsData,
+    ) => {
+      const { put } = useApi();
+      return put<ApiResponse<DockerEnvVar[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/env-vars`,
+        data,
+      );
+    },
+
+    updateEnvVar: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      envVarId: string,
+      data: UpdateDockerEnvVarData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerEnvVar>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/env-vars/${envVarId}`,
+        data,
+      );
+    },
+
+    deleteEnvVar: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      envVarId: string,
+    ) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/env-vars/${envVarId}`,
+      );
+    },
+
+    // volumes
+    listVolumes: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerVolume[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/volumes`,
+      );
+    },
+
+    createVolume: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: CreateDockerVolumeData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerVolume>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/volumes`,
+        data,
+      );
+    },
+
+    updateVolume: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      volumeId: string,
+      data: UpdateDockerVolumeData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerVolume>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/volumes/${volumeId}`,
+        data,
+      );
+    },
+
+    deleteVolume: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      volumeId: string,
+    ) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/volumes/${volumeId}`,
       );
     },
   },
