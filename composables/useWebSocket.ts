@@ -23,6 +23,17 @@ const reconnectAttempts = ref(0)
 const maxReconnectAttempts = 10
 const baseReconnectDelay = 1000 // 1 second
 
+// Reference count per channel. Many components can call
+// subscribeToChannel('team.X') concurrently (the servers index page,
+// the provision-logs sheet, the navbar banner, etc.) — we must only
+// send the wire-level `subscribe` once, and only send `unsubscribe`
+// when the LAST local listener goes away. Without this refcount, the
+// first component to unmount would remove the client from the channel
+// at the hub, even though other components still wanted events. This
+// caused the "server.deleted event never arrives" symptom: 6 subscribes
+// + 2 unsubscribes within 30ms killed the team-channel subscription.
+const channelRefCounts = new Map<string, number>()
+
 export const useWebSocket = () => {
   const config = useRuntimeConfig()
   const { token, isInitialized, waitForAuth } = useAuth()
@@ -56,6 +67,17 @@ export const useWebSocket = () => {
       console.log('[WebSocket] Connected')
       isConnected.value = true
       reconnectAttempts.value = 0
+
+      // Re-send subscribe for every channel that still has live local
+      // listeners. Otherwise on reconnect (or after the API restarts),
+      // the hub-side subscription is gone and we silently stop getting
+      // events even though our components still expect them.
+      for (const channel of channelRefCounts.keys()) {
+        ws.value?.send(JSON.stringify({
+          action: 'subscribe',
+          channel,
+        }))
+      }
     }
 
     ws.value.onmessage = (e) => {
@@ -149,7 +171,10 @@ export const useWebSocket = () => {
   }
 
   const subscribeToChannel = (channel: string) => {
-    if (ws.value?.readyState === WebSocket.OPEN) {
+    const before = channelRefCounts.get(channel) ?? 0
+    channelRefCounts.set(channel, before + 1)
+    // Only send the wire-level subscribe on the first listener.
+    if (before === 0 && ws.value?.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({
         action: 'subscribe',
         channel,
@@ -158,11 +183,21 @@ export const useWebSocket = () => {
   }
 
   const unsubscribeFromChannel = (channel: string) => {
-    if (ws.value?.readyState === WebSocket.OPEN) {
-      ws.value.send(JSON.stringify({
-        action: 'unsubscribe',
-        channel,
-      }))
+    const before = channelRefCounts.get(channel) ?? 0
+    if (before <= 0) return
+    const after = before - 1
+    if (after === 0) {
+      channelRefCounts.delete(channel)
+      // Only send the wire-level unsubscribe when the last listener
+      // goes away. See the comment on channelRefCounts above.
+      if (ws.value?.readyState === WebSocket.OPEN) {
+        ws.value.send(JSON.stringify({
+          action: 'unsubscribe',
+          channel,
+        }))
+      }
+    } else {
+      channelRefCounts.set(channel, after)
     }
   }
 

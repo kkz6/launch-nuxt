@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { storeToRefs } from "pinia";
 import { toast } from "vue-sonner";
-import { useServerEvents } from "~/composables/useChannelEvents";
 import type { Server } from "~/types";
 import { serverService } from "~/services/serverService";
+import { useServersStore } from "~/stores/useServersStore";
 import {
   Tooltip,
   TooltipContent,
@@ -20,12 +21,12 @@ useHead({
   title: "Servers",
 });
 
-const servers = ref<Server[]>([]);
-const isLoading = ref(true);
-
-// Get current team for WebSocket channel
-const { user } = useAuth();
-const teamId = computed(() => user.value?.current_team_id?.toString() || '');
+// Pinia store owns: the servers list, the WS subscription, and event-
+// driven mutations. We just read from it. Compare with the old code
+// where every page had its own fetch+merge+subscribe — see
+// stores/useServersStore.ts for the rationale.
+const serversStore = useServersStore();
+const { servers, isLoading } = storeToRefs(serversStore);
 
 // Provision dialog state
 const showProvisionDialog = ref(false);
@@ -44,15 +45,27 @@ const openLogsDialog = (server: Server) => {
   showLogsDialog.value = true;
 };
 
+// Navigate to detail page on card click — only when the server is running.
+// We do this manually (instead of <NuxtLink>) because the previous
+// <component :is="'NuxtLink'"> dynamic-component pattern silently dropped
+// NuxtLink's navigation wiring, leaving cards visually clickable but inert.
+const onCardClick = (server: Server) => {
+  if (server.status !== 'running') return;
+  cacheServer(server);
+  navigateTo(`/servers/${server.id}`);
+};
+
+// Optimistically remove the row immediately while the WS event catches up.
+// The store will reconcile on the next event.
 const handleServerDeleted = (serverId: string) => {
-  servers.value = servers.value.filter(s => s.id !== serverId);
+  serversStore.remove(serverId);
 };
 
 const handleRetryProvision = async (server: Server) => {
   try {
     await serverService.retryProvision(server.id);
     toast.success("Provisioning has been queued");
-    await fetchServers();
+    await serversStore.fetchAll();
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
     toast.error(err.data?.message || "Failed to retry provisioning");
@@ -67,7 +80,7 @@ const needsPendingActions = (server: Server): boolean => {
 // Watch for refresh trigger (e.g., after team switch)
 const serversRefreshKey = useState('serversRefreshKey', () => 0);
 watch(serversRefreshKey, () => {
-  fetchServers();
+  serversStore.fetchAll();
 });
 
 const getProviderIcon = (provider: string): string => {
@@ -84,6 +97,7 @@ const getProviderIcon = (provider: string): string => {
 
 const getServerIcon = (server: Server): string => {
   if (server.type === "loadbalancer") return "lucide:network";
+  if (server.type === "docker") return "simple-icons:docker";
   return getProviderIcon(server.provider);
 };
 
@@ -145,55 +159,9 @@ const formatDate = (date: string): string => {
   }
 };
 
-const fetchServers = async (silent = false) => {
-  if (!silent) isLoading.value = true;
-  try {
-    const response = await serverService.list();
-    if (silent && servers.value.length > 0) {
-      // Merge updates in-place to avoid full re-renders and animation restarts
-      const newMap = new Map(response.data.map((s: Server) => [s.id, s]));
-
-      // Update existing servers in-place
-      for (const server of servers.value) {
-        const updated = newMap.get(server.id);
-        if (updated) {
-          Object.assign(server, updated);
-        }
-      }
-
-      // Remove deleted servers
-      const toRemove = servers.value.filter(s => !newMap.has(s.id));
-      for (const server of toRemove) {
-        const idx = servers.value.indexOf(server);
-        if (idx !== -1) servers.value.splice(idx, 1);
-      }
-
-      // Add new servers
-      const existingIds = new Set(servers.value.map(s => s.id));
-      for (const server of response.data) {
-        if (!existingIds.has(server.id)) {
-          servers.value.push(server);
-        }
-      }
-    } else {
-      servers.value = response.data;
-    }
-  } catch {
-    // Handle error silently
-  } finally {
-    isLoading.value = false;
-  }
-};
-
-// Debounced silent refetch for WebSocket events
-let serverFetchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-useServerEvents(teamId, () => {
-  if (serverFetchTimeout) clearTimeout(serverFetchTimeout);
-  serverFetchTimeout = setTimeout(() => fetchServers(true), 300);
-});
-
-// Auto-close provision dialogs when selected server's status changes
+// Auto-close provision dialogs when the selected server's status changes.
+// Reads directly from the store's reactive list — no local state to keep
+// in sync.
 watch(servers, (newServers) => {
   if (!selectedServer.value) return
 
@@ -214,10 +182,16 @@ watch(servers, (newServers) => {
 // Cache server data for Navbar when navigating to detail page
 const { cacheServer } = useNavbarCache();
 
-onMounted(() => fetchServers());
-
-onUnmounted(() => {
-  if (serverFetchTimeout) clearTimeout(serverFetchTimeout);
+// First-mount fetch. The store dedupes by `hasFetched`, so revisiting
+// /servers from another route doesn't refetch unnecessarily, but the WS
+// subscription has already been keeping the list current in the
+// background — no spinner flash on return visits.
+onMounted(() => {
+  if (!serversStore.hasFetched) {
+    serversStore.fetchAll();
+  } else {
+    serversStore.ensureSubscribed();
+  }
 });
 </script>
 
@@ -242,16 +216,19 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <NuxtLink
+      <!-- All cards are plain divs. Only running cards get the click
+           handler that navigates to the detail page; non-running cards get
+           pointer-events-none so they look inert. Inner action buttons
+           override that with pointer-events-auto so they still work. -->
+      <div
         v-for="server in servers"
         :key="server.id"
-        :to="server.status === 'running' ? `/servers/${server.id}` : '#'"
-        class="group"
-        :class="{ 'pointer-events-none': server.status !== 'running' }"
-        @click="cacheServer(server)"
+        class="group block h-full"
+        :class="server.status === 'running' ? 'cursor-pointer' : 'pointer-events-none'"
+        @click="onCardClick(server)"
       >
         <div
-          class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+          class="relative flex h-full flex-col rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
           :class="{
             'border-destructive/30 bg-destructive/5': server.status === 'failed',
             'opacity-60': server.status === 'unknown',
@@ -363,7 +340,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="relative mt-4 flex min-h-7 items-center justify-between text-sm">
+          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
             <div class="flex items-center gap-4">
               <div
                 v-if="server.status === 'running'"
@@ -412,7 +389,7 @@ onUnmounted(() => {
             </span>
           </div>
         </div>
-      </NuxtLink>
+      </div>
     </div>
 
     <!-- Provision Command Dialog -->

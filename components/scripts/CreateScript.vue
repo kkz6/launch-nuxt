@@ -161,9 +161,9 @@ const variablesInfo = [
 <template>
   <Dialog v-model:open="open">
     <DialogTrigger as-child>
-      <Button>
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Create Script
+      <Button class="px-2.5 sm:px-4" aria-label="Create script">
+        <Icon name="lucide:plus" class="h-4 w-4 sm:mr-2" />
+        <span class="hidden sm:inline">Create Script</span>
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-2xl">

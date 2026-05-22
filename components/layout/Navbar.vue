@@ -910,15 +910,22 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Global Navigation Tabs (Servers / Domains) -->
+    <!-- On mobile the tabs can overflow the viewport; we let them scroll
+         horizontally and keep the page-level "Create" action pinned to the
+         right so it's always reachable. The scrollbar is hidden visually
+         but the area still scrolls via touch / wheel. -->
     <div v-if="showGlobalTabs" class="px-4 lg:px-8">
-      <div class="-mb-px flex items-center justify-between">
-        <nav ref="globalNavRef" class="relative flex gap-6">
+      <div class="-mb-px flex items-center gap-3">
+        <nav
+          ref="globalNavRef"
+          class="relative flex flex-1 gap-6 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
           <NuxtLink
             v-for="tab in globalTabs"
             :key="tab.value"
             :ref="(el) => setTabRef(tab.value, el)"
             :to="tab.route"
-            class="relative flex items-center gap-2 px-1 py-3 text-sm font-medium transition-colors"
+            class="relative flex shrink-0 items-center gap-2 whitespace-nowrap px-1 py-3 text-sm font-medium transition-colors"
             :class="[
               isGlobalTabActive(tab.route)
                 ? 'text-foreground'
@@ -934,9 +941,11 @@ onMounted(fetchTeams);
             :style="{ left: `${indicatorLeft}px`, width: `${indicatorWidth}px` }"
           />
         </nav>
-        <ServerCreateServerDialog v-if="route.path === '/servers'" />
-        <DnsAddDomain v-if="route.path === '/dns'" :providers="[]" @created="onDnsCreated" />
-        <ScriptsCreateScript v-if="route.path === '/scripts'" @created="onScriptCreated" />
+        <div class="flex shrink-0 items-center">
+          <ServerCreateServerDialog v-if="route.path === '/servers'" />
+          <DnsAddDomain v-if="route.path === '/dns'" :providers="[]" @created="onDnsCreated" />
+          <ScriptsCreateScript v-if="route.path === '/scripts'" @created="onScriptCreated" />
+        </div>
       </div>
     </div>
 

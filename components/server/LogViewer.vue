@@ -137,11 +137,98 @@ const getLogType = (message: string): LogLine['type'] => {
   return 'info'
 }
 
+// Patterns that are operational noise customers shouldn't see in the log
+// viewer. Each entry is matched against the trimmed (and ansi-stripped)
+// line; matches are dropped silently.
+//
+// Why each one is here:
+//
+// - `tail: cannot open ... no files remaining` — the log-tail SSH starts
+//   before the script's log file exists. Cosmetic.
+// - `SSH connection failed: ...` — early-provision SSH tail races sshd
+//   coming up. Leaks the IP and looks like a hard failure to non-technical
+//   users; instead we silently retry under the hood.
+// - `overall progress: X out of N tasks` / `verify: Waiting N seconds to
+//   verify that tasks are stable` — `docker service create` streams these
+//   on every poll until swarm convergence (40+ identical lines).
+// - `Canceled hold on cloud-init` / `cloud-init was already not on hold` —
+//   cosmetic chatter from `apt-mark unhold` in the cleanup step.
+// - `debconf: unable to initialize frontend ...` / `debconf: (...)` /
+//   `dpkg-preconfigure: unable to re-open stdin:` — every apt-get install
+//   over SSH lacks a controlling tty, so debconf falls back to teletype
+//   and prints 5+ lines of harmless warnings. Pure noise.
+// - `(Reading database ... NN%)` — apt's progress bar; emits ~20 lines
+//   per package operation. Useless without a terminal width.
+// - `SyntaxWarning: invalid escape sequence ...` — upstream fail2ban
+//   ships Python files with deprecation warnings (not our bug).
+// - `[Pp]rocessing triggers for ...` / `Setting up ...` / `Selecting
+//   previously unselected package ...` / `Preparing to unpack ...` /
+//   `Unpacking ...` — verbose apt step-by-step that buries the actionable
+//   lines. We keep the high-level `echo "Install essential packages"`
+//   line from our script — that's the one the customer needs.
+const NOISE_PATTERNS: RegExp[] = [
+  /^tail: (?:cannot open '.*' for reading: No such file or directory|no files remaining)$/,
+  /^SSH connection failed:/,
+  /^overall progress:\s+\d+\s+out of\s+\d+\s+tasks?\b/,
+  /^verify: Waiting \d+ seconds to verify that tasks are stable/,
+  /^Canceled hold on cloud-init\.?$/,
+  /^cloud-init was already not on hold\.?$/,
+  /^debconf:/,
+  /^dpkg-preconfigure: unable to re-open stdin:/,
+  /^\(Reading database \.\.\./,
+  /SyntaxWarning: invalid escape sequence/,
+  /^Selecting previously unselected package /,
+  /^Preparing to unpack /,
+  /^Unpacking /,
+  /^Setting up /,
+  /^Processing triggers for /,
+  /^Created symlink /,
+  /^Running kernel seems to be up-to-date\.?$/,
+  /^No (?:services|containers|user sessions|VM guests) /,
+  /^Synchronizing state of /,
+  /^Executing: \/usr\/lib\/systemd\/systemd-sysv-install /,
+]
+
+const isNoise = (line: string): boolean => {
+  const t = stripAnsi(line).trim()
+  return NOISE_PATTERNS.some(re => re.test(t))
+}
+
+// Python prints SyntaxWarning headers like
+//   /usr/.../foo.py:224: SyntaxWarning: invalid escape sequence '\s'
+// followed by the *source line* the warning refers to:
+//   "1490349000 test failed.dns.ch", "^\s*test <F-ID>\S+</F-ID>"
+// The header matches NOISE_PATTERNS, but the source line is arbitrary
+// Python and doesn't. So we maintain a one-line look-back: once we drop
+// a SyntaxWarning header, we also drop the next non-empty line that
+// follows it (the snippet). Applies once per warning so we don't
+// accidentally swallow real log lines downstream.
+const SYNTAX_WARNING_RE = /SyntaxWarning: invalid escape sequence/
+
+const stripNoiseLines = (lines: string[]): string[] => {
+  const out: string[] = []
+  let dropNext = false
+  for (const line of lines) {
+    if (dropNext) {
+      dropNext = false
+      continue
+    }
+    if (isNoise(line)) {
+      const t = stripAnsi(line).trim()
+      if (SYNTAX_WARNING_RE.test(t)) dropNext = true
+      continue
+    }
+    out.push(line)
+  }
+  return out
+}
+
 const parseLogs = (raw: string): LogLine[] => {
   if (!raw) return []
-  return raw.split('\n').filter(line => line.trim())
-    .filter(line => !line.includes('::LAUNCH::'))
-    .filter(line => !/^tail: (?:cannot open '.*' for reading: No such file or directory|no files remaining)$/.test(line.trim()))
+  const stripped = stripNoiseLines(
+    raw.split('\n').filter(line => line.trim() && !line.includes('::LAUNCH::')),
+  )
+  return stripped
     .map((line) => {
       const cleanLine = stripAnsi(line)
 
