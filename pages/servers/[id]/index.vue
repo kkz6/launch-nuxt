@@ -214,7 +214,13 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'networks'">
-      <ServerShowNetworks :server-id="server.id" />
+      <!-- Docker servers get the host-level docker-network view; everything
+           else uses the existing PHP/loadbalancer firewall rules view. -->
+      <ServerDockerNetworks
+        v-if="server.type === 'docker'"
+        :server-id="server.id"
+      />
+      <ServerShowNetworks v-else :server-id="server.id" />
     </div>
 
     <div v-else-if="activeTab === 'daemons'">
@@ -236,27 +242,15 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'containers'">
-      <ServerDockerComingSoon
-        title="Containers"
-        description="View and manage every container running on this server."
-        icon="lucide:container"
-      />
+      <ServerDockerContainers :server-id="server.id" />
     </div>
 
     <div v-else-if="activeTab === 'volumes'">
-      <ServerDockerComingSoon
-        title="Volumes"
-        description="Browse Docker volumes attached to this host."
-        icon="lucide:hard-drive"
-      />
+      <ServerDockerVolumes :server-id="server.id" />
     </div>
 
     <div v-else-if="activeTab === 'traefik'">
-      <ServerDockerComingSoon
-        title="Traefik"
-        description="Live Traefik configuration and dashboard."
-        icon="simple-icons:traefikproxy"
-      />
+      <ServerDockerTraefik :server-id="server.id" />
     </div>
 
     <div v-else-if="activeTab === 'advanced'">
