@@ -95,6 +95,7 @@ onMounted(fetchApp);
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   deployments: true,
+  domains: true,
   logs: true,
 };
 
@@ -196,6 +197,11 @@ useDockerApplicationEvents(teamId, (data) => {
 
     <ApplicationDeployments
       v-else-if="subTab === 'deployments'"
+      :application="app"
+    />
+
+    <ApplicationDomains
+      v-else-if="subTab === 'domains'"
       :application="app"
     />
 
