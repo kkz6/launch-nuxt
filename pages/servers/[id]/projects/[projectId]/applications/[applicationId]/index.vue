@@ -95,6 +95,7 @@ onMounted(fetchApp);
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   deployments: true,
+  logs: true,
 };
 
 // Refetch the application when WS events tell us its status changed —
@@ -197,6 +198,8 @@ useDockerApplicationEvents(teamId, (data) => {
       v-else-if="subTab === 'deployments'"
       :application="app"
     />
+
+    <ApplicationLogs v-else-if="subTab === 'logs'" :application="app" />
 
     <ServerDockerComingSoon
       v-else-if="!READY_SUBTABS[subTab]"
