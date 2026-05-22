@@ -178,6 +178,42 @@ export interface UpdateDockerVolumeData {
   host_path?: string;
 }
 
+// ---- Host diagnostic types ------------------------------------------------
+
+/** Output of `docker ps -a --format '{{json .}}'`. */
+export interface DockerHostContainer {
+  ID: string;
+  Names: string;
+  Image: string;
+  Command: string;
+  Status: string;
+  State: string;
+  Ports: string;
+  CreatedAt: string;
+}
+
+/** Output of `docker volume ls --format '{{json .}}'`. */
+export interface DockerHostVolume {
+  Name: string;
+  Driver: string;
+  Scope: string;
+  Mountpoint: string;
+}
+
+/** Output of `docker network ls --format '{{json .}}'`. */
+export interface DockerHostNetwork {
+  ID: string;
+  Name: string;
+  Driver: string;
+  Scope: string;
+}
+
+/** Traefik static + dynamic config files served from /etc/launch/traefik. */
+export interface DockerTraefikSnapshot {
+  static_config: string;
+  dynamic_files: Record<string, string>;
+}
+
 // ---- Compose stacks -------------------------------------------------------
 
 export type DockerComposeSourceType = "git" | "raw_yaml";
@@ -610,6 +646,39 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerDeployment[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments`,
+      );
+    },
+  },
+
+  /**
+   * Host-level diagnostic endpoints. Read-only views of the docker
+   * server's containers/volumes/networks + the on-disk Traefik config.
+   * Drives the four server-detail tabs that previously rendered the
+   * ComingSoon placeholder.
+   */
+  host: {
+    containers: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerHostContainer[]>>(
+        `/servers/${serverId}/docker/containers`,
+      );
+    },
+    volumes: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerHostVolume[]>>(
+        `/servers/${serverId}/docker/volumes`,
+      );
+    },
+    networks: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerHostNetwork[]>>(
+        `/servers/${serverId}/docker/networks`,
+      );
+    },
+    traefik: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerTraefikSnapshot>>(
+        `/servers/${serverId}/docker/traefik`,
       );
     },
   },
