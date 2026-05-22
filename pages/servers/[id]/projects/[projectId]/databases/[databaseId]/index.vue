@@ -37,6 +37,7 @@ type SubTabId = (typeof SUBTABS)[number]["value"];
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   environment: true,
+  backups: true,
 };
 
 const validIds = SUBTABS.map((s) => s.value);
@@ -391,10 +392,15 @@ function defaultPort(engine: string): number {
       </div>
     </section>
 
+    <DatabaseBackups
+      v-else-if="subTab === 'backups'"
+      :database="db"
+    />
+
     <ServerDockerComingSoon
       v-else-if="!READY_SUBTABS[subTab]"
       :title="SUBTABS.find((s) => s.value === subTab)?.label ?? subTab"
-      description="This tab lands in a future slice once the backup + logs UX is settled."
+      description="Logs + Advanced for managed databases land in a follow-up slice."
       :icon="SUBTABS.find((s) => s.value === subTab)?.icon ?? 'lucide:hammer'"
     />
   </div>

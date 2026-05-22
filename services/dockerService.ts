@@ -331,6 +331,48 @@ export type DockerDatabaseLifecycleAction = "start" | "stop" | "restart";
 /** Engine catalogue returned by /api/docker/databases/engines. */
 export type DockerDatabaseEngineCatalogue = Record<DockerDatabaseEngine, string[]>;
 
+// ---- Database backups -----------------------------------------------------
+
+export interface DockerDatabaseBackup {
+  id: string;
+  database_id: string;
+  provider: string;
+  endpoint?: string | null;
+  bucket: string;
+  region?: string | null;
+  path_prefix?: string | null;
+  cron_schedule?: string | null;
+  enabled: boolean;
+  access_key: string;
+  has_secret_key: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DockerDatabaseBackupRun {
+  id: string;
+  backup_id: string;
+  status: string;
+  started_at?: string | null;
+  finished_at?: string | null;
+  object_key?: string | null;
+  size_bytes?: number | null;
+  error?: string | null;
+  created_at?: string;
+}
+
+export interface ConfigureDockerBackupData {
+  provider: "s3";
+  endpoint?: string;
+  bucket: string;
+  region?: string;
+  path_prefix?: string;
+  access_key: string;
+  secret_key: string;
+  cron_schedule?: string;
+  enabled: boolean;
+}
+
 /**
  * Deployment history row for an application or compose stack.
  * target_type discriminates which workload it belongs to; the UI on a
@@ -842,6 +884,57 @@ export const dockerService = {
       return post<ApiResponse<DockerDatabase>>(
         `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/lifecycle`,
         { action },
+      );
+    },
+
+    // backup config
+    getBackup: (serverId: string, projectId: string, databaseId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDatabaseBackup | null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup`,
+      );
+    },
+    configureBackup: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+      data: ConfigureDockerBackupData,
+    ) => {
+      const { put } = useApi();
+      return put<ApiResponse<DockerDatabaseBackup>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup`,
+        data,
+      );
+    },
+    deleteBackup: (serverId: string, projectId: string, databaseId: string) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup`,
+      );
+    },
+    listBackupRuns: (serverId: string, projectId: string, databaseId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDatabaseBackupRun[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup/runs`,
+      );
+    },
+    runBackup: (serverId: string, projectId: string, databaseId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDatabaseBackupRun>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup/run`,
+        {},
+      );
+    },
+    restoreBackup: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+      runId: string,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup/restore`,
+        { run_id: runId },
       );
     },
   },
