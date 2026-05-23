@@ -161,20 +161,6 @@ const execStr = computed(() => {
   return joinShellArgs([inspect.value.path, ...(inspect.value.args ?? [])]);
 });
 
-// --- Raw config dialog ----------------------------------------------------
-//
-// Mirrors dokploy's ShowContainerConfig: a separate, wider dialog
-// rendering the full `docker inspect` JSON in a CodeEditor. Useful
-// for debugging when our curated view drops a field they care about.
-const rawDialogOpen = ref(false);
-const rawJSON = computed(() => {
-  if (!inspect.value?.raw) return "";
-  try {
-    return JSON.stringify(inspect.value.raw, null, 2);
-  } catch {
-    return "";
-  }
-});
 </script>
 
 <template>
@@ -350,19 +336,9 @@ const rawJSON = computed(() => {
           is much longer than the Dockerfile CMD.
         -->
         <section>
-          <div class="mb-2 flex items-center justify-between">
-            <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Command
-            </h3>
-            <button
-              type="button"
-              class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
-              @click="rawDialogOpen = true"
-            >
-              <Icon name="lucide:file-json" class="h-3 w-3" />
-              View raw config
-            </button>
-          </div>
+          <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Command
+          </h3>
 
           <div v-if="entrypointStr" class="space-y-1">
             <p class="text-[11px] text-muted-foreground">
@@ -492,31 +468,6 @@ const rawJSON = computed(() => {
           </div>
         </section>
       </div>
-    </DialogContent>
-  </Dialog>
-
-  <!--
-    "View raw config" — mirrors dokploy's ShowContainerConfig pattern.
-    The full `docker inspect` JSON is dropped into a wide CodeEditor
-    so power users can grep the bits we didn't surface in the curated
-    view above. Read-only; no edit flow because docker doesn't accept
-    config writes on a running container anyway.
-  -->
-  <Dialog v-model:open="rawDialogOpen">
-    <DialogContent class="max-h-[90vh] overflow-hidden sm:max-w-4xl">
-      <DialogHeader>
-        <DialogTitle>Raw config</DialogTitle>
-        <DialogDescription>
-          Full output of <code>docker inspect</code> for this
-          container. Read-only.
-        </DialogDescription>
-      </DialogHeader>
-      <SharedCodeEditor
-        :model-value="rawJSON"
-        :disabled="true"
-        :line-wrapping="false"
-        class="h-[70vh]"
-      />
     </DialogContent>
   </Dialog>
 </template>
