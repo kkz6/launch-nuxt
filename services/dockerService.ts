@@ -218,6 +218,61 @@ export interface UpdateDockerAdvancedData {
 // ---- Host diagnostic types ------------------------------------------------
 
 /**
+ * Curated subset of `docker inspect`. Same shape the
+ * ServerDockerContainers status dialog renders — pull only the
+ * fields a customer would actually want to see, deliberately leaving
+ * out env vars (could leak secrets) and the giant raw config blob.
+ */
+export interface DockerContainerInspect {
+  id: string;
+  name: string;
+  image: string;
+  image_id: string;
+  command: string;
+  created_at: string;
+  state: {
+    status: string;
+    running: boolean;
+    started_at: string;
+    finished_at: string;
+    exit_code: number;
+    error?: string;
+    oom_killed: boolean;
+    pid: number;
+  };
+  health?: {
+    status: string;
+    failing_streak: number;
+    log?: Array<{
+      start: string;
+      end: string;
+      exit_code: number;
+      output: string;
+    }>;
+  };
+  restart_count: number;
+  platform: string;
+  resources: {
+    memory_limit_bytes: number;
+    cpu_shares: number;
+    nano_cpus: number;
+  };
+  restart_policy: string;
+  mounts: Array<{
+    type: string;
+    source: string;
+    destination: string;
+    read_only: boolean;
+  }>;
+  networks: Array<{
+    name: string;
+    ip_address: string;
+    mac_address?: string;
+  }>;
+  labels?: Record<string, string>;
+}
+
+/**
  * Output of `docker ps -a --format '{{json .}}'`.
  *
  * `system` is set by the backend for Launch-managed rows (Traefik,
@@ -822,6 +877,18 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerHostContainer[]>>(
         `/servers/${serverId}/docker/containers`,
+      );
+    },
+    /**
+     * Detailed `docker inspect` for a single container. The backend
+     * whitelists the container ID to a hex pattern before
+     * interpolating it into the SSH command, so URL tampering can't
+     * inject docker args.
+     */
+    inspectContainer: (serverId: string, containerId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerContainerInspect>>(
+        `/servers/${serverId}/docker/containers/${containerId}/inspect`,
       );
     },
     volumes: (serverId: string) => {
