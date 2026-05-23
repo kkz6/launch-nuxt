@@ -12,10 +12,6 @@ const props = defineProps<Props>();
 const projects = ref<DockerProject[]>([]);
 const isLoading = ref(true);
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
-
 const fetchProjects = async (silent = false) => {
   if (!silent) isLoading.value = true;
   try {
@@ -36,34 +32,6 @@ const refreshKey = useState<number>("dockerProjectsRefreshKey", () => 0);
 watch(refreshKey, () => {
   void fetchProjects(true);
 });
-
-const deleteProject = async (project: DockerProject) => {
-  if (!confirmationDialog.value) return;
-  const totalWorkloads =
-    project.applications_count + project.composes_count + project.databases_count;
-  const result = await confirmationDialog.value.show({
-    title: "Delete Project",
-    description:
-      totalWorkloads > 0
-        ? `Are you sure you want to delete "${project.name}"? It still has ${totalWorkloads} workload(s) — they will be removed too.`
-        : `Are you sure you want to delete "${project.name}"?`,
-    confirmText: "Delete",
-    cancelText: "Cancel",
-    destructive: true,
-    inputVerificationText: project.name,
-    helpText: "Type the project name to confirm:",
-  });
-  if (!result.ok) return;
-
-  try {
-    await dockerService.projects.delete(props.server.id, project.id);
-    projects.value = projects.value.filter((p) => p.id !== project.id);
-    toast.success("Project deleted");
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete project");
-  }
-};
 
 const formatDate = (iso?: string): string => {
   if (!iso) return "";
@@ -88,8 +56,6 @@ onMounted(fetchProjects);
 
 <template>
   <div>
-    <SharedConfirmationDialog ref="confirmationDialog" />
-
     <!--
       No section heading and no inline "New Project" button — the
       action lives in the navbar (ServerDockerCreateProject) next to
@@ -140,19 +106,13 @@ onMounted(fetchProjects);
         <div
           class="relative flex h-full flex-col rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
         >
-          <!-- Delete action, top-right. pointer-events-auto so the
-               outer card click doesn't swallow it; .stop guards the
-               navigateTo path. -->
-          <Button
-            variant="ghost"
-            size="icon"
-            class="pointer-events-auto absolute right-3 top-3 z-10 h-7 w-7 text-muted-foreground opacity-0 transition group-hover:opacity-100"
-            title="Delete project"
-            @click.prevent.stop="deleteProject(project)"
-          >
-            <Icon name="lucide:trash-2" class="h-3.5 w-3.5" />
-          </Button>
-
+          <!--
+            Delete deliberately omitted from the card. The destructive
+            flow lives on the project detail page's Settings subtab,
+            same shape as Sites where individual deletion happens
+            from the site detail page rather than the index. Keeps
+            mis-clicks on a crowded grid from removing infra.
+          -->
           <div class="relative flex items-start gap-3">
             <div
               class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
@@ -162,7 +122,7 @@ onMounted(fetchProjects);
                 class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
               />
             </div>
-            <div class="min-w-0 flex-1 pr-6">
+            <div class="min-w-0 flex-1">
               <h3 class="truncate font-semibold">{{ project.name }}</h3>
               <p
                 v-if="project.description"
