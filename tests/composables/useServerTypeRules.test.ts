@@ -161,6 +161,10 @@ describe("tabs per server type", () => {
     expect(tabs).toContain("containers");
     expect(tabs).toContain("volumes");
     expect(tabs).toContain("networks");
+    // Schedulers (host-level cron) shares the backend with PHP — we
+    // expose the same UI here for things like `docker system prune`
+    // on a schedule.
+    expect(tabs).toContain("schedulers");
     expect(tabs).toContain("advanced");
     expect(tabs).not.toContain("sites");
     expect(tabs).not.toContain("databases");

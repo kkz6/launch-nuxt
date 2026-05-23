@@ -71,15 +71,19 @@ const LOADBALANCER_TABS: ServerDetailTab[] = [
 ];
 
 // Docker server has its own world: Projects group docker workloads
-// (applications, compose, databases). Containers/Volumes/Networks
-// give server-level visibility into the docker host. Traefik config
-// editing lives under Advanced — it's an admin escape hatch, not a
+// (applications, compose, databases). Containers/Volumes give
+// server-level visibility into the docker host. Schedulers exposes
+// host-level cron jobs (e.g. `docker system prune`, custom
+// maintenance commands) — same backend the PHP servers use; the
+// commands just run on a docker host instead of a PHP one. Traefik
+// config editing lives under Advanced — admin escape hatch, not a
 // day-to-day tab. See docs/plans/2026-05-22-docker-server-menus-design.md.
 const DOCKER_TABS: ServerDetailTab[] = [
   { value: "projects", label: "Projects", query: "projects", icon: "lucide:folder-tree" },
   { value: "containers", label: "Containers", query: "containers", icon: "lucide:container" },
   { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
   { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
+  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
   { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];
