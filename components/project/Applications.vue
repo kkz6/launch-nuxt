@@ -223,7 +223,7 @@ onMounted(fetchApps);
       </NuxtLink>
     </div>
 
-    <CreateApplicationSheet
+    <ProjectCreateApplicationSheet
       v-model:open="createSheetOpen"
       :server-id="props.serverId"
       :project-id="props.projectId"

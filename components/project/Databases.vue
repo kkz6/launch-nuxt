@@ -200,7 +200,7 @@ onMounted(fetchDatabases);
       </NuxtLink>
     </div>
 
-    <CreateDatabaseSheet
+    <ProjectCreateDatabaseSheet
       v-model:open="createOpen"
       :server-id="props.serverId"
       :project-id="props.projectId"
