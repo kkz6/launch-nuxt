@@ -14,6 +14,18 @@ const rows = ref<DockerHostContainer[]>([]);
 const isLoading = ref(true);
 const refreshing = ref(false);
 
+// Launch-managed containers (Traefik etc.) are hidden by default — the
+// Containers tab is meant for user workloads, not infrastructure.
+// Mirrors dokploy's behaviour. The toggle reveals them for admins
+// debugging the control plane.
+const showSystem = ref(false);
+
+const visibleRows = computed(() =>
+  showSystem.value ? rows.value : rows.value.filter((r) => !r.system),
+);
+
+const systemCount = computed(() => rows.value.filter((r) => r.system).length);
+
 const fetchRows = async () => {
   refreshing.value = true;
   try {
@@ -43,21 +55,30 @@ onMounted(fetchRows);
 
 <template>
   <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex items-center justify-between gap-4">
       <div>
         <h2 class="text-2xl font-semibold">Containers</h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Every container on this docker host. Read-only view of
-          <code>docker ps -a</code>.
+          Workloads running on this docker host. Launch's own services
+          (Traefik, etc.) are hidden by default.
         </p>
       </div>
-      <Button variant="outline" :disabled="refreshing" @click="fetchRows">
-        <Icon
-          :name="refreshing ? 'lucide:loader-2' : 'lucide:refresh-cw'"
-          :class="['mr-2 h-4 w-4', refreshing && 'animate-spin']"
-        />
-        Refresh
-      </Button>
+      <div class="flex items-center gap-3">
+        <label
+          v-if="systemCount > 0"
+          class="flex items-center gap-2 text-xs text-muted-foreground"
+        >
+          <Switch v-model:checked="showSystem" />
+          Show system ({{ systemCount }})
+        </label>
+        <Button variant="outline" :disabled="refreshing" @click="fetchRows">
+          <Icon
+            :name="refreshing ? 'lucide:loader-2' : 'lucide:refresh-cw'"
+            :class="['mr-2 h-4 w-4', refreshing && 'animate-spin']"
+          />
+          Refresh
+        </Button>
+      </div>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -65,14 +86,17 @@ onMounted(fetchRows);
     </div>
 
     <div
-      v-else-if="rows.length === 0"
+      v-else-if="visibleRows.length === 0"
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:container" class="h-12 w-12 text-muted-foreground" />
       <h3 class="mt-4 text-lg font-medium">No containers</h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Once you deploy an application or compose stack, the resulting
-        containers will appear here.
+        {{
+          systemCount > 0 && !showSystem
+            ? `Only system containers are running. Toggle "Show system" above to see them, or deploy an application to populate this view.`
+            : "Once you deploy an application or compose stack, the resulting containers will appear here."
+        }}
       </p>
     </div>
 
@@ -88,9 +112,18 @@ onMounted(fetchRows);
           </tr>
         </thead>
         <tbody>
-          <tr v-for="c in rows" :key="c.ID" class="border-t">
+          <tr v-for="c in visibleRows" :key="c.ID" class="border-t">
             <td class="px-4 py-3 font-mono text-xs">
-              {{ c.Names }}
+              <div class="flex items-center gap-2">
+                <span>{{ c.Names }}</span>
+                <span
+                  v-if="c.system"
+                  class="rounded-full bg-zinc-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-700 dark:text-zinc-300"
+                  title="Installed and managed by Launch"
+                >
+                  system
+                </span>
+              </div>
               <p class="text-[10px] text-muted-foreground">{{ c.ID }}</p>
             </td>
             <td class="px-4 py-3 font-mono text-xs">{{ c.Image }}</td>

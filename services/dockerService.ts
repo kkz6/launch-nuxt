@@ -217,7 +217,14 @@ export interface UpdateDockerAdvancedData {
 
 // ---- Host diagnostic types ------------------------------------------------
 
-/** Output of `docker ps -a --format '{{json .}}'`. */
+/**
+ * Output of `docker ps -a --format '{{json .}}'`.
+ *
+ * `system` is set by the backend for Launch-managed rows (Traefik,
+ * future control-plane services) so the UI can hide them by default
+ * — mirrors dokploy's `name.includes("dokploy")` exclusion. See
+ * isLaunchSystemName on the Go side for the classification rule.
+ */
 export interface DockerHostContainer {
   ID: string;
   Names: string;
@@ -227,6 +234,7 @@ export interface DockerHostContainer {
   State: string;
   Ports: string;
   CreatedAt: string;
+  system: boolean;
 }
 
 /** Output of `docker volume ls --format '{{json .}}'`. */
@@ -235,14 +243,20 @@ export interface DockerHostVolume {
   Driver: string;
   Scope: string;
   Mountpoint: string;
+  system: boolean;
 }
 
-/** Output of `docker network ls --format '{{json .}}'`. */
+/**
+ * Output of `docker network ls --format '{{json .}}'`. `system` covers
+ * both Launch-managed networks (launch-network) and docker's built-in
+ * networks (bridge/host/none) — neither is user-managed.
+ */
 export interface DockerHostNetwork {
   ID: string;
   Name: string;
   Driver: string;
   Scope: string;
+  system: boolean;
 }
 
 /** Traefik static + dynamic config files served from /etc/launch/traefik. */
