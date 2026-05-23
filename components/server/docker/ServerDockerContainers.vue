@@ -68,7 +68,7 @@ onMounted(fetchRows);
           v-if="systemCount > 0"
           class="flex items-center gap-2 text-xs text-muted-foreground"
         >
-          <Switch v-model:checked="showSystem" />
+          <Switch v-model="showSystem" />
           Show system ({{ systemCount }})
         </label>
         <Button variant="outline" :disabled="refreshing" @click="fetchRows">
