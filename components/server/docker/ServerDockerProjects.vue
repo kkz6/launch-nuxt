@@ -105,6 +105,15 @@ const formatDate = (iso?: string): string => {
   }
 };
 
+// Click handler that pushes to the project detail page. We don't wrap
+// the card in <NuxtLink> because the inner delete button needs its own
+// click target — same pattern as pages/servers/index.vue. Returns true
+// so the @click is treated as handled; nested @click.prevent.stop on
+// the action button does the bubbling guard.
+const goToProject = (project: DockerProject) => {
+  navigateTo(`/servers/${props.server.id}/projects/${project.id}`);
+};
+
 onMounted(fetchProjects);
 </script>
 
@@ -145,54 +154,83 @@ onMounted(fetchProjects);
       </Button>
     </div>
 
+    <!--
+      Card layout mirrors pages/servers/index.vue:
+      - outer wrapper holds the click handler (cursor-pointer, group)
+      - inner div is the visible card with bg-card + hover:bg-muted/50
+      - icon block on the left (brand-icon-bg fills on hover via the
+        CSS rule at the bottom of this file)
+      - name + subtitle stack to the right
+      - bottom row pinned via mt-auto: workload stats on the left,
+        created date on the right
+    -->
     <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <NuxtLink
+      <div
         v-for="project in projects"
         :key="project.id"
-        :to="`/servers/${props.server.id}/projects/${project.id}`"
-        class="group block rounded-lg border bg-card p-5 transition hover:border-primary"
+        class="group block h-full cursor-pointer"
+        @click="goToProject(project)"
       >
-        <div class="flex items-start justify-between">
-          <div class="min-w-0">
-            <h3 class="truncate text-lg font-semibold group-hover:text-primary">
-              {{ project.name }}
-            </h3>
-            <p
-              v-if="project.description"
-              class="mt-1 line-clamp-2 text-sm text-muted-foreground"
-            >
-              {{ project.description }}
-            </p>
-          </div>
+        <div
+          class="relative flex h-full flex-col rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+        >
+          <!-- Delete action, top-right. pointer-events-auto so the
+               outer card click doesn't swallow it; .stop guards the
+               navigateTo path. -->
           <Button
             variant="ghost"
             size="icon"
-            class="ml-2 shrink-0 opacity-0 transition group-hover:opacity-100"
-            @click.prevent="deleteProject(project)"
+            class="pointer-events-auto absolute right-3 top-3 z-10 h-7 w-7 text-muted-foreground opacity-0 transition group-hover:opacity-100"
+            title="Delete project"
+            @click.prevent.stop="deleteProject(project)"
           >
-            <Icon name="lucide:trash-2" class="h-4 w-4" />
+            <Icon name="lucide:trash-2" class="h-3.5 w-3.5" />
           </Button>
-        </div>
 
-        <div class="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
-          <span class="flex items-center gap-1">
-            <Icon name="lucide:box" class="h-3.5 w-3.5" />
-            {{ project.applications_count }} app{{ project.applications_count === 1 ? "" : "s" }}
-          </span>
-          <span class="flex items-center gap-1">
-            <Icon name="lucide:layers" class="h-3.5 w-3.5" />
-            {{ project.composes_count }} compose
-          </span>
-          <span class="flex items-center gap-1">
-            <Icon name="lucide:database" class="h-3.5 w-3.5" />
-            {{ project.databases_count }} db
-          </span>
-        </div>
+          <div class="relative flex items-start gap-3">
+            <div
+              class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
+            >
+              <Icon
+                name="lucide:folder-tree"
+                class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
+              />
+            </div>
+            <div class="min-w-0 flex-1 pr-6">
+              <h3 class="truncate font-semibold">{{ project.name }}</h3>
+              <p
+                v-if="project.description"
+                class="line-clamp-1 text-sm text-muted-foreground"
+              >
+                {{ project.description }}
+              </p>
+              <p v-else class="text-sm text-muted-foreground">
+                No description
+              </p>
+            </div>
+          </div>
 
-        <p class="mt-3 text-xs text-muted-foreground">
-          Created {{ formatDate(project.created_at) }}
-        </p>
-      </NuxtLink>
+          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+            <div class="flex items-center gap-4 text-muted-foreground">
+              <span class="flex items-center gap-1.5" title="Applications">
+                <Icon name="lucide:box" class="h-3.5 w-3.5" />
+                {{ project.applications_count }}
+              </span>
+              <span class="flex items-center gap-1.5" title="Compose stacks">
+                <Icon name="lucide:layers" class="h-3.5 w-3.5" />
+                {{ project.composes_count }}
+              </span>
+              <span class="flex items-center gap-1.5" title="Databases">
+                <Icon name="lucide:database" class="h-3.5 w-3.5" />
+                {{ project.databases_count }}
+              </span>
+            </div>
+            <span class="text-xs text-muted-foreground">
+              {{ formatDate(project.created_at) }}
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <Dialog v-model:open="createOpen">
@@ -250,3 +288,19 @@ onMounted(fetchProjects);
     </Dialog>
   </div>
 </template>
+
+<style scoped>
+/*
+  Hover-fill for the icon block, matching the server cards. Uses the
+  theme primary as the highlight tone — projects don't have a per-row
+  brand colour the way servers do (one per provider), so a single
+  shared accent reads cleanly across the grid.
+*/
+.group:hover .brand-icon-bg {
+  background-color: hsl(var(--primary));
+}
+
+.group:hover .brand-icon {
+  color: hsl(var(--primary-foreground));
+}
+</style>
