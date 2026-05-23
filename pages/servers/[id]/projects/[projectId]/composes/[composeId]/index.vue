@@ -4,6 +4,7 @@ import {
   dockerService,
   type DockerCompose,
 } from "~/services/dockerService";
+import type { Server } from "~/types";
 
 definePageMeta({
   layout: "default",
@@ -20,16 +21,18 @@ const compose = ref<DockerCompose | null>(null);
 const isLoading = ref(true);
 const isDeploying = ref(false);
 
-// Only the subtabs that have real backing content are exposed in
-// the nav strip. environment/domains/schedules used to render here
-// as ComingSoon placeholders — confusing affordance (label promises
-// a feature, click reveals there's nothing). Better to hide until
-// the multi-service UX is figured out (a compose stack has N
-// services, per-service routing is the open question).
+// Compose subtabs mirror the application's where the concept maps
+// 1:1 at the stack level. Per-service tabs (Domains, Redirects,
+// Volumes, Schedulers) are deliberately skipped — the YAML owns
+// those, and surfacing a service picker for each of them is its
+// own slice. Logs gets a service picker inside the component since
+// every compose stack has multiple containers.
 const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
+  { value: "environment", label: "Environment", icon: "lucide:key" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
+  { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
 ] as const;
 type SubTabId = (typeof SUBTABS)[number]["value"];
 
@@ -39,18 +42,23 @@ type SubTabId = (typeof SUBTABS)[number]["value"];
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   deployments: true,
+  environment: true,
   logs: true,
+  advanced: true,
 };
 
+// Read straight from the URL — navbar subtab links are the source of
+// truth. setSubTab updates the URL; the computed reacts.
 const validIds = SUBTABS.map((s) => s.value);
-const initial = (): SubTabId => {
-  const q = route.query.subtab as string;
-  return (validIds as readonly string[]).includes(q) ? (q as SubTabId) : "general";
-};
-const subTab = ref<SubTabId>(initial());
-watch(subTab, (v) => {
-  router.replace({ query: { ...route.query, subtab: v } });
+const subTab = computed<SubTabId>(() => {
+  const q = route.query.subtab as string | undefined;
+  return q && (validIds as readonly string[]).includes(q)
+    ? (q as SubTabId)
+    : "general";
 });
+const setSubTab = (v: SubTabId) => {
+  router.replace({ query: { ...route.query, subtab: v } });
+};
 
 const fetchCompose = async () => {
   isLoading.value = true;
@@ -81,7 +89,7 @@ const quickDeploy = async () => {
       compose.value.project_id,
       compose.value.id,
     );
-    subTab.value = "deployments";
+    setSubTab("deployments");
     toast.success("Deployment started");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
@@ -92,6 +100,21 @@ const quickDeploy = async () => {
 };
 
 onMounted(fetchCompose);
+
+// Server fetch + Terminal mount — see databases/[databaseId]/index.vue
+// for the same pattern. Required so the navbar's Terminal button has
+// somewhere to render the bottom pane.
+const server = ref<Server | null>(null);
+const isTerminalOpen = useState("serverTerminalOpen", () => false);
+const loadServer = async () => {
+  try {
+    const res = await $api<{ data: Server }>(`/servers/${serverId.value}`);
+    server.value = res.data;
+  } catch {
+    server.value = null;
+  }
+};
+onMounted(loadServer);
 
 const statusBadge = computed(() => {
   if (!compose.value) return "";
@@ -112,68 +135,30 @@ const statusBadge = computed(() => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex items-center justify-center py-12">
-    <Icon name="lucide:loader-2" class="h-8 w-8 animate-spin text-muted-foreground" />
-  </div>
+  <!--
+    Chrome renders immediately; only the per-subtab body waits on the
+    `compose` ref. No inline back link — navbar breadcrumb handles
+    the trail.
+  -->
+  <div class="space-y-6 pb-10">
+    <!--
+      No on-page header — name + status are in the navbar breadcrumb.
+      Deploy button lives on the Deployments subtab.
+    -->
 
-  <div v-else-if="compose" class="space-y-6 pb-10">
-    <NuxtLink
-      :to="`/servers/${serverId}/projects/${projectId}?tab=compose`"
-      class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+    <!-- Content body waits on `compose` so children don't get null. -->
+    <div
+      v-if="!compose"
+      class="flex items-center justify-center rounded-lg border border-dashed py-16"
     >
-      <Icon name="lucide:arrow-left" class="h-4 w-4" />
-      Back to project
-    </NuxtLink>
-
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-3">
-          <h1 class="text-3xl font-semibold">{{ compose.name }}</h1>
-          <span
-            class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-            :class="statusBadge"
-          >
-            {{ compose.status }}
-          </span>
-        </div>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Source: {{ compose.compose_source_type === "git" ? "git" : "inline YAML" }}
-        </p>
-      </div>
-
-      <Button
-        :disabled="compose.status === 'building' || isDeploying"
-        @click="quickDeploy"
-      >
-        <Icon
-          v-if="isDeploying || compose.status === 'building'"
-          name="lucide:loader-2"
-          class="mr-2 h-4 w-4 animate-spin"
-        />
-        <Icon v-else name="lucide:rocket" class="mr-2 h-4 w-4" />
-        {{ compose.last_deployed_at ? "Redeploy" : "Deploy" }}
-      </Button>
-    </div>
-
-    <div class="flex flex-wrap gap-4 border-b">
-      <button
-        v-for="tab in SUBTABS"
-        :key="tab.value"
-        class="flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-colors"
-        :class="
-          subTab === tab.value
-            ? 'border-primary font-medium text-foreground'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-        "
-        @click="subTab = tab.value"
-      >
-        <Icon :name="tab.icon" class="h-4 w-4" />
-        {{ tab.label }}
-      </button>
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <ComposeGeneral
-      v-if="subTab === 'general'"
+      v-else-if="subTab === 'general'"
       :compose="compose"
       @updated="fetchCompose"
     />
@@ -183,13 +168,33 @@ const statusBadge = computed(() => {
       :compose="compose"
     />
 
+    <ComposeEnvironment
+      v-else-if="subTab === 'environment'"
+      :compose="compose"
+    />
+
     <ComposeLogs v-else-if="subTab === 'logs'" :compose="compose" />
+
+    <ComposeAdvanced
+      v-else-if="subTab === 'advanced'"
+      :compose="compose"
+      @updated="fetchCompose"
+      @deleted="navigateTo(`/servers/${serverId}/projects/${projectId}?tab=compose`)"
+    />
 
     <ServerDockerComingSoon
       v-else-if="!READY_SUBTABS[subTab]"
       :title="SUBTABS.find((s) => s.value === subTab)?.label ?? subTab"
       description="Compose subtab is per-service which needs its own design pass — landing in a future slice."
       :icon="SUBTABS.find((s) => s.value === subTab)?.icon ?? 'lucide:hammer'"
+    />
+
+    <!-- Bottom Terminal pane — opens via the navbar's Terminal button. -->
+    <ServerTerminalBottom
+      v-if="server && server.connected"
+      :server="server"
+      :is-open="isTerminalOpen"
+      @close="isTerminalOpen = false"
     />
   </div>
 </template>

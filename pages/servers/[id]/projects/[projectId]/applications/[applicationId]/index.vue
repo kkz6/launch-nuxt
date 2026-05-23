@@ -4,6 +4,7 @@ import {
   dockerService,
   type DockerApplication,
 } from "~/services/dockerService";
+import type { Server } from "~/types";
 
 definePageMeta({
   layout: "default",
@@ -25,6 +26,7 @@ const SUBTABS = [
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", icon: "lucide:key" },
   { value: "domains", label: "Domains", icon: "lucide:globe" },
+  { value: "redirects", label: "Redirects", icon: "lucide:corner-up-right" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
   { value: "schedules", label: "Schedules", icon: "lucide:clock" },
@@ -32,15 +34,19 @@ const SUBTABS = [
 ] as const;
 type SubTabId = (typeof SUBTABS)[number]["value"];
 
+// Read straight from the URL — navbar subtab links are the source of
+// truth. Setting via `setSubTab` updates the URL; everything else
+// follows from the computed reading route.query.subtab.
 const validIds = SUBTABS.map((s) => s.value);
-const initial = (): SubTabId => {
-  const q = route.query.subtab as string;
-  return (validIds as readonly string[]).includes(q) ? (q as SubTabId) : "general";
-};
-const subTab = ref<SubTabId>(initial());
-watch(subTab, (v) => {
-  router.replace({ query: { ...route.query, subtab: v } });
+const subTab = computed<SubTabId>(() => {
+  const q = route.query.subtab as string | undefined;
+  return q && (validIds as readonly string[]).includes(q)
+    ? (q as SubTabId)
+    : "general";
 });
+const setSubTab = (v: SubTabId) => {
+  router.replace({ query: { ...route.query, subtab: v } });
+};
 
 // Header-level "Deploy" button. Flip subtab to Deployments after kick-off
 // so the user lands on the live history table.
@@ -54,7 +60,7 @@ const quickDeploy = async () => {
       app.value.project_id,
       app.value.id,
     );
-    subTab.value = "deployments";
+    setSubTab("deployments");
     toast.success("Deployment started");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
@@ -87,6 +93,21 @@ const fetchApp = async () => {
 };
 
 onMounted(fetchApp);
+
+// Server fetch + Terminal mount — see databases/[databaseId]/index.vue
+// for the same pattern. Required so the navbar's Terminal button has
+// somewhere to render the bottom pane.
+const server = ref<Server | null>(null);
+const isTerminalOpen = useState("serverTerminalOpen", () => false);
+const loadServer = async () => {
+  try {
+    const res = await $api<{ data: Server }>(`/servers/${serverId.value}`);
+    server.value = res.data;
+  } catch {
+    server.value = null;
+  }
+};
+onMounted(loadServer);
 
 // Subtabs that have a real implementation in phase 2b/2c. The rest
 // still render the ComingSoon placeholder until later slices fill them
@@ -124,77 +145,35 @@ useDockerApplicationEvents(teamId, (data) => {
 </script>
 
 <template>
-  <div v-if="isLoading" class="flex items-center justify-center py-12">
-    <Icon name="lucide:loader-2" class="h-8 w-8 animate-spin text-muted-foreground" />
-  </div>
+  <!--
+    Chrome renders immediately; the per-subtab body waits on `app`.
+    No inline "Back to project" link — the navbar's workload-detail
+    breadcrumb (Servers / serverName / projectName / appName) does
+    the trail.
+  -->
+  <div class="space-y-6 pb-10">
+    <!--
+      No on-page header — name + status are in the navbar breadcrumb.
+      Deploy button lives on the Deployments subtab.
+    -->
 
-  <div v-else-if="app" class="space-y-6 pb-10">
-    <NuxtLink
-      :to="`/servers/${serverId}/projects/${projectId}?tab=applications`"
-      class="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+    <!--
+      Content body waits on `app` so child components don't receive a
+      null prop. Skeleton card mirrors the eventual layout so the
+      page doesn't jump when data arrives.
+    -->
+    <div
+      v-if="!app"
+      class="flex items-center justify-center rounded-lg border border-dashed py-16"
     >
-      <Icon name="lucide:arrow-left" class="h-4 w-4" />
-      Back to project
-    </NuxtLink>
-
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <div class="flex items-center gap-3">
-          <h1 class="text-3xl font-semibold">{{ app.name }}</h1>
-          <span
-            class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-            :class="{
-              'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400':
-                app.status === 'running',
-              'bg-amber-500/15 text-amber-700 dark:text-amber-400':
-                app.status === 'idle' || app.status === 'building',
-              'bg-rose-500/15 text-rose-700 dark:text-rose-400':
-                app.status === 'failed',
-              'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300':
-                app.status === 'stopped',
-            }"
-          >
-            {{ app.status }}
-          </span>
-        </div>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Source: {{ app.source_type }}
-        </p>
-      </div>
-
-      <Button
-        :disabled="app.status === 'building' || isDeploying"
-        @click="quickDeploy"
-      >
-        <Icon
-          v-if="isDeploying || app.status === 'building'"
-          name="lucide:loader-2"
-          class="mr-2 h-4 w-4 animate-spin"
-        />
-        <Icon v-else name="lucide:rocket" class="mr-2 h-4 w-4" />
-        {{ app.last_deployed_at ? "Redeploy" : "Deploy" }}
-      </Button>
-    </div>
-
-    <div class="flex flex-wrap gap-4 border-b">
-      <button
-        v-for="tab in SUBTABS"
-        :key="tab.value"
-        class="flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-colors"
-        :class="
-          subTab === tab.value
-            ? 'border-primary font-medium text-foreground'
-            : 'border-transparent text-muted-foreground hover:text-foreground'
-        "
-        @click="subTab = tab.value"
-      >
-        <Icon :name="tab.icon" class="h-4 w-4" />
-        {{ tab.label }}
-      </button>
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <ApplicationGeneral
-      v-if="subTab === 'general'"
+      v-else-if="subTab === 'general'"
       :application="app"
       @updated="fetchApp"
     />
@@ -206,6 +185,11 @@ useDockerApplicationEvents(teamId, (data) => {
 
     <ApplicationDomains
       v-else-if="subTab === 'domains'"
+      :application="app"
+    />
+
+    <ApplicationRedirects
+      v-else-if="subTab === 'redirects'"
       :application="app"
     />
 
@@ -225,6 +209,7 @@ useDockerApplicationEvents(teamId, (data) => {
       v-else-if="subTab === 'advanced'"
       :application="app"
       @updated="fetchApp"
+      @deleted="navigateTo(`/servers/${serverId}/projects/${projectId}?tab=applications`)"
     />
 
     <ApplicationLogs v-else-if="subTab === 'logs'" :application="app" />
@@ -234,6 +219,19 @@ useDockerApplicationEvents(teamId, (data) => {
       :title="SUBTABS.find((s) => s.value === subTab)?.label ?? subTab"
       description="This tab will be wired up in a later phase. See the design doc for the full plan."
       :icon="SUBTABS.find((s) => s.value === subTab)?.icon ?? 'lucide:hammer'"
+    />
+
+    <!--
+      Bottom Terminal pane — `container` switches the WS handler to
+      `docker exec -it <container> sh` so the shell opens INSIDE the
+      application container, not on the host root.
+    -->
+    <ServerTerminalBottom
+      v-if="server && server.connected"
+      :server="server"
+      :is-open="isTerminalOpen"
+      :container="app?.container_name || ''"
+      @close="isTerminalOpen = false"
     />
   </div>
 </template>

@@ -12,17 +12,11 @@ interface Props {
 }
 const props = defineProps<Props>();
 
+// Volumes list lives in this component; the add-form moved to
+// ApplicationCreateVolume (dialog), same pattern Redirects and
+// Schedules use. Keeps this file focused on display + delete.
 const volumes = ref<DockerVolume[]>([]);
 const isLoading = ref(true);
-const isSaving = ref(false);
-const showAddForm = ref(false);
-
-const form = reactive({
-  type: "named" as DockerVolumeType,
-  name: "",
-  mount_path: "",
-  host_path: "",
-});
 
 const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
@@ -44,54 +38,27 @@ const fetchVolumes = async () => {
   }
 };
 
-const resetForm = () => {
-  form.type = "named";
-  form.name = "";
-  form.mount_path = "";
-  form.host_path = "";
-};
-
-const submitAdd = async () => {
-  if (!form.name.trim() || !form.mount_path.trim()) {
-    toast.error("Name and mount path are required");
-    return;
-  }
-  if (form.type === "bind" && !form.host_path.trim()) {
-    toast.error("Bind mounts need a host path");
-    return;
-  }
-  isSaving.value = true;
-  try {
-    const res = await dockerService.applications.createVolume(
-      props.application.server_id,
-      props.application.project_id,
-      props.application.id,
-      {
-        name: form.name.trim(),
-        mount_path: form.mount_path.trim(),
-        type: form.type,
-        ...(form.type === "bind" ? { host_path: form.host_path.trim() } : {}),
-      },
-    );
-    volumes.value = [...volumes.value, res.data].sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
-    resetForm();
-    showAddForm.value = false;
-    toast.success("Volume added");
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to add volume");
-  } finally {
-    isSaving.value = false;
-  }
+const onCreated = () => {
+  fetchVolumes();
 };
 
 const removeVolume = async (v: DockerVolume) => {
   if (!confirmationDialog.value) return;
+  const kind =
+    v.type === "file"
+      ? "file mount"
+      : v.type === "bind"
+        ? "bind mount"
+        : "volume";
   const result = await confirmationDialog.value.show({
-    title: "Remove Volume",
-    description: `Remove ${v.name} from this application? Data on the underlying volume is NOT deleted.`,
+    title: `Remove ${kind}`,
+    description: `Remove "${v.name}" from this application? ${
+      v.type === "volume"
+        ? "The underlying docker named volume is NOT deleted."
+        : v.type === "bind"
+          ? "The host directory is left in place."
+          : "The on-host config file is left in place."
+    }`,
     confirmText: "Remove",
     cancelText: "Cancel",
     destructive: true,
@@ -105,11 +72,51 @@ const removeVolume = async (v: DockerVolume) => {
       v.id,
     );
     volumes.value = volumes.value.filter((x) => x.id !== v.id);
-    toast.success("Volume removed");
+    toast.success("Mount removed");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to remove volume");
+    toast.error(e.data?.message || "Failed to remove mount");
   }
+};
+
+// Normalise the legacy "named" type to "volume" for display; the
+// backend coerces on create but historic rows still carry the old
+// string.
+const typeLabel = (t: DockerVolumeType): string => {
+  switch (t) {
+    case "bind":
+      return "bind";
+    case "file":
+      return "file";
+    case "volume":
+    case "named":
+    default:
+      return "volume";
+  }
+};
+
+const typeBadgeClass = (t: DockerVolumeType): string => {
+  switch (t) {
+    case "bind":
+      return "bg-blue-500/15 text-blue-700 dark:text-blue-400";
+    case "file":
+      return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
+    case "volume":
+    case "named":
+    default:
+      return "bg-violet-500/15 text-violet-700 dark:text-violet-400";
+  }
+};
+
+// Source / target column resolver — what to show in the "Source"
+// column varies by mount kind:
+//   - bind:   host_path
+//   - volume: name
+//   - file:   file_path (the on-host filename)
+const sourceFor = (v: DockerVolume): string => {
+  if (v.type === "bind") return v.host_path || "—";
+  if (v.type === "file") return v.file_path || v.name;
+  return v.name;
 };
 
 onMounted(fetchVolumes);
@@ -121,123 +128,62 @@ onMounted(fetchVolumes);
 
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold">Volumes</h2>
+        <h2 class="text-xl font-semibold">Volumes / Mounts</h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Mounts attached to the container at deploy time. Named volumes
-          survive container replacement; bind mounts map a host path
-          straight into the container.
+          Three flavours: <span class="font-medium">bind</span> maps a
+          host path, <span class="font-medium">volume</span> uses a
+          docker named volume that survives container replacement,
+          <span class="font-medium">file</span> writes a config file on
+          the host and bind-mounts it.
         </p>
       </div>
-      <Button @click="showAddForm = !showAddForm">
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Volume
-      </Button>
-    </div>
-
-    <div
-      v-if="showAddForm"
-      class="space-y-3 rounded-lg border bg-card p-4"
-    >
-      <div class="space-y-2">
-        <Label>Type</Label>
-        <div class="grid grid-cols-2 gap-2">
-          <button
-            v-for="t in [
-              { value: 'named' as const, label: 'Named volume', icon: 'lucide:database' },
-              { value: 'bind' as const, label: 'Bind mount', icon: 'lucide:link-2' },
-            ]"
-            :key="t.value"
-            type="button"
-            class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition"
-            :class="
-              form.type === t.value
-                ? 'border-primary bg-primary/5 text-foreground'
-                : 'border-input text-muted-foreground hover:border-foreground/40'
-            "
-            @click="form.type = t.value"
-          >
-            <Icon :name="t.icon" class="h-4 w-4" />
-            {{ t.label }}
-          </button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div class="space-y-1">
-          <Label for="vol-name">Name</Label>
-          <Input
-            id="vol-name"
-            v-model="form.name"
-            placeholder="data"
-            autocomplete="off"
-          />
-        </div>
-        <div class="space-y-1">
-          <Label for="vol-mount">Mount path</Label>
-          <Input
-            id="vol-mount"
-            v-model="form.mount_path"
-            placeholder="/var/lib/app/data"
-            autocomplete="off"
-          />
-        </div>
-      </div>
-
-      <div v-if="form.type === 'bind'" class="space-y-1">
-        <Label for="vol-host">Host path</Label>
-        <Input
-          id="vol-host"
-          v-model="form.host_path"
-          placeholder="/opt/launch/data"
-          autocomplete="off"
-        />
-        <p class="text-xs text-muted-foreground">
-          Absolute path on the docker server. Must exist and be readable
-          by the container's user.
-        </p>
-      </div>
-
-      <div class="flex justify-end gap-2">
-        <Button
-          variant="outline"
-          :disabled="isSaving"
-          @click="showAddForm = false"
-        >
-          Cancel
-        </Button>
-        <Button :disabled="isSaving" @click="submitAdd">
-          <Icon
-            v-if="isSaving"
-            name="lucide:loader-2"
-            class="mr-2 h-4 w-4 animate-spin"
-          />
-          Add Volume
-        </Button>
-      </div>
+      <ApplicationCreateVolume
+        v-if="volumes.length > 0"
+        :application="application"
+        @created="onCreated"
+      />
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
+    <!--
+      Empty state. The Add Mount button slot lives inline here (not
+      via SharedDataTable's #empty since the table isn't rendered when
+      the list is empty) so users always see a primary CTA when there
+      are no mounts yet.
+    -->
     <div
       v-else-if="volumes.length === 0"
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:hard-drive" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No volumes yet</h3>
+      <h3 class="mt-4 text-lg font-medium">No mounts yet</h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Attach a named volume for persistent state, or bind a host
-        directory into the container.
+        Attach a bind mount, named volume, or file mount to persist
+        state or push config into the container.
       </p>
+      <div class="mt-6">
+        <ApplicationCreateVolume
+          :application="application"
+          @created="onCreated"
+        />
+      </div>
     </div>
 
     <div v-else class="overflow-hidden rounded-lg border">
       <table class="w-full text-sm">
-        <thead class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead
+          class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground"
+        >
           <tr>
             <th class="px-4 py-3">Type</th>
-            <th class="px-4 py-3">Name / Host</th>
+            <th class="px-4 py-3">Name</th>
+            <th class="px-4 py-3">Source</th>
             <th class="px-4 py-3">Mount path</th>
             <th class="px-4 py-3"></th>
           </tr>
@@ -247,21 +193,14 @@ onMounted(fetchVolumes);
             <td class="px-4 py-3">
               <span
                 class="rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="
-                  v.type === 'bind'
-                    ? 'bg-blue-500/15 text-blue-700 dark:text-blue-400'
-                    : 'bg-violet-500/15 text-violet-700 dark:text-violet-400'
-                "
+                :class="typeBadgeClass(v.type)"
               >
-                {{ v.type }}
+                {{ typeLabel(v.type) }}
               </span>
             </td>
-            <td class="px-4 py-3 font-mono text-xs">
-              {{ v.type === "bind" ? v.host_path || v.name : v.name }}
-            </td>
-            <td class="px-4 py-3 font-mono text-xs">
-              {{ v.mount_path }}
-            </td>
+            <td class="px-4 py-3 font-medium">{{ v.name }}</td>
+            <td class="px-4 py-3 font-mono text-xs">{{ sourceFor(v) }}</td>
+            <td class="px-4 py-3 font-mono text-xs">{{ v.mount_path }}</td>
             <td class="px-4 py-3 text-right">
               <Button variant="ghost" size="icon" @click="removeVolume(v)">
                 <Icon name="lucide:trash-2" class="h-4 w-4" />
@@ -273,8 +212,11 @@ onMounted(fetchVolumes);
     </div>
 
     <p class="text-xs text-muted-foreground">
-      <Icon name="lucide:info" class="-mt-0.5 mr-1 inline-block h-3 w-3" />
-      Volume changes only apply on the next deploy — running containers
+      <Icon
+        name="lucide:info"
+        class="-mt-0.5 mr-1 inline-block h-3 w-3"
+      />
+      Mount changes only apply on the next deploy — running containers
       keep their existing mounts.
     </p>
   </div>

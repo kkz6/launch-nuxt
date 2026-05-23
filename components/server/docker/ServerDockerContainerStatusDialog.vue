@@ -332,8 +332,8 @@ const execStr = computed(() => {
           isn't a single field: ENTRYPOINT and CMD compose
           structurally, while Path + Args is what's actually running.
           Showing all three lets the user reconcile them — especially
-          handy for swarm-spawned containers where the runtime line
-          is much longer than the Dockerfile CMD.
+          handy for legacy (pre-v2) swarm-spawned containers where the
+          runtime line is much longer than the Dockerfile CMD.
         -->
         <section>
           <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

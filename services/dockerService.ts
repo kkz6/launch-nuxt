@@ -67,6 +67,13 @@ export interface DockerApplication {
   build_config?: Record<string, unknown> | null;
   status: DockerApplicationStatus;
   container_id?: string | null;
+  /**
+   * Deterministic on-host docker container name
+   * (`launch-<project>-<app>`). Fed to the navbar Terminal button so
+   * the WS handler opens a shell inside the container rather than on
+   * the host root.
+   */
+  container_name?: string;
   last_deployed_at?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -101,12 +108,28 @@ export interface UpdateDockerApplicationData {
   name?: string;
 }
 
+export interface DockerDomainDnsValidation {
+  host: string;
+  ok: boolean;
+  wildcard: boolean;
+  expected_ip?: string;
+  resolved_ips?: string[];
+  message: string;
+}
+
 export interface DockerDomain {
   id: string;
   application_id: string;
   host: string;
   path?: string | null;
+  /** Path the app expects internally; defaults to "/". */
+  internal_path?: string | null;
+  /** When true, Traefik strips `path` before forwarding. */
+  strip_path: boolean;
+  /** Per-domain override of app.internal_port. Null = use app port. */
+  container_port?: number | null;
   https: boolean;
+  certificate_provider: "letsencrypt" | string;
   certificate_id?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -115,12 +138,27 @@ export interface DockerDomain {
 export interface CreateDockerDomainData {
   host: string;
   path?: string;
+  internal_path?: string;
+  strip_path?: boolean;
+  container_port?: number;
   https?: boolean;
+  certificate_provider?: "letsencrypt";
+  /**
+   * Mirrors AddSite — when true and the host's base domain is
+   * registered in the DNS module, the API creates an A record
+   * pointing at the docker server's public IP.
+   */
+  create_dns_record?: boolean;
+  connected_domain_id?: string | null;
 }
 
 export interface UpdateDockerDomainData {
-  https?: boolean;
   path?: string;
+  internal_path?: string;
+  strip_path?: boolean;
+  container_port?: number;
+  https?: boolean;
+  certificate_provider?: "letsencrypt";
 }
 
 // ---- App env vars + volumes ----------------------------------------------
@@ -155,7 +193,42 @@ export interface SetDockerEnvVarsData {
   vars: CreateDockerEnvVarData[];
 }
 
-export type DockerVolumeType = "named" | "bind";
+/**
+ * Project-scoped env var. Same shape as DockerEnvVar but owned by a
+ * project — referenced from container envs via `${{project.<KEY>}}`.
+ */
+export interface DockerProjectEnvVar {
+  id: string;
+  project_id: string;
+  key: string;
+  value: string;
+  is_secret: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Env var attached to a managed database container (user-added
+ * extras on top of the auto-generated engine credentials).
+ */
+export interface DockerDatabaseEnvVar {
+  id: string;
+  database_id: string;
+  key: string;
+  value: string;
+  is_secret: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * Mirrors dokploy's mount-kinds: "bind" (host_path), "volume" (docker
+ * named volume), "file" (content + file_path written on the host then
+ * bind-mounted). "named" is the legacy spelling of "volume" — the
+ * backend coerces it on create; we keep the literal in the union so
+ * rows persisted before the rename still type-check.
+ */
+export type DockerVolumeType = "bind" | "volume" | "file" | "named";
 
 export interface DockerVolume {
   id: string;
@@ -164,6 +237,10 @@ export interface DockerVolume {
   mount_path: string;
   type: DockerVolumeType;
   host_path?: string | null;
+  /** Body written to disk for type=file. */
+  content?: string | null;
+  /** On-host filename for type=file (under the deploy dir). */
+  file_path?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -173,11 +250,15 @@ export interface CreateDockerVolumeData {
   mount_path: string;
   type: DockerVolumeType;
   host_path?: string;
+  content?: string;
+  file_path?: string;
 }
 
 export interface UpdateDockerVolumeData {
   mount_path?: string;
   host_path?: string;
+  content?: string;
+  file_path?: string;
 }
 
 // ---- Schedules + advanced -------------------------------------------------
@@ -187,6 +268,16 @@ export interface DockerSchedule {
   application_id: string;
   cron: string;
   command: string;
+  /** false = paused (worker skips it). */
+  enabled: boolean;
+  /** "bash" or "sh" — the in-container shell exec'd into. */
+  shell_type: "bash" | "sh";
+  /**
+   * ULID of the server-tasks row from the most recent run. The
+   * Schedules subtab pipes this into <ServerLogViewer entity="task">
+   * to stream that single run's stdout+stderr.
+   */
+  last_task_id?: string | null;
   last_run_at?: string | null;
   last_status?: string | null;
   created_at?: string;
@@ -196,23 +287,77 @@ export interface DockerSchedule {
 export interface CreateDockerScheduleData {
   cron: string;
   command: string;
+  /** Defaults to true server-side. */
+  enabled?: boolean;
+  shell_type?: "bash" | "sh";
 }
 
 export interface UpdateDockerScheduleData {
   cron?: string;
   command?: string;
+  enabled?: boolean;
+  shell_type?: "bash" | "sh";
 }
 
 /**
  * Advanced runtime knobs. All optional; present keys go to
  * build_config and apply on the next deploy. Empty strings clear.
  */
+export interface DockerRedirectInput {
+  regex: string;
+  replacement: string;
+  permanent: boolean;
+}
+
+/**
+ * Per-row docker-application redirect. Same shape the PHP-site
+ * redirects use (from/to/type) so the same DataTable + dialog
+ * component code can hydrate either source.
+ */
+export interface DockerApplicationRedirect {
+  id: string;
+  from: string;
+  to: string;
+  type: 301 | 302 | 307 | 308;
+  created_at?: string;
+}
+
+export interface CreateDockerApplicationRedirectData {
+  from: string;
+  to: string;
+  type: 301 | 302 | 307 | 308;
+}
+
+export interface UpdateDockerApplicationRedirectData {
+  from?: string;
+  to?: string;
+  type?: 301 | 302 | 307 | 308;
+}
+
+export interface DockerSecurityInput {
+  username: string;
+  password: string;
+}
+
 export interface UpdateDockerAdvancedData {
   cpu_limit?: string;
   memory_limit?: string;
+  cpu_reservation?: string;
+  memory_reservation?: string;
   restart_policy?: "no" | "on-failure" | "always" | "unless-stopped";
   healthcheck_command?: string;
   extra_ports?: string[];
+  /**
+   * Send `redirects: []` to clear all; omit the key to leave them
+   * unchanged. Each row compiles to a Traefik RedirectRegex
+   * middleware on the next deploy.
+   */
+  redirects?: DockerRedirectInput[];
+  /**
+   * Send `security: { username: "", password: "" }` to clear basic
+   * auth; omit the key to leave it unchanged.
+   */
+  security?: DockerSecurityInput;
 }
 
 // ---- Host diagnostic types ------------------------------------------------
@@ -348,6 +493,11 @@ export interface DockerCompose {
   source_config?: Record<string, unknown> | null;
   compose_file_path?: string | null;
   raw_yaml?: string | null;
+  // Body of the .env file written next to the compose file on each
+  // deploy. Only populated on the detail (Show) response, omitted
+  // from list responses to keep them small. UI: edited via the
+  // compose Environment subtab.
+  env_file?: string | null;
   status: DockerApplicationStatus;
   last_deployed_at?: string | null;
   created_at?: string;
@@ -370,6 +520,10 @@ export interface CreateDockerComposeData {
 
 export interface UpdateDockerComposeData {
   name?: string;
+  // Setting to an empty string clears the file; omitting (undefined)
+  // leaves it unchanged. The backend deploy task writes this to
+  // `${STACK_DIR}/.env` on the next deploy.
+  env_file?: string;
 }
 
 // ---- Managed databases ----------------------------------------------------
@@ -400,6 +554,31 @@ export interface DockerDatabase {
   status: DockerApplicationStatus;
   /** Present only on get-with-reveal responses. */
   credentials?: DockerDatabaseCredentials | null;
+  /**
+   * Advanced subtab knobs — restart_policy + resource limits.
+   * Shape matches docker_applications.build_config so the same form
+   * patterns work on both. Optional; brand-new rows may be null.
+   */
+  build_config?: Record<string, unknown> | null;
+  /**
+   * Deterministic named-volume label the run-database script binds at
+   * `data_path`. Surfaced here so the Advanced subtab can render the
+   * Volumes section without an extra round-trip.
+   */
+  volume_name?: string;
+  /**
+   * In-container path where the engine keeps its on-disk state
+   * (`/var/lib/postgresql/data`, `/var/lib/mysql`, ...). Engine-specific
+   * — derived on the backend from the engine catalogue.
+   */
+  data_path?: string;
+  /**
+   * Deterministic on-host docker container name
+   * (`launch-db-<project>-<db>`). The navbar Terminal button reads
+   * this and forwards it to the WS handler as `?container=` so the
+   * shell opens inside the container, not on the host.
+   */
+  container_name?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -421,15 +600,20 @@ export type DockerDatabaseEngineCatalogue = Record<DockerDatabaseEngine, string[
 export interface DockerDatabaseBackup {
   id: string;
   database_id: string;
-  provider: string;
-  endpoint?: string | null;
-  bucket: string;
-  region?: string | null;
-  path_prefix?: string | null;
+  /**
+   * FK into `storage_providers`. The actual S3 credentials live on
+   * that row; configure the destination once under
+   * Settings → Connections, reuse it across every database backup.
+   */
+  storage_provider_id: number;
+  /** Bucket sub-folder where this database's dumps land. */
+  path?: string | null;
+  /** Number of past run rows to keep. Older rows are pruned. */
+  retention: number;
+  notify_on_success: boolean;
+  notify_on_failure: boolean;
   cron_schedule?: string | null;
   enabled: boolean;
-  access_key: string;
-  has_secret_key: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -447,13 +631,11 @@ export interface DockerDatabaseBackupRun {
 }
 
 export interface ConfigureDockerBackupData {
-  provider: "s3";
-  endpoint?: string;
-  bucket: string;
-  region?: string;
-  path_prefix?: string;
-  access_key: string;
-  secret_key: string;
+  storage_provider_id: number;
+  path?: string;
+  retention: number;
+  notify_on_success: boolean;
+  notify_on_failure: boolean;
   cron_schedule?: string;
   enabled: boolean;
 }
@@ -469,8 +651,13 @@ export interface DockerDeployment {
   id: string;
   team_id: string;
   server_id: string;
-  target_type: "application" | "compose";
+  // Three workload kinds share this polymorphic row — application,
+  // compose, and (added in slice 2j) database for lifecycle history.
+  target_type: "application" | "compose" | "database";
   target_id: string;
+  // Set on database rows (create/start/restart/stop/rm). null for
+  // application + compose rows where the implicit verb is "deploy".
+  action?: string | null;
   status:
     | "pending"
     | "building"
@@ -478,6 +665,10 @@ export interface DockerDeployment {
     | "success"
     | "failed"
     | "cancelled";
+  // task_id binds the row to a running server-task so the UI can
+  // stream live SSH output via ServerLogViewer entity="task". Null
+  // until the worker has dispatched the task.
+  task_id?: string | null;
   commit_sha?: string | null;
   commit_msg?: string | null;
   image_ref?: string | null;
@@ -527,6 +718,47 @@ export const dockerService = {
       const { delete: del } = useApi();
       return del(`/servers/${serverId}/docker/projects/${projectId}`);
     },
+
+    // Project-scoped env vars — referenced from container envs via
+    // `${{project.<KEY>}}`. Same CRUD shape as the application env
+    // vars below; the backend resolves the refs at deploy/run time.
+    envVars: {
+      list: (serverId: string, projectId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<DockerProjectEnvVar[]>>(
+          `/servers/${serverId}/docker/projects/${projectId}/env-vars`,
+        );
+      },
+      create: (
+        serverId: string,
+        projectId: string,
+        data: CreateDockerEnvVarData,
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<DockerProjectEnvVar>>(
+          `/servers/${serverId}/docker/projects/${projectId}/env-vars`,
+          data,
+        );
+      },
+      update: (
+        serverId: string,
+        projectId: string,
+        envVarId: string,
+        data: UpdateDockerEnvVarData,
+      ) => {
+        const { patch } = useApi();
+        return patch<ApiResponse<DockerProjectEnvVar>>(
+          `/servers/${serverId}/docker/projects/${projectId}/env-vars/${envVarId}`,
+          data,
+        );
+      },
+      delete: (serverId: string, projectId: string, envVarId: string) => {
+        const { delete: del } = useApi();
+        return del(
+          `/servers/${serverId}/docker/projects/${projectId}/env-vars/${envVarId}`,
+        );
+      },
+    },
   },
 
   applications: {
@@ -569,10 +801,22 @@ export const dockerService = {
       );
     },
 
-    delete: (serverId: string, projectId: string, applicationId: string) => {
+    /**
+     * `removeVolumes` opt-in flag mirrors the docker compose / database
+     * delete shape. When true the backend iterates the application's
+     * named volume rows and `docker volume rm` each AFTER the container
+     * is gone. Default false — preserves data on a misclick.
+     */
+    delete: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      opts?: { removeVolumes?: boolean },
+    ) => {
       const { delete: del } = useApi();
+      const q = opts?.removeVolumes ? "?remove_volumes=true" : "";
       return del(
-        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}`,
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}${q}`,
       );
     },
 
@@ -580,6 +824,24 @@ export const dockerService = {
       const { post } = useApi();
       return post<ApiResponse<DockerDeployment>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deploy`,
+        {},
+      );
+    },
+
+    /**
+     * Lifecycle action against the running container. "reload" maps
+     * to docker restart server-side; "stop" / "start" are passthrough.
+     * Rebuild isn't here — Rebuild = Deploy (same endpoint above).
+     */
+    lifecycle: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      action: "reload" | "stop" | "start",
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<{ action: string }>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/${action}`,
         {},
       );
     },
@@ -634,6 +896,74 @@ export const dockerService = {
       const { delete: del } = useApi();
       return del(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}`,
+      );
+    },
+
+    /**
+     * Validate the domain's A record against the docker server's
+     * public IP. Backed by a server-side DNS lookup (so this works
+     * across CORS-restricted browser contexts). Wildcard hostnames
+     * (traefik.me, sslip.io, …) short-circuit to ok=true.
+     */
+    validateDomainDns: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      domainId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDomainDnsValidation>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}/validate-dns`,
+      );
+    },
+
+    // redirects — backed by build_config.redirects, exposed per-row
+    // so the Redirects subtab can plug into the same DataTable + dialog
+    // shape the PHP-site SitesRedirects subtab uses.
+    listRedirects: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerApplicationRedirect[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/redirects`,
+      );
+    },
+    createRedirect: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: CreateDockerApplicationRedirectData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerApplicationRedirect>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/redirects`,
+        data,
+      );
+    },
+    updateRedirect: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      redirectId: string,
+      data: UpdateDockerApplicationRedirectData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerApplicationRedirect>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/redirects/${redirectId}`,
+        data,
+      );
+    },
+    deleteRedirect: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      redirectId: string,
+    ) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/redirects/${redirectId}`,
       );
     },
 
@@ -851,10 +1181,21 @@ export const dockerService = {
       );
     },
 
-    delete: (serverId: string, projectId: string, composeId: string) => {
+    /**
+     * `removeVolumes` opt-in flips the backend teardown from
+     * `docker compose down` to `down -v`. Default false — keeps named
+     * volumes so a redeploy of the same stack reuses the existing data.
+     */
+    delete: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      opts?: { removeVolumes?: boolean },
+    ) => {
       const { delete: del } = useApi();
+      const q = opts?.removeVolumes ? "?remove_volumes=true" : "";
       return del(
-        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}`,
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}${q}`,
       );
     },
 
@@ -870,6 +1211,19 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerDeployment[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments`,
+      );
+    },
+
+    /**
+     * List service names in the compose stack — drives the Logs
+     * subtab's container picker. Returns [] when the stack has
+     * never been deployed. Implementation: backend SSHes the host
+     * and runs `docker compose ps --services`.
+     */
+    listServices: (serverId: string, projectId: string, composeId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<string[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/services`,
       );
     },
   },
@@ -981,10 +1335,22 @@ export const dockerService = {
       );
     },
 
-    delete: (serverId: string, projectId: string, databaseId: string) => {
+    /**
+     * `removeVolumes` opt-in tells the backend's rm lifecycle action to
+     * also `docker volume rm` the database's named data volume after
+     * the container is gone. Default false — preserves the data dir so
+     * a recreate restarts with the previous state intact.
+     */
+    delete: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+      opts?: { removeVolumes?: boolean },
+    ) => {
       const { delete: del } = useApi();
+      const q = opts?.removeVolumes ? "?remove_volumes=true" : "";
       return del(
-        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}`,
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}${q}`,
       );
     },
 
@@ -998,6 +1364,71 @@ export const dockerService = {
       return post<ApiResponse<DockerDatabase>>(
         `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/lifecycle`,
         { action },
+      );
+    },
+
+    // Lifecycle history. Same shape as applications/composes — rows
+    // come from the polymorphic docker_deployments table with
+    // target_type="database" and action set to the lifecycle verb.
+    listDeployments: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDeployment[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/deployments`,
+      );
+    },
+
+    // Toggle the external port mapping. Enabled=true with port=N maps
+    // N:internal_port on the host; enabled=false clears the mapping.
+    // Triggers a container recreate on the worker.
+    setExpose: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+      data: { enabled: boolean; port?: number | null },
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDatabase>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/expose`,
+        data,
+      );
+    },
+
+    // Update the Advanced subtab's runtime knobs — restart policy and
+    // resource limits/reservations. Persists into build_config and
+    // dispatches `docker update` over SSH so the change applies live.
+    // Empty strings clear that knob.
+    updateAdvanced: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+      data: {
+        restart_policy: "no" | "on-failure" | "always" | "unless-stopped";
+        cpu_limit?: string;
+        memory_limit?: string;
+        cpu_reservation?: string;
+        memory_reservation?: string;
+      },
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerDatabase>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/advanced`,
+        data,
+      );
+    },
+
+    // Danger Zone — wipe the named data volume and recreate the
+    // container with the same config. Returns the row in its pre-
+    // rebuild state; the worker flips status as the run script
+    // progresses.
+    rebuild: (serverId: string, projectId: string, databaseId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDatabase>>(
+        `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/rebuild`,
+        {},
       );
     },
 
@@ -1050,6 +1481,56 @@ export const dockerService = {
         `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup/restore`,
         { run_id: runId },
       );
+    },
+
+    // Database env vars — user-added extras layered on top of the
+    // auto-generated engine credentials. Values may reference
+    // `${{project.<KEY>}}` — the run-database worker substitutes
+    // them at docker-run time so a project-level change propagates
+    // on the next Restart / Rebuild.
+    envVars: {
+      list: (serverId: string, projectId: string, databaseId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<DockerDatabaseEnvVar[]>>(
+          `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/env-vars`,
+        );
+      },
+      create: (
+        serverId: string,
+        projectId: string,
+        databaseId: string,
+        data: CreateDockerEnvVarData,
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<DockerDatabaseEnvVar>>(
+          `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/env-vars`,
+          data,
+        );
+      },
+      update: (
+        serverId: string,
+        projectId: string,
+        databaseId: string,
+        envVarId: string,
+        data: UpdateDockerEnvVarData,
+      ) => {
+        const { patch } = useApi();
+        return patch<ApiResponse<DockerDatabaseEnvVar>>(
+          `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/env-vars/${envVarId}`,
+          data,
+        );
+      },
+      delete: (
+        serverId: string,
+        projectId: string,
+        databaseId: string,
+        envVarId: string,
+      ) => {
+        const { delete: del } = useApi();
+        return del(
+          `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/env-vars/${envVarId}`,
+        );
+      },
     },
   },
 };

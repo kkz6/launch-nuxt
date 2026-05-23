@@ -14,7 +14,12 @@ const props = defineProps<Props>();
 const composes = ref<DockerCompose[]>([]);
 const isLoading = ref(true);
 
-const createOpen = ref(false);
+// Shared with the navbar "+ New Compose Stack" button — see
+// components/layout/Navbar.vue.
+const createOpen = useState<boolean>(
+  "dockerCreateComposeOpen",
+  () => false,
+);
 
 const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
@@ -117,19 +122,17 @@ onMounted(fetchComposes);
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-semibold">Compose</h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Multi-container stacks deployed with <code>docker compose up</code>.
-          Use these for apps that need a database alongside, sidecars, or
-          anything beyond a single container.
-        </p>
-      </div>
-      <Button @click="createOpen = true">
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        New Compose Stack
-      </Button>
+    <!--
+      Heading-only row — the "New Compose Stack" trigger now lives in
+      the project navbar next to Terminal.
+    -->
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold">Compose</h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Multi-container stacks deployed with <code>docker compose up</code>.
+        Use these for apps that need a database alongside, sidecars, or
+        anything beyond a single container.
+      </p>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -152,45 +155,57 @@ onMounted(fetchComposes);
       </Button>
     </div>
 
+    <!--
+      Card layout mirrors ServerDockerProjects.vue / Databases.vue /
+      Applications.vue. All four card grids share the same brand-icon-bg
+      pattern so the project's three workload tabs read consistently.
+    -->
     <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <NuxtLink
         v-for="c in composes"
         :key="c.id"
         :to="`/servers/${props.serverId}/projects/${props.projectId}/composes/${c.id}`"
-        class="group block rounded-lg border bg-card p-5 transition hover:border-primary"
+        class="group block h-full"
       >
-        <div class="flex items-start justify-between">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <Icon name="lucide:layers" class="h-4 w-4 text-muted-foreground" />
-              <h3 class="truncate text-lg font-semibold group-hover:text-primary">
-                {{ c.name }}
-              </h3>
+        <div
+          class="relative flex h-full flex-col rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+        >
+          <div class="relative flex items-start gap-3">
+            <div
+              class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
+            >
+              <Icon
+                name="lucide:layers"
+                class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
+              />
             </div>
-            <p class="mt-1 line-clamp-1 text-xs text-muted-foreground">
-              {{ sourceSummary(c) }}
-            </p>
+            <div class="min-w-0 flex-1">
+              <h3 class="truncate font-semibold">{{ c.name }}</h3>
+              <p class="line-clamp-1 text-sm text-muted-foreground">
+                {{ sourceSummary(c) }}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="-mr-1 -mt-1 shrink-0 opacity-0 transition group-hover:opacity-100"
+              @click.stop.prevent="deleteCompose(c)"
+            >
+              <Icon name="lucide:trash-2" class="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="ml-2 shrink-0 opacity-0 transition group-hover:opacity-100"
-            @click.prevent="deleteCompose(c)"
-          >
-            <Icon name="lucide:trash-2" class="h-4 w-4" />
-          </Button>
-        </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <span
-            class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-            :class="statusColor(c.status)"
-          >
-            {{ c.status }}
-          </span>
-          <span class="text-xs text-muted-foreground">
-            {{ c.last_deployed_at ? `Deployed ${relative(c.last_deployed_at)}` : "Never deployed" }}
-          </span>
+          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+            <span
+              class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+              :class="statusColor(c.status)"
+            >
+              {{ c.status }}
+            </span>
+            <span class="text-xs text-muted-foreground">
+              {{ c.last_deployed_at ? `Deployed ${relative(c.last_deployed_at)}` : "Never deployed" }}
+            </span>
+          </div>
         </div>
       </NuxtLink>
     </div>
@@ -203,3 +218,18 @@ onMounted(fetchComposes);
     />
   </div>
 </template>
+
+<style scoped>
+/*
+  Hover-fill for the icon block, matching the project/database/app
+  cards. Single theme primary tone keeps the four workload grids
+  visually unified.
+*/
+.group:hover .brand-icon-bg {
+  background-color: hsl(var(--primary));
+}
+
+.group:hover .brand-icon {
+  color: hsl(var(--primary-foreground));
+}
+</style>

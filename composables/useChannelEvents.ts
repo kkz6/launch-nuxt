@@ -346,6 +346,13 @@ export const useDockerApplicationEvents = (
       'docker.application.deploying',
       'docker.application.deployed',
       'docker.application.failed',
+      // Schedule lifecycle — fired by RunApplicationScheduleJob on
+      // every tick so the Schedules subtab refreshes Last Run /
+      // Status / Last Task without polling.
+      'docker.application.schedule.added',
+      'docker.application.schedule.updated',
+      'docker.application.schedule.deleted',
+      'docker.application.schedule.ran',
     ],
     onEvent,
   )
@@ -401,6 +408,42 @@ export const useDockerComposeEvents = (
       'docker.compose.deployed',
       'docker.compose.failed',
       'docker.compose.removed',
+    ],
+    onEvent,
+  )
+}
+
+/**
+ * Database backup lifecycle events. Both the synchronous "Run now"
+ * path (BackupService.RunNow) and the every-minute scheduled poller
+ * (jobs.PollDueBackupsJob → jobs.RunBackupJob) fire the same event
+ * names — the Backups subtab refetches its run history on any of them
+ * so the new row appears without a manual reload.
+ *
+ * Events:
+ * - docker.database.backup.configured (config created/updated)
+ * - docker.database.backup.deleted    (config removed)
+ * - docker.database.backup.restored   (restore-from-snapshot finished)
+ * - docker.database.backup.run.started   (scheduled run dispatched)
+ * - docker.database.backup.run.succeeded (run uploaded to S3)
+ * - docker.database.backup.run.failed    (dump or upload failed)
+ */
+export const useDockerBackupEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    [
+      'docker.database.backup.configured',
+      'docker.database.backup.deleted',
+      'docker.database.backup.restored',
+      'docker.database.backup.run.started',
+      'docker.database.backup.run.succeeded',
+      'docker.database.backup.run.failed',
     ],
     onEvent,
   )

@@ -222,6 +222,41 @@ const updateProjectIndicator = () => {
   }
 };
 
+// Workload (database / application / compose) subtab nav. Same shape
+// as the project tab nav — sliding underline indicator + ref map.
+const workloadNavRef = ref<HTMLElement | null>(null);
+const workloadTabRefs = ref<Map<string, HTMLElement>>(new Map());
+const workloadIndicatorLeft = ref(0);
+const workloadIndicatorWidth = ref(0);
+
+const setWorkloadTabRef = (key: string, el: unknown) => {
+  if (el) {
+    workloadTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
+  }
+};
+
+const updateWorkloadIndicator = () => {
+  if (!isWorkloadDetailPage.value) {
+    workloadIndicatorWidth.value = 0;
+    return;
+  }
+  const currentSubtab = (route.query.subtab as string) || 'general';
+  if (workloadTabRefs.value.has(currentSubtab)) {
+    const tabEl = workloadTabRefs.value.get(currentSubtab);
+    if (tabEl && workloadNavRef.value) {
+      const navRect = workloadNavRef.value.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+      workloadIndicatorLeft.value = tabRect.left - navRect.left;
+      workloadIndicatorWidth.value = tabRect.width;
+    }
+  } else {
+    workloadIndicatorWidth.value = 0;
+  }
+};
+
 // Advanced sub-tabs indicator
 const advancedNavRef = ref<HTMLElement | null>(null);
 const advancedTabRefs = ref<Map<string, HTMLElement>>(new Map());
@@ -259,6 +294,7 @@ watch([() => route.path, () => route.query.tab, () => route.query.subtab], () =>
     updateServerIndicator();
     updateSiteIndicator();
     updateProjectIndicator();
+    updateWorkloadIndicator();
     updateAdvancedIndicator();
   });
 }, { immediate: true });
@@ -332,9 +368,8 @@ const isSiteDetailPage = computed(() => {
 
 // Project detail page — exact match on /servers/:id/projects/:projectId
 // (no deeper segments). The workload detail pages live one level
-// further down (applications/composes/databases) and get their own
-// navbar treatment when they need it; the breadcrumb on those still
-// resolves to this page via the back arrow.
+// further down (applications/composes/databases) and have their own
+// breadcrumb block below.
 const isProjectDetailPage = computed(() => {
   return (
     route.path.match(
@@ -342,6 +377,302 @@ const isProjectDetailPage = computed(() => {
     ) !== null
   );
 });
+
+// Workload detail pages — /servers/:id/projects/:p/(databases|applications|composes)/:w
+// The navbar renders a breadcrumb trail (Servers / server / project /
+// workload) on these so the user doesn't need an inline "Back to
+// project" link on the page itself.
+const workloadDetailMatch = computed(() => {
+  return route.path.match(
+    /^\/servers\/([^/]+)\/projects\/([^/]+)\/(databases|applications|composes)\/([^/]+)$/,
+  );
+});
+const isWorkloadDetailPage = computed(() => workloadDetailMatch.value !== null);
+const workloadKind = computed<"database" | "application" | "compose" | null>(() => {
+  const m = workloadDetailMatch.value;
+  if (!m) return null;
+  if (m[3] === "databases") return "database";
+  if (m[3] === "applications") return "application";
+  return "compose";
+});
+const workloadId = computed(() => {
+  const m = workloadDetailMatch.value;
+  return m ? m[4] : null;
+});
+const workloadKindLabel = computed(() => {
+  switch (workloadKind.value) {
+    case "database":
+      return "Database";
+    case "application":
+      return "Application";
+    case "compose":
+      return "Compose stack";
+    default:
+      return "";
+  }
+});
+const workloadKindIcon = computed(() => {
+  // Databases get the engine-specific brand icon so the breadcrumb
+  // reads like a per-engine product entry (Postgres logo, MySQL
+  // dolphin, etc.) rather than the generic database glyph. Apps and
+  // composes use their kind icon.
+  //
+  // While the workload fetch is in flight, `workloadEngine` is still
+  // null. Return an empty string here so the template hides the icon
+  // (via v-if) instead of falling through to the generic
+  // `lucide:database` glyph for ~200ms — that flicker is what made
+  // the breadcrumb seem to pick a random icon between renders.
+  if (workloadKind.value === "database") {
+    switch (workloadEngine.value) {
+      case "postgres":
+        return "simple-icons:postgresql";
+      case "mysql":
+        return "simple-icons:mysql";
+      case "mariadb":
+        return "simple-icons:mariadb";
+      case "redis":
+        return "simple-icons:redis";
+      case "mongo":
+        return "simple-icons:mongodb";
+      default:
+        return "";
+    }
+  }
+  if (workloadKind.value === "application") return "lucide:box";
+  if (workloadKind.value === "compose") return "lucide:layers";
+  return "lucide:circle";
+});
+
+// Per-engine icon tint so the breadcrumb's last segment carries a
+// little brand colour — postgres = sky, mysql/mariadb = amber, etc.
+const workloadKindIconColor = computed(() => {
+  if (workloadKind.value !== "database") return "text-muted-foreground";
+  switch (workloadEngine.value) {
+    case "postgres":
+      return "text-sky-500";
+    case "mysql":
+    case "mariadb":
+      return "text-amber-500";
+    case "redis":
+      return "text-rose-500";
+    case "mongo":
+      return "text-emerald-500";
+    default:
+      return "text-muted-foreground";
+  }
+});
+
+const workloadStatusBadgeClass = computed(() => {
+  switch (workloadStatus.value) {
+    case "running":
+      return "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400";
+    case "building":
+    case "idle":
+      return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+    case "failed":
+      return "bg-rose-500/15 text-rose-700 dark:text-rose-400";
+    case "stopped":
+      return "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300";
+    default:
+      return "";
+  }
+});
+
+// Single-dot variant of the status indicator. Same colour ramp as the
+// pill badge above, used in the breadcrumb so the visual weight stays
+// low — same pattern the project breadcrumb uses for server
+// connection state.
+const workloadStatusDotClass = computed(() => {
+  switch (workloadStatus.value) {
+    case "running":
+      return "bg-emerald-500";
+    case "building":
+    case "idle":
+      return "bg-amber-500 animate-pulse";
+    case "failed":
+      return "bg-rose-500";
+    case "stopped":
+      return "bg-zinc-400";
+    default:
+      return "bg-muted";
+  }
+});
+
+// Engine version + port info used to live in a breadcrumb subtitle
+// but the two-line layout felt heavy. Engine version is shown on the
+// General tab info-card grid; the breadcrumb stays single-line.
+const workloadParentTab = computed(() => {
+  switch (workloadKind.value) {
+    case "database":
+      return "databases";
+    case "application":
+      return "applications";
+    case "compose":
+      return "compose";
+    default:
+      return "overview";
+  }
+});
+
+// Subtabs per workload kind. Mirrors the existing per-page SUBTABS
+// arrays so a refactor here keeps the navbar + page in sync. The
+// `query` value matches the `?subtab=` URL param the pages already
+// read on mount.
+const databaseSubTabs = [
+  { value: "general", label: "General", query: "general", icon: "lucide:info" },
+  { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
+  { value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" },
+  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+];
+const applicationSubTabs = [
+  { value: "general", label: "General", query: "general", icon: "lucide:info" },
+  { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
+  { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
+  { value: "domains", label: "Domains", query: "domains", icon: "lucide:globe" },
+  { value: "redirects", label: "Redirects", query: "redirects", icon: "lucide:corner-up-right" },
+  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
+  { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
+  { value: "schedules", label: "Schedulers", query: "schedules", icon: "lucide:clock" },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+];
+// Compose subtabs mirror the application tabs where they make sense
+// at the stack level. Skipped:
+//   - Domains / Redirects → per-service config, lives in the YAML
+//   - Volumes              → declared in the YAML
+//   - Schedulers           → per-container; needs a service selector
+// Logs has a service selector inside the component so the user can
+// pick which container's stdout to stream when the stack has more
+// than one service.
+const composeSubTabs = [
+  { value: "general", label: "General", query: "general", icon: "lucide:info" },
+  { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
+  { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
+  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+];
+const workloadSubTabs = computed(() => {
+  switch (workloadKind.value) {
+    case "database":
+      // Redis is the one engine where backups don't apply — it's an
+      // in-memory store, the dump tools simply don't exist for it.
+      // Hide the tab so we don't dangle a non-functional surface.
+      if (workloadEngine.value === "redis") {
+        return databaseSubTabs.filter((t) => t.value !== "backups");
+      }
+      return databaseSubTabs;
+    case "application":
+      return applicationSubTabs;
+    case "compose":
+      return composeSubTabs;
+    default:
+      return [];
+  }
+});
+
+const isWorkloadSubTabActive = (query: string) => {
+  const current = (route.query.subtab as string) || 'general';
+  return current === query;
+};
+
+// Workload action bus. The detail page subscribes to bumps on this
+// key so it can re-fetch immediately when the navbar fires a
+// lifecycle action — same shape dockerProjectsRefreshKey uses for
+// the New-Project flow.
+const workloadActionRefreshKey = useState<number>(
+  'workloadActionRefreshKey',
+  () => 0,
+);
+const workloadActionInFlight = useState<
+  'start' | 'stop' | 'restart' | 'deploy' | null
+>('workloadActionInFlight', () => null);
+
+// Application Actions dropdown handler. The verbs in the dropdown
+// (Deploy / Reload / Rebuild / Stop / Start) map to:
+//   - Deploy / Rebuild → POST /:id/deploy (rebuild is currently same
+//     pipeline; "rebuild" label kept so users coming from dokploy
+//     find what they expect)
+//   - Reload  → POST /:id/reload  (docker restart)
+//   - Stop    → POST /:id/stop    (docker stop)
+//   - Start   → POST /:id/start   (docker start)
+const runApplicationAction = async (
+  action: 'deploy' | 'reload' | 'rebuild' | 'stop' | 'start',
+) => {
+  if (
+    !serverId.value ||
+    !projectId.value ||
+    !workloadId.value ||
+    workloadActionInFlight.value !== null
+  ) {
+    return;
+  }
+  // Map the dropdown verb back onto the slot the in-flight ref expects.
+  // Deploy + Rebuild share the slot so the spinner shows on either.
+  const inflightSlot: 'start' | 'stop' | 'restart' | 'deploy' = {
+    deploy: 'deploy',
+    rebuild: 'deploy',
+    reload: 'restart',
+    stop: 'stop',
+    start: 'start',
+  }[action] as 'start' | 'stop' | 'restart' | 'deploy';
+  workloadActionInFlight.value = inflightSlot;
+  try {
+    const { dockerService } = await import('~/services/dockerService');
+    if (action === 'deploy' || action === 'rebuild') {
+      await dockerService.applications.deploy(
+        serverId.value,
+        projectId.value,
+        workloadId.value,
+      );
+      toast.success(
+        action === 'rebuild' ? 'Rebuild queued' : 'Deployment queued',
+      );
+    } else {
+      await dockerService.applications.lifecycle(
+        serverId.value,
+        projectId.value,
+        workloadId.value,
+        action,
+      );
+      const label = { reload: 'Reload', stop: 'Stop', start: 'Start' }[action];
+      toast.success(`${label} queued`);
+    }
+    workloadActionRefreshKey.value++;
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || `Failed to ${action}`);
+  } finally {
+    workloadActionInFlight.value = null;
+  }
+};
+
+const runDatabaseLifecycle = async (action: 'start' | 'stop' | 'restart') => {
+  if (
+    !serverId.value ||
+    !projectId.value ||
+    !workloadId.value ||
+    workloadActionInFlight.value !== null
+  ) {
+    return;
+  }
+  workloadActionInFlight.value = action;
+  try {
+    const { dockerService } = await import('~/services/dockerService');
+    await dockerService.databases.lifecycle(
+      serverId.value,
+      projectId.value,
+      workloadId.value,
+      action,
+    );
+    toast.success(`${action[0].toUpperCase()}${action.slice(1)} queued`);
+    workloadActionRefreshKey.value++;
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || `Failed to ${action}`);
+  } finally {
+    workloadActionInFlight.value = null;
+  }
+};
 
 // Check if we're on a DNS domain detail page
 const isDnsDetailPage = computed(() => {
@@ -403,12 +734,31 @@ const isDeploying = ref(false);
 // "Loading..." on every route change inside the project subtree.
 const projectName = ref<string | null>(null);
 
+// Workload (database / application / compose) metadata for the
+// breadcrumb on workload detail pages. Loaded once per workloadId
+// change; falls back to "Loading..." while in-flight.
+//
+// Engine / version are populated for databases (postgres / mysql / etc)
+// so the last breadcrumb segment can use the brand icon + show the
+// version inline — replaces the redundant on-page h1.
+const workloadName = ref<string | null>(null);
+const workloadStatus = ref<string | null>(null);
+const workloadEngine = ref<string | null>(null);
+const workloadVersion = ref<string | null>(null);
+const workloadExternalPort = ref<number | null>(null);
+
 const projectDetailTabs = [
   { value: 'overview', label: 'Overview', query: 'overview', icon: 'lucide:layout-dashboard' },
   { value: 'applications', label: 'Applications', query: 'applications', icon: 'lucide:box' },
   { value: 'compose', label: 'Compose', query: 'compose', icon: 'lucide:layers' },
   { value: 'databases', label: 'Databases', query: 'databases', icon: 'lucide:database' },
   { value: 'settings', label: 'Settings', query: 'settings', icon: 'lucide:settings' },
+  // Project-level env vars don't live as a tab — they're a sibling
+  // concept used by every workload, so they're reached via a
+  // dedicated Environment button in the project breadcrumb action
+  // area that opens a Dialog. Keeping it out of the tab strip means
+  // the user can update shared env from any tab without losing
+  // their place.
 ];
 
 const showProjectTabs = computed(() => {
@@ -484,9 +834,19 @@ const siteDetailTabs = computed(() => {
 
 const { getCachedServer, getCachedSite } = useNavbarCache();
 
+// Shared state bus for the current server's public IP. The navbar
+// already fetches the server for the breadcrumb; broadcasting the IP
+// here lets child pages (e.g. database General → External Connection
+// URL) reuse it without making a duplicate /servers/:id request.
+const currentServerPublicIp = useState<string | null>(
+  'currentServerPublicIp',
+  () => null,
+);
+
 const applyServerData = (data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string }) => {
   serverName.value = data.name;
   serverIp.value = data.public_ipv4;
+  currentServerPublicIp.value = data.public_ipv4 || null;
   serverConnected.value = data.connected;
   serverProvider.value = data.provider;
   serverStatus.value = data.status;
@@ -582,8 +942,62 @@ watch([serverId, siteId, projectId], async ([sId, stId, pId]) => {
     serverProvisionCommand.value = null;
     siteAddress.value = null;
     siteType.value = null;
+    currentServerPublicIp.value = null;
   }
 }, { immediate: true });
+
+// Load the workload name when on a workload detail page so the
+// breadcrumb segment renders the real name rather than the opaque
+// ULID. Three sibling endpoints (databases/applications/composes)
+// all return { data: { name, status } } so we branch by kind and
+// keep the lookup tight.
+// workloadActionRefreshKey is in the deps array so a lifecycle action
+// fired from the navbar (Stop / Restart) immediately re-pulls the
+// status — Running → Stopped flips the button in the chrome to
+// "Start" without waiting for a WS round-trip.
+watch(
+  [workloadKind, workloadId, serverId, projectId, workloadActionRefreshKey],
+  async ([kind, wId, sId, pId]) => {
+    if (!kind || !wId || !sId || !pId) {
+      workloadName.value = null;
+      workloadStatus.value = null;
+      workloadEngine.value = null;
+      workloadVersion.value = null;
+      workloadExternalPort.value = null;
+      return;
+    }
+    const path = `/servers/${sId}/docker/projects/${pId}/${
+      kind === "database"
+        ? "databases"
+        : kind === "application"
+          ? "applications"
+          : "composes"
+    }/${wId}`;
+    try {
+      const res = await $api<{
+        data: {
+          name: string;
+          status?: string;
+          engine?: string;
+          engine_version?: string;
+          external_port?: number | null;
+        };
+      }>(path);
+      workloadName.value = res.data.name;
+      workloadStatus.value = res.data.status ?? null;
+      workloadEngine.value = res.data.engine ?? null;
+      workloadVersion.value = res.data.engine_version ?? null;
+      workloadExternalPort.value = res.data.external_port ?? null;
+    } catch {
+      workloadName.value = null;
+      workloadStatus.value = null;
+      workloadEngine.value = null;
+      workloadVersion.value = null;
+      workloadExternalPort.value = null;
+    }
+  },
+  { immediate: true },
+);
 
 // Fetch domain info when on DNS detail page
 watch(domainId, async (dId) => {
@@ -680,11 +1094,12 @@ const showSiteTabs = computed(() => {
 });
 
 // Watch for section visibility changes to update indicators when they become visible
-watch([showGlobalTabs, showServerTabs, showSiteTabs, showProjectTabs, isAdvancedTabActive], ([globalVisible, serverVisible, siteVisible, projectVisible, advancedVisible]) => {
+watch([showGlobalTabs, showServerTabs, showSiteTabs, showProjectTabs, isWorkloadDetailPage, isAdvancedTabActive], ([globalVisible, serverVisible, siteVisible, projectVisible, workloadVisible, advancedVisible]) => {
   // Clear stale refs when sections become hidden
   if (!serverVisible) serverTabRefs.value.clear();
   if (!siteVisible) siteTabRefs.value.clear();
   if (!projectVisible) projectTabRefs.value.clear();
+  if (!workloadVisible) workloadTabRefs.value.clear();
   if (!advancedVisible) advancedTabRefs.value.clear();
 
   // Wait for refs to be populated after render
@@ -694,6 +1109,7 @@ watch([showGlobalTabs, showServerTabs, showSiteTabs, showProjectTabs, isAdvanced
       if (serverVisible) updateServerIndicator();
       if (siteVisible) updateSiteIndicator();
       if (projectVisible) updateProjectIndicator();
+      if (workloadVisible) updateWorkloadIndicator();
       if (advancedVisible) updateAdvancedIndicator();
     });
   }, 50);
@@ -729,6 +1145,44 @@ const onDockerProjectCreated = () => {
 const isTerminalOpen = useState('serverTerminalOpen', () => false);
 const openTerminal = () => {
   isTerminalOpen.value = true;
+};
+
+// Cross-component bus for the project detail tabs' "New X" buttons.
+// Pages bind their create sheets' v-model:open to these flags; the
+// navbar trigger flips the flag, the page reacts. Keeps the navbar
+// decoupled from the page's local component state — same convention
+// dockerProjectsRefreshKey + ServerDockerCreateProject established.
+const dockerCreateApplicationOpen = useState<boolean>(
+  'dockerCreateApplicationOpen',
+  () => false,
+);
+const dockerCreateComposeOpen = useState<boolean>(
+  'dockerCreateComposeOpen',
+  () => false,
+);
+const dockerCreateDatabaseOpen = useState<boolean>(
+  'dockerCreateDatabaseOpen',
+  () => false,
+);
+// Project-level env-vars dialog. Doesn't belong on any single project
+// tab — it's a sibling concept used by every workload below — so we
+// surface it as a stand-alone action button in the project breadcrumb
+// and open a Dialog on the page from here.
+const dockerProjectEnvOpen = useState<boolean>(
+  'dockerProjectEnvOpen',
+  () => false,
+);
+const openCreateApplication = () => {
+  dockerCreateApplicationOpen.value = true;
+};
+const openCreateCompose = () => {
+  dockerCreateComposeOpen.value = true;
+};
+const openCreateDatabase = () => {
+  dockerCreateDatabaseOpen.value = true;
+};
+const openProjectEnv = () => {
+  dockerProjectEnvOpen.value = true;
 };
 
 const setColorMode = (mode: "light" | "dark" | "system") => {
@@ -1298,19 +1752,79 @@ onMounted(fetchTeams);
             </span>
           </div>
         </div>
-        <div class="flex items-center gap-2">
+        <!--
+          min-h-9 reserves the action row's height even when only some
+          tabs render a "New X" button. Without it the row collapsed
+          on tabs that had no action (Overview / Settings pre-change),
+          which made the whole breadcrumb shorter by ~28px between
+          Databases ↔ Settings — the navbar appeared to "move up".
+          The Environment button is always present below, but the
+          min-height is the proper structural fix so future per-tab
+          actions can come and go without shifting the chrome.
+        -->
+        <div class="flex min-h-9 items-center gap-2">
+          <!--
+            No Terminal button at the project level — a project is a
+            grouping of workloads, not a thing you shell into. Per-
+            workload Terminal lives on the database / application
+            detail breadcrumb below and opens the CONTAINER shell.
+          -->
+
+          <!--
+            Environment button — always available on the project
+            breadcrumb regardless of which tab is active. Flips the
+            shared `dockerProjectEnvOpen` useState bus that the
+            project page reads to open the env-vars dialog.
+            Stand-alone (not tab-scoped) because shared env applies
+            to every workload underneath.
+          -->
+          <Button variant="outline" size="sm" @click="openProjectEnv">
+            <Icon name="lucide:key" class="mr-2 h-4 w-4" />
+            Environment
+          </Button>
+
+          <!--
+            Per-tab "New X" trigger. We flip a useState flag the page
+            component reads on its sheet's v-model:open binding — same
+            convention dockerProjectsRefreshKey uses to keep the navbar
+            decoupled from page internals. The sheet itself stays in
+            the page so its $emit('created') still drives the
+            optimistic prepend.
+          -->
           <Button
-            v-if="serverConnected"
-            variant="outline"
+            v-if="isProjectTabActive('applications')"
             size="sm"
-            @click="openTerminal"
+            @click="openCreateApplication"
           >
-            <Terminal class="mr-2 h-4 w-4" />
-            Terminal
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            New Application
+          </Button>
+          <Button
+            v-else-if="isProjectTabActive('compose')"
+            size="sm"
+            @click="openCreateCompose"
+          >
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            New Compose Stack
+          </Button>
+          <Button
+            v-else-if="isProjectTabActive('databases')"
+            size="sm"
+            @click="openCreateDatabase"
+          >
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            New Database
           </Button>
         </div>
       </div>
-      <nav ref="projectNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">
+      <!--
+        -ml-3 pulls the nav left by exactly the first tab's px-3 left
+        padding so the Overview icon lines up vertically with the
+        Servers icon in the breadcrumb above. Indicator math reads
+        tabRect.left - navRect.left so it's relative to the nav and
+        survives the offset.
+      -->
+      <nav ref="projectNavRef" class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto">
         <NuxtLink
           v-for="tab in projectDetailTabs"
           :key="tab.value"
@@ -1332,6 +1846,235 @@ onMounted(fetchTeams);
         <span
           class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
           :style="{ left: `${projectIndicatorLeft}px`, width: `${projectIndicatorWidth}px` }"
+        />
+      </nav>
+    </div>
+
+    <!--
+      Workload Detail navigation. Same shape as the project + site
+      detail blocks: breadcrumb on top, then a subtab strip with a
+      sliding underline indicator. Removes the need for an inline
+      "Back to project" link AND the on-page tab strip the workload
+      pages used to render themselves.
+    -->
+    <div v-if="isWorkloadDetailPage" class="px-4 lg:px-8">
+      <div class="flex items-center justify-between py-2">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <NuxtLink
+            to="/servers"
+            class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Server class="h-4 w-4" />
+            Servers
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <NuxtLink
+            :to="`/servers/${serverId}?tab=projects`"
+            class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span
+              class="h-2 w-2 rounded-full"
+              :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
+            />
+            {{ serverName || 'Loading...' }}
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <NuxtLink
+            :to="`/servers/${serverId}/projects/${projectId}?tab=${workloadParentTab}`"
+            class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Icon name="lucide:folder-tree" class="h-4 w-4" />
+            {{ projectName || 'Loading...' }}
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <!--
+            Last breadcrumb segment — single line.
+              [• dot] [🐘 brand icon] [name]
+            Status dot on the left mirrors the server-connection
+            indicator higher up in the breadcrumb (uniform colour-dot
+            pattern), then the engine logo (postgres / mysql / redis /
+            etc.), then the name. Title attr surfaces the verbal
+            status on hover.
+          -->
+          <div class="flex min-w-0 items-center gap-2">
+            <span
+              v-if="workloadStatus"
+              class="h-2 w-2 shrink-0 rounded-full"
+              :class="workloadStatusDotClass"
+              :title="workloadStatus.charAt(0).toUpperCase() + workloadStatus.slice(1)"
+            />
+            <Icon
+              v-if="workloadKindIcon"
+              :name="workloadKindIcon"
+              class="h-4 w-4 shrink-0"
+              :class="workloadKindIconColor"
+            />
+            <span class="truncate text-sm font-medium text-foreground">
+              {{ workloadName || 'Loading...' }}
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <!--
+            Workload chrome — Terminal + lifecycle (Start / Stop /
+            Restart) collapsed into a single Actions dropdown. Keeps
+            the breadcrumb tidy on narrow widths and groups every
+            mutating action under one label (matches the Backups
+            tab's "Actions" pattern). The dropdown items hide / swap
+            based on workloadStatus so users only see legal
+            transitions for the current state.
+          -->
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button variant="outline" size="sm">
+                <Icon name="lucide:settings-2" class="mr-2 h-4 w-4" />
+                Actions
+                <Icon name="lucide:chevron-down" class="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" class="w-44">
+              <DropdownMenuItem v-if="serverConnected" @select="openTerminal">
+                <Terminal class="mr-2 h-4 w-4" />
+                Terminal
+              </DropdownMenuItem>
+
+              <template v-if="workloadKind === 'database'">
+                <DropdownMenuSeparator v-if="serverConnected" />
+                <DropdownMenuItem
+                  v-if="workloadStatus && workloadStatus !== 'running'"
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runDatabaseLifecycle('start')"
+                >
+                  <Icon
+                    :name="workloadActionInFlight === 'start' ? 'lucide:loader-2' : 'lucide:play'"
+                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'start' && 'animate-spin']"
+                  />
+                  Start
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="workloadStatus === 'running'"
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runDatabaseLifecycle('stop')"
+                >
+                  <Icon
+                    :name="workloadActionInFlight === 'stop' ? 'lucide:loader-2' : 'lucide:square'"
+                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'stop' && 'animate-spin']"
+                  />
+                  Stop
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runDatabaseLifecycle('restart')"
+                >
+                  <Icon
+                    :name="workloadActionInFlight === 'restart' ? 'lucide:loader-2' : 'lucide:rotate-cw'"
+                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'restart' && 'animate-spin']"
+                  />
+                  Restart
+                </DropdownMenuItem>
+              </template>
+
+              <!--
+                Application actions — mirrors dokploy's row of buttons
+                (Deploy / Reload / Rebuild / Stop) but rolled into the
+                Actions dropdown so the breadcrumb chrome stays the
+                same height across workload kinds.
+
+                Items shown/hidden by workloadStatus so the user only
+                sees legal transitions: Start appears only when the
+                container is stopped; Stop only when running; Deploy /
+                Rebuild always; Reload only when running.
+              -->
+              <template v-if="workloadKind === 'application'">
+                <DropdownMenuSeparator v-if="serverConnected" />
+                <DropdownMenuItem
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runApplicationAction('deploy')"
+                >
+                  <Icon
+                    :name="workloadActionInFlight === 'deploy' ? 'lucide:loader-2' : 'lucide:rocket'"
+                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'deploy' && 'animate-spin']"
+                  />
+                  Deploy
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="workloadStatus === 'running'"
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runApplicationAction('reload')"
+                >
+                  <Icon
+                    :name="workloadActionInFlight === 'restart' ? 'lucide:loader-2' : 'lucide:refresh-cw'"
+                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'restart' && 'animate-spin']"
+                  />
+                  Reload
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runApplicationAction('rebuild')"
+                >
+                  <Icon
+                    name="lucide:hammer"
+                    class="mr-2 h-4 w-4"
+                  />
+                  Rebuild
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="workloadStatus && workloadStatus !== 'running'"
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runApplicationAction('start')"
+                >
+                  <Icon
+                    :name="workloadActionInFlight === 'start' ? 'lucide:loader-2' : 'lucide:play'"
+                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'start' && 'animate-spin']"
+                  />
+                  Start
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  v-if="workloadStatus === 'running'"
+                  :disabled="workloadActionInFlight !== null"
+                  @select="runApplicationAction('stop')"
+                >
+                  <Icon
+                    :name="workloadActionInFlight === 'stop' ? 'lucide:loader-2' : 'lucide:square'"
+                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'stop' && 'animate-spin']"
+                  />
+                  Stop
+                </DropdownMenuItem>
+              </template>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+      <!--
+        -ml-3 nudges the first tab so its icon aligns with the
+        breadcrumb's Server icon above (same trick the project tab nav
+        uses). Indicator math is relative to the nav so it follows.
+      -->
+      <nav
+        ref="workloadNavRef"
+        class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
+      >
+        <NuxtLink
+          v-for="tab in workloadSubTabs"
+          :key="tab.value"
+          :ref="(el) => setWorkloadTabRef(tab.query, el)"
+          :to="{ query: { ...route.query, subtab: tab.query } }"
+          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            isWorkloadSubTabActive(tab.query)
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          ]"
+        >
+          <Icon :name="tab.icon" class="h-4 w-4" />
+          {{ tab.label }}
+        </NuxtLink>
+        <span
+          class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
+          :style="{
+            left: `${workloadIndicatorLeft}px`,
+            width: `${workloadIndicatorWidth}px`,
+          }"
         />
       </nav>
     </div>

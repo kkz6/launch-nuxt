@@ -56,6 +56,17 @@ const toggle = (id: string) => {
   expanded.value = new Set(expanded.value);
 };
 
+// Live SSH log sheet — same pattern application + database Deployments
+// tabs use. task_id appears on the row once the worker dispatches the
+// asynq task (see DeployComposeJob's TrackInDB().Dispatch path).
+const logSheetOpen = ref(false);
+const logTaskId = ref<string>("");
+const openLogs = (d: DockerDeployment) => {
+  if (!d.task_id) return;
+  logTaskId.value = d.task_id;
+  logSheetOpen.value = true;
+};
+
 const statusBadge = (status: string): string => {
   switch (status) {
     case "success":
@@ -174,17 +185,28 @@ onMounted(fetchDeployments);
                 {{ duration(d) }}
               </td>
               <td class="px-4 py-3 text-right">
-                <Button
-                  v-if="d.error"
-                  variant="ghost"
-                  size="sm"
-                  @click="toggle(d.id)"
-                >
-                  <Icon
-                    :name="expanded.has(d.id) ? 'lucide:chevron-up' : 'lucide:chevron-down'"
-                    class="h-4 w-4"
-                  />
-                </Button>
+                <div class="flex items-center justify-end gap-1">
+                  <Button
+                    v-if="d.task_id"
+                    variant="ghost"
+                    size="sm"
+                    @click="openLogs(d)"
+                  >
+                    <Icon name="lucide:scroll-text" class="mr-1.5 h-4 w-4" />
+                    View logs
+                  </Button>
+                  <Button
+                    v-if="d.error"
+                    variant="ghost"
+                    size="sm"
+                    @click="toggle(d.id)"
+                  >
+                    <Icon
+                      :name="expanded.has(d.id) ? 'lucide:chevron-up' : 'lucide:chevron-down'"
+                      class="h-4 w-4"
+                    />
+                  </Button>
+                </div>
               </td>
             </tr>
             <tr
@@ -201,5 +223,29 @@ onMounted(fetchDeployments);
         </tbody>
       </table>
     </div>
+
+    <Sheet v-model:open="logSheetOpen">
+      <SheetContent
+        class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none"
+      >
+        <SheetHeader class="shrink-0">
+          <SheetTitle>Deployment logs</SheetTitle>
+          <SheetDescription>
+            Live SSH output for this <code>docker compose</code> run.
+          </SheetDescription>
+        </SheetHeader>
+        <div class="mt-4 flex flex-col flex-1 min-h-0">
+          <ServerLogViewer
+            v-if="logSheetOpen && logTaskId"
+            :server-id="props.compose.server_id"
+            entity="task"
+            :entity-id="logTaskId"
+            :no-timestamp="true"
+            hide-options
+            container-class-name="h-full rounded-b-lg"
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
   </div>
 </template>
