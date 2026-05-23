@@ -50,6 +50,17 @@ const stateBadge = (state: string): string => {
   return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
 };
 
+// Status detail dialog state. Clicking the state badge opens it
+// against the row's container — mirrors how the PHP server's
+// Services tab clickable status badge works (see
+// ServiceStatusDialog.vue for the original pattern).
+const statusDialogOpen = ref(false);
+const inspectTarget = ref<DockerHostContainer | null>(null);
+const openStatus = (c: DockerHostContainer) => {
+  inspectTarget.value = c;
+  statusDialogOpen.value = true;
+};
+
 onMounted(fetchRows);
 </script>
 
@@ -128,12 +139,25 @@ onMounted(fetchRows);
             </td>
             <td class="px-4 py-3 align-top font-mono text-xs">{{ c.Image }}</td>
             <td class="px-4 py-3 align-top">
-              <span
-                class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+              <!--
+                Clickable badge opens the detail dialog with the
+                `docker inspect` output (state, health, mounts,
+                networks, restart count, resources). Mirrors how the
+                PHP-server Services tab opens ServiceStatusDialog.
+              -->
+              <button
+                type="button"
+                class="group inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium capitalize transition hover:ring-2 hover:ring-primary/30"
                 :class="stateBadge(c.State)"
+                title="View container details"
+                @click="openStatus(c)"
               >
                 {{ c.State }}
-              </span>
+                <Icon
+                  name="lucide:info"
+                  class="h-3 w-3 opacity-50 transition group-hover:opacity-100"
+                />
+              </button>
               <p class="mt-1 text-[10px] text-muted-foreground">
                 {{ c.Status }}
               </p>
@@ -163,5 +187,11 @@ onMounted(fetchRows);
         </tbody>
       </table>
     </div>
+
+    <ServerDockerContainerStatusDialog
+      v-model:open="statusDialogOpen"
+      :server-id="props.serverId"
+      :container="inspectTarget"
+    />
   </div>
 </template>
