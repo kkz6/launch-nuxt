@@ -75,3 +75,28 @@ export function isValidHostname(s: string): boolean {
   const normalised = s.trim().toLowerCase().replace(/\.$/, "");
   return hostnameRe.test(normalised);
 }
+
+/**
+ * Minimal shell-escape used by the container status dialog to render
+ * docker's Entrypoint/Cmd/Args arrays as a readable single line.
+ *
+ * Safe chars pass through; anything else is wrapped in single quotes,
+ * with embedded single quotes escaped via the close-then-reopen trick
+ * Bash uses. This is for *display only* — don't pipe the output back
+ * into a shell.
+ */
+export function shellish(arg: string): string {
+  if (arg === "") return `''`;
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(arg)) return arg;
+  return `'${arg.replace(/'/g, `'\\''`)}'`;
+}
+
+/**
+ * Join an arg list into a single shell-safe display string. Returns
+ * an empty string for null/undefined/empty input so the caller can
+ * v-if on it.
+ */
+export function joinShellArgs(parts?: string[] | null): string {
+  if (!parts || parts.length === 0) return "";
+  return parts.map(shellish).join(" ");
+}

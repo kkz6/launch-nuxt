@@ -4,6 +4,8 @@ import {
   looksLikeCron,
   isValidPortMapping,
   isValidHostname,
+  shellish,
+  joinShellArgs,
 } from "~/composables/useDockerHelpers";
 
 describe("parseDotEnv", () => {
@@ -121,5 +123,59 @@ describe("isValidHostname", () => {
   it("rejects empty input", () => {
     expect(isValidHostname("")).toBe(false);
     expect(isValidHostname("   ")).toBe(false);
+  });
+});
+
+describe("shellish", () => {
+  it("passes through safe-charset args unchanged", () => {
+    // Letters, digits, and a handful of common path/url chars are
+    // unambiguous in a shell context — no need to quote.
+    expect(shellish("traefik")).toBe("traefik");
+    expect(shellish("--providers.swarm.network=launch-network")).toBe(
+      "--providers.swarm.network=launch-network",
+    );
+    expect(shellish("/usr/local/bin/entrypoint.sh")).toBe(
+      "/usr/local/bin/entrypoint.sh",
+    );
+  });
+
+  it("quotes args containing whitespace or shell metas", () => {
+    expect(shellish("hello world")).toBe(`'hello world'`);
+    expect(shellish("a;b")).toBe(`'a;b'`);
+    expect(shellish("$HOME")).toBe(`'$HOME'`);
+    expect(shellish("a|b")).toBe(`'a|b'`);
+  });
+
+  it("escapes embedded single quotes with the close-then-reopen trick", () => {
+    // The classic bash escape: 'it'\''s' renders as it's because the
+    // shell concatenates the two quoted segments. Anything less
+    // careful breaks on names like O'Brien.
+    expect(shellish(`it's`)).toBe(`'it'\\''s'`);
+  });
+
+  it("represents an empty arg as two single quotes", () => {
+    // Distinct from "no arg" — preserving the empty slot matters
+    // for some entrypoints that expect a positional placeholder.
+    expect(shellish("")).toBe(`''`);
+  });
+});
+
+describe("joinShellArgs", () => {
+  it("returns empty string for null / undefined / empty list", () => {
+    expect(joinShellArgs(null)).toBe("");
+    expect(joinShellArgs(undefined)).toBe("");
+    expect(joinShellArgs([])).toBe("");
+  });
+
+  it("joins safe args with single spaces", () => {
+    expect(joinShellArgs(["traefik", "--api"])).toBe("traefik --api");
+  });
+
+  it("quotes each arg independently before joining", () => {
+    // Each element is quoted on its own — joining a list with embedded
+    // spaces shouldn't smear the spaces into the wrong arg boundary.
+    expect(joinShellArgs(["sh", "-c", "echo hello world"])).toBe(
+      `sh -c 'echo hello world'`,
+    );
   });
 });

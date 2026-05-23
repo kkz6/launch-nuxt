@@ -228,7 +228,16 @@ export interface DockerContainerInspect {
   name: string;
   image: string;
   image_id: string;
+  /** Legacy single-line summary. Prefer entrypoint + cmd + path/args for display. */
   command: string;
+  /** ENTRYPOINT array from the image (or runtime override). */
+  entrypoint?: string[];
+  /** CMD array. */
+  cmd?: string[];
+  /** The binary docker actually exec'd. */
+  path?: string;
+  /** Args passed to `path` at exec time. */
+  args?: string[];
   created_at: string;
   state: {
     status: string;
@@ -270,6 +279,13 @@ export interface DockerContainerInspect {
     mac_address?: string;
   }>;
   labels?: Record<string, string>;
+  /**
+   * Full `docker inspect` JSON passed through. Used by the "View raw
+   * config" dialog. Typed as `unknown` because the shape is enormous
+   * and we never read it field-by-field on the frontend — just
+   * stringify and render in the editor.
+   */
+  raw?: unknown;
 }
 
 /**
