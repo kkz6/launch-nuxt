@@ -121,13 +121,13 @@ onMounted(fetchProjects);
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h2 class="text-2xl font-semibold">Projects</h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Group docker workloads — applications, compose stacks, and databases.
-        </p>
-      </div>
+    <!--
+      No section heading — the active "Projects" tab in the navbar
+      already tells the user where they are, same convention the
+      Sites tab uses. Just a right-aligned action button to keep the
+      page clean.
+    -->
+    <div class="mb-4 flex justify-end">
       <Button @click="openCreate">
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
         New Project
@@ -138,20 +138,22 @@ onMounted(fetchProjects);
       <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
     </div>
 
+    <!--
+      Empty state mirrors ShowSites.vue: tall card with a single
+      icon and a one-line hint. The New Project button is already
+      in the toolbar above so we don't repeat it here.
+    -->
     <div
       v-else-if="projects.length === 0"
-      class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
+      class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4 rounded-lg border bg-card"
     >
-      <Icon name="lucide:folder-tree" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No projects yet</h3>
-      <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Create your first project to start grouping applications, compose
-        stacks, and databases on this server.
-      </p>
-      <Button class="mt-6" @click="openCreate">
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        New Project
-      </Button>
+      <Icon name="lucide:folder-tree" class="h-16 w-16 text-muted-foreground" />
+      <div class="text-center">
+        <p class="font-medium">No projects yet</p>
+        <p class="text-sm text-muted-foreground">
+          Click on New Project to get started
+        </p>
+      </div>
     </div>
 
     <!--
