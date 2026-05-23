@@ -77,12 +77,17 @@ const LOADBALANCER_TABS: ServerDetailTab[] = [
 // maintenance commands) — same backend the PHP servers use; the
 // commands just run on a docker host instead of a PHP one. Traefik
 // config editing lives under Advanced — admin escape hatch, not a
-// day-to-day tab. See docs/plans/2026-05-22-docker-server-menus-design.md.
+// day-to-day tab.
+//
+// Networks deliberately omitted: Launch installs `launch-network` and
+// every app joins it automatically. Customers don't create custom
+// networks via the UI (no creator flow exists, and the SaaS model
+// doesn't need one), so the tab was empty for everyone — see
+// docs/plans/2026-05-22-docker-server-menus-design.md.
 const DOCKER_TABS: ServerDetailTab[] = [
   { value: "projects", label: "Projects", query: "projects", icon: "lucide:folder-tree" },
   { value: "containers", label: "Containers", query: "containers", icon: "lucide:container" },
   { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
-  { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
   { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
   { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },

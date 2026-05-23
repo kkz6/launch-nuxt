@@ -160,7 +160,6 @@ describe("tabs per server type", () => {
     expect(tabs[0]).toBe("projects");
     expect(tabs).toContain("containers");
     expect(tabs).toContain("volumes");
-    expect(tabs).toContain("networks");
     // Schedulers (host-level cron) shares the backend with PHP — we
     // expose the same UI here for things like `docker system prune`
     // on a schedule.
@@ -172,6 +171,10 @@ describe("tabs per server type", () => {
     // Traefik moved into Advanced as a sub-tab — it shouldn't be a
     // top-level docker tab anymore.
     expect(tabs).not.toContain("traefik");
+    // Networks removed: Launch manages launch-network for the user,
+    // and there's no Create-network flow, so the tab was empty for
+    // every customer. SSH covers any remaining debugging needs.
+    expect(tabs).not.toContain("networks");
   });
 
   it("php servers default to Sites and include Databases", () => {
