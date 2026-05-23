@@ -131,8 +131,8 @@ describe("shellish", () => {
     // Letters, digits, and a handful of common path/url chars are
     // unambiguous in a shell context — no need to quote.
     expect(shellish("traefik")).toBe("traefik");
-    expect(shellish("--providers.swarm.network=launch-network")).toBe(
-      "--providers.swarm.network=launch-network",
+    expect(shellish("--providers.docker.network=launch-network")).toBe(
+      "--providers.docker.network=launch-network",
     );
     expect(shellish("/usr/local/bin/entrypoint.sh")).toBe(
       "/usr/local/bin/entrypoint.sh",

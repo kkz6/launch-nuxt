@@ -169,6 +169,11 @@ export interface Server {
   sites_count?: number;
   services_count?: number;
   upstreams_count?: number;
+  // Live count of docker_projects on this server. Always present in
+  // responses (0 for PHP / database / loadbalancer servers). The
+  // delete-server flow on docker servers blocks while this is > 0;
+  // the backend re-validates the same condition.
+  projects_count?: number;
 }
 
 export interface Site extends InstallationStatus {

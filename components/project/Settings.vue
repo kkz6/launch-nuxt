@@ -13,52 +13,23 @@ const emit = defineEmits<{
   deleted: [];
 }>();
 
-const form = reactive({
-  name: props.project.name,
-  description: props.project.description ?? "",
-});
-const isSaving = ref(false);
-
-// Keep the form in sync if the parent refetches.
-watch(
-  () => props.project,
-  (p) => {
-    form.name = p.name;
-    form.description = p.description ?? "";
-  },
-);
-
-const isDirty = computed(
-  () =>
-    form.name.trim() !== props.project.name ||
-    form.description.trim() !== (props.project.description ?? ""),
-);
-
-const save = async () => {
-  const name = form.name.trim();
-  if (!name) {
-    toast.error("Project name is required");
-    return;
-  }
-  isSaving.value = true;
-  try {
-    await dockerService.projects.update(props.serverId, props.project.id, {
-      name,
-      description: form.description.trim(),
-    });
-    toast.success("Project updated");
-    emit("updated");
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update project");
-  } finally {
-    isSaving.value = false;
-  }
-};
+const name = ref(props.project.name);
+const description = ref(props.project.description ?? "");
+const isLoading = ref(false);
+const deleteLoading = ref(false);
 
 const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
 >(null);
+
+// Keep refs in sync if the parent refetches.
+watch(
+  () => props.project,
+  (p) => {
+    name.value = p.name;
+    description.value = p.description ?? "";
+  },
+);
 
 const totalWorkloads = computed(
   () =>
@@ -66,102 +37,174 @@ const totalWorkloads = computed(
     props.project.composes_count +
     props.project.databases_count,
 );
+const canDelete = computed(() => totalWorkloads.value === 0);
 
-const deleteProject = async () => {
-  if (!confirmationDialog.value) return;
-  const result = await confirmationDialog.value.show({
-    title: "Delete Project",
-    description:
-      totalWorkloads.value > 0
-        ? `This project has ${totalWorkloads.value} workload(s). Deleting it will remove them all.`
-        : "This will permanently delete the project.",
-    confirmText: "Delete project",
-    cancelText: "Cancel",
-    destructive: true,
-    inputVerificationText: props.project.name,
-    helpText: "Type the project name to confirm:",
-  });
-  if (!result.ok) return;
+// Per-kind breakdown for the yellow "cannot delete" callout — gives
+// the user a precise list of what still has to go before they can
+// remove the project.
+const workloadSummary = computed(() => {
+  const parts: string[] = [];
+  const p = props.project;
+  if (p.applications_count > 0)
+    parts.push(`${p.applications_count} application${p.applications_count === 1 ? "" : "s"}`);
+  if (p.composes_count > 0)
+    parts.push(`${p.composes_count} compose stack${p.composes_count === 1 ? "" : "s"}`);
+  if (p.databases_count > 0)
+    parts.push(`${p.databases_count} database${p.databases_count === 1 ? "" : "s"}`);
+  return parts.join(", ");
+});
 
+const updateProject = async () => {
+  const trimmed = name.value.trim();
+  if (!trimmed) {
+    toast.error("Project name is required");
+    return;
+  }
+  isLoading.value = true;
   try {
-    await dockerService.projects.delete(props.serverId, props.project.id);
-    toast.success("Project deleted");
-    emit("deleted");
+    await dockerService.projects.update(props.serverId, props.project.id, {
+      name: trimmed,
+      description: description.value.trim(),
+    });
+    toast.success("Project settings updated");
+    emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to update project");
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+const deleteProject = async () => {
+  if (!canDelete.value) {
+    toast.error(
+      `Cannot delete project: remove ${workloadSummary.value} first.`,
+    );
+    return;
+  }
+  if (!confirmationDialog.value) return;
+
+  const result = await confirmationDialog.value.show({
+    title: "Delete Project",
+    description: `Are you sure you want to delete "${props.project.name}"? This action cannot be undone.`,
+    confirmText: "Delete Project",
+    cancelText: "Cancel",
+    destructive: true,
+    helpText: "Type the project name to confirm deletion:",
+    inputVerificationText: props.project.name,
+  });
+  if (!result.ok) return;
+
+  deleteLoading.value = true;
+  try {
+    await dockerService.projects.delete(props.serverId, props.project.id);
+    toast.success("Project deleted successfully");
+    emit("deleted");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Unable to delete project");
+  } finally {
+    deleteLoading.value = false;
   }
 };
 </script>
 
 <template>
   <!--
-    Settings page intentionally follows the SiteSettings layout: flat
-    space-y-6 column, each section is a small h3 + paragraph + form
-    block, sections separated by <Separator />, no boxed cards. The
-    danger zone gets a destructive-coloured heading but no red panel.
+    Mirrors components/server/settings/General.vue: top-level space-y-6,
+    each section is a heading block + a space-y-4 form column, a single
+    Separator before Danger Zone, and the yellow callout for "cannot
+    delete" uses the exact same colour ramp. Keep it pixel-close so the
+    docker workload pages feel native next to the server settings.
   -->
-  <div>
+  <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div class="space-y-6">
+    <!-- Project Information -->
+    <div class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium">General</h3>
+        <h3 class="text-lg font-medium">Project Information</h3>
         <p class="text-sm text-muted-foreground">
-          Rename this project or update its description.
+          Update your project name and description.
         </p>
       </div>
 
-      <form class="space-y-4" @submit.prevent="save">
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div class="space-y-2">
-            <Label for="settings-name">Name</Label>
-            <Input
-              id="settings-name"
-              v-model="form.name"
-              placeholder="e.g. acme-prod"
-              autocomplete="off"
-            />
-          </div>
-          <div class="space-y-2 md:row-span-2">
-            <Label for="settings-description">Description</Label>
-            <Textarea
-              id="settings-description"
-              v-model="form.description"
-              rows="5"
-              placeholder="What lives in this project?"
-            />
-          </div>
+      <div class="space-y-4">
+        <div class="space-y-2">
+          <Label for="project-name">Project Name</Label>
+          <Input
+            id="project-name"
+            v-model="name"
+            placeholder="Enter project name"
+          />
         </div>
-        <Button type="submit" :disabled="!isDirty || isSaving">
+
+        <div class="space-y-2">
+          <Label for="project-description">Description</Label>
+          <Textarea
+            id="project-description"
+            v-model="description"
+            placeholder="Enter a description for your project (optional)"
+            :rows="3"
+          />
+        </div>
+
+        <Button :disabled="isLoading" @click="updateProject">
           <Icon
-            v-if="isSaving"
+            v-if="isLoading"
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Update settings
-        </Button>
-      </form>
-
-      <Separator />
-
-      <div class="space-y-4 pt-2">
-        <div>
-          <h3 class="text-lg font-medium text-destructive">Danger zone</h3>
-          <p class="text-sm text-muted-foreground">
-            {{
-              totalWorkloads > 0
-                ? `Permanently delete this project and the ${totalWorkloads} workload(s) it contains.`
-                : "Permanently delete this project."
-            }}
-            This action can't be undone.
-          </p>
-        </div>
-        <Button variant="destructive" @click="deleteProject">
-          <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
-          Delete project
+          Save Changes
         </Button>
       </div>
+    </div>
+
+    <Separator />
+
+    <!-- Danger Zone -->
+    <div class="space-y-4">
+      <div>
+        <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+        <p class="text-sm text-muted-foreground">
+          Permanently delete this project. This action cannot be undone.
+        </p>
+      </div>
+
+      <!--
+        Yellow callout reuses the exact tone components/server/settings/
+        General.vue uses for "cannot delete server" — so the blocked
+        state feels consistent across servers + docker workloads.
+      -->
+      <div
+        v-if="!canDelete"
+        class="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/50"
+      >
+        <div class="space-y-1">
+          <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+            Cannot delete project
+          </p>
+          <p class="text-sm text-yellow-700 dark:text-yellow-300">
+            This project has {{ workloadSummary }}. Please delete
+            every workload before removing the project.
+          </p>
+        </div>
+      </div>
+
+      <Button
+        variant="destructive"
+        :disabled="!canDelete || deleteLoading"
+        @click="deleteProject"
+      >
+        <Icon
+          v-if="deleteLoading"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
+        Delete Project
+      </Button>
     </div>
   </div>
 </template>

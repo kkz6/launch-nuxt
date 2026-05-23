@@ -246,9 +246,12 @@ onMounted(async () => {
       <ServerDockerContainers :server-id="server.id" />
     </div>
 
-    <div v-else-if="activeTab === 'volumes'">
-      <ServerDockerVolumes :server-id="server.id" />
-    </div>
+    <!--
+      Volumes tab removed at the docker-server level — per-app volume
+      management lives on the Application → Volumes subtab (bind /
+      volume / file mount picker). See useServerTypeRules.ts for the
+      reasoning + the dropped row.
+    -->
 
     <!--
       Traefik used to be a top-level tab; it now lives as a sub-tab

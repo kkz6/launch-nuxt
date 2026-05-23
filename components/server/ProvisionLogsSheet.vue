@@ -97,8 +97,8 @@ watch(open, (isOpen) => {
 
 // Debounced silent refetch when the store's server entry changes while
 // the sheet is open. The store's WS subscription mutates the entry
-// (status, progress, etc.); we react by pulling the detailed provision
-// status which lives on a different endpoint.
+// (status, progress, progress_step, etc.); we react by pulling the
+// detailed provision status which lives on a different endpoint.
 //
 // IMPORTANT: We watch a *tuple of primitive values* rather than the
 // reactive object itself. Vue 3 passes the same reference for `next`
@@ -107,24 +107,32 @@ watch(open, (isOpen) => {
 // gets `next.progress === prev.progress` even after the value changed,
 // and the refetch never fires. Watching a getter that returns a fresh
 // array each time gives us proper snapshot semantics.
+//
+// We include `progress_step` in the tuple — that's the field the store
+// updates inline on every `server.provision_step` event. Without it,
+// rapid step bursts where progress% doesn't tick up between two
+// adjacent steps (the same step weight) wouldn't trigger a refetch and
+// the UI would look stuck on the previous step until the next slow
+// step's progress%.
 let statusFetchTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch(
   () => [
     storeServer.value?.status,
     storeServer.value?.progress,
+    storeServer.value?.progress_step,
     storeServer.value?.connected,
   ] as const,
-  ([nextStatus, nextProgress, nextConnected], [prevStatus, prevProgress, prevConnected]) => {
+  (next, prev) => {
     if (!open.value || !storeServer.value) return
-    if (
-      nextStatus === prevStatus
-      && nextProgress === prevProgress
-      && nextConnected === prevConnected
-    ) return
+    if (next.every((v, i) => v === prev[i])) return
 
     if (statusFetchTimeout) clearTimeout(statusFetchTimeout)
-    statusFetchTimeout = setTimeout(() => fetchProvisionStatus(true), 300)
+    // Tighter debounce now that the store is doing inline patches —
+    // a 300ms debounce here on top of immediate store mutations made
+    // the UI feel laggy without buying anything (the store already
+    // collapses bursts via its own scheduleRefetch).
+    statusFetchTimeout = setTimeout(() => fetchProvisionStatus(true), 100)
   },
 )
 

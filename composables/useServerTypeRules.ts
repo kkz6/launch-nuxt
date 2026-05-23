@@ -84,10 +84,17 @@ const LOADBALANCER_TABS: ServerDetailTab[] = [
 // networks via the UI (no creator flow exists, and the SaaS model
 // doesn't need one), so the tab was empty for everyone — see
 // docs/plans/2026-05-22-docker-server-menus-design.md.
+// Volumes deliberately omitted at the docker-server level: per-app
+// volume management lives on the application detail page (the
+// dokploy-style bind / volume / file mount picker). A flat host-
+// wide list of docker volumes doesn't add operational value beyond
+// what the Application → Volumes tab already shows, and surfacing
+// orphaned volumes from `docker volume ls` invites accidental
+// cleanup of volumes belonging to running apps. Drop the tab; the
+// underlying `ServerDockerVolumes.vue` component is gone too.
 const DOCKER_TABS: ServerDetailTab[] = [
   { value: "projects", label: "Projects", query: "projects", icon: "lucide:folder-tree" },
   { value: "containers", label: "Containers", query: "containers", icon: "lucide:container" },
-  { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
   { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
   { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
@@ -120,7 +127,7 @@ const RULES: Record<string, ServerTypeRules> = {
     showsDatabase: false,
     showsAgentToggle: true,
     description:
-      "Docker CE + Swarm + Traefik reverse proxy. Run apps as containers.",
+      "Docker CE + Traefik reverse proxy with docker-label discovery. Run apps as containers.",
     tabs: DOCKER_TABS,
   },
 };

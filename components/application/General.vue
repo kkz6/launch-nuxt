@@ -1,53 +1,11 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import {
-  dockerService,
-  type DockerApplication,
-} from "~/services/dockerService";
+import type { DockerApplication } from "~/services/dockerService";
 
 interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
-const emit = defineEmits<{ updated: [] }>();
-
-// Renaming is in scope for phase 2a; everything else (source, build) is
-// immutable until later slices add a reconfigure flow.
-const form = reactive({ name: props.application.name });
-const isSaving = ref(false);
-
-watch(
-  () => props.application.name,
-  (n) => {
-    form.name = n;
-  },
-);
-
-const isDirty = computed(() => form.name.trim() !== props.application.name);
-
-const save = async () => {
-  const newName = form.name.trim();
-  if (!newName) {
-    toast.error("Name is required");
-    return;
-  }
-  isSaving.value = true;
-  try {
-    await dockerService.applications.update(
-      props.application.server_id,
-      props.application.project_id,
-      props.application.id,
-      { name: newName },
-    );
-    toast.success("Application updated");
-    emit("updated");
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update application");
-  } finally {
-    isSaving.value = false;
-  }
-};
 
 // Source-config rendering helpers. Each source type has its own shape;
 // the API returns a generic Record<string, unknown> so we read defensively.
@@ -68,145 +26,313 @@ const buildConfig = computed(
 const dockerfilePath = computed(
   () => buildConfig.value.dockerfile_path as string | undefined,
 );
+
+// Source-type metadata — same single-source-of-truth shape the
+// database General uses for engine info.
+const sourceMeta = computed(() => {
+  switch (props.application.source_type) {
+    case "image":
+      return {
+        label: "Docker Image",
+        icon: "simple-icons:docker",
+        iconBg: "bg-sky-500/10",
+        iconColor: "text-sky-500",
+      };
+    case "git":
+      return {
+        label: "Git Repository",
+        icon: "lucide:git-branch",
+        iconBg: "bg-violet-500/10",
+        iconColor: "text-violet-500",
+      };
+    case "dockerfile":
+      return {
+        label: "Dockerfile",
+        icon: "lucide:file-code",
+        iconBg: "bg-amber-500/10",
+        iconColor: "text-amber-500",
+      };
+    default:
+      return {
+        label: props.application.source_type,
+        icon: "lucide:box",
+        iconBg: "bg-zinc-500/10",
+        iconColor: "text-zinc-500",
+      };
+  }
+});
+
+// Container name on the host — same slug pattern the worker uses
+// (see tasks.ContainerNameFor server-side). The backend also stamps
+// this onto the response (resp.container_name) once the app has
+// deployed; we fall back to a placeholder for pre-deploy.
+const containerName = computed(
+  () => props.application.container_name || "—",
+);
+
+const formatDate = (iso?: string | null): string => {
+  if (!iso) return "Never";
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return "—";
+  }
+};
+
+const copyValue = async (label: string, value: string | null | undefined) => {
+  if (!value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(`${label} copied`);
+  } catch {
+    toast.error(`Couldn't copy ${label}`);
+  }
+};
 </script>
 
 <template>
+  <!--
+    Mirrors components/database/General.vue: no page-body heading
+    (the breadcrumb above already names the workload), just a 4-up
+    info-card grid. Rename + delete live on the Advanced subtab so
+    this page stays read-only — a glance, not a form.
+  -->
   <div class="space-y-8">
-    <!-- Editable bits live in their own card so the source/build summaries
-         below stay clearly read-only. -->
-    <section class="rounded-lg border bg-card p-6">
-      <h3 class="text-lg font-semibold">General</h3>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Rename the application. Source and build settings are immutable
-        until a later release adds a reconfigure flow.
-      </p>
-
-      <form class="mt-6 space-y-4" @submit.prevent="save">
-        <div class="space-y-2">
-          <Label for="app-general-name">Name</Label>
-          <Input
-            id="app-general-name"
-            v-model="form.name"
-            placeholder="e.g. api, web, worker"
-            autocomplete="off"
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <!-- Source type -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+          :class="sourceMeta.iconBg"
+        >
+          <Icon
+            :name="sourceMeta.icon"
+            class="h-5 w-5"
+            :class="sourceMeta.iconColor"
           />
         </div>
-        <div class="flex justify-end">
-          <Button type="submit" :disabled="!isDirty || isSaving">
-            <Icon
-              v-if="isSaving"
-              name="lucide:loader-2"
-              class="mr-2 h-4 w-4 animate-spin"
-            />
-            Save changes
-          </Button>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Source</p>
+          <p class="text-sm font-medium text-foreground">
+            {{ sourceMeta.label }}
+          </p>
         </div>
-      </form>
-    </section>
+      </div>
 
-    <!-- Source summary card. Three branches; each one renders the keys
-         this source type actually populates. -->
-    <section class="rounded-lg border bg-card p-6">
-      <h3 class="text-lg font-semibold">Source</h3>
-      <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <div class="space-y-1">
-          <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-            Source type
-          </dt>
-          <dd class="font-medium capitalize">{{ application.source_type }}</dd>
+      <!-- Internal Port -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10"
+        >
+          <Icon name="lucide:plug-zap" class="h-5 w-5 text-blue-500" />
         </div>
-        <div class="space-y-1">
-          <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-            Internal port
-          </dt>
-          <dd class="font-mono text-sm">{{ application.internal_port }}</dd>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Internal Port</p>
+          <p class="font-mono text-sm font-medium text-foreground">
+            {{ application.internal_port }}
+          </p>
         </div>
+      </div>
 
-        <template v-if="application.source_type === 'image'">
-          <div class="space-y-1 sm:col-span-2">
-            <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-              Image
-            </dt>
-            <dd class="font-mono text-sm">{{ imageRef || "—" }}</dd>
-          </div>
-        </template>
-
-        <template v-else-if="application.source_type === 'git'">
-          <div class="space-y-1">
-            <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-              Repository
-            </dt>
-            <dd class="break-all font-mono text-xs">{{ gitRepo || "—" }}</dd>
-          </div>
-          <div class="space-y-1">
-            <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-              Branch
-            </dt>
-            <dd class="font-mono text-sm">{{ gitBranch || "—" }}</dd>
-          </div>
-          <div class="space-y-1">
-            <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-              Build type
-            </dt>
-            <dd class="font-medium">{{ application.build_type || "auto-detect" }}</dd>
-          </div>
-          <div v-if="dockerfilePath" class="space-y-1">
-            <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-              Dockerfile path
-            </dt>
-            <dd class="font-mono text-xs">{{ dockerfilePath }}</dd>
-          </div>
-        </template>
-
-        <template v-else-if="application.source_type === 'dockerfile'">
-          <div class="space-y-2 sm:col-span-2">
-            <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-              Dockerfile
-            </dt>
-            <dd>
-              <pre
-                class="max-h-64 overflow-auto rounded-md border bg-muted/30 p-3 font-mono text-xs"
-                >{{ dockerfileContents || "—" }}</pre
-              >
-            </dd>
-          </div>
-        </template>
-      </dl>
-    </section>
-
-    <!-- Runtime info: what's actually running on the docker server right
-         now. Populated by the deploy job (slice 2b); pre-deploy this card
-         shows "Never deployed" placeholders. -->
-    <section class="rounded-lg border bg-card p-6">
-      <h3 class="text-lg font-semibold">Runtime</h3>
-      <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-        <div class="space-y-1">
-          <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-            Status
-          </dt>
-          <dd class="font-medium capitalize">{{ application.status }}</dd>
+      <!-- Build type (only meaningful for git/dockerfile sources;
+           shown as "—" for plain image source to keep the grid balanced) -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10"
+        >
+          <Icon name="lucide:hammer" class="h-5 w-5 text-amber-500" />
         </div>
-        <div class="space-y-1">
-          <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-            Container ID
-          </dt>
-          <dd class="font-mono text-xs">
-            {{ application.container_id || "—" }}
-          </dd>
-        </div>
-        <div class="space-y-1 sm:col-span-2">
-          <dt class="text-xs uppercase tracking-wide text-muted-foreground">
-            Last deployed
-          </dt>
-          <dd class="font-medium">
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Build</p>
+          <p class="text-sm font-medium capitalize text-foreground">
             {{
-              application.last_deployed_at
-                ? new Date(application.last_deployed_at).toLocaleString()
-                : "Never"
+              application.source_type === "image"
+                ? "—"
+                : application.build_type || "auto-detect"
             }}
-          </dd>
+          </p>
         </div>
-      </dl>
-    </section>
+      </div>
+
+      <!-- Last Deployed -->
+      <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10"
+        >
+          <Icon name="lucide:clock" class="h-5 w-5 text-emerald-500" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm text-muted-foreground">Last Deployed</p>
+          <p class="text-sm font-medium text-foreground">
+            {{ formatDate(application.last_deployed_at) }}
+          </p>
+        </div>
+      </div>
+
+      <!-- Image / Git repo — full-width tile, branch shown alongside on git -->
+      <div
+        v-if="application.source_type === 'image'"
+        class="flex items-start gap-3 rounded-lg border bg-card p-4 sm:col-span-2 lg:col-span-4"
+      >
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-500/10"
+        >
+          <Icon name="simple-icons:docker" class="h-5 w-5 text-zinc-500" />
+        </div>
+        <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm text-muted-foreground">Image</p>
+            <p class="truncate font-mono text-sm font-medium text-foreground">
+              {{ imageRef || "—" }}
+            </p>
+          </div>
+          <button
+            v-if="imageRef"
+            type="button"
+            class="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Copy image reference"
+            @click="copyValue('Image', imageRef)"
+          >
+            <Icon name="lucide:copy" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <template v-if="application.source_type === 'git'">
+        <div
+          class="flex items-start gap-3 rounded-lg border bg-card p-4 sm:col-span-2 lg:col-span-3"
+        >
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-500/10"
+          >
+            <Icon name="lucide:git-branch" class="h-5 w-5 text-zinc-500" />
+          </div>
+          <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
+            <div class="min-w-0">
+              <p class="text-sm text-muted-foreground">Repository</p>
+              <p class="truncate font-mono text-xs font-medium text-foreground">
+                {{ gitRepo || "—" }}
+              </p>
+            </div>
+            <button
+              v-if="gitRepo"
+              type="button"
+              class="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              title="Copy repository URL"
+              @click="copyValue('Repository', gitRepo)"
+            >
+              <Icon name="lucide:copy" class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+        <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10"
+          >
+            <Icon
+              name="lucide:git-commit-vertical"
+              class="h-5 w-5 text-violet-500"
+            />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm text-muted-foreground">Branch</p>
+            <p class="font-mono text-sm font-medium text-foreground">
+              {{ gitBranch || "—" }}
+            </p>
+          </div>
+        </div>
+        <div
+          v-if="dockerfilePath"
+          class="flex items-start gap-3 rounded-lg border bg-card p-4 sm:col-span-2 lg:col-span-4"
+        >
+          <div
+            class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-500/10"
+          >
+            <Icon name="lucide:file-code" class="h-5 w-5 text-amber-500" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm text-muted-foreground">Dockerfile Path</p>
+            <p class="truncate font-mono text-xs font-medium text-foreground">
+              {{ dockerfilePath }}
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <!-- Container name + Container ID — full-width row, two cards -->
+      <div
+        class="flex items-start gap-3 rounded-lg border bg-card p-4 sm:col-span-2"
+      >
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-500/10"
+        >
+          <Icon name="lucide:container" class="h-5 w-5 text-orange-500" />
+        </div>
+        <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm text-muted-foreground">Container Name</p>
+            <p class="truncate font-mono text-xs font-medium text-foreground">
+              {{ containerName }}
+            </p>
+          </div>
+          <button
+            v-if="application.container_name"
+            type="button"
+            class="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Copy container name"
+            @click="copyValue('Container name', application.container_name)"
+          >
+            <Icon name="lucide:copy" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+      <div
+        class="flex items-start gap-3 rounded-lg border bg-card p-4 sm:col-span-2"
+      >
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-zinc-500/10"
+        >
+          <Icon name="lucide:fingerprint" class="h-5 w-5 text-zinc-500" />
+        </div>
+        <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-sm text-muted-foreground">Container ID</p>
+            <p class="truncate font-mono text-xs font-medium text-foreground">
+              {{ application.container_id || "—" }}
+            </p>
+          </div>
+          <button
+            v-if="application.container_id"
+            type="button"
+            class="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Copy container id"
+            @click="copyValue('Container ID', application.container_id)"
+          >
+            <Icon name="lucide:copy" class="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!--
+      Dockerfile contents (only for source_type=dockerfile). Read-only
+      pre block matches the way ServerTraefik's read-only YAML view
+      renders — no editor chrome needed since this is a snapshot of
+      what gets built.
+    -->
+    <div
+      v-if="application.source_type === 'dockerfile' && dockerfileContents"
+      class="rounded-lg border bg-card"
+    >
+      <div class="border-b px-5 py-3">
+        <p class="text-sm font-medium text-foreground">Dockerfile</p>
+        <p class="mt-0.5 text-xs text-muted-foreground">
+          Built on every deploy. Edit it via the Advanced tab.
+        </p>
+      </div>
+      <pre
+        class="max-h-72 overflow-auto p-5 font-mono text-xs leading-relaxed text-foreground"
+      >{{ dockerfileContents }}</pre>
+    </div>
   </div>
 </template>

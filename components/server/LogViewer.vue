@@ -150,7 +150,10 @@ const getLogType = (message: string): LogLine['type'] => {
 //   users; instead we silently retry under the hood.
 // - `overall progress: X out of N tasks` / `verify: Waiting N seconds to
 //   verify that tasks are stable` — `docker service create` streams these
-//   on every poll until swarm convergence (40+ identical lines).
+//   on every poll until convergence (40+ identical lines). Legacy
+//   (pre-v2) docker servers used swarm + `docker service create` for
+//   Traefik; new servers run Traefik as a plain container so this
+//   pattern only appears in old provision logs we replay.
 // - `Canceled hold on cloud-init` / `cloud-init was already not on hold` —
 //   cosmetic chatter from `apt-mark unhold` in the cleanup step.
 // - `debconf: unable to initialize frontend ...` / `debconf: (...)` /

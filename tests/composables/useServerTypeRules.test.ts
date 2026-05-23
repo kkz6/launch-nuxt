@@ -34,7 +34,7 @@ describe("getServerTypeRules", () => {
     expect(r.showsAgentToggle).toBe(true);
     // The description must mention the docker stack so users understand the
     // empty advanced-options panel.
-    expect(r.description.toLowerCase()).toMatch(/docker|swarm|traefik/);
+    expect(r.description.toLowerCase()).toMatch(/docker|traefik/);
   });
 
   it("falls back to permissive defaults for unknown types", () => {
@@ -159,7 +159,10 @@ describe("tabs per server type", () => {
     const tabs = getServerTypeRules("docker").tabs.map((t) => t.value);
     expect(tabs[0]).toBe("projects");
     expect(tabs).toContain("containers");
-    expect(tabs).toContain("volumes");
+    // Volumes was dropped at the host level — per-app volume management
+    // lives on the Application → Volumes subtab now. See
+    // useServerTypeRules.ts for the rationale.
+    expect(tabs).not.toContain("volumes");
     // Schedulers (host-level cron) shares the backend with PHP — we
     // expose the same UI here for things like `docker system prune`
     // on a schedule.

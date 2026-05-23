@@ -13,6 +13,14 @@ interface Props {
   applicationId?: string;
   databaseId?: string;
   composeId?: string;
+  /**
+   * Compose-mode only. When set, the WS query string includes
+   * `service=<name>` so the backend runs `docker compose logs <svc>`
+   * and the stream is scoped to that single container. Empty string
+   * = aggregate (every service). Changing this re-establishes the
+   * WS connection automatically via the watcher below.
+   */
+  service?: string;
   /** Friendly empty-state copy when the container hasn't started. */
   emptyStateMessage?: string;
 }
@@ -72,6 +80,11 @@ const connect = async () => {
     token: token.value || "",
   });
   if (teamId) params.set("team_id", teamId);
+  // Compose-only: scope the stream to a single service when set.
+  // Empty string = aggregate (omit the param).
+  if (props.composeId && props.service) {
+    params.set("service", props.service);
+  }
 
   const wsBase = config.public.wsBase as string;
   ws = new WebSocket(`${wsBase}/docker/applications/logs?${params.toString()}`);
@@ -165,6 +178,19 @@ watch(
   () => props.application?.container_id,
   () => {
     void connect();
+  },
+);
+
+// Compose-only: reconnect when the user picks a different service
+// from the Logs subtab's service picker. The empty-string ↔ named
+// transition also re-fires here.
+watch(
+  () => props.service,
+  () => {
+    if (props.composeId) {
+      lines.value = [];
+      void connect();
+    }
   },
 );
 

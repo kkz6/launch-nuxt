@@ -15,7 +15,14 @@ const props = defineProps<Props>();
 const apps = ref<DockerApplication[]>([]);
 const isLoading = ref(true);
 
-const createSheetOpen = ref(false);
+// Shared with the navbar "+ New Application" button — see
+// components/layout/Navbar.vue. Keeps the trigger affordance next to
+// Terminal where the eye expects it, without the page reaching into
+// navbar internals or vice versa.
+const createSheetOpen = useState<boolean>(
+  "dockerCreateApplicationOpen",
+  () => false,
+);
 
 const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
@@ -56,16 +63,24 @@ const deleteApp = async (app: DockerApplication) => {
     destructive: true,
     inputVerificationText: app.name,
     helpText: "Type the application name to confirm:",
+    // Same opt-in volume cleanup as the app-detail Advanced delete.
+    // Off by default — only the user's explicit tick wipes data.
+    checkbox: {
+      label: "Also delete attached named volumes (data will be lost)",
+      checked: false,
+    },
   });
   if (!result.ok) return;
+  const removeVolumes = !!result.checkbox?.checked;
   try {
     await dockerService.applications.delete(
       props.serverId,
       props.projectId,
       app.id,
+      { removeVolumes },
     );
     apps.value = apps.value.filter((a) => a.id !== app.id);
-    toast.success("Application deleted");
+    toast.success(removeVolumes ? "Application + volumes deleted" : "Application deleted");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to delete application");
@@ -148,18 +163,18 @@ onMounted(fetchApps);
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div class="mb-6 flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-semibold">Applications</h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Single-container workloads. Deploy from a public image, a git
-          repo, or a pasted Dockerfile.
-        </p>
-      </div>
-      <Button @click="createSheetOpen = true">
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        New Application
-      </Button>
+    <!--
+      Heading-only row — the "New Application" trigger now lives in
+      the project navbar next to Terminal so it's symmetric with how
+      Sites are created. Empty state below still has its own CTA for
+      first-time discovery.
+    -->
+    <div class="mb-6">
+      <h2 class="text-xl font-semibold">Applications</h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Single-container workloads. Deploy from a public image, a git
+        repo, or a pasted Dockerfile.
+      </p>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -185,52 +200,61 @@ onMounted(fetchApps);
       </Button>
     </div>
 
+    <!--
+      Card layout mirrors ServerDockerProjects.vue / Databases.vue.
+      Same brand-icon-bg pattern across all three workload kinds so
+      the grids read as siblings.
+    -->
     <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <NuxtLink
         v-for="app in apps"
         :key="app.id"
         :to="`/servers/${props.serverId}/projects/${props.projectId}/applications/${app.id}`"
-        class="group block rounded-lg border bg-card p-5 transition hover:border-primary"
+        class="group block h-full"
       >
-        <div class="flex items-start justify-between">
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
+        <div
+          class="relative flex h-full flex-col rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+        >
+          <div class="relative flex items-start gap-3">
+            <div
+              class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
+            >
               <Icon
                 :name="sourceIcon(app.source_type)"
-                class="h-4 w-4 text-muted-foreground"
+                class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
               />
-              <h3 class="truncate text-lg font-semibold group-hover:text-primary">
-                {{ app.name }}
-              </h3>
             </div>
-            <p class="mt-1 line-clamp-1 text-xs text-muted-foreground">
-              {{ sourceSummary(app) }}
-            </p>
+            <div class="min-w-0 flex-1">
+              <h3 class="truncate font-semibold">{{ app.name }}</h3>
+              <p class="line-clamp-1 text-sm text-muted-foreground">
+                {{ sourceSummary(app) }}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="-mr-1 -mt-1 shrink-0 opacity-0 transition group-hover:opacity-100"
+              @click.stop.prevent="deleteApp(app)"
+            >
+              <Icon name="lucide:trash-2" class="h-4 w-4" />
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            class="ml-2 shrink-0 opacity-0 transition group-hover:opacity-100"
-            @click.prevent="deleteApp(app)"
-          >
-            <Icon name="lucide:trash-2" class="h-4 w-4" />
-          </Button>
-        </div>
 
-        <div class="mt-4 flex items-center justify-between">
-          <span
-            class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-            :class="statusColor(app.status)"
-          >
-            {{ app.status }}
-          </span>
-          <span class="text-xs text-muted-foreground">
-            {{
-              app.last_deployed_at
-                ? `Deployed ${relative(app.last_deployed_at)}`
-                : "Never deployed"
-            }}
-          </span>
+          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+            <span
+              class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+              :class="statusColor(app.status)"
+            >
+              {{ app.status }}
+            </span>
+            <span class="text-xs text-muted-foreground">
+              {{
+                app.last_deployed_at
+                  ? `Deployed ${relative(app.last_deployed_at)}`
+                  : "Never deployed"
+              }}
+            </span>
+          </div>
         </div>
       </NuxtLink>
     </div>
@@ -243,3 +267,18 @@ onMounted(fetchApps);
     />
   </div>
 </template>
+
+<style scoped>
+/*
+  Hover-fill for the icon block, matching ServerDockerProjects.vue +
+  Databases.vue. Single theme primary tone across all source types
+  (image / git / dockerfile) — simpler than per-source brand colours.
+*/
+.group:hover .brand-icon-bg {
+  background-color: hsl(var(--primary));
+}
+
+.group:hover .brand-icon {
+  color: hsl(var(--primary-foreground));
+}
+</style>

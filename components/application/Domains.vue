@@ -1,22 +1,28 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
 import {
   dockerService,
   type DockerApplication,
   type DockerDomain,
 } from "~/services/dockerService";
 
+// Per-row Validate-DNS state. Map keyed by domain id so two rows
+// can validate in parallel without stomping each other's spinner.
+const validatingDns = ref<Set<string>>(new Set());
+
 interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
 
+// Two dialog modes share the same component (matches Redirects /
+// Schedules / Volumes): create vs. edit. selectedDomain drives which.
 const domains = ref<DockerDomain[]>([]);
 const isLoading = ref(true);
 
-const addOpen = ref(false);
-const form = reactive({ host: "", path: "", https: true });
-const isAdding = ref(false);
+const selectedDomain = ref<DockerDomain | null>(null);
+const isEditDialogOpen = ref(false);
 
 const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
@@ -38,61 +44,46 @@ const fetchDomains = async (silent = false) => {
   }
 };
 
-const openAdd = () => {
-  form.host = "";
-  form.path = "";
-  form.https = true;
-  addOpen.value = true;
+const editDomain = (d: DockerDomain) => {
+  selectedDomain.value = d;
+  isEditDialogOpen.value = true;
 };
 
-const submitAdd = async () => {
-  const host = form.host.trim().toLowerCase();
-  if (!host) {
-    toast.error("Host is required");
-    return;
-  }
-  isAdding.value = true;
-  try {
-    const res = await dockerService.applications.createDomain(
-      props.application.server_id,
-      props.application.project_id,
-      props.application.id,
-      {
-        host,
-        path: form.path.trim() || undefined,
-        https: form.https,
-      },
-    );
-    domains.value = [...domains.value, res.data].sort((a, b) =>
-      a.host.localeCompare(b.host),
-    );
-    toast.success("Domain added — Traefik is updating");
-    addOpen.value = false;
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to add domain");
-  } finally {
-    isAdding.value = false;
-  }
+const handleDomainUpdated = () => {
+  isEditDialogOpen.value = false;
+  selectedDomain.value = null;
+  fetchDomains();
 };
 
-const toggleHttps = async (d: DockerDomain) => {
-  const newValue = !d.https;
+watch(isEditDialogOpen, (open) => {
+  if (!open) selectedDomain.value = null;
+});
+
+const validateDns = async (d: DockerDomain) => {
+  if (validatingDns.value.has(d.id)) return;
+  validatingDns.value = new Set([...validatingDns.value, d.id]);
   try {
-    const res = await dockerService.applications.updateDomain(
+    const res = await dockerService.applications.validateDomainDns(
       props.application.server_id,
       props.application.project_id,
       props.application.id,
       d.id,
-      { https: newValue },
     );
-    // Replace in-place so the row's other fields aren't reset.
-    const idx = domains.value.findIndex((x) => x.id === d.id);
-    if (idx >= 0) domains.value[idx] = res.data;
-    toast.success(newValue ? "HTTPS enabled" : "HTTPS disabled");
+    const v = res.data;
+    if (v.ok) {
+      toast.success(v.message || "DNS resolves to the docker server");
+    } else {
+      toast.warning(v.message || "DNS does not point at this server", {
+        duration: 6000,
+      });
+    }
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update domain");
+    toast.error(e.data?.message || "Failed to validate DNS");
+  } finally {
+    const next = new Set(validatingDns.value);
+    next.delete(d.id);
+    validatingDns.value = next;
   }
 };
 
@@ -133,6 +124,17 @@ onMounted(fetchDomains);
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
+    <!-- Edit dialog — only mounts when a row is selected so form
+         state stays out of the DOM otherwise. Same shape Redirects
+         and Schedules use. -->
+    <ApplicationCreateDomain
+      v-if="selectedDomain"
+      v-model:open="isEditDialogOpen"
+      :application="application"
+      :domain="selectedDomain"
+      @updated="handleDomainUpdated"
+    />
+
     <div class="mb-6 flex items-center justify-between">
       <div>
         <h2 class="text-xl font-semibold">Domains</h2>
@@ -141,10 +143,11 @@ onMounted(fetchDomains);
           domains are served with Let's Encrypt certificates.
         </p>
       </div>
-      <Button @click="openAdd">
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Domain
-      </Button>
+      <ApplicationCreateDomain
+        v-if="domains.length > 0"
+        :application="application"
+        @created="fetchDomains"
+      />
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -164,54 +167,149 @@ onMounted(fetchDomains);
         Point a DNS A record at the docker server's public IP, then add
         the hostname here. Traefik handles the certificate.
       </p>
-      <Button class="mt-6" @click="openAdd">
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Domain
-      </Button>
+      <div class="mt-6">
+        <ApplicationCreateDomain
+          :application="application"
+          @created="fetchDomains"
+        />
+      </div>
     </div>
 
+    <!--
+      Table layout — same shape as Redirects / Volumes / Schedules
+      tables. URL is the headline, secondary fields (Path, Internal
+      Path, Strip Path) tuck under it as a muted second line when
+      non-default to keep the column count tractable. Port / HTTPS /
+      Cert / DNS each own a column.
+    -->
     <div v-else class="overflow-hidden rounded-lg border">
       <table class="w-full text-sm">
-        <thead class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead
+          class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground"
+        >
           <tr>
             <th class="px-4 py-3">URL</th>
+            <th class="px-4 py-3">Port</th>
             <th class="px-4 py-3">HTTPS</th>
+            <th class="px-4 py-3">Cert</th>
+            <th class="px-4 py-3">DNS</th>
             <th class="px-4 py-3"></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="d in domains" :key="d.id" class="border-t">
+          <tr v-for="d in domains" :key="d.id" class="border-t align-top">
             <td class="px-4 py-3">
               <a
                 :href="fullUrl(d)"
                 target="_blank"
                 rel="noopener"
-                class="flex items-center gap-1.5 font-mono text-sm hover:underline"
+                class="inline-flex items-center gap-1.5 font-mono text-sm hover:underline"
               >
                 {{ fullUrl(d) }}
-                <Icon name="lucide:external-link" class="h-3.5 w-3.5" />
+                <Icon
+                  name="lucide:external-link"
+                  class="h-3.5 w-3.5 shrink-0"
+                />
               </a>
-            </td>
-            <td class="px-4 py-3">
-              <button
-                class="inline-flex items-center gap-2 text-xs"
-                @click="toggleHttps(d)"
+              <!--
+                Secondary line — only renders when at least one of
+                Path / Internal Path / Strip Path is set. Each piece
+                separated by `·` to mirror dokploy's compact info
+                run.
+              -->
+              <p
+                v-if="
+                  d.path ||
+                  d.strip_path ||
+                  (d.internal_path && d.internal_path !== '/')
+                "
+                class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground"
               >
+                <span v-if="d.path">
+                  Path: <code class="font-mono">{{ d.path }}</code>
+                </span>
                 <span
-                  class="rounded-full px-2 py-0.5 font-medium"
-                  :class="
-                    d.https
-                      ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-                      : 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300'
+                  v-if="d.path && (d.strip_path || (d.internal_path && d.internal_path !== '/'))"
+                >
+                  ·
+                </span>
+                <span v-if="d.internal_path && d.internal_path !== '/'">
+                  Internal:
+                  <code class="font-mono">{{ d.internal_path }}</code>
+                </span>
+                <span
+                  v-if="
+                    d.strip_path && d.internal_path && d.internal_path !== '/'
                   "
                 >
-                  {{ d.https ? "Enabled" : "Disabled" }}
+                  ·
                 </span>
-                <Icon name="lucide:refresh-cw" class="h-3 w-3 opacity-50" />
+                <span v-if="d.strip_path">strip path</span>
+              </p>
+            </td>
+
+            <td class="px-4 py-3 font-mono text-xs text-muted-foreground">
+              {{ d.container_port ?? application.internal_port }}
+            </td>
+
+            <td class="px-4 py-3">
+              <span
+                class="rounded-full px-2 py-0.5 text-xs font-medium"
+                :class="
+                  d.https
+                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
+                    : 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300'
+                "
+              >
+                {{ d.https ? "Enabled" : "Disabled" }}
+              </span>
+            </td>
+
+            <td class="px-4 py-3 text-xs text-muted-foreground">
+              <span v-if="d.https" class="font-mono">
+                {{ d.certificate_provider }}
+              </span>
+              <span v-else>—</span>
+            </td>
+
+            <td class="px-4 py-3">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 rounded-full border border-amber-500/50 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-500/20 disabled:opacity-60 dark:text-amber-400"
+                :disabled="validatingDns.has(d.id)"
+                @click="validateDns(d)"
+              >
+                <Icon
+                  :name="
+                    validatingDns.has(d.id)
+                      ? 'lucide:loader-2'
+                      : 'lucide:refresh-cw'
+                  "
+                  :class="[
+                    'h-3 w-3',
+                    validatingDns.has(d.id) && 'animate-spin',
+                  ]"
+                />
+                Validate
               </button>
             </td>
+
             <td class="px-4 py-3 text-right">
-              <Button variant="ghost" size="icon" @click="removeDomain(d)">
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Edit domain"
+                @click="editDomain(d)"
+              >
+                <Icon name="lucide:pencil" class="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                title="Remove domain"
+                class="hover:bg-destructive/90 hover:text-white"
+                @click="removeDomain(d)"
+              >
                 <Icon name="lucide:trash-2" class="h-4 w-4" />
               </Button>
             </td>
@@ -219,63 +317,5 @@ onMounted(fetchDomains);
         </tbody>
       </table>
     </div>
-
-    <Dialog v-model:open="addOpen">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Add Domain</DialogTitle>
-          <DialogDescription>
-            Point an A record at this server's public IP, then add the
-            hostname below. Certificate issuance can take ~30 seconds.
-          </DialogDescription>
-        </DialogHeader>
-        <form class="space-y-4" @submit.prevent="submitAdd">
-          <div class="space-y-2">
-            <Label for="domain-host">Host</Label>
-            <Input
-              id="domain-host"
-              v-model="form.host"
-              placeholder="api.example.com"
-              autocomplete="off"
-              required
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="domain-path">Path prefix (optional)</Label>
-            <Input
-              id="domain-path"
-              v-model="form.path"
-              placeholder="/api"
-              autocomplete="off"
-            />
-            <p class="text-xs text-muted-foreground">
-              Leave blank to route all paths to this app.
-            </p>
-          </div>
-          <label class="flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="form.https" type="checkbox" class="h-4 w-4" />
-            Enable HTTPS via Let's Encrypt
-          </label>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              :disabled="isAdding"
-              @click="addOpen = false"
-            >
-              Cancel
-            </Button>
-            <Button type="submit" :disabled="isAdding">
-              <Icon
-                v-if="isAdding"
-                name="lucide:loader-2"
-                class="mr-2 h-4 w-4 animate-spin"
-              />
-              Add Domain
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   </div>
 </template>
