@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
+import { Separator } from "~/components/ui/separator";
 import { dockerService, type DockerProject } from "~/services/dockerService";
 
 interface Props {
@@ -59,17 +60,20 @@ const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
 >(null);
 
-const deleteProject = async () => {
-  if (!confirmationDialog.value) return;
-  const totalWorkloads =
+const totalWorkloads = computed(
+  () =>
     props.project.applications_count +
     props.project.composes_count +
-    props.project.databases_count;
+    props.project.databases_count,
+);
+
+const deleteProject = async () => {
+  if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
     title: "Delete Project",
     description:
-      totalWorkloads > 0
-        ? `This project has ${totalWorkloads} workload(s). Deleting it will remove them all.`
+      totalWorkloads.value > 0
+        ? `This project has ${totalWorkloads.value} workload(s). Deleting it will remove them all.`
         : "This will permanently delete the project.",
     confirmText: "Delete project",
     cancelText: "Cancel",
@@ -85,67 +89,79 @@ const deleteProject = async () => {
     emit("deleted");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete project");
+    toast.error(e.data?.message || "Failed to update project");
   }
 };
 </script>
 
 <template>
-  <div class="space-y-8">
+  <!--
+    Settings page intentionally follows the SiteSettings layout: flat
+    space-y-6 column, each section is a small h3 + paragraph + form
+    block, sections separated by <Separator />, no boxed cards. The
+    danger zone gets a destructive-coloured heading but no red panel.
+  -->
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <section class="rounded-lg border bg-card p-6">
-      <h3 class="text-lg font-semibold">General</h3>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Rename the project or update its description.
-      </p>
+    <div class="space-y-6">
+      <div>
+        <h3 class="text-lg font-medium">General</h3>
+        <p class="text-sm text-muted-foreground">
+          Rename this project or update its description.
+        </p>
+      </div>
 
-      <form class="mt-6 space-y-4" @submit.prevent="save">
-        <div class="space-y-2">
-          <Label for="settings-name">Name</Label>
-          <Input
-            id="settings-name"
-            v-model="form.name"
-            placeholder="e.g. acme-prod"
-            autocomplete="off"
-          />
-        </div>
-        <div class="space-y-2">
-          <Label for="settings-description">Description</Label>
-          <Textarea
-            id="settings-description"
-            v-model="form.description"
-            rows="3"
-            placeholder="What lives in this project?"
-          />
-        </div>
-        <div class="flex justify-end">
-          <Button type="submit" :disabled="!isDirty || isSaving">
-            <Icon
-              v-if="isSaving"
-              name="lucide:loader-2"
-              class="mr-2 h-4 w-4 animate-spin"
+      <form class="space-y-4" @submit.prevent="save">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div class="space-y-2">
+            <Label for="settings-name">Name</Label>
+            <Input
+              id="settings-name"
+              v-model="form.name"
+              placeholder="e.g. acme-prod"
+              autocomplete="off"
             />
-            Save changes
-          </Button>
+          </div>
+          <div class="space-y-2 md:row-span-2">
+            <Label for="settings-description">Description</Label>
+            <Textarea
+              id="settings-description"
+              v-model="form.description"
+              rows="5"
+              placeholder="What lives in this project?"
+            />
+          </div>
         </div>
+        <Button type="submit" :disabled="!isDirty || isSaving">
+          <Icon
+            v-if="isSaving"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          Update settings
+        </Button>
       </form>
-    </section>
 
-    <section
-      class="rounded-lg border border-destructive/40 bg-destructive/5 p-6"
-    >
-      <h3 class="text-lg font-semibold text-destructive">Danger zone</h3>
-      <p class="mt-1 text-sm text-muted-foreground">
-        Deleting the project removes it and every workload it contains.
-        This can't be undone.
-      </p>
-      <div class="mt-4 flex justify-end">
+      <Separator />
+
+      <div class="space-y-4 pt-2">
+        <div>
+          <h3 class="text-lg font-medium text-destructive">Danger zone</h3>
+          <p class="text-sm text-muted-foreground">
+            {{
+              totalWorkloads > 0
+                ? `Permanently delete this project and the ${totalWorkloads} workload(s) it contains.`
+                : "Permanently delete this project."
+            }}
+            This action can't be undone.
+          </p>
+        </div>
         <Button variant="destructive" @click="deleteProject">
           <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
           Delete project
         </Button>
       </div>
-    </section>
+    </div>
   </div>
 </template>
