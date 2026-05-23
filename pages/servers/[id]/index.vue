@@ -69,7 +69,10 @@ watch(sitesRefreshKey, () => {
 // Tab validation is driven by the per-server-type rules. The set of valid
 // tabs differs between PHP / load-balancer / docker — single source of
 // truth is useServerTypeRules so this page never drifts from the Navbar.
-const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services"];
+// Accepted Advanced sub-tabs across all server types. Per-type filtering
+// (e.g. only docker shows 'traefik', only PHP shows 'backups'/'packages')
+// happens in Navbar.advancedSubTabs — this list is the union.
+const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services", "traefik"];
 
 const allValidTabs = computed(() =>
   getServerTypeRules(server.value?.type).tabs.map((t) => t.value),
@@ -249,10 +252,12 @@ onMounted(async () => {
       <ServerDockerVolumes :server-id="server.id" />
     </div>
 
-    <div v-else-if="activeTab === 'traefik'">
-      <ServerDockerTraefik :server-id="server.id" />
-    </div>
-
+    <!--
+      Traefik used to be a top-level tab; it now lives as a sub-tab
+      under Advanced (docker servers only). The ServerAdvancedSettings
+      component dispatches on activeSubTab and renders the Traefik
+      panel when it matches.
+    -->
     <div v-else-if="activeTab === 'advanced'">
       <ServerAdvancedSettings :server="server" :active-sub-tab="activeSubTab" />
     </div>
