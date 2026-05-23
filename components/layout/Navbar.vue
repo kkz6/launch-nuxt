@@ -188,6 +188,40 @@ const updateSiteIndicator = () => {
   }
 };
 
+// Project tabs indicator — same shape as siteTabRefs.
+const projectNavRef = ref<HTMLElement | null>(null);
+const projectTabRefs = ref<Map<string, HTMLElement>>(new Map());
+const projectIndicatorLeft = ref(0);
+const projectIndicatorWidth = ref(0);
+
+const setProjectTabRef = (key: string, el: unknown) => {
+  if (el) {
+    projectTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
+  }
+};
+
+const updateProjectIndicator = () => {
+  if (!showProjectTabs.value) {
+    projectIndicatorWidth.value = 0;
+    return;
+  }
+  const currentTab = (route.query.tab as string) || 'overview';
+  if (projectTabRefs.value.has(currentTab)) {
+    const tabEl = projectTabRefs.value.get(currentTab);
+    if (tabEl && projectNavRef.value) {
+      const navRect = projectNavRef.value.getBoundingClientRect();
+      const tabRect = tabEl.getBoundingClientRect();
+      projectIndicatorLeft.value = tabRect.left - navRect.left;
+      projectIndicatorWidth.value = tabRect.width;
+    }
+  } else {
+    projectIndicatorWidth.value = 0;
+  }
+};
+
 // Advanced sub-tabs indicator
 const advancedNavRef = ref<HTMLElement | null>(null);
 const advancedTabRefs = ref<Map<string, HTMLElement>>(new Map());
@@ -224,6 +258,7 @@ watch([() => route.path, () => route.query.tab, () => route.query.subtab], () =>
   nextTick(() => {
     updateServerIndicator();
     updateSiteIndicator();
+    updateProjectIndicator();
     updateAdvancedIndicator();
   });
 }, { immediate: true });
@@ -295,6 +330,19 @@ const isSiteDetailPage = computed(() => {
   return match !== null;
 });
 
+// Project detail page — exact match on /servers/:id/projects/:projectId
+// (no deeper segments). The workload detail pages live one level
+// further down (applications/composes/databases) and get their own
+// navbar treatment when they need it; the breadcrumb on those still
+// resolves to this page via the back arrow.
+const isProjectDetailPage = computed(() => {
+  return (
+    route.path.match(
+      /^\/servers\/([^/]+)\/projects\/([^/]+)$/,
+    ) !== null
+  );
+});
+
 // Check if we're on a DNS domain detail page
 const isDnsDetailPage = computed(() => {
   const match = route.path.match(/^\/dns\/([^/]+)(?:\/|$)/);
@@ -314,6 +362,18 @@ const serverId = computed(() => {
 
 const siteId = computed(() => {
   const match = route.path.match(/^\/servers\/([^/]+)\/sites\/([^/]+)$/);
+  return match ? match[2] : null;
+});
+
+// projectId is extracted from any URL that starts with
+// /servers/:id/projects/:projectId, so it works on the project page
+// AND its nested workload pages (applications/.., composes/.., etc.)
+// — those pages won't use the project tab strip but might reuse the
+// crumb in a future iteration.
+const projectId = computed(() => {
+  const match = route.path.match(
+    /^\/servers\/([^/]+)\/projects\/([^/]+)/,
+  );
   return match ? match[2] : null;
 });
 
@@ -337,6 +397,29 @@ const siteAddress = ref<string | null>(null);
 const siteType = ref<string | null>(null);
 const siteUrl = ref<string | null>(null);
 const isDeploying = ref(false);
+
+// Project data for detail page. Loaded on navigation; cached in
+// memory across re-renders so the breadcrumb name doesn't flash to
+// "Loading..." on every route change inside the project subtree.
+const projectName = ref<string | null>(null);
+
+const projectDetailTabs = [
+  { value: 'overview', label: 'Overview', query: 'overview', icon: 'lucide:layout-dashboard' },
+  { value: 'applications', label: 'Applications', query: 'applications', icon: 'lucide:box' },
+  { value: 'compose', label: 'Compose', query: 'compose', icon: 'lucide:layers' },
+  { value: 'databases', label: 'Databases', query: 'databases', icon: 'lucide:database' },
+  { value: 'settings', label: 'Settings', query: 'settings', icon: 'lucide:settings' },
+];
+
+const showProjectTabs = computed(() => {
+  if (!isSubscribed.value) return false;
+  return isProjectDetailPage.value;
+});
+
+const isProjectTabActive = (query: string) => {
+  const currentTab = (route.query.tab as string) || 'overview';
+  return currentTab === query;
+};
 
 // Shared bus consumed by the site detail page so that triggering a deploy
 // from the navbar updates the on-page overview card immediately, without
@@ -411,8 +494,12 @@ const applyServerData = (data: { name: string; public_ipv4: string; connected: b
   serverProvisionCommand.value = data.provision_command || null;
 };
 
-// Fetch server info when on server or site detail page
-watch([serverId, siteId], async ([sId, stId]) => {
+// Fetch server info when on server / site / project detail page.
+// projectId is in the dep list so the crumb refreshes if the user
+// jumps between projects, but the watch body keeps its existing
+// site-vs-server-only branches and treats project the same as
+// "server with extra resource".
+watch([serverId, siteId, projectId], async ([sId, stId, pId]) => {
   if (sId && !stId) {
     // Server detail page - use cache if available, otherwise fetch
     const cached = getCachedServer(sId);
@@ -451,7 +538,43 @@ watch([serverId, siteId], async ([sId, stId]) => {
       serverName.value = null;
       siteAddress.value = null;
     }
-  } else {
+  }
+
+  // Project detail page — load the project (and server, if not
+  // already loaded by the branch above). The crumb keeps stale data
+  // around for an instant load on back/forward navigation; the
+  // ${projectId}` URL change forces a refresh.
+  if (sId && pId) {
+    try {
+      const [serverRes, projectRes] = await Promise.all([
+        $api<{
+          data: {
+            name: string;
+            public_ipv4: string;
+            connected: boolean;
+            provider: string;
+            status: string;
+            type: string;
+            provision_command?: string;
+          };
+        }>(`/servers/${sId}`),
+        $api<{ data: { name: string } }>(
+          `/servers/${sId}/docker/projects/${pId}`,
+        ),
+      ]);
+      applyServerData(serverRes.data);
+      projectName.value = projectRes.data.name;
+    } catch {
+      // Page-level guard will redirect on its own — just blank.
+      projectName.value = null;
+    }
+  } else if (!pId) {
+    // Clear the project name when leaving the project subtree so a
+    // late navigation doesn't paint the previous breadcrumb.
+    projectName.value = null;
+  }
+
+  if (!sId) {
     serverName.value = null;
     serverProvider.value = null;
     serverStatus.value = null;
@@ -557,10 +680,11 @@ const showSiteTabs = computed(() => {
 });
 
 // Watch for section visibility changes to update indicators when they become visible
-watch([showGlobalTabs, showServerTabs, showSiteTabs, isAdvancedTabActive], ([globalVisible, serverVisible, siteVisible, advancedVisible]) => {
+watch([showGlobalTabs, showServerTabs, showSiteTabs, showProjectTabs, isAdvancedTabActive], ([globalVisible, serverVisible, siteVisible, projectVisible, advancedVisible]) => {
   // Clear stale refs when sections become hidden
   if (!serverVisible) serverTabRefs.value.clear();
   if (!siteVisible) siteTabRefs.value.clear();
+  if (!projectVisible) projectTabRefs.value.clear();
   if (!advancedVisible) advancedTabRefs.value.clear();
 
   // Wait for refs to be populated after render
@@ -569,6 +693,7 @@ watch([showGlobalTabs, showServerTabs, showSiteTabs, isAdvancedTabActive], ([glo
       if (globalVisible) updateIndicator();
       if (serverVisible) updateServerIndicator();
       if (siteVisible) updateSiteIndicator();
+      if (projectVisible) updateProjectIndicator();
       if (advancedVisible) updateAdvancedIndicator();
     });
   }, 50);
@@ -1134,6 +1259,79 @@ onMounted(fetchTeams);
         <span
           class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
           :style="{ left: `${siteIndicatorLeft}px`, width: `${siteIndicatorWidth}px` }"
+        />
+      </nav>
+    </div>
+
+    <!--
+      Project Detail Navigation. Same shape as the site detail block —
+      breadcrumb on the left (Servers / serverName / projectName),
+      action bar on the right (just Terminal for now), then a tab
+      strip with the sliding indicator.
+    -->
+    <div v-if="showProjectTabs" class="px-4 lg:px-8">
+      <div class="flex items-center justify-between py-2">
+        <div class="flex items-center gap-3">
+          <NuxtLink
+            to="/servers"
+            class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <Server class="h-4 w-4" />
+            Servers
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <NuxtLink
+            :to="`/servers/${serverId}?tab=projects`"
+            class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <span
+              class="h-2 w-2 rounded-full"
+              :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
+            />
+            {{ serverName || 'Loading...' }}
+          </NuxtLink>
+          <span class="text-muted-foreground">/</span>
+          <div class="flex items-center gap-2">
+            <Icon name="lucide:folder-tree" class="h-4 w-4 text-muted-foreground" />
+            <span class="text-sm font-medium">
+              {{ projectName || 'Loading...' }}
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <Button
+            v-if="serverConnected"
+            variant="outline"
+            size="sm"
+            @click="openTerminal"
+          >
+            <Terminal class="mr-2 h-4 w-4" />
+            Terminal
+          </Button>
+        </div>
+      </div>
+      <nav ref="projectNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">
+        <NuxtLink
+          v-for="tab in projectDetailTabs"
+          :key="tab.value"
+          :ref="(el) => setProjectTabRef(tab.query, el)"
+          :to="{
+            path: `/servers/${serverId}/projects/${projectId}`,
+            query: { tab: tab.query },
+          }"
+          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
+          :class="[
+            isProjectTabActive(tab.query)
+              ? 'text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
+          ]"
+        >
+          <Icon :name="tab.icon" class="h-4 w-4" />
+          {{ tab.label }}
+        </NuxtLink>
+        <span
+          class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
+          :style="{ left: `${projectIndicatorLeft}px`, width: `${projectIndicatorWidth}px` }"
         />
       </nav>
     </div>
