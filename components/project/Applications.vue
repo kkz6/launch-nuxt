@@ -129,6 +129,18 @@ const relative = (iso?: string | null): string => {
   }
 };
 
+// WS keeps the list live across deploy lifecycle. The backend
+// broadcasts deploying / deployed / failed with the application's
+// id; we refetch silently so status badges + last_deployed_at stay
+// accurate without a manual reload. Audit 2026-05-23 flagged this
+// as the worst HALF-WIRED gap on the list views.
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+useDockerApplicationEvents(teamId, (data) => {
+  if (data.project_id && data.project_id !== props.projectId) return;
+  void fetchApps();
+});
+
 onMounted(fetchApps);
 </script>
 

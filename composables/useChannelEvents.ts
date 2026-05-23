@@ -378,6 +378,35 @@ export const useDockerProjectEvents = (
 }
 
 /**
+ * Compose stack lifecycle events. Mirrors useDockerApplicationEvents
+ * — same list-view refresh pattern, same broadcast names with
+ * "application" → "compose". The backend normalises the payload so
+ * every event carries `compose_id` even when ComposeResponse's JSON
+ * field is just `id` (see compose_service.go composeBroadcast).
+ */
+export const useDockerComposeEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    [
+      'docker.compose.created',
+      'docker.compose.updated',
+      'docker.compose.deleted',
+      'docker.compose.deploying',
+      'docker.compose.deployed',
+      'docker.compose.failed',
+      'docker.compose.removed',
+    ],
+    onEvent,
+  )
+}
+
+/**
  * Composable to subscribe to load balancer upstream and backend events
  *
  * @param teamId - The team ID

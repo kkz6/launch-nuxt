@@ -33,6 +33,16 @@ watch(refreshKey, () => {
   void fetchProjects(true);
 });
 
+// WS subscription so the list stays live when another tab / teammate
+// adds / renames / deletes a project. Filter on server_id so events
+// for projects on OTHER servers don't refetch this page.
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+useDockerProjectEvents(teamId, (data) => {
+  if (data.server_id && data.server_id !== props.server.id) return;
+  void fetchProjects(true);
+});
+
 const formatDate = (iso?: string): string => {
   if (!iso) return "";
   try {
