@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import {
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxItemIndicator,
+  ComboboxPortal,
+  ComboboxRoot,
+  ComboboxTrigger,
+} from "reka-ui";
+import type { Repository, SourceControl } from "~/types";
+import {
   dockerService,
   type CreateDockerApplicationData,
   type DockerApplication,
@@ -35,13 +48,72 @@ const name = ref("");
 const internalPort = ref<number>(80);
 
 const imageRef = ref(""); // for source_type=image
-const gitRepo = ref(""); // for git
+
+// Git: source-control picker → repository combobox → branch.
+// Same shape as AddSite.vue. Public repos can still be entered via
+// the URL fallback so we don't force a provider connection.
+const sourceControls = ref<SourceControl[]>([]);
+const repositories = ref<Repository[]>([]);
+const isLoadingRepositories = ref(false);
+const repositorySearchTerm = ref("");
+const sourceControlId = ref("");
+const selectedRepo = ref<Repository | null>(null);
+const gitRepoFallback = ref("");
 const gitBranch = ref("main");
 const gitBuildType = ref<"auto" | "nixpacks" | "dockerfile">("auto");
 const gitDockerfilePath = ref("");
+
 const dockerfileContents = ref("");
 
 const isSubmitting = ref(false);
+
+const fetchSourceControls = async () => {
+  try {
+    const res = await sourceControlService.list();
+    sourceControls.value = res.data;
+  } catch {
+    sourceControls.value = [];
+  }
+};
+
+const fetchRepositories = async (scId: string) => {
+  if (!scId) {
+    repositories.value = [];
+    return;
+  }
+  isLoadingRepositories.value = true;
+  try {
+    const res = await sourceControlService.repositories(scId);
+    repositories.value = res.data ?? [];
+  } catch {
+    repositories.value = [];
+  } finally {
+    isLoadingRepositories.value = false;
+  }
+};
+
+const handleSourceControlChange = (scId: string) => {
+  sourceControlId.value = scId;
+  selectedRepo.value = null;
+  gitBranch.value = "main";
+  void fetchRepositories(scId);
+};
+
+const handleRepoSelect = (repo: Repository) => {
+  selectedRepo.value = repo;
+  gitBranch.value = repo.default_branch || "main";
+  repositorySearchTerm.value = "";
+};
+
+const filteredRepositories = computed(() => {
+  if (!repositorySearchTerm.value) return repositories.value;
+  const q = repositorySearchTerm.value.toLowerCase();
+  return repositories.value.filter(
+    (r) =>
+      r.full_name.toLowerCase().includes(q) ||
+      r.name.toLowerCase().includes(q),
+  );
+});
 
 watch(isOpen, (open) => {
   if (open) {
@@ -49,11 +121,18 @@ watch(isOpen, (open) => {
     name.value = "";
     internalPort.value = 80;
     imageRef.value = "";
-    gitRepo.value = "";
+    sourceControlId.value = "";
+    selectedRepo.value = null;
+    repositories.value = [];
+    repositorySearchTerm.value = "";
+    gitRepoFallback.value = "";
     gitBranch.value = "main";
     gitBuildType.value = "auto";
     gitDockerfilePath.value = "";
     dockerfileContents.value = "";
+    // Pre-load source controls so the combobox is ready when the
+    // user clicks "Git repo". Idempotent — bails if already loaded.
+    void fetchSourceControls();
   }
 });
 
@@ -87,10 +166,20 @@ const submit = async () => {
       break;
     }
     case "git": {
-      const repo = gitRepo.value.trim();
+      // Repo URL either comes from the picked repository (preferred —
+      // we know the clone URL is correct + we can use the connection's
+      // auth for private repos) or from the fallback public-URL input.
+      let repoUrl = "";
+      if (selectedRepo.value) {
+        repoUrl =
+          selectedRepo.value.ssh_url ||
+          `https://github.com/${selectedRepo.value.full_name}.git`;
+      } else if (gitRepoFallback.value.trim()) {
+        repoUrl = gitRepoFallback.value.trim();
+      }
       const branch = gitBranch.value.trim();
-      if (!repo) {
-        toast.error("Git repository URL is required");
+      if (!repoUrl) {
+        toast.error("Pick a repository or paste a public URL");
         return;
       }
       if (!branch) {
@@ -98,8 +187,11 @@ const submit = async () => {
         return;
       }
       payload.git = {
-        repo,
+        repo: repoUrl,
         branch,
+        ...(sourceControlId.value
+          ? { source_control_id: sourceControlId.value }
+          : {}),
         ...(gitBuildType.value !== "auto"
           ? { build_type: gitBuildType.value }
           : {}),
@@ -217,41 +309,142 @@ const submit = async () => {
           </p>
         </div>
 
-        <!-- Git source -->
-        <div v-else-if="sourceType === 'git'" class="space-y-3">
-          <div class="space-y-2">
-            <Label for="app-git-repo">Repository URL</Label>
+        <!-- Git source — same picker AddSite uses: connected provider
+             selector + repository combobox. Falls back to a public URL
+             input when no provider is connected. -->
+        <div v-else-if="sourceType === 'git'" class="space-y-4">
+          <div
+            v-if="sourceControls.length === 0"
+            class="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+          >
+            <Icon
+              name="lucide:triangle-alert"
+              class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom"
+            />
+            No Git provider connected. Paste a public repo URL below,
+            or connect GitHub / GitLab / Bitbucket in Settings &rarr;
+            Integrations to pick from a list.
+          </div>
+
+          <div v-if="sourceControls.length > 0" class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label>Git provider</Label>
+              <Select
+                :model-value="sourceControlId"
+                @update:model-value="(v) => handleSourceControlChange(v as string)"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select git provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="sc in sourceControls" :key="sc.id" :value="sc.id">
+                    <div class="flex items-center gap-2">
+                      <Icon :name="`simple-icons:${sc.provider}`" class="h-4 w-4" />
+                      <span>
+                        {{ sc.login }}
+                        <span class="text-muted-foreground">
+                          ({{ sc.repository_count }}
+                          {{ sc.repository_count === 1 ? 'repo' : 'repos' }})
+                        </span>
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="space-y-2">
+              <Label>Repository</Label>
+              <ComboboxRoot
+                v-model:search-term="repositorySearchTerm"
+                :model-value="selectedRepo"
+                :disabled="!sourceControlId || isLoadingRepositories"
+                :filter-function="(list: Repository[]) => list"
+                class="relative"
+                @update:model-value="(val: Repository | null) => val && handleRepoSelect(val)"
+              >
+                <ComboboxAnchor
+                  class="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+                >
+                  <ComboboxInput
+                    class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+                    :placeholder="isLoadingRepositories ? 'Loading...' : 'Search repository...'"
+                    :display-value="(repo: Repository) => repo?.full_name || ''"
+                  />
+                  <ComboboxTrigger class="flex items-center justify-center">
+                    <Icon name="lucide:chevron-down" class="h-4 w-4 opacity-50" />
+                  </ComboboxTrigger>
+                </ComboboxAnchor>
+                <ComboboxPortal>
+                  <ComboboxContent
+                    position="popper"
+                    :side-offset="4"
+                    class="z-[200] max-h-60 w-[--reka-combobox-trigger-width] overflow-hidden rounded-md border bg-popover shadow-md"
+                  >
+                    <ComboboxEmpty class="py-6 text-center text-sm text-muted-foreground">
+                      No repository found.
+                    </ComboboxEmpty>
+                    <ComboboxGroup class="overflow-auto p-1">
+                      <ComboboxItem
+                        v-for="repo in filteredRepositories"
+                        :key="repo.id"
+                        :value="repo"
+                        class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                        @select="handleRepoSelect(repo)"
+                      >
+                        <ComboboxItemIndicator class="mr-2 h-4 w-4">
+                          <Icon name="lucide:check" class="h-4 w-4" />
+                        </ComboboxItemIndicator>
+                        <Icon
+                          :name="repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'"
+                          class="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
+                        />
+                        <span class="truncate">{{ repo.full_name }}</span>
+                      </ComboboxItem>
+                    </ComboboxGroup>
+                  </ComboboxContent>
+                </ComboboxPortal>
+              </ComboboxRoot>
+            </div>
+          </div>
+
+          <div v-if="!selectedRepo" class="space-y-2">
+            <Label for="app-git-repo-url">Or paste a public repository URL</Label>
             <Input
-              id="app-git-repo"
-              v-model="gitRepo"
-              placeholder="https://github.com/owner/repo"
+              id="app-git-repo-url"
+              v-model="gitRepoFallback"
+              placeholder="https://github.com/owner/repo.git"
               autocomplete="off"
             />
           </div>
-          <div class="space-y-2">
-            <Label for="app-git-branch">Branch</Label>
-            <Input
-              id="app-git-branch"
-              v-model="gitBranch"
-              placeholder="main"
-              autocomplete="off"
-            />
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label for="app-git-branch">Branch</Label>
+              <Input
+                id="app-git-branch"
+                v-model="gitBranch"
+                placeholder="main"
+                autocomplete="off"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label>Builder</Label>
+              <Select v-model="gitBuildType">
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose builder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">
+                    Auto-detect (Dockerfile, else Nixpacks)
+                  </SelectItem>
+                  <SelectItem value="dockerfile">Dockerfile</SelectItem>
+                  <SelectItem value="nixpacks">Nixpacks</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div class="space-y-2">
-            <Label>Builder</Label>
-            <Select v-model="gitBuildType">
-              <SelectTrigger>
-                <SelectValue placeholder="Choose builder" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="auto">
-                  Auto-detect (Dockerfile, else Nixpacks)
-                </SelectItem>
-                <SelectItem value="dockerfile">Dockerfile</SelectItem>
-                <SelectItem value="nixpacks">Nixpacks</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+
           <div v-if="gitBuildType === 'dockerfile'" class="space-y-2">
             <Label for="app-dockerfile-path">Dockerfile path</Label>
             <Input
@@ -265,11 +458,6 @@ const submit = async () => {
               <code>./Dockerfile</code>.
             </p>
           </div>
-          <p class="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
-            Private repositories work once you connect a Git provider
-            under Settings → Integrations. Public repos clone with no
-            credentials.
-          </p>
         </div>
 
         <!-- Dockerfile source -->

@@ -1,6 +1,19 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import {
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxGroup,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxItemIndicator,
+  ComboboxPortal,
+  ComboboxRoot,
+  ComboboxTrigger,
+} from "reka-ui";
+import type { Repository, SourceControl } from "~/types";
+import {
   dockerService,
   type CreateDockerComposeData,
   type DockerCompose,
@@ -23,26 +36,103 @@ const isOpen = computed({
   set: (v) => emit("update:open", v),
 });
 
-// Compose has only two source types — keep the discriminator simple.
+// ---- form state ---------------------------------------------------------
 const sourceType = ref<DockerComposeSourceType>("git");
 const name = ref("");
-const gitRepo = ref("");
+
+// Git fields. We track sourceControlId separately so the API gets the
+// connection used for cloning private repos; gitRepo is the cloneable URL
+// (full_name → cloned via the connection's auth). For convenience the
+// user can also paste a public URL directly (no source-control needed).
+const sourceControls = ref<SourceControl[]>([]);
+const repositories = ref<Repository[]>([]);
+const isLoadingRepositories = ref(false);
+const repositorySearchTerm = ref("");
+
+const sourceControlId = ref("");
+const selectedRepo = ref<Repository | null>(null);
+const gitRepoFallback = ref(""); // when no provider connected, paste URL
 const gitBranch = ref("main");
 const composeFilePath = ref("");
+
 const rawYAML = ref("");
 const isSubmitting = ref(false);
 
+// ---- data loading -------------------------------------------------------
+const fetchSourceControls = async () => {
+  try {
+    const res = await sourceControlService.list();
+    sourceControls.value = res.data;
+  } catch {
+    // Silent — the form falls back to the public-URL input below.
+    sourceControls.value = [];
+  }
+};
+
+const fetchRepositories = async (scId: string) => {
+  if (!scId) {
+    repositories.value = [];
+    return;
+  }
+  isLoadingRepositories.value = true;
+  try {
+    const res = await sourceControlService.repositories(scId);
+    repositories.value = res.data ?? [];
+  } catch {
+    repositories.value = [];
+  } finally {
+    isLoadingRepositories.value = false;
+  }
+};
+
+const handleSourceControlChange = (scId: string) => {
+  sourceControlId.value = scId;
+  selectedRepo.value = null;
+  gitBranch.value = "main";
+  void fetchRepositories(scId);
+};
+
+const handleRepoSelect = (repo: Repository) => {
+  selectedRepo.value = repo;
+  gitBranch.value = repo.default_branch || "main";
+  repositorySearchTerm.value = "";
+};
+
+const filteredRepositories = computed(() => {
+  if (!repositorySearchTerm.value) return repositories.value;
+  const q = repositorySearchTerm.value.toLowerCase();
+  return repositories.value.filter(
+    (r) =>
+      r.full_name.toLowerCase().includes(q) ||
+      r.name.toLowerCase().includes(q),
+  );
+});
+
+// `selectedSourceControl` shown next to the picker (label + icon).
+const selectedSourceControl = computed(() =>
+  sourceControls.value.find((sc) => sc.id === sourceControlId.value) ?? null,
+);
+
+// ---- lifecycle ---------------------------------------------------------
 watch(isOpen, (open) => {
   if (open) {
     sourceType.value = "git";
     name.value = "";
-    gitRepo.value = "";
+    sourceControlId.value = "";
+    selectedRepo.value = null;
+    gitRepoFallback.value = "";
     gitBranch.value = "main";
     composeFilePath.value = "";
     rawYAML.value = "";
+    repositorySearchTerm.value = "";
+    repositories.value = [];
+    // Lazy load source-control accounts. The endpoint is cheap and
+    // results are cached server-side per team.
+    void fetchSourceControls();
   }
 });
 
+// ---- submit ------------------------------------------------------------
 const submit = async () => {
   const trimmedName = name.value.trim();
   if (!trimmedName) {
@@ -56,15 +146,29 @@ const submit = async () => {
   };
 
   if (sourceType.value === "git") {
-    const repo = gitRepo.value.trim();
+    // Three valid combos:
+    //   - source-control + repo picked → repo.full_name + sc id
+    //   - public URL only             → URL only, no sc id
+    //   - source-control + URL fallback (rare) → URL + sc id
+    let repoUrl = "";
+    if (selectedRepo.value) {
+      // ssh_url is what the deploy job clones with when there's a
+      // source-control connection; for public URLs we use html_url.
+      repoUrl =
+        selectedRepo.value.ssh_url ||
+        `https://github.com/${selectedRepo.value.full_name}.git`;
+    } else if (gitRepoFallback.value.trim()) {
+      repoUrl = gitRepoFallback.value.trim();
+    }
     const branch = gitBranch.value.trim();
-    if (!repo || !branch) {
-      toast.error("Repository URL and branch are required");
+    if (!repoUrl || !branch) {
+      toast.error("Pick a repository and branch");
       return;
     }
     payload.git = {
-      repo,
+      repo: repoUrl,
       branch,
+      ...(sourceControlId.value ? { source_control_id: sourceControlId.value } : {}),
       ...(composeFilePath.value.trim()
         ? { compose_file_path: composeFilePath.value.trim() }
         : {}),
@@ -101,10 +205,11 @@ const submit = async () => {
       <DialogHeader>
         <DialogTitle>New Compose Stack</DialogTitle>
         <DialogDescription>
-          Register a docker-compose stack. Source can be a git repo or
-          a YAML body pasted inline. To route through Traefik, declare
-          <code>launch-network</code> as <code>external: true</code>
-          on the services you want exposed.
+          Register a docker-compose stack. Source can be a git repo
+          (via a connected Git provider for private repos, or a public
+          URL) or a YAML body pasted inline. To route through Traefik,
+          declare <code>launch-network</code> as
+          <code>external: true</code> on services you want exposed.
         </DialogDescription>
       </DialogHeader>
 
@@ -144,37 +249,138 @@ const submit = async () => {
           </div>
         </div>
 
-        <div v-if="sourceType === 'git'" class="space-y-3">
-          <div class="space-y-2">
-            <Label for="compose-repo">Repository URL</Label>
+        <!-- Git source: picker + repo combobox if a provider is
+             connected, otherwise a plain URL fallback. -->
+        <div v-if="sourceType === 'git'" class="space-y-4">
+          <div
+            v-if="sourceControls.length === 0"
+            class="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+          >
+            <Icon
+              name="lucide:triangle-alert"
+              class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom"
+            />
+            No Git provider connected. Paste a public repo URL below,
+            or connect GitHub / GitLab / Bitbucket in Settings &rarr;
+            Integrations to pick from a list.
+          </div>
+
+          <div v-if="sourceControls.length > 0" class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label>Git provider</Label>
+              <Select
+                :model-value="sourceControlId"
+                @update:model-value="(v) => handleSourceControlChange(v as string)"
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select git provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem v-for="sc in sourceControls" :key="sc.id" :value="sc.id">
+                    <div class="flex items-center gap-2">
+                      <Icon :name="`simple-icons:${sc.provider}`" class="h-4 w-4" />
+                      <span>
+                        {{ sc.login }}
+                        <span class="text-muted-foreground">
+                          ({{ sc.repository_count }}
+                          {{ sc.repository_count === 1 ? 'repo' : 'repos' }})
+                        </span>
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div class="space-y-2">
+              <Label>Repository</Label>
+              <ComboboxRoot
+                v-model:search-term="repositorySearchTerm"
+                :model-value="selectedRepo"
+                :disabled="!sourceControlId || isLoadingRepositories"
+                :filter-function="(list: Repository[]) => list"
+                class="relative"
+                @update:model-value="(val: Repository | null) => val && handleRepoSelect(val)"
+              >
+                <ComboboxAnchor
+                  class="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+                >
+                  <ComboboxInput
+                    class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+                    :placeholder="isLoadingRepositories ? 'Loading...' : 'Search repository...'"
+                    :display-value="(repo: Repository) => repo?.full_name || ''"
+                  />
+                  <ComboboxTrigger class="flex items-center justify-center">
+                    <Icon name="lucide:chevron-down" class="h-4 w-4 opacity-50" />
+                  </ComboboxTrigger>
+                </ComboboxAnchor>
+                <ComboboxPortal>
+                  <ComboboxContent
+                    position="popper"
+                    :side-offset="4"
+                    class="z-[200] max-h-60 w-[--reka-combobox-trigger-width] overflow-hidden rounded-md border bg-popover shadow-md"
+                  >
+                    <ComboboxEmpty class="py-6 text-center text-sm text-muted-foreground">
+                      No repository found.
+                    </ComboboxEmpty>
+                    <ComboboxGroup class="overflow-auto p-1">
+                      <ComboboxItem
+                        v-for="repo in filteredRepositories"
+                        :key="repo.id"
+                        :value="repo"
+                        class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
+                        @select="handleRepoSelect(repo)"
+                      >
+                        <ComboboxItemIndicator class="mr-2 h-4 w-4">
+                          <Icon name="lucide:check" class="h-4 w-4" />
+                        </ComboboxItemIndicator>
+                        <Icon
+                          :name="repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'"
+                          class="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
+                        />
+                        <span class="truncate">{{ repo.full_name }}</span>
+                      </ComboboxItem>
+                    </ComboboxGroup>
+                  </ComboboxContent>
+                </ComboboxPortal>
+              </ComboboxRoot>
+            </div>
+          </div>
+
+          <!-- Public URL fallback (always visible — quick path for
+               public repos even when a provider is connected). -->
+          <div v-if="!selectedRepo" class="space-y-2">
+            <Label for="compose-repo-url">Or paste a public repository URL</Label>
             <Input
-              id="compose-repo"
-              v-model="gitRepo"
-              placeholder="https://github.com/owner/repo"
+              id="compose-repo-url"
+              v-model="gitRepoFallback"
+              placeholder="https://github.com/owner/repo.git"
               autocomplete="off"
             />
           </div>
-          <div class="space-y-2">
-            <Label for="compose-branch">Branch</Label>
-            <Input
-              id="compose-branch"
-              v-model="gitBranch"
-              placeholder="main"
-              autocomplete="off"
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="compose-file">Compose file path (optional)</Label>
-            <Input
-              id="compose-file"
-              v-model="composeFilePath"
-              placeholder="docker-compose.yml"
-              autocomplete="off"
-            />
-            <p class="text-xs text-muted-foreground">
-              Relative to the repository root. Leave blank for
-              <code>docker-compose.yml</code>.
-            </p>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="space-y-2">
+              <Label for="compose-branch">Branch</Label>
+              <Input
+                id="compose-branch"
+                v-model="gitBranch"
+                placeholder="main"
+                autocomplete="off"
+              />
+            </div>
+            <div class="space-y-2">
+              <Label for="compose-file">Compose file path</Label>
+              <Input
+                id="compose-file"
+                v-model="composeFilePath"
+                placeholder="docker-compose.yml"
+                autocomplete="off"
+              />
+              <p class="text-xs text-muted-foreground">
+                Optional. Relative to the repository root.
+              </p>
+            </div>
           </div>
         </div>
 
