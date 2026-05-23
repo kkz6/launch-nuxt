@@ -185,7 +185,7 @@ onMounted(fetchComposes);
       </NuxtLink>
     </div>
 
-    <CreateComposeSheet
+    <ProjectCreateComposeSheet
       v-model:open="createOpen"
       :server-id="props.serverId"
       :project-id="props.projectId"
