@@ -139,7 +139,22 @@ onMounted(fetchRows);
               </p>
             </td>
             <td class="px-4 py-3 align-top font-mono text-xs text-muted-foreground">
-              {{ c.Ports || "—" }}
+              <template v-if="c.Ports">
+                <!--
+                  docker ps returns ports as a single comma-separated
+                  blob, e.g. "0.0.0.0:80->80/tcp, [::]:80->80/tcp".
+                  Split on commas so each binding sits on its own line —
+                  much easier to scan than one wrapped paragraph.
+                -->
+                <div
+                  v-for="(p, i) in c.Ports.split(',').map((s) => s.trim()).filter(Boolean)"
+                  :key="i"
+                  class="whitespace-nowrap"
+                >
+                  {{ p }}
+                </div>
+              </template>
+              <template v-else>—</template>
             </td>
             <td class="px-4 py-3 align-top text-muted-foreground">
               {{ c.CreatedAt }}
