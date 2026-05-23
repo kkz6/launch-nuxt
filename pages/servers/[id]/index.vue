@@ -216,14 +216,12 @@ onMounted(async () => {
       <ServerShowDatabases :server-id="server.id" />
     </div>
 
+    <!-- 'networks' here is the PHP/loadbalancer firewall-rules view.
+         Docker servers don't expose this tab at all (Launch manages
+         the launch-network overlay for them); the route guard in
+         useServerTypeRules filters it out of DOCKER_TABS. -->
     <div v-else-if="activeTab === 'networks'">
-      <!-- Docker servers get the host-level docker-network view; everything
-           else uses the existing PHP/loadbalancer firewall rules view. -->
-      <ServerDockerNetworks
-        v-if="server.type === 'docker'"
-        :server-id="server.id"
-      />
-      <ServerShowNetworks v-else :server-id="server.id" />
+      <ServerShowNetworks :server-id="server.id" />
     </div>
 
     <div v-else-if="activeTab === 'daemons'">
