@@ -95,7 +95,7 @@ onMounted(fetchRows);
         </thead>
         <tbody>
           <tr v-for="v in visibleRows" :key="v.Name" class="border-t">
-            <td class="px-4 py-3 font-mono text-xs">
+            <td class="px-4 py-3 align-top font-mono text-xs">
               <div class="flex items-center gap-2">
                 <span>{{ v.Name }}</span>
                 <span
@@ -106,9 +106,9 @@ onMounted(fetchRows);
                 </span>
               </div>
             </td>
-            <td class="px-4 py-3 text-muted-foreground">{{ v.Driver }}</td>
-            <td class="px-4 py-3 text-muted-foreground">{{ v.Scope }}</td>
-            <td class="px-4 py-3 font-mono text-xs text-muted-foreground">
+            <td class="px-4 py-3 align-top text-muted-foreground">{{ v.Driver }}</td>
+            <td class="px-4 py-3 align-top text-muted-foreground">{{ v.Scope }}</td>
+            <td class="px-4 py-3 align-top font-mono text-xs text-muted-foreground">
               {{ v.Mountpoint }}
             </td>
           </tr>

@@ -113,7 +113,7 @@ onMounted(fetchRows);
         </thead>
         <tbody>
           <tr v-for="c in visibleRows" :key="c.ID" class="border-t">
-            <td class="px-4 py-3 font-mono text-xs">
+            <td class="px-4 py-3 align-top font-mono text-xs">
               <div class="flex items-center gap-2">
                 <span>{{ c.Names }}</span>
                 <span
@@ -126,8 +126,8 @@ onMounted(fetchRows);
               </div>
               <p class="text-[10px] text-muted-foreground">{{ c.ID }}</p>
             </td>
-            <td class="px-4 py-3 font-mono text-xs">{{ c.Image }}</td>
-            <td class="px-4 py-3">
+            <td class="px-4 py-3 align-top font-mono text-xs">{{ c.Image }}</td>
+            <td class="px-4 py-3 align-top">
               <span
                 class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
                 :class="stateBadge(c.State)"
@@ -138,10 +138,10 @@ onMounted(fetchRows);
                 {{ c.Status }}
               </p>
             </td>
-            <td class="px-4 py-3 font-mono text-xs text-muted-foreground">
+            <td class="px-4 py-3 align-top font-mono text-xs text-muted-foreground">
               {{ c.Ports || "—" }}
             </td>
-            <td class="px-4 py-3 text-muted-foreground">
+            <td class="px-4 py-3 align-top text-muted-foreground">
               {{ c.CreatedAt }}
             </td>
           </tr>
