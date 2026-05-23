@@ -259,9 +259,15 @@ export interface DockerHostNetwork {
   system: boolean;
 }
 
-/** Traefik static + dynamic config files served from /etc/launch/traefik. */
+/**
+ * Traefik dynamic config files served from
+ * /etc/launch/traefik/dynamic/. Launch's own plumbing
+ * (traefik.yml static config, acme.json, certificates) is NOT
+ * surfaced — this is a SaaS so the infrastructure layer belongs to
+ * us, not the user. Compare with dokploy, which is self-hosted and
+ * exposes the whole filesystem.
+ */
 export interface DockerTraefikSnapshot {
-  static_config: string;
   dynamic_files: Record<string, string>;
 }
 
@@ -834,6 +840,27 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerTraefikSnapshot>>(
         `/servers/${serverId}/docker/traefik`,
+      );
+    },
+
+    /**
+     * Overwrite a dynamic Traefik config file. The backend validates
+     * the filename (alphanumeric + dot/dash/underscore, .yml/.yaml,
+     * not a reserved name) and writes via `sudo tee` so the file
+     * inherits root ownership like everything else in the directory.
+     *
+     * Traefik watches /etc/launch/traefik/dynamic/ so the change
+     * takes effect within a couple of seconds with no reload.
+     */
+    writeTraefikFile: (
+      serverId: string,
+      filename: string,
+      contents: string,
+    ) => {
+      const { put } = useApi();
+      return put(
+        `/servers/${serverId}/docker/traefik/files/${encodeURIComponent(filename)}`,
+        { contents },
       );
     },
   },
