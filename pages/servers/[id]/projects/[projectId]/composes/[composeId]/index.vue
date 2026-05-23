@@ -20,20 +20,22 @@ const compose = ref<DockerCompose | null>(null);
 const isLoading = ref(true);
 const isDeploying = ref(false);
 
+// Only the subtabs that have real backing content are exposed in
+// the nav strip. environment/domains/schedules used to render here
+// as ComingSoon placeholders — confusing affordance (label promises
+// a feature, click reveals there's nothing). Better to hide until
+// the multi-service UX is figured out (a compose stack has N
+// services, per-service routing is the open question).
 const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
-  { value: "environment", label: "Environment", icon: "lucide:key" },
-  { value: "domains", label: "Domains", icon: "lucide:globe" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
-  { value: "schedules", label: "Schedules", icon: "lucide:clock" },
 ] as const;
 type SubTabId = (typeof SUBTABS)[number]["value"];
 
-// Phase 2h ships General + Deployments. Logs/env/domains/schedules
-// arrive in later slices when we figure out the multi-service UX —
-// a compose stack has N services, so per-service routing is the open
-// design question.
+// Kept for parity with the application/database detail pages — every
+// subtab in the SUBTABS list is "ready" here because unready ones
+// don't appear at all.
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   deployments: true,

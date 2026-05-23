@@ -100,6 +100,16 @@ const relative = (iso?: string | null): string => {
   }
 };
 
+// WS so status badges + names stay live across renames and deploys.
+// The backend's composeBroadcast helper guarantees every event
+// carries compose_id alongside id — see compose_service.go.
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+useDockerComposeEvents(teamId, (data) => {
+  if (data.project_id && data.project_id !== props.projectId) return;
+  void fetchComposes();
+});
+
 onMounted(fetchComposes);
 </script>
 

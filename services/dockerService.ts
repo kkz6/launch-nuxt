@@ -317,18 +317,10 @@ export interface DockerHostVolume {
   system: boolean;
 }
 
-/**
- * Output of `docker network ls --format '{{json .}}'`. `system` covers
- * both Launch-managed networks (launch-network) and docker's built-in
- * networks (bridge/host/none) — neither is user-managed.
- */
-export interface DockerHostNetwork {
-  ID: string;
-  Name: string;
-  Driver: string;
-  Scope: string;
-  system: boolean;
-}
+// DockerHostNetwork removed: the Networks tab and the matching
+// backend route are both gone. Launch manages the launch-network
+// overlay; customers don't create custom docker networks via the
+// UI.
 
 /**
  * Traefik dynamic config files served from
@@ -913,12 +905,8 @@ export const dockerService = {
         `/servers/${serverId}/docker/volumes`,
       );
     },
-    networks: (serverId: string) => {
-      const { get } = useApi();
-      return get<ApiResponse<DockerHostNetwork[]>>(
-        `/servers/${serverId}/docker/networks`,
-      );
-    },
+    // host.networks removed alongside the Networks tab — see
+    // launch-go's routes.go for the matching backend removal.
     traefik: (serverId: string) => {
       const { get } = useApi();
       return get<ApiResponse<DockerTraefikSnapshot>>(
