@@ -159,10 +159,15 @@ describe("tabs per server type", () => {
     const tabs = getServerTypeRules("docker").tabs.map((t) => t.value);
     expect(tabs[0]).toBe("projects");
     expect(tabs).toContain("containers");
-    expect(tabs).toContain("traefik");
+    expect(tabs).toContain("volumes");
+    expect(tabs).toContain("networks");
+    expect(tabs).toContain("advanced");
     expect(tabs).not.toContain("sites");
     expect(tabs).not.toContain("databases");
     expect(tabs).not.toContain("daemons");
+    // Traefik moved into Advanced as a sub-tab — it shouldn't be a
+    // top-level docker tab anymore.
+    expect(tabs).not.toContain("traefik");
   });
 
   it("php servers default to Sites and include Databases", () => {

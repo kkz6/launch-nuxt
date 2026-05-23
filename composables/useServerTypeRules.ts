@@ -71,15 +71,15 @@ const LOADBALANCER_TABS: ServerDetailTab[] = [
 ];
 
 // Docker server has its own world: Projects group docker workloads
-// (applications, compose, databases). Containers/Volumes/Networks/Traefik
-// give server-level visibility into the docker host. See
-// docs/plans/2026-05-22-docker-server-menus-design.md.
+// (applications, compose, databases). Containers/Volumes/Networks
+// give server-level visibility into the docker host. Traefik config
+// editing lives under Advanced — it's an admin escape hatch, not a
+// day-to-day tab. See docs/plans/2026-05-22-docker-server-menus-design.md.
 const DOCKER_TABS: ServerDetailTab[] = [
   { value: "projects", label: "Projects", query: "projects", icon: "lucide:folder-tree" },
   { value: "containers", label: "Containers", query: "containers", icon: "lucide:container" },
   { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
   { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
-  { value: "traefik", label: "Traefik", query: "traefik", icon: "simple-icons:traefikproxy" },
   { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];

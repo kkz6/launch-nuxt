@@ -257,6 +257,12 @@ const advancedSubTabs = computed(() => {
     tabs.push({ value: "packages", label: "Packages", query: "packages", icon: "lucide:package" });
   }
   tabs.push({ value: "services", label: "Services", query: "services", icon: "lucide:cog" });
+  // Docker-only: Traefik config editing sits under Advanced rather than
+  // as a top-level tab — admins occasionally inspect it, but it's not a
+  // day-to-day workflow.
+  if (isDockerServer.value) {
+    tabs.push({ value: "traefik", label: "Traefik", query: "traefik", icon: "simple-icons:traefikproxy" });
+  }
   return tabs;
 });
 
