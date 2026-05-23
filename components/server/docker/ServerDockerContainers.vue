@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import {
   dockerService,
   type DockerHostContainer,
 } from "~/services/dockerService";
@@ -120,6 +126,8 @@ onMounted(fetchRows);
             <th class="px-4 py-3">State</th>
             <th class="px-4 py-3">Ports</th>
             <th class="px-4 py-3">Created</th>
+            <!-- Right-aligned action column for the inspect button. -->
+            <th class="w-px px-4 py-3"></th>
           </tr>
         </thead>
         <tbody>
@@ -140,27 +148,28 @@ onMounted(fetchRows);
             <td class="px-4 py-3 align-top font-mono text-xs">{{ c.Image }}</td>
             <td class="px-4 py-3 align-top">
               <!--
-                Clickable badge opens the detail dialog with the
-                `docker inspect` output (state, health, mounts,
-                networks, restart count, resources). Mirrors how the
-                PHP-server Services tab opens ServiceStatusDialog.
+                Passive badge — the uptime / status detail
+                (`Up 21 hours`, `Exited (0) 2 minutes ago`, etc.)
+                lives in the native title tooltip. The full
+                docker-inspect dialog opens from the Actions column
+                so the badge stays a status indicator, not an
+                action surface.
               -->
-              <button
-                type="button"
-                class="group inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium capitalize transition hover:ring-2 hover:ring-primary/30"
-                :class="stateBadge(c.State)"
-                title="View container details"
-                @click="openStatus(c)"
-              >
-                {{ c.State }}
-                <Icon
-                  name="lucide:info"
-                  class="h-3 w-3 opacity-50 transition group-hover:opacity-100"
-                />
-              </button>
-              <p class="mt-1 text-[10px] text-muted-foreground">
-                {{ c.Status }}
-              </p>
+              <TooltipProvider :delay-duration="150">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <span
+                      class="inline-flex cursor-default rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+                      :class="stateBadge(c.State)"
+                    >
+                      {{ c.State }}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" class="max-w-xs text-xs">
+                    {{ c.Status || c.State }}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </td>
             <td class="px-4 py-3 align-top font-mono text-xs text-muted-foreground">
               <template v-if="c.Ports">
@@ -182,6 +191,25 @@ onMounted(fetchRows);
             </td>
             <td class="px-4 py-3 align-top text-muted-foreground">
               {{ c.CreatedAt }}
+            </td>
+            <!--
+              Inspect action. Icon-only to keep the row compact;
+              the native title tooltip plus the icon (info-circle)
+              is enough affordance for "click here for more".
+              Dropdown menu would be the right pattern once a
+              second action lands (View logs, Restart, etc.) —
+              defer until then.
+            -->
+            <td class="px-4 py-3 align-top text-right">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                title="Inspect container"
+                @click="openStatus(c)"
+              >
+                <Icon name="lucide:info" class="h-4 w-4" />
+              </Button>
             </td>
           </tr>
         </tbody>
