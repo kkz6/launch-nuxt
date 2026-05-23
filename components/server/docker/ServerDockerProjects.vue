@@ -12,13 +12,6 @@ const props = defineProps<Props>();
 const projects = ref<DockerProject[]>([]);
 const isLoading = ref(true);
 
-// Create dialog state. We keep a local form so the dialog is self-contained
-// and reset between opens — no zod schema for phase 1 since the only field
-// with a non-trivial rule is the server-side uniqueness check.
-const createOpen = ref(false);
-const isCreating = ref(false);
-const form = reactive({ name: "", description: "" });
-
 const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
 >(null);
@@ -35,38 +28,14 @@ const fetchProjects = async (silent = false) => {
   }
 };
 
-const openCreate = () => {
-  form.name = "";
-  form.description = "";
-  createOpen.value = true;
-};
-
-const submitCreate = async () => {
-  const name = form.name.trim();
-  if (!name) {
-    toast.error("Project name is required");
-    return;
-  }
-
-  isCreating.value = true;
-  try {
-    const res = await dockerService.projects.create(props.server.id, {
-      name,
-      description: form.description.trim() || undefined,
-    });
-    // Prepend so the new project is the top card without a full refetch.
-    // The WS broadcast (docker.project.created) will also update other open
-    // tabs once we wire useDockerProjectEvents in a later phase.
-    projects.value = [res.data, ...projects.value];
-    toast.success("Project created");
-    createOpen.value = false;
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to create project");
-  } finally {
-    isCreating.value = false;
-  }
-};
+// Bumped by the navbar's New Project button (ServerDockerCreateProject)
+// after a successful create. Same convention sitesRefreshKey uses for
+// the Sites tab — keeps the navbar action loosely coupled to the page
+// component, no event-bus needed.
+const refreshKey = useState<number>("dockerProjectsRefreshKey", () => 0);
+watch(refreshKey, () => {
+  void fetchProjects(true);
+});
 
 const deleteProject = async (project: DockerProject) => {
   if (!confirmationDialog.value) return;
@@ -122,17 +91,12 @@ onMounted(fetchProjects);
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!--
-      No section heading — the active "Projects" tab in the navbar
-      already tells the user where they are, same convention the
-      Sites tab uses. Just a right-aligned action button to keep the
-      page clean.
+      No section heading and no inline "New Project" button — the
+      action lives in the navbar (ServerDockerCreateProject) next to
+      Terminal / Provision so it's symmetric with how Sites work.
+      Empty state below points the user at the navbar action.
     -->
-    <div class="mb-4 flex justify-end">
-      <Button @click="openCreate">
-        <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        New Project
-      </Button>
-    </div>
+
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
@@ -235,59 +199,8 @@ onMounted(fetchProjects);
       </div>
     </div>
 
-    <Dialog v-model:open="createOpen">
-      <DialogContent class="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>New Project</DialogTitle>
-          <DialogDescription>
-            A project groups docker applications, compose stacks, and
-            databases running on this server.
-          </DialogDescription>
-        </DialogHeader>
-        <form class="space-y-4" @submit.prevent="submitCreate">
-          <div class="space-y-2">
-            <Label for="project-name">Name</Label>
-            <Input
-              id="project-name"
-              v-model="form.name"
-              placeholder="e.g. acme-prod"
-              autocomplete="off"
-              required
-            />
-            <p class="text-xs text-muted-foreground">
-              Must be unique on this server.
-            </p>
-          </div>
-          <div class="space-y-2">
-            <Label for="project-description">Description (optional)</Label>
-            <Textarea
-              id="project-description"
-              v-model="form.description"
-              placeholder="What lives in this project?"
-              rows="3"
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              :disabled="isCreating"
-              @click="createOpen = false"
-            >
-              Cancel
-            </Button>
-            <Button type="submit" :disabled="isCreating">
-              <Icon
-                v-if="isCreating"
-                name="lucide:loader-2"
-                class="mr-2 h-4 w-4 animate-spin"
-              />
-              Create Project
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+    <!-- The create dialog lives in ServerDockerCreateProject (mounted
+         from the navbar), so nothing more here. -->
   </div>
 </template>
 

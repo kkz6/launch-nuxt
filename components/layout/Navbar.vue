@@ -592,6 +592,14 @@ const onSiteCreated = () => {
   sitesRefreshKey.value++;
 };
 
+// Docker projects refresh trigger — bumped by the navbar's New
+// Project button so ServerDockerProjects can prepend the new row
+// without a full refetch. Same pattern as sitesRefreshKey.
+const dockerProjectsRefreshKey = useState('dockerProjectsRefreshKey', () => 0);
+const onDockerProjectCreated = () => {
+  dockerProjectsRefreshKey.value++;
+};
+
 // Terminal state (shared with server detail page)
 const isTerminalOpen = useState('serverTerminalOpen', () => false);
 const openTerminal = () => {
@@ -983,6 +991,17 @@ onMounted(fetchTeams);
             Terminal
           </Button>
           <ServerAddSite v-if="serverId && !isLoadBalancerServer && isServerTabActive('sites')" :server-id="serverId" @created="onSiteCreated" />
+          <!--
+            Docker-only create-project action. Mirrors ServerAddSite's
+            convention: tab-gated, self-contained button + dialog,
+            emits to bump the page's refresh key. Visible only on
+            docker servers when the Projects tab is active.
+          -->
+          <ServerDockerCreateProject
+            v-if="serverId && isDockerServer && isServerTabActive('projects')"
+            :server-id="serverId"
+            @created="onDockerProjectCreated"
+          />
         </div>
       </div>
       <nav
