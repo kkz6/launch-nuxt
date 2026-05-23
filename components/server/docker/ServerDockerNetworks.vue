@@ -99,7 +99,7 @@ onMounted(fetchRows);
         </thead>
         <tbody>
           <tr v-for="n in visibleRows" :key="n.ID" class="border-t">
-            <td class="px-4 py-3 font-mono text-xs">
+            <td class="px-4 py-3 align-top font-mono text-xs">
               <div class="flex items-center gap-2">
                 <span>{{ n.Name }}</span>
                 <span
@@ -110,9 +110,9 @@ onMounted(fetchRows);
                 </span>
               </div>
             </td>
-            <td class="px-4 py-3 text-muted-foreground">{{ n.Driver }}</td>
-            <td class="px-4 py-3 text-muted-foreground">{{ n.Scope }}</td>
-            <td class="px-4 py-3 font-mono text-[10px] text-muted-foreground">
+            <td class="px-4 py-3 align-top text-muted-foreground">{{ n.Driver }}</td>
+            <td class="px-4 py-3 align-top text-muted-foreground">{{ n.Scope }}</td>
+            <td class="px-4 py-3 align-top font-mono text-[10px] text-muted-foreground">
               {{ n.ID.slice(0, 12) }}
             </td>
           </tr>
