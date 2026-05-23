@@ -141,6 +141,40 @@ const healthColor = (status?: string): string => {
       return "bg-zinc-500/15 text-zinc-700 dark:text-zinc-300";
   }
 };
+
+// --- Command rendering ----------------------------------------------------
+//
+// docker's "command" isn't a single field. We render:
+//   - Entrypoint (from the image, often a shell script wrapper)
+//   - CMD (image default or runtime override)
+//   - Runtime exec: Path + Args (what docker actually exec'd)
+// Each goes in its own SharedCodeEditor block so the user sees the
+// structural shape AND the runtime shape.
+
+// shellish + joinShellArgs live in useDockerHelpers so the quoting
+// rules are pinned by unit tests — bash escaping is famously easy
+// to get subtly wrong.
+const entrypointStr = computed(() => joinShellArgs(inspect.value?.entrypoint));
+const cmdStr = computed(() => joinShellArgs(inspect.value?.cmd));
+const execStr = computed(() => {
+  if (!inspect.value?.path) return "";
+  return joinShellArgs([inspect.value.path, ...(inspect.value.args ?? [])]);
+});
+
+// --- Raw config dialog ----------------------------------------------------
+//
+// Mirrors dokploy's ShowContainerConfig: a separate, wider dialog
+// rendering the full `docker inspect` JSON in a CodeEditor. Useful
+// for debugging when our curated view drops a field they care about.
+const rawDialogOpen = ref(false);
+const rawJSON = computed(() => {
+  if (!inspect.value?.raw) return "";
+  try {
+    return JSON.stringify(inspect.value.raw, null, 2);
+  } catch {
+    return "";
+  }
+});
 </script>
 
 <template>
@@ -283,7 +317,7 @@ const healthColor = (status?: string): string => {
           </div>
         </section>
 
-        <!-- Image + command -->
+        <!-- Image -->
         <section>
           <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Image
@@ -297,10 +331,6 @@ const healthColor = (status?: string): string => {
               <dt class="text-xs text-muted-foreground">Platform</dt>
               <dd>{{ inspect.platform }}</dd>
             </div>
-            <div v-if="inspect.command" class="sm:col-span-2">
-              <dt class="text-xs text-muted-foreground">Command</dt>
-              <dd class="break-all font-mono text-xs">{{ inspect.command }}</dd>
-            </div>
             <div class="sm:col-span-2">
               <dt class="text-xs text-muted-foreground">Image ID</dt>
               <dd class="break-all font-mono text-[10px] text-muted-foreground">
@@ -308,6 +338,81 @@ const healthColor = (status?: string): string => {
               </dd>
             </div>
           </dl>
+        </section>
+
+        <!--
+          Command / Entrypoint / Exec — rendered via SharedCodeEditor
+          so long arg lists wrap and stay readable. docker's "command"
+          isn't a single field: ENTRYPOINT and CMD compose
+          structurally, while Path + Args is what's actually running.
+          Showing all three lets the user reconcile them — especially
+          handy for swarm-spawned containers where the runtime line
+          is much longer than the Dockerfile CMD.
+        -->
+        <section>
+          <div class="mb-2 flex items-center justify-between">
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Command
+            </h3>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] text-muted-foreground transition hover:border-foreground/40 hover:text-foreground"
+              @click="rawDialogOpen = true"
+            >
+              <Icon name="lucide:file-json" class="h-3 w-3" />
+              View raw config
+            </button>
+          </div>
+
+          <div v-if="entrypointStr" class="space-y-1">
+            <p class="text-[11px] text-muted-foreground">
+              Entrypoint <span class="opacity-60">(from image)</span>
+            </p>
+            <SharedCodeEditor
+              :model-value="entrypointStr"
+              :disabled="true"
+              :line-numbers="false"
+              :fold-gutter="false"
+              class="h-16"
+            />
+          </div>
+
+          <div v-if="cmdStr" class="mt-3 space-y-1">
+            <p class="text-[11px] text-muted-foreground">
+              CMD <span class="opacity-60">(image default or override)</span>
+            </p>
+            <SharedCodeEditor
+              :model-value="cmdStr"
+              :disabled="true"
+              :line-numbers="false"
+              :fold-gutter="false"
+              class="h-16"
+            />
+          </div>
+
+          <div
+            v-if="execStr && execStr !== cmdStr && execStr !== entrypointStr"
+            class="mt-3 space-y-1"
+          >
+            <p class="text-[11px] text-muted-foreground">
+              Runtime exec <span class="opacity-60">(what docker actually ran)</span>
+            </p>
+            <SharedCodeEditor
+              :model-value="execStr"
+              :disabled="true"
+              :line-numbers="false"
+              :fold-gutter="false"
+              class="h-24"
+            />
+          </div>
+
+          <p
+            v-if="!entrypointStr && !cmdStr && !execStr"
+            class="text-xs text-muted-foreground"
+          >
+            No command captured. The image's ENTRYPOINT/CMD may be
+            empty or inherited from a parent layer.
+          </p>
         </section>
 
         <!-- Resources -->
@@ -387,6 +492,31 @@ const healthColor = (status?: string): string => {
           </div>
         </section>
       </div>
+    </DialogContent>
+  </Dialog>
+
+  <!--
+    "View raw config" — mirrors dokploy's ShowContainerConfig pattern.
+    The full `docker inspect` JSON is dropped into a wide CodeEditor
+    so power users can grep the bits we didn't surface in the curated
+    view above. Read-only; no edit flow because docker doesn't accept
+    config writes on a running container anyway.
+  -->
+  <Dialog v-model:open="rawDialogOpen">
+    <DialogContent class="max-h-[90vh] overflow-hidden sm:max-w-4xl">
+      <DialogHeader>
+        <DialogTitle>Raw config</DialogTitle>
+        <DialogDescription>
+          Full output of <code>docker inspect</code> for this
+          container. Read-only.
+        </DialogDescription>
+      </DialogHeader>
+      <SharedCodeEditor
+        :model-value="rawJSON"
+        :disabled="true"
+        :line-wrapping="false"
+        class="h-[70vh]"
+      />
     </DialogContent>
   </Dialog>
 </template>
