@@ -56,6 +56,21 @@ const stateBadge = (state: string): string => {
   return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
 };
 
+// Used inside the hover tooltip — same colour family as the badge
+// but solid text rather than tinted background. Mirrors the
+// Site Queues tooltip's "Status: RUNNING" colouring.
+const stateTextColor = (state: string): string => {
+  switch (state.toLowerCase()) {
+    case "running":
+      return "text-emerald-600 dark:text-emerald-400 font-medium";
+    case "exited":
+    case "dead":
+      return "text-rose-600 dark:text-rose-400 font-medium";
+    default:
+      return "text-amber-600 dark:text-amber-400 font-medium";
+  }
+};
+
 // Status detail dialog state. Clicking the state badge opens it
 // against the row's container — mirrors how the PHP server's
 // Services tab clickable status badge works (see
@@ -148,25 +163,48 @@ onMounted(fetchRows);
             <td class="px-4 py-3 align-top font-mono text-xs">{{ c.Image }}</td>
             <td class="px-4 py-3 align-top">
               <!--
-                Passive badge — the uptime / status detail
-                (`Up 21 hours`, `Exited (0) 2 minutes ago`, etc.)
-                lives in the native title tooltip. The full
-                docker-inspect dialog opens from the Actions column
-                so the badge stays a status indicator, not an
-                action surface.
+                Structured hover tooltip — same pattern as the
+                Site Queues status badge (Status / Uptime / PID grid).
+                Every field comes from the existing `docker ps` row,
+                so no extra fetch on hover. The richer
+                `docker inspect` view (mounts, networks, health)
+                still lives in the Actions column.
               -->
               <TooltipProvider :delay-duration="150">
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <span
-                      class="inline-flex cursor-default rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+                      class="inline-flex cursor-help rounded-full px-2 py-0.5 text-xs font-medium capitalize"
                       :class="stateBadge(c.State)"
                     >
                       {{ c.State }}
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent side="right" class="max-w-xs text-xs">
-                    {{ c.Status || c.State }}
+                  <TooltipContent side="right" class="max-w-sm">
+                    <div class="space-y-1.5 text-sm">
+                      <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+                        <span class="text-muted-foreground">Status</span>
+                        <span :class="stateTextColor(c.State)">
+                          {{ c.State }}
+                        </span>
+                        <template v-if="c.Status">
+                          <span class="text-muted-foreground">Uptime</span>
+                          <span>{{ c.Status }}</span>
+                        </template>
+                        <span class="text-muted-foreground">Image</span>
+                        <span class="break-all font-mono text-[11px]">
+                          {{ c.Image }}
+                        </span>
+                        <span class="text-muted-foreground">Container ID</span>
+                        <span class="font-mono text-[11px]">{{ c.ID }}</span>
+                      </div>
+                      <p
+                        v-if="c.CreatedAt"
+                        class="border-t pt-1.5 text-xs text-muted-foreground"
+                      >
+                        Created: {{ c.CreatedAt }}
+                      </p>
+                    </div>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
