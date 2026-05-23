@@ -14,6 +14,15 @@ const rows = ref<DockerHostVolume[]>([]);
 const isLoading = ref(true);
 const refreshing = ref(false);
 
+// Hide Launch-managed volumes (currently none — kept for future
+// control-plane state). Matches the Containers + Networks tabs so the
+// UX is consistent across the host-inspect family.
+const showSystem = ref(false);
+const visibleRows = computed(() =>
+  showSystem.value ? rows.value : rows.value.filter((r) => !r.system),
+);
+const systemCount = computed(() => rows.value.filter((r) => r.system).length);
+
 const fetchRows = async () => {
   refreshing.value = true;
   try {
@@ -33,21 +42,30 @@ onMounted(fetchRows);
 
 <template>
   <div>
-    <div class="mb-6 flex items-center justify-between">
+    <div class="mb-6 flex items-center justify-between gap-4">
       <div>
         <h2 class="text-2xl font-semibold">Volumes</h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Docker volumes on this host. Read-only view of
-          <code>docker volume ls</code>.
+          Docker volumes on this host. System-managed volumes are
+          hidden by default.
         </p>
       </div>
-      <Button variant="outline" :disabled="refreshing" @click="fetchRows">
-        <Icon
-          :name="refreshing ? 'lucide:loader-2' : 'lucide:refresh-cw'"
-          :class="['mr-2 h-4 w-4', refreshing && 'animate-spin']"
-        />
-        Refresh
-      </Button>
+      <div class="flex items-center gap-3">
+        <label
+          v-if="systemCount > 0"
+          class="flex items-center gap-2 text-xs text-muted-foreground"
+        >
+          <Switch v-model:checked="showSystem" />
+          Show system ({{ systemCount }})
+        </label>
+        <Button variant="outline" :disabled="refreshing" @click="fetchRows">
+          <Icon
+            :name="refreshing ? 'lucide:loader-2' : 'lucide:refresh-cw'"
+            :class="['mr-2 h-4 w-4', refreshing && 'animate-spin']"
+          />
+          Refresh
+        </Button>
+      </div>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
@@ -55,7 +73,7 @@ onMounted(fetchRows);
     </div>
 
     <div
-      v-else-if="rows.length === 0"
+      v-else-if="visibleRows.length === 0"
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:hard-drive" class="h-12 w-12 text-muted-foreground" />
@@ -76,8 +94,18 @@ onMounted(fetchRows);
           </tr>
         </thead>
         <tbody>
-          <tr v-for="v in rows" :key="v.Name" class="border-t">
-            <td class="px-4 py-3 font-mono text-xs">{{ v.Name }}</td>
+          <tr v-for="v in visibleRows" :key="v.Name" class="border-t">
+            <td class="px-4 py-3 font-mono text-xs">
+              <div class="flex items-center gap-2">
+                <span>{{ v.Name }}</span>
+                <span
+                  v-if="v.system"
+                  class="rounded-full bg-zinc-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-700 dark:text-zinc-300"
+                >
+                  system
+                </span>
+              </div>
+            </td>
             <td class="px-4 py-3 text-muted-foreground">{{ v.Driver }}</td>
             <td class="px-4 py-3 text-muted-foreground">{{ v.Scope }}</td>
             <td class="px-4 py-3 font-mono text-xs text-muted-foreground">
