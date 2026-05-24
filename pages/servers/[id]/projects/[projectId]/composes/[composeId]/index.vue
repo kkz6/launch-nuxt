@@ -36,6 +36,7 @@ const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", icon: "lucide:key" },
+  { value: "domains", label: "Domains", icon: "lucide:globe" },
   { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
@@ -49,6 +50,7 @@ const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   deployments: true,
   environment: true,
+  domains: true,
   volumes: true,
   logs: true,
   advanced: true,
@@ -181,6 +183,11 @@ const statusBadge = computed(() => {
 
     <ComposeEnvironment
       v-else-if="subTab === 'environment'"
+      :compose="compose"
+    />
+
+    <ComposeDomains
+      v-else-if="subTab === 'domains'"
       :compose="compose"
     />
 

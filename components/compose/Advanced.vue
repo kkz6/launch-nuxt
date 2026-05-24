@@ -145,6 +145,80 @@ const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
 >(null);
 
+// --- Traefik dynamic-config card -----------------------------------
+//
+// Mirrors the application Advanced → Traefik card. Read-only by
+// default; Modify opens the editor for emergency tweaks. The
+// SyncComposeTraefikConfig job regenerates this file from compose
+// domain rows on every domain mutation + after each successful
+// deploy, so hand-edits survive until something triggers a re-render
+// — same caveat the application card spells out.
+
+const traefikFilename = ref("");
+const traefikContent = ref("");
+const traefikContentOnDisk = ref("");
+const traefikLoading = ref(true);
+const traefikSaving = ref(false);
+const traefikEditing = ref(false);
+
+const traefikDirty = computed(
+  () => traefikContent.value !== traefikContentOnDisk.value,
+);
+
+const fetchTraefikConfig = async () => {
+  traefikLoading.value = true;
+  try {
+    const res = await dockerService.composes.getTraefikConfig(
+      props.compose.server_id,
+      props.compose.project_id,
+      props.compose.id,
+    );
+    traefikFilename.value = res.data.filename;
+    traefikContent.value = res.data.content;
+    traefikContentOnDisk.value = res.data.content;
+  } catch {
+    traefikFilename.value = "";
+    traefikContent.value = "";
+    traefikContentOnDisk.value = "";
+  } finally {
+    traefikLoading.value = false;
+  }
+};
+
+const beginModifyTraefik = () => {
+  traefikEditing.value = true;
+};
+
+const cancelModifyTraefik = () => {
+  traefikContent.value = traefikContentOnDisk.value;
+  traefikEditing.value = false;
+};
+
+const saveTraefikConfig = async () => {
+  traefikSaving.value = true;
+  try {
+    const res = await dockerService.composes.updateTraefikConfig(
+      props.compose.server_id,
+      props.compose.project_id,
+      props.compose.id,
+      traefikContent.value,
+    );
+    traefikContentOnDisk.value = res.data.content;
+    traefikFilename.value = res.data.filename;
+    traefikEditing.value = false;
+    toast.success(
+      "Traefik config saved — Traefik picks it up automatically.",
+    );
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to save Traefik config");
+  } finally {
+    traefikSaving.value = false;
+  }
+};
+
+onMounted(fetchTraefikConfig);
+
 const deleteCompose = async () => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
@@ -315,6 +389,107 @@ const deleteCompose = async () => {
             Save
           </Button>
         </div>
+      </div>
+    </div>
+
+    <!--
+      Traefik dynamic-config card. Same shape as the application
+      Advanced Traefik card — read-only by default, Modify reveals
+      the editor + Save/Cancel in the footer. The
+      SyncComposeTraefikConfig job populates this file from compose
+      domain rows on every domain mutation and after every successful
+      deploy, so manual edits get clobbered when domains change.
+    -->
+    <div class="rounded-lg border bg-card">
+      <div class="flex items-start gap-3 p-4">
+        <div
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-500/10"
+        >
+          <Icon name="lucide:route" class="h-4 w-4 text-zinc-500" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-base font-semibold">Traefik</h3>
+          <p class="mt-0.5 text-sm text-muted-foreground">
+            Modify the traefik config, in rare cases you may need to
+            add specific config, be careful because modifying
+            incorrectly can break traefik and your application.
+            <span
+              v-if="traefikFilename"
+              class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono text-xs"
+              :title="`/etc/launch/traefik/dynamic/${traefikFilename}`"
+            >
+              <Icon name="lucide:file-text" class="h-3 w-3" />
+              {{ traefikFilename }}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      <div class="space-y-2 px-4 pb-3">
+        <div
+          v-if="traefikLoading"
+          class="flex h-72 items-center justify-center rounded-md border bg-muted/30"
+        >
+          <Icon
+            name="lucide:loader-2"
+            class="h-5 w-5 animate-spin text-muted-foreground"
+          />
+        </div>
+        <div v-else-if="!traefikContent && !traefikEditing" class="relative">
+          <div
+            class="flex h-32 flex-col items-center justify-center rounded-md border border-dashed text-center text-xs text-muted-foreground"
+          >
+            <Icon name="lucide:route-off" class="mb-2 h-5 w-5" />
+            No Traefik config on this server yet. Add a domain on the
+            Domains tab and the platform will write the file — or hit
+            Modify to write it yourself.
+          </div>
+        </div>
+        <div v-else class="relative">
+          <Button
+            v-if="!traefikEditing"
+            size="sm"
+            class="absolute right-2 top-2 z-10"
+            @click="beginModifyTraefik"
+          >
+            <Icon name="lucide:pencil" class="mr-2 h-3.5 w-3.5" />
+            Modify
+          </Button>
+          <SharedCodeEditor
+            v-model="traefikContent"
+            language="yaml"
+            class="h-72 rounded-md border"
+            :line-numbers="true"
+            :disabled="!traefikEditing"
+            placeholder="http:&#10;  routers:&#10;    ..."
+          />
+        </div>
+      </div>
+
+      <div
+        v-if="traefikEditing"
+        class="flex justify-end gap-2 border-t bg-muted/30 px-4 py-2"
+      >
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="traefikSaving"
+          @click="cancelModifyTraefik"
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          :disabled="traefikSaving || !traefikDirty"
+          @click="saveTraefikConfig"
+        >
+          <Icon
+            v-if="traefikSaving"
+            name="lucide:loader-2"
+            class="mr-2 h-3.5 w-3.5 animate-spin"
+          />
+          Save
+        </Button>
       </div>
     </div>
 
