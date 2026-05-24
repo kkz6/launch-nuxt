@@ -559,7 +559,14 @@ onMounted(() => {
       retyping the secret.
     -->
     <div class="px-6 py-6">
-      <h3 class="mb-4 text-base font-semibold">Docker Registry Credentials</h3>
+      <!--
+        Heading uses mb-2 (not the mb-4 the other sections use)
+        because this section sits below the heading with no
+        intermediate row card buffering the gap when there are zero
+        credentials. mb-4 leaves an awkward void; mb-2 keeps the
+        Connect button visually anchored to the heading.
+      -->
+      <h3 class="mb-2 text-base font-semibold">Docker Registry Credentials</h3>
 
       <SettingsRegistryCredentialDialog
         v-model:open="isRegistryDialogOpen"
