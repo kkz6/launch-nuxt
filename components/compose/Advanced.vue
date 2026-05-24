@@ -4,6 +4,10 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
+  Alert,
+  AlertDescription,
+} from "~/components/ui/alert";
+import {
   dockerService,
   type DockerCompose,
 } from "~/services/dockerService";
@@ -53,6 +57,74 @@ const saveSettings = async () => {
     toast.error(e.data?.message || "Failed to update compose stack");
   } finally {
     isSaving.value = false;
+  }
+};
+
+// --- Run Command ---------------------------------------------------------
+//
+// Free-text override for the docker suffix the deploy script runs.
+// Empty = use default (`compose -p <name> -f <file> up -d --build
+// --remove-orphans`). Non-empty = run `docker <run_command>`
+// verbatim — operator owns the whole tail including the
+// `compose ...` shape. Matches dokploy's Run Command feature.
+//
+// We pull the live default-command preview from the backend so the
+// "Default Command (...)" hint shows the actual project-slug /
+// compose-file path the deploy job would resolve. Rendered through
+// the same code path as the deploy script so they can't drift.
+
+const runCommand = ref(props.compose.run_command || "");
+const isSavingRunCommand = ref(false);
+const defaultRunCommand = ref<string>("");
+
+watch(
+  () => props.compose.run_command,
+  (cmd) => {
+    runCommand.value = cmd || "";
+  },
+);
+
+const fetchDefaultCommand = async () => {
+  try {
+    const res = await dockerService.composes.getDefaultCommand(
+      props.compose.server_id,
+      props.compose.project_id,
+      props.compose.id,
+    );
+    defaultRunCommand.value = res.data?.command || "";
+  } catch {
+    // Silent: the input + Save still work. The hint just won't
+    // populate, which is a minor UX miss not worth a toast.
+    defaultRunCommand.value = "";
+  }
+};
+
+onMounted(fetchDefaultCommand);
+
+const saveRunCommand = async () => {
+  isSavingRunCommand.value = true;
+  try {
+    await dockerService.composes.update(
+      props.compose.server_id,
+      props.compose.project_id,
+      props.compose.id,
+      // Backend semantics: empty string CLEARS the override (reverts
+      // to default), non-empty replaces it. The `?? ""` is belt-and-
+      // braces — runCommand is already a string but the model can
+      // hold null for the type contract.
+      { run_command: runCommand.value },
+    );
+    toast.success(
+      runCommand.value.trim()
+        ? "Run command updated"
+        : "Run command cleared — using default on next deploy",
+    );
+    emit("updated");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to update run command");
+  } finally {
+    isSavingRunCommand.value = false;
   }
 };
 
@@ -169,6 +241,80 @@ const deleteCompose = async () => {
           <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
           Save Changes
         </Button>
+      </div>
+    </div>
+
+    <!--
+      Run Command — free-text override for the docker suffix the
+      deploy script runs. Matches dokploy's add-command card shape.
+      Trust the operator: anything they type lands as `docker
+      <run_command>` verbatim. Default Command hint comes from the
+      live backend renderer so the suggestion can't drift from what
+      a real deploy would do.
+    -->
+    <div class="rounded-lg border bg-card p-6">
+      <div class="flex items-start gap-3">
+        <div
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/10"
+        >
+          <Icon name="lucide:terminal" class="h-4 w-4 text-indigo-500" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-base font-semibold">Run Command</h3>
+          <p class="mt-0.5 text-sm text-muted-foreground">
+            Override the custom command the deploy script runs after
+            <code class="font-mono text-xs">docker</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-5 space-y-4">
+        <Alert
+          class="border-amber-500/30 bg-amber-500/[0.06] text-amber-900 dark:text-amber-200"
+        >
+          <Icon
+            name="lucide:triangle-alert"
+            class="h-4 w-4 text-amber-600 dark:text-amber-400"
+          />
+          <AlertDescription class="text-sm">
+            Modifying the default command may affect deployment
+            stability, impacting logs and monitoring. Proceed
+            carefully and test thoroughly. By default, the command
+            starts with <strong>docker</strong>.
+          </AlertDescription>
+        </Alert>
+
+        <div class="space-y-2">
+          <Label for="compose-run-command">Command</Label>
+          <Input
+            id="compose-run-command"
+            v-model="runCommand"
+            placeholder="compose -p my-stack -f docker-compose.yml up -d --build --no-cache"
+            class="font-mono text-sm"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <p class="text-xs text-muted-foreground">
+            <template v-if="defaultRunCommand">
+              Default Command (<code class="font-mono">docker {{ defaultRunCommand }}</code>)
+            </template>
+            <template v-else>
+              Leave blank to use the default deploy command.
+            </template>
+          </p>
+        </div>
+
+        <div class="flex justify-end">
+          <Button :disabled="isSavingRunCommand" @click="saveRunCommand">
+            <Icon
+              v-if="isSavingRunCommand"
+              name="lucide:loader-2"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
+            Save
+          </Button>
+        </div>
       </div>
     </div>
 
