@@ -286,24 +286,12 @@ const stackName = computed(() => props.compose.name);
     </div>
 
     <!--
-      docker-compose.yml read-only view (raw_yaml source only). Same
-      bordered card shape the application Dockerfile preview uses.
-      Editing lives on a future "Source" subtab; for now the YAML
-      is set at create time and replaced via re-create.
+      docker-compose.yml read-only view moved out of General — it now
+      lives in the Navbar's Actions dropdown ("View YAML") to keep
+      General to the same info-card grid shape application + database
+      General use. The compose detail page mounts the dialog
+      (see pages/.../composes/[composeId]/index.vue) and the navbar
+      flips a shared useState flag to open it.
     -->
-    <div
-      v-if="compose.compose_source_type === 'raw_yaml' && compose.raw_yaml"
-      class="rounded-lg border bg-card"
-    >
-      <div class="border-b px-5 py-3">
-        <p class="text-sm font-medium text-foreground">docker-compose.yml</p>
-        <p class="mt-0.5 text-xs text-muted-foreground">
-          Applied on every deploy. Edit + redeploy via the Advanced tab.
-        </p>
-      </div>
-      <pre
-        class="max-h-72 overflow-auto p-5 font-mono text-xs leading-relaxed text-foreground"
-      >{{ compose.raw_yaml }}</pre>
-    </div>
   </div>
 </template>

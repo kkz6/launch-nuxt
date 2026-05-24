@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import {
   dockerService,
   type DockerCompose,
 } from "~/services/dockerService";
@@ -115,6 +122,21 @@ onMounted(fetchCompose);
 // somewhere to render the bottom pane.
 const server = ref<Server | null>(null);
 const isTerminalOpen = useState("serverTerminalOpen", () => false);
+
+// Bound to the navbar's "View YAML" Actions dropdown item. The
+// dialog markup lives here so it has access to the already-loaded
+// `compose.raw_yaml` without a second fetch — the navbar just flips
+// this flag to open / close.
+const composeYamlDialogOpen = useState<boolean>(
+  "composeYamlDialogOpen",
+  () => false,
+);
+// Belt-and-braces: ensure the flag is reset on page enter so a
+// stale `true` from a previous visit doesn't pop the dialog
+// immediately.
+onMounted(() => {
+  composeYamlDialogOpen.value = false;
+});
 const loadServer = async () => {
   try {
     const res = await $api<{ data: Server }>(`/servers/${serverId.value}`);
@@ -219,5 +241,43 @@ const statusBadge = computed(() => {
       :is-open="isTerminalOpen"
       @close="isTerminalOpen = false"
     />
+
+    <!--
+      docker-compose.yml viewer. Triggered from the navbar's Actions
+      dropdown via the shared `composeYamlDialogOpen` useState flag.
+      Only meaningful for raw_yaml-source stacks — git-source stacks
+      pull the YAML at deploy time, there's nothing to show here. We
+      reuse the SharedCodeEditor for the YAML body so syntax highlight
+      + line numbers work, locked to read-only via :disabled.
+    -->
+    <Dialog v-model:open="composeYamlDialogOpen">
+      <DialogContent class="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>docker-compose.yml</DialogTitle>
+          <DialogDescription>
+            Applied on every deploy. Edit + redeploy via the Advanced tab.
+          </DialogDescription>
+        </DialogHeader>
+        <div
+          v-if="compose?.compose_source_type === 'raw_yaml' && compose?.raw_yaml"
+        >
+          <SharedCodeEditor
+            :model-value="compose.raw_yaml"
+            language="yaml"
+            class="h-96 rounded-md border"
+            :line-numbers="true"
+            :disabled="true"
+          />
+        </div>
+        <div
+          v-else
+          class="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground"
+        >
+          This stack pulls its <code class="font-mono">docker-compose.yml</code>
+          from a git source — the file isn't stored on launchctl. Inspect
+          it in the source repository or on the server's deploy directory.
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

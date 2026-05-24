@@ -1153,6 +1153,18 @@ const openTerminal = () => {
   isTerminalOpen.value = true;
 };
 
+// Compose "View YAML" dialog state — shared with the compose detail
+// page which mounts the actual dialog (so it can read the already-
+// loaded `compose.raw_yaml` without a second fetch). The navbar item
+// just flips the flag; the page reacts.
+const composeYamlDialogOpen = useState<boolean>(
+  'composeYamlDialogOpen',
+  () => false,
+);
+const openComposeYamlDialog = () => {
+  composeYamlDialogOpen.value = true;
+};
+
 // Cross-component bus for the project detail tabs' "New X" buttons.
 // Pages bind their create sheets' v-model:open to these flags; the
 // navbar trigger flips the flag, the page reacts. Keeps the navbar
@@ -2045,6 +2057,24 @@ onMounted(fetchTeams);
                     :class="['mr-2 h-4 w-4', workloadActionInFlight === 'stop' && 'animate-spin']"
                   />
                   Stop
+                </DropdownMenuItem>
+              </template>
+
+              <!--
+                Compose-specific actions. Just "View YAML" today — the
+                read-only docker-compose.yml viewer that used to live
+                on the General subtab. Edit + redeploy stays on the
+                Advanced subtab; this is a quick peek without leaving
+                the current view. The dropdown item flips a shared
+                useState flag the compose detail page watches; the
+                dialog itself is mounted there so it has access to the
+                already-loaded compose row (avoids a second fetch).
+              -->
+              <template v-if="workloadKind === 'compose'">
+                <DropdownMenuSeparator v-if="serverConnected" />
+                <DropdownMenuItem @select="openComposeYamlDialog">
+                  <Icon name="lucide:file-code" class="mr-2 h-4 w-4" />
+                  View YAML
                 </DropdownMenuItem>
               </template>
             </DropdownMenuContent>
