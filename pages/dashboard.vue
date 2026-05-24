@@ -31,7 +31,20 @@ interface Server {
   name: string
   status: string
   provider: string
+  /**
+   * "php" / "database" / "loadbalancer" / "docker" — matches the
+   * server module's enum. Drives which workload count to show on
+   * the card (sites for PHP, workloads for docker).
+   */
+  type?: string
   sites_count: number
+  /**
+   * Live count of docker workloads (applications + composes +
+   * managed databases) for this server. Only meaningful when
+   * `type === "docker"`; otherwise it's 0 and the card uses
+   * `sites_count` instead.
+   */
+  workloads_count: number
 }
 
 interface Activity {
@@ -231,7 +244,22 @@ const getUserInitials = (name: string): string => {
                         :class="server.status === 'connected' ? 'bg-green-500' : 'bg-red-500'"
                       />
                     </div>
-                    <p class="text-xs text-muted-foreground">{{ server.sites_count }} sites</p>
+                    <p class="text-xs text-muted-foreground">
+                      <!--
+                        Docker servers don't have rows in the Laravel
+                        `sites` table — their workloads (applications,
+                        compose stacks, managed databases) live in the
+                        docker module. Switch the label so the card
+                        shows something meaningful instead of always
+                        "0 sites".
+                      -->
+                      <template v-if="server.type === 'docker'">
+                        {{ server.workloads_count }} {{ server.workloads_count === 1 ? 'workload' : 'workloads' }}
+                      </template>
+                      <template v-else>
+                        {{ server.sites_count }} {{ server.sites_count === 1 ? 'site' : 'sites' }}
+                      </template>
+                    </p>
                   </div>
                 </div>
               </div>
