@@ -119,18 +119,35 @@ export interface DockerDomainDnsValidation {
 
 export interface DockerDomain {
   id: string;
-  application_id: string;
+  /**
+   * Polymorphic owner — exactly one of `application_id` / `compose_id`
+   * is set per row (the other is omitted from the JSON). Same shape
+   * as DockerVolume after the 0035 / 0036 refactors.
+   */
+  application_id?: string | null;
+  compose_id?: string | null;
   host: string;
   path?: string | null;
   /** Path the app expects internally; defaults to "/". */
   internal_path?: string | null;
   /** When true, Traefik strips `path` before forwarding. */
   strip_path: boolean;
-  /** Per-domain override of app.internal_port. Null = use app port. */
+  /**
+   * For applications: per-domain override of app.internal_port; null
+   * falls back to the app. For compose: required (no fallback — the
+   * YAML owns the port).
+   */
   container_port?: number | null;
   https: boolean;
   certificate_provider: "letsencrypt" | string;
   certificate_id?: string | null;
+  /**
+   * Compose-only — names the YAML service the domain routes to. The
+   * Traefik renderer resolves it to the compose-managed container
+   * `<project>-<compose>-<service>-1`. Always null on application
+   * rows.
+   */
+  service_name?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -150,6 +167,11 @@ export interface CreateDockerDomainData {
    */
   create_dns_record?: boolean;
   connected_domain_id?: string | null;
+  /**
+   * Required on the compose endpoint, ignored on the application
+   * endpoint. Names the compose YAML service this domain targets.
+   */
+  service_name?: string;
 }
 
 export interface UpdateDockerDomainData {
@@ -159,6 +181,12 @@ export interface UpdateDockerDomainData {
   container_port?: number;
   https?: boolean;
   certificate_provider?: "letsencrypt";
+  /**
+   * Retarget a compose domain at a different YAML service. Empty
+   * string is rejected at the backend (clearing is not allowed on a
+   * compose row). Ignored on application rows.
+   */
+  service_name?: string;
 }
 
 // ---- App env vars + volumes ----------------------------------------------
@@ -1360,6 +1388,93 @@ export const dockerService = {
           `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/volumes/${volumeId}`,
         );
       },
+    },
+
+    // Compose domains — same shape as application domains but the
+    // create call requires `service_name` (which YAML service to
+    // route to) and `container_port` (no fallback — the YAML owns
+    // the port). The Traefik renderer composes the target container
+    // name as `<project>-<compose>-<service>-1` so the operator must
+    // keep their YAML service name in sync with the row.
+    domains: {
+      list: (serverId: string, projectId: string, composeId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<DockerDomain[]>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains`,
+        );
+      },
+      create: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        data: CreateDockerDomainData,
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<DockerDomain>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains`,
+          data,
+        );
+      },
+      update: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        domainId: string,
+        data: UpdateDockerDomainData,
+      ) => {
+        const { patch } = useApi();
+        return patch<ApiResponse<DockerDomain>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}`,
+          data,
+        );
+      },
+      delete: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        domainId: string,
+      ) => {
+        const { delete: del } = useApi();
+        return del(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}`,
+        );
+      },
+      validateDNS: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        domainId: string,
+      ) => {
+        const { get } = useApi();
+        return get<ApiResponse<DockerDomainDnsValidation>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}/validate-dns`,
+        );
+      },
+    },
+
+    // Per-compose Traefik dynamic-config card. Same on-disk file the
+    // SyncComposeTraefikConfig job writes on every domain mutation.
+    getTraefikConfig: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerApplicationTraefikConfig>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/traefik-config`,
+      );
+    },
+    updateTraefikConfig: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      content: string,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerApplicationTraefikConfig>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/traefik-config`,
+        { content },
+      );
     },
   },
 

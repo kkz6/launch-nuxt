@@ -552,6 +552,7 @@ const composeSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
+  { value: "domains", label: "Domains", query: "domains", icon: "lucide:globe" },
   { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
