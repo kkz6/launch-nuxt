@@ -174,6 +174,12 @@ export interface Server {
   // delete-server flow on docker servers blocks while this is > 0;
   // the backend re-validates the same condition.
   projects_count?: number;
+  // Live count of docker workloads (applications + composes +
+  // managed databases) for the server. 0 on non-docker servers.
+  // Surfaced on the Servers list card in place of `sites_count`
+  // when type === "docker" — that table is Laravel-only and is
+  // always 0 for docker servers.
+  workloads_count?: number;
 }
 
 export interface Site extends InstallationStatus {
