@@ -39,9 +39,18 @@ interface Props {
   /**
    * Adds a one-line banner above the form explaining the project-ref
    * syntax. Set true on application + database editors; false on the
-   * project editor itself (referencing yourself doesn't make sense).
+   * project editor itself (referencing yourself doesn't make sense)
+   * AND on compose (whose env_file is plain dotenv with no
+   * `${{project.KEY}}` substitution support).
    */
   showProjectHint?: boolean;
+  /**
+   * Optional override for the empty-state body copy. The default
+   * branches on showProjectHint (per-container hint vs project-share
+   * hint); compose wants its own wording because the default false
+   * branch implies project-scope which is wrong for a single stack.
+   */
+  emptyDescription?: string;
   /**
    * Optional replace-all bulk endpoint. When provided, used by the
    * "Replace all" path inside the bulk dialog. When omitted, that
@@ -514,9 +523,10 @@ const sortVars = (vars: EnvVarRow[]) =>
       icon="lucide:key"
       title="No env vars yet"
       :description="
-        showProjectHint
-          ? 'Add per-container config like DATABASE_URL or NODE_ENV. Already have a .env file? Use Paste .env above.'
-          : 'Add shared config that any workload under this project can reference via ${{project.KEY}}.'
+        emptyDescription
+          ?? (showProjectHint
+            ? 'Add per-container config like DATABASE_URL or NODE_ENV. Already have a .env file? Use Paste .env above.'
+            : 'Add shared config that any workload under this project can reference via ${{project.KEY}}.')
       "
     />
 
