@@ -351,6 +351,19 @@ export interface DockerSecurityInput {
   password: string;
 }
 
+/**
+ * Per-application Traefik dynamic-config file body. Same on-disk
+ * file the deploy task writes when domains are attached. Surfaced
+ * on the application Advanced subtab so operators can spot-check or
+ * override the generated YAML without bouncing to the server-level
+ * Traefik file tree. Filename is informational — the backend
+ * resolves it from the app's project+name slug pair.
+ */
+export interface DockerApplicationTraefikConfig {
+  filename: string;
+  content: string;
+}
+
 export interface UpdateDockerAdvancedData {
   cpu_limit?: string;
   memory_limit?: string;
@@ -1162,6 +1175,37 @@ export const dockerService = {
       return patch<ApiResponse<DockerApplication>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/advanced`,
         data,
+      );
+    },
+
+    // Per-application Traefik dynamic-config file — same on-disk file
+    // the deploy task writes (`/etc/launch/traefik/dynamic/<project>-
+    // <app>.yml`), surfaced inline on the Advanced subtab so the
+    // operator can spot-check or override the generated routes
+    // without leaving the app page. Backend resolves the filename
+    // from the application's project+name slug pair; the operator
+    // can't redirect the write to a different file via a crafted
+    // request.
+    getTraefikConfig: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerApplicationTraefikConfig>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/traefik-config`,
+      );
+    },
+    updateTraefikConfig: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      content: string,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerApplicationTraefikConfig>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/traefik-config`,
+        { content },
       );
     },
   },
