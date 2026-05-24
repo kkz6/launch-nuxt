@@ -589,9 +589,12 @@ onMounted(() => {
             <span class="text-sm text-muted-foreground">
               No docker registry credentials saved
             </span>
-            <Button size="sm" @click="openCreateRegistryDialog">
-              <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-              Add Registry
+            <!-- Same outline + size=sm "Connect" pattern the other
+                 sections (Source Control, Storage, DNS) use for their
+                 "Add" affordance. -->
+            <Button variant="outline" size="sm" @click="openCreateRegistryDialog">
+              <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
+              Connect
             </Button>
           </div>
         </div>
@@ -611,6 +614,14 @@ onMounted(() => {
                 </p>
               </div>
             </div>
+            <!--
+              Edit + delete actions. Other sections only carry a
+              delete because their credentials are OAuth-style (no
+              user-rotatable secret); registry logins genuinely need
+              an edit affordance for password rotation, so we keep
+              both. Both use the same ghost+sm style the others use
+              for their delete button.
+            -->
             <div class="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -630,9 +641,9 @@ onMounted(() => {
               </Button>
             </div>
           </div>
-          <Button size="sm" @click="openCreateRegistryDialog">
-            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-            Add Registry
+          <Button variant="outline" size="sm" @click="openCreateRegistryDialog">
+            <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
+            Connect
           </Button>
         </div>
       </template>
