@@ -498,6 +498,11 @@ export interface DockerCompose {
   // from list responses to keep them small. UI: edited via the
   // compose Environment subtab.
   env_file?: string | null;
+  // Docker-suffix override the deploy script runs verbatim. NULL =
+  // use the default (`compose -p NAME -f FILE up -d --build
+  // --remove-orphans`). Detail-only (omitted from list responses).
+  // UI: edited on the Advanced subtab.
+  run_command?: string | null;
   status: DockerApplicationStatus;
   last_deployed_at?: string | null;
   created_at?: string;
@@ -524,6 +529,10 @@ export interface UpdateDockerComposeData {
   // leaves it unchanged. The backend deploy task writes this to
   // `${STACK_DIR}/.env` on the next deploy.
   env_file?: string;
+  // Same nil/empty/set semantics — empty string clears the override
+  // (deploy reverts to default), non-empty sets the docker suffix
+  // verbatim.
+  run_command?: string;
 }
 
 // ---- Managed databases ----------------------------------------------------
@@ -1224,6 +1233,22 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<string[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/services`,
+      );
+    },
+
+    // Preview of the docker-suffix the deploy script falls back to
+    // when no per-stack RunCommand override is set. The Advanced
+    // subtab shows this verbatim so the operator knows what they're
+    // overriding. Backend renders via the same code path the deploy
+    // job uses, so the hint and the deploy can't drift.
+    getDefaultCommand: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<{ command: string }>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/default-command`,
       );
     },
   },
