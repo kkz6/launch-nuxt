@@ -513,7 +513,7 @@ onMounted(() => {
     </div>
 
     <!-- DNS Providers Section -->
-    <div class="px-6 pt-6">
+    <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">DNS Providers</h3>
 
       <div v-if="isDnsProvidersLoading" class="flex items-center justify-center py-4">
@@ -558,7 +558,14 @@ onMounted(() => {
       so users can rotate the label / username / URL without
       retyping the secret.
     -->
-    <div class="px-6 py-6">
+    <!--
+      Last section in ConnectionsTab — uses pt-6 only (no bottom
+      padding) because divide-y on the parent doesn't draw a line
+      below the last child, and the outer container's bottom padding
+      handles the rest. Same convention DNS Providers used to follow
+      when it was the last section.
+    -->
+    <div class="px-6 pt-6">
       <!--
         Heading uses mb-2 (not the mb-4 the other sections use)
         because this section sits below the heading with no
