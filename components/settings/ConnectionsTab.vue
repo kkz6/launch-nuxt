@@ -289,11 +289,80 @@ const deleteDnsProvider = async (provider: DnsProvider) => {
   }
 }
 
+// --- Docker registry credentials ----------------------------------
+//
+// Saved docker-image logins. Picked from the application + compose
+// create dialogs; deploy scripts run `docker login` for each before
+// pulling private images. Same row-card shape the storage/dns
+// sections use; the add+edit dialog component handles both modes.
+
+import {
+  dockerService,
+  type DockerRegistryCredential,
+} from '~/services/dockerService'
+
+const registryCredentials = ref<DockerRegistryCredential[]>([])
+const isRegistryCredentialsLoading = ref(true)
+const editingRegistryCredential = ref<DockerRegistryCredential | undefined>(undefined)
+const isRegistryDialogOpen = ref(false)
+
+const fetchRegistryCredentials = async () => {
+  isRegistryCredentialsLoading.value = true
+  try {
+    const res = await dockerService.registryCredentials.list()
+    registryCredentials.value = res.data
+  } catch {
+    toast.error('Failed to load registry credentials')
+  } finally {
+    isRegistryCredentialsLoading.value = false
+  }
+}
+
+const openCreateRegistryDialog = () => {
+  editingRegistryCredential.value = undefined
+  isRegistryDialogOpen.value = true
+}
+
+const editRegistryCredential = (c: DockerRegistryCredential) => {
+  editingRegistryCredential.value = c
+  isRegistryDialogOpen.value = true
+}
+
+const handleRegistryDialogClosed = () => {
+  editingRegistryCredential.value = undefined
+}
+
+const deleteRegistryCredential = async (c: DockerRegistryCredential) => {
+  if (!confirmationDialog.value) return
+  const result = await confirmationDialog.value.show({
+    title: 'Delete Registry Credential',
+    description: `Delete "${c.name}"? Applications referencing it will be disconnected (their next deploy will run without auth); compose stacks will silently drop the link.`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    destructive: true,
+  })
+  if (!result.ok) return
+  try {
+    await dockerService.registryCredentials.delete(c.id)
+    registryCredentials.value = registryCredentials.value.filter((x) => x.id !== c.id)
+    toast.success('Registry credential deleted')
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } }
+    toast.error(e.data?.message || 'Failed to delete credential')
+  }
+}
+
+const registryDisplayHost = (c: DockerRegistryCredential): string => {
+  if (c.registry_url && c.registry_url.trim()) return c.registry_url
+  return 'Docker Hub'
+}
+
 onMounted(() => {
   fetchGitProviders()
   fetchServerProviders()
   fetchStorageProviders()
   fetchDnsProviders()
+  fetchRegistryCredentials()
 })
 </script>
 
@@ -478,6 +547,93 @@ onMounted(() => {
             </Button>
           </div>
           <SettingsAddDnsProvider @created="fetchDnsProviders" />
+        </div>
+      </template>
+    </div>
+
+    <!--
+      Docker Registry Credentials. Same row-card shape as Storage /
+      DNS Providers. The dialog handles both create + edit modes; on
+      edit, leaving the password input blank keeps the stored value
+      so users can rotate the label / username / URL without
+      retyping the secret.
+    -->
+    <div class="px-6 py-6">
+      <h3 class="mb-4 text-base font-semibold">Docker Registry Credentials</h3>
+
+      <SettingsRegistryCredentialDialog
+        v-model:open="isRegistryDialogOpen"
+        :credential="editingRegistryCredential"
+        @created="fetchRegistryCredentials"
+        @updated="fetchRegistryCredentials"
+        @update:open="(v) => { if (!v) handleRegistryDialogClosed() }"
+      />
+
+      <div
+        v-if="isRegistryCredentialsLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
+      </div>
+
+      <template v-else>
+        <div
+          v-if="registryCredentials.length === 0"
+          class="rounded-lg border p-4"
+        >
+          <div class="flex flex-col items-center gap-3 py-2">
+            <Icon name="lucide:container" class="h-8 w-8 text-muted-foreground" />
+            <span class="text-sm text-muted-foreground">
+              No docker registry credentials saved
+            </span>
+            <Button size="sm" @click="openCreateRegistryDialog">
+              <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+              Add Registry
+            </Button>
+          </div>
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="c in registryCredentials"
+            :key="c.id"
+            class="flex items-center justify-between rounded-lg border p-4"
+          >
+            <div class="flex items-center gap-3">
+              <Icon name="lucide:container" class="h-5 w-5" />
+              <div>
+                <span class="text-sm font-medium">{{ c.name }}</span>
+                <p class="text-xs text-muted-foreground">
+                  {{ registryDisplayHost(c) }} · {{ c.username }}
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Edit"
+                @click="editRegistryCredential(c)"
+              >
+                <Icon name="lucide:pencil" class="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                @click="deleteRegistryCredential(c)"
+              >
+                <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </div>
+          <Button size="sm" @click="openCreateRegistryDialog">
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            Add Registry
+          </Button>
         </div>
       </template>
     </div>
