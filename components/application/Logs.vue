@@ -212,6 +212,15 @@ onBeforeUnmount(disconnect);
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <!--
+          `header-actions` slot lets callers inject extra controls
+          inline with the Live/Clear/Pause buttons. Compose Logs uses
+          it for the service picker so the page has one header strip
+          instead of two stacked rows (which broke the visual rhythm
+          with the application Logs page). The slot is left of the
+          built-in controls so the picker reads first.
+        -->
+        <slot name="header-actions" />
         <span
           class="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
           :class="
