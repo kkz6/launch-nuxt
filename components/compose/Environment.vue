@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import { Button } from "~/components/ui/button";
+import { parseDotEnv } from "~/composables/useDockerHelpers";
 import {
   dockerService,
   type DockerCompose,
@@ -11,130 +11,172 @@ interface Props {
 }
 const props = defineProps<Props>();
 
-// Compose Environment surfaces the `.env` file that lives next to the
-// compose YAML on the host. The backend persists it on the
-// `docker_composes.env_file` column (added in migration 0033) and the
-// deploy task writes it to `${STACK_DIR}/.env` right before
-// `docker compose up`. Compose then uses it automatically for
-// `${VAR}` substitution in the YAML and passes matching keys into
-// services that declare them without explicit values.
+// Compose Environment uses the same SharedEnvVarsEditor as
+// application + database + project Environment so the UX is one
+// learnable surface across every workload type. The backend storage
+// is different (compose persists a single `env_file` LONGTEXT blob,
+// not per-row rows) but we hide that here by:
 //
-// We chose a single textarea over a structured key/value grid because:
-//   * `.env` is a line-oriented format with comments and blank lines
-//     that a row-grid would mangle.
-//   * The compose YAML's own `environment:` blocks already cover
-//     per-service vars when you need fine-grained control. This file
-//     is for project-wide values (DOMAIN, NODE_ENV, secrets pulled
-//     from the launchctl vault later).
-//   * Matches dokploy's UX — operators coming from there hit muscle
-//     memory immediately.
+//   1. Parsing compose.env_file into virtual rows on load. Each row
+//      gets a synthetic id (`row-N`) so the editor's keyed v-for +
+//      single-row update calls have something stable to target.
+//   2. Re-serializing the rows back to a KEY=VALUE\n body on every
+//      mutation and saving the whole body via PATCH /composes/:id.
+//
+// Trade-off: comments and blank lines in the existing .env body are
+// dropped on the first save. Acceptable for the structured-editor
+// UX; power users who need to preserve comments can still hand-edit
+// via the Advanced subtab or a raw-mode toggle we add later.
 
-const initial = props.compose.env_file ?? "";
-const body = ref(initial);
-const isSaving = ref(false);
+interface VirtualRow {
+  id: string;
+  key: string;
+  value: string;
+  is_secret: boolean;
+}
 
-// "Dirty" = current body diverges from what we last successfully
-// saved (or from initial load). Drives the disabled state of Save +
-// the unsaved-changes hint.
-const baseline = ref(initial);
-const isDirty = computed(() => body.value !== baseline.value);
+const vars = ref<VirtualRow[]>([]);
+const isLoading = ref(false);
 
-const save = async () => {
-  isSaving.value = true;
-  try {
-    await dockerService.composes.update(
-      props.compose.server_id,
-      props.compose.project_id,
-      props.compose.id,
-      { env_file: body.value },
-    );
-    baseline.value = body.value;
-    toast.success("Environment saved. Redeploy the stack to apply.");
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to save environment");
-  } finally {
-    isSaving.value = false;
+// Synthetic-id factory — increments per parse so every row has a
+// unique key for v-for + so update/delete calls can find the right
+// row by id even after re-parses.
+let rowCounter = 0;
+const nextId = () => `row-${++rowCounter}`;
+
+const hydrate = (envFile: string | null | undefined) => {
+  const parsed = parseDotEnv(envFile ?? "");
+  vars.value = parsed.map((p) => ({
+    id: nextId(),
+    key: p.key,
+    value: p.value,
+    is_secret: false,
+  }));
+};
+
+hydrate(props.compose.env_file);
+
+// Re-hydrate when the parent passes in a fresh compose row (e.g.
+// after a successful save the page may refetch). Keeps the editor
+// in sync with the canonical server copy.
+watch(
+  () => props.compose.env_file,
+  (next, prev) => {
+    if (next === prev) return;
+    hydrate(next);
+  },
+);
+
+// Compose values may interpolate ${...} but NOT the project-ref
+// `${{project.X}}` syntax that application + database env vars
+// support — docker compose's own variable substitution doesn't know
+// about that wrapper. So we leave the project hint off here to
+// avoid implying it works.
+
+// Serialise virtual rows back to a .env body for the PATCH. We quote
+// values that contain whitespace, `=`, `"`, or `'` so docker compose
+// parses them back the same way. Other values are emitted bare.
+const serialize = (rows: VirtualRow[]): string => {
+  const needsQuoting = /[\s='"]/;
+  return rows
+    .map((r) => {
+      const value = needsQuoting.test(r.value)
+        ? `"${r.value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+        : r.value;
+      return `${r.key}=${value}`;
+    })
+    .join("\n");
+};
+
+const persist = async (rows: VirtualRow[]) => {
+  const body = serialize(rows);
+  await dockerService.composes.update(
+    props.compose.server_id,
+    props.compose.project_id,
+    props.compose.id,
+    { env_file: body },
+  );
+};
+
+// Editor callbacks. The SharedEnvVarsEditor expects per-row CRUD
+// promises that return a server row. We satisfy that contract from
+// the virtual-rows side: mutate locally, persist the whole body,
+// return the mutated row.
+const onCreate = async (data: {
+  key: string;
+  value: string;
+  is_secret?: boolean;
+}) => {
+  const row: VirtualRow = {
+    id: nextId(),
+    key: data.key,
+    value: data.value,
+    is_secret: !!data.is_secret,
+  };
+  const next = [...vars.value, row];
+  await persist(next);
+  vars.value = next;
+  return row;
+};
+
+const onUpdate = async (
+  id: string,
+  patch: { value?: string; is_secret?: boolean },
+) => {
+  const idx = vars.value.findIndex((r) => r.id === id);
+  if (idx === -1) {
+    throw new Error("Row vanished — refresh and try again");
   }
+  const updated: VirtualRow = {
+    ...vars.value[idx],
+    value: patch.value ?? vars.value[idx].value,
+    is_secret: patch.is_secret ?? vars.value[idx].is_secret,
+  };
+  const next = vars.value.slice();
+  next[idx] = updated;
+  await persist(next);
+  vars.value = next;
+  return updated;
 };
 
-const revert = () => {
-  body.value = baseline.value;
+const onDelete = async (id: string) => {
+  const next = vars.value.filter((r) => r.id !== id);
+  await persist(next);
+  vars.value = next;
 };
 
-const lineCount = computed(() => {
-  if (!body.value) return 0;
-  return body.value.split("\n").length;
-});
+const onSetBulk = async (
+  rows: { key: string; value: string; is_secret?: boolean }[],
+) => {
+  const next: VirtualRow[] = rows.map((r) => ({
+    id: nextId(),
+    key: r.key,
+    value: r.value,
+    is_secret: !!r.is_secret,
+  }));
+  await persist(next);
+  vars.value = next;
+  return next;
+};
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!--
-      Header strip: title + Save action. Matches the application
-      Environment subtab's affordance (Save button right-aligned).
-      The unsaved-changes hint is the secondary line beneath the
-      title so the user knows what state they're in.
-    -->
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <h3 class="text-lg font-semibold">Environment</h3>
-        <p class="text-sm text-muted-foreground">
-          Written to <code class="font-mono text-xs">.env</code> next to the
-          compose file on each deploy. Compose uses it for
-          <code class="font-mono text-xs">${VAR}</code> substitution and
-          passes matching keys to services.
-          <span v-if="isDirty" class="ml-1 font-medium text-amber-600 dark:text-amber-400">
-            Unsaved changes
-          </span>
-        </p>
-      </div>
-      <div class="flex shrink-0 items-center gap-2">
-        <Button
-          v-if="isDirty"
-          variant="outline"
-          size="sm"
-          :disabled="isSaving"
-          @click="revert"
-        >
-          Revert
-        </Button>
-        <Button :disabled="!isDirty || isSaving" size="sm" @click="save">
-          <Icon
-            v-if="isSaving"
-            name="lucide:loader-2"
-            class="mr-2 h-4 w-4 animate-spin"
-          />
-          <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
-          Save
-        </Button>
-      </div>
-    </div>
-
-    <!--
-      The editor itself. SharedCodeEditor gives line numbers + fold
-      gutter; with mono-font + line wrapping disabled the dotenv body
-      stays readable for long secrets. We let the textarea grow inside
-      a max-height container so very long files don't push the page
-      below the fold.
-    -->
-    <div class="rounded-lg border bg-card">
-      <SharedCodeEditor
-        v-model="body"
-        :line-numbers="true"
-        :fold-gutter="false"
-        :line-wrapping="false"
-        placeholder="# Lines like KEY=value. Comments start with '#'.&#10;# Used by docker compose for ${VAR} substitution.&#10;&#10;DOMAIN=example.com&#10;NODE_ENV=production"
-        class="min-h-[360px]"
-      />
-    </div>
-
-    <!-- Footer meta — line count + redeploy hint. Mirrors the kind of
-         small status line the application Advanced tab uses. -->
-    <p class="text-xs text-muted-foreground">
-      {{ lineCount }} line{{ lineCount === 1 ? "" : "s" }}. Changes apply on
-      the next deploy — use the Deploy button on the Deployments subtab to
-      push them to the server.
-    </p>
-  </div>
+  <!--
+    SharedEnvVarsEditor is the same component application / database /
+    project Environment use. We pass the same prop shape so the chrome
+    (title + subtitle + Add / Copy buttons + empty state + replace-
+    all dialog) is byte-identical with the other workload Environment
+    pages. The compose-specific subtitle clarifies the deploy timing.
+  -->
+  <SharedEnvVarsEditor
+    :vars="vars"
+    :loading="isLoading"
+    title="Environment"
+    description="Written to .env next to the compose file on each deploy. Compose uses it for ${VAR} substitution and passes matching keys to services."
+    empty-description="Add KEY=VALUE pairs (or paste a .env file) — they're written next to the compose file on every deploy and used by docker compose for ${VAR} substitution."
+    :on-create="onCreate"
+    :on-update="onUpdate"
+    :on-delete="onDelete"
+    :on-set-bulk="onSetBulk"
+  />
 </template>
