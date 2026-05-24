@@ -19,9 +19,11 @@ interface Props {
 const props = defineProps<Props>();
 
 // Compose Logs wraps ApplicationLogs in compose-mode (composeId set)
-// and adds a service-picker on top. Empty selection = aggregate
-// stream from every service (the previous default behaviour); a
-// specific selection scopes to `docker compose logs <svc>`.
+// and slots a service-picker into ApplicationLogs's header so the
+// page has ONE header strip — matching the application Logs subtab's
+// visual rhythm. Empty selection = aggregate stream from every
+// service (the previous default behaviour); a specific selection
+// scopes to `docker compose logs <svc>`.
 //
 // We fetch the live service list from the backend (which SSHes and
 // runs `docker compose ps --services`) instead of parsing the YAML
@@ -29,7 +31,11 @@ const props = defineProps<Props>();
 // services added/removed since last deploy, etc.
 
 const services = ref<string[]>([]);
-const selected = ref<string>("");
+// Sentinel "__all__" maps to empty-string on the wire. The Select
+// component treats "" as "no selection" which would surface the
+// placeholder instead of the chosen option, so we use a non-empty
+// sentinel and translate when binding to ApplicationLogs.
+const selected = ref<string>("__all__");
 const isLoadingServices = ref(true);
 
 const fetchServices = async () => {
@@ -42,9 +48,9 @@ const fetchServices = async () => {
     );
     services.value = res.data ?? [];
   } catch {
-    // Silent on first load — the WS connection will surface a
-    // meaningful error if the host isn't reachable. The picker just
-    // stays at "All services".
+    // Silent on first load — the WS connection surfaces a meaningful
+    // error if the host isn't reachable. The picker stays at "All
+    // services" so logs still aggregate.
     services.value = [];
   } finally {
     isLoadingServices.value = false;
@@ -64,66 +70,50 @@ onMounted(fetchServices);
 </script>
 
 <template>
-  <div class="space-y-3">
-    <!--
-      Service picker strip. Sits above the log stream so it reads as
-      "I'm watching <this>" rather than buried inside the terminal
-      frame. The Refresh button is right-aligned because services
-      come from a live `docker ps` and the user might want to re-poll
-      after a deploy mid-session.
-    -->
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex min-w-0 items-center gap-2">
+  <!--
+    ApplicationLogs is the shared shell — same header (title +
+    subtitle + Live pill + Clear/Pause buttons) and log surface the
+    application + database Logs tabs render. We slot a service picker
+    into its header-actions slot so this page reads as one strip
+    instead of the previous two-strip layout that diverged from
+    everything else.
+  -->
+  <ApplicationLogs
+    :compose-id="compose.id"
+    :service="selected === '__all__' ? '' : selected"
+    empty-state-message="Deploy this compose stack first; logs start streaming once at least one service is running."
+  >
+    <template #header-actions>
+      <Select v-model="selected">
+        <SelectTrigger class="h-8 min-w-[180px] text-sm">
+          <SelectValue placeholder="All services" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">All services</SelectItem>
+          <SelectItem v-for="svc in services" :key="svc" :value="svc">
+            {{ svc }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <Button
+        variant="outline"
+        size="sm"
+        :disabled="isLoadingServices"
+        :title="
+          isLoadingServices
+            ? 'Re-fetching service list…'
+            : 'Re-fetch the service list (after a deploy)'
+        "
+        @click="refresh"
+      >
         <Icon
-          name="lucide:container"
-          class="h-4 w-4 shrink-0 text-muted-foreground"
+          :name="
+            isLoadingServices ? 'lucide:loader-2' : 'lucide:refresh-cw'
+          "
+          class="h-4 w-4"
+          :class="isLoadingServices ? 'animate-spin' : ''"
         />
-        <span class="text-sm text-muted-foreground">Service:</span>
-        <Select v-model="selected">
-          <SelectTrigger class="h-8 min-w-[180px] text-sm">
-            <SelectValue placeholder="All services" />
-          </SelectTrigger>
-          <SelectContent>
-            <!--
-              Empty value = aggregate. The Select component treats ""
-              as "no selection" which surfaces the placeholder, so we
-              use a sentinel value of "__all__" and translate to ""
-              in the WS query. Vue's v-model on Select wraps strings
-              directly — the translation lives in the prop binding
-              below.
-            -->
-            <SelectItem value="__all__">All services</SelectItem>
-            <SelectItem
-              v-for="svc in services"
-              :key="svc"
-              :value="svc"
-            >
-              {{ svc }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-        <span
-          v-if="isLoadingServices"
-          class="text-xs text-muted-foreground"
-        >
-          loading…
-        </span>
-      </div>
-      <Button variant="ghost" size="sm" @click="refresh">
-        <Icon name="lucide:refresh-cw" class="mr-2 h-3.5 w-3.5" />
-        Refresh
       </Button>
-    </div>
-
-    <!--
-      Reuse ApplicationLogs in compose-mode. When `service` is the
-      sentinel "__all__" we pass an empty string so the WS handler
-      streams every container's logs (the historical default).
-    -->
-    <ApplicationLogs
-      :compose-id="compose.id"
-      :service="selected === '__all__' ? '' : selected"
-      empty-state-message="Deploy this compose stack first; logs start streaming once at least one service is running."
-    />
-  </div>
+    </template>
+  </ApplicationLogs>
 </template>

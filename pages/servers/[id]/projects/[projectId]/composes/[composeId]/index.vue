@@ -157,10 +157,14 @@ const statusBadge = computed(() => {
       />
     </div>
 
+    <!--
+      General is read-only (info-card grid) — rename + danger zone
+      moved to Advanced, so no @updated emit is needed here. Mirrors
+      application + database General which take the same shape.
+    -->
     <ComposeGeneral
       v-else-if="subTab === 'general'"
       :compose="compose"
-      @updated="fetchCompose"
     />
 
     <ComposeDeployments

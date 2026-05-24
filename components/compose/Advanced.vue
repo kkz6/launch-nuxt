@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
   dockerService,
   type DockerCompose,
@@ -14,6 +16,45 @@ const emit = defineEmits<{
   updated: [];
   deleted: [];
 }>();
+
+// Rename form moved here from compose/General.vue so General stays
+// read-only (info-card grid only, matches application + database
+// detail pages). Stack name is the only mutable field today; future
+// per-stack knobs (pause toggle, restart-policy override, etc.) will
+// live in their own sections above the danger zone.
+const name = ref(props.compose.name);
+const isSaving = ref(false);
+
+watch(
+  () => props.compose.name,
+  (n) => {
+    name.value = n;
+  },
+);
+
+const saveSettings = async () => {
+  const trimmed = name.value.trim();
+  if (!trimmed) {
+    toast.error("Stack name is required");
+    return;
+  }
+  isSaving.value = true;
+  try {
+    await dockerService.composes.update(
+      props.compose.server_id,
+      props.compose.project_id,
+      props.compose.id,
+      { name: trimmed },
+    );
+    toast.success("Compose stack updated");
+    emit("updated");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to update compose stack");
+  } finally {
+    isSaving.value = false;
+  }
+};
 
 // Compose Advanced mirrors components/application/Advanced.vue —
 // houses the destructive operations for the stack. General stays
@@ -82,9 +123,59 @@ const deleteCompose = async () => {
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!--
-      Danger Zone is the only section here for now. Wrapped in a
-      destructive-tinted card so the visual weight matches the action.
-      Mirrors components/application/Advanced.vue's Danger Zone shape.
+      General section — same Card-primitive sectioned layout the
+      application Advanced uses. Holds the rename today; future
+      stack-level toggles (pause, restart-policy override) land
+      here. Stays read-only-friendly: the Save button greys out
+      when there's nothing to apply.
+    -->
+    <div class="rounded-lg border bg-card p-6">
+      <div class="flex items-start gap-3">
+        <div
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-500/10"
+        >
+          <Icon name="lucide:tag" class="h-4 w-4 text-zinc-500" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-base font-semibold">General</h3>
+          <p class="mt-0.5 text-sm text-muted-foreground">
+            Rename the stack. Source + compose body are immutable from
+            this page — reconfigure by recreating the stack.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-5 space-y-4">
+        <div class="space-y-2">
+          <Label for="compose-name">Stack Name</Label>
+          <Input
+            id="compose-name"
+            v-model="name"
+            placeholder="e.g. monitoring, db-stack"
+            autocomplete="off"
+          />
+          <p class="text-xs text-muted-foreground">
+            Used as the <code class="font-mono">docker-compose</code>
+            project name on the host.
+          </p>
+        </div>
+
+        <Button :disabled="isSaving || !name.trim()" @click="saveSettings">
+          <Icon
+            v-if="isSaving"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
+          Save Changes
+        </Button>
+      </div>
+    </div>
+
+    <!--
+      Danger Zone — wrapped in a destructive-tinted card so the
+      visual weight matches the action. Mirrors the application
+      Advanced danger zone shape.
     -->
     <div class="rounded-lg border border-destructive/30 bg-destructive/[0.03] p-6">
       <h3 class="text-base font-semibold text-destructive">Danger Zone</h3>
