@@ -232,6 +232,94 @@ const saveSecurity = async () => {
   }
 };
 
+// --- Traefik dynamic-config card ----------------------------------
+//
+// Mirrors dokploy's Advanced → Traefik surface. Read-only by default
+// (the deploy pipeline writes this file; hand-edits get clobbered on
+// the next domain change), with a "Modify" button that opens up the
+// editor for emergency tweaks. Save round-trips through the backend
+// which validates filename/size and writes via SSH; Traefik watches
+// the dir so the change takes effect with no reload.
+//
+// Stays in sync with the server when the user lands on the tab:
+// fetchTraefikConfig runs on mount AND whenever the lock is
+// re-engaged, so re-opening Modify shows the latest on-disk state
+// rather than a stale cached one.
+
+const traefikFilename = ref("");
+const traefikContent = ref("");
+const traefikContentOnDisk = ref("");
+const traefikLoading = ref(true);
+const traefikSaving = ref(false);
+const traefikEditing = ref(false);
+
+const traefikDirty = computed(
+  () => traefikContent.value !== traefikContentOnDisk.value,
+);
+
+const fetchTraefikConfig = async () => {
+  traefikLoading.value = true;
+  try {
+    const res = await dockerService.applications.getTraefikConfig(
+      props.application.server_id,
+      props.application.project_id,
+      props.application.id,
+    );
+    traefikFilename.value = res.data.filename;
+    traefikContent.value = res.data.content;
+    traefikContentOnDisk.value = res.data.content;
+  } catch {
+    // Silent: empty editor is fine. The card heading still loads;
+    // the user can save to create the file if Traefik hasn't been
+    // populated yet. Avoid a toast on the cold-load path because
+    // the Advanced tab also triggers other fetches and stacking
+    // error toasts is noisy.
+    traefikFilename.value = "";
+    traefikContent.value = "";
+    traefikContentOnDisk.value = "";
+  } finally {
+    traefikLoading.value = false;
+  }
+};
+
+const beginModifyTraefik = () => {
+  // Re-pull so the operator edits the file as it is RIGHT NOW —
+  // domains added since the page load would otherwise be invisible.
+  fetchTraefikConfig().then(() => {
+    traefikEditing.value = true;
+  });
+};
+
+const cancelModifyTraefik = () => {
+  traefikContent.value = traefikContentOnDisk.value;
+  traefikEditing.value = false;
+};
+
+const saveTraefikConfig = async () => {
+  traefikSaving.value = true;
+  try {
+    const res = await dockerService.applications.updateTraefikConfig(
+      props.application.server_id,
+      props.application.project_id,
+      props.application.id,
+      traefikContent.value,
+    );
+    traefikContentOnDisk.value = res.data.content;
+    traefikFilename.value = res.data.filename;
+    traefikEditing.value = false;
+    toast.success(
+      "Traefik config saved — Traefik picks it up automatically.",
+    );
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to save Traefik config");
+  } finally {
+    traefikSaving.value = false;
+  }
+};
+
+onMounted(fetchTraefikConfig);
+
 const deleteApplication = async () => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
@@ -593,6 +681,115 @@ const deleteApplication = async () => {
         <Button size="sm" :disabled="portsSaving" @click="savePorts">
           <Icon
             v-if="portsSaving"
+            name="lucide:loader-2"
+            class="mr-2 h-3.5 w-3.5 animate-spin"
+          />
+          Save
+        </Button>
+      </CardFooter>
+    </Card>
+
+    <!-- ─── Traefik dynamic-config ────────────────────────────── -->
+    <!--
+      Mirrors dokploy's Advanced → Traefik card: read-only viewer with
+      a Modify button that opens up the editor for emergency tweaks.
+      The deploy task is the source of truth — adding a domain on the
+      Domains tab regenerates this file, so manual edits get clobbered
+      on the next domain change. The Save flow round-trips through
+      WriteTraefikDynamicFile, which validates filename + size cap;
+      Traefik watches the dir and picks up changes with no reload.
+    -->
+    <Card>
+      <CardHeader class="p-4">
+        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
+          <Icon name="lucide:route" class="h-4 w-4 text-muted-foreground" />
+          Traefik
+        </CardTitle>
+        <CardDescription class="text-xs">
+          Modify the traefik config, in rare cases you may need to add
+          specific config, be careful because modifying incorrectly
+          can break traefik and your application.
+          <span
+            v-if="traefikFilename"
+            class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono"
+            :title="`/etc/launch/traefik/dynamic/${traefikFilename}`"
+          >
+            <Icon name="lucide:file-text" class="h-3 w-3" />
+            {{ traefikFilename }}
+          </span>
+        </CardDescription>
+      </CardHeader>
+
+      <CardContent class="space-y-2 p-4 pt-0">
+        <div
+          v-if="traefikLoading"
+          class="flex h-72 items-center justify-center rounded-md border bg-muted/30"
+        >
+          <Icon
+            name="lucide:loader-2"
+            class="h-5 w-5 animate-spin text-muted-foreground"
+          />
+        </div>
+        <div v-else-if="!traefikContent && !traefikEditing" class="relative">
+          <!--
+            Empty state — file doesn't exist yet on the host (first
+            deploy hasn't run, or no domains attached). Modify still
+            works; saving creates the file.
+          -->
+          <div
+            class="flex h-32 flex-col items-center justify-center rounded-md border border-dashed text-center text-xs text-muted-foreground"
+          >
+            <Icon name="lucide:route-off" class="mb-2 h-5 w-5" />
+            No Traefik config on this server yet. Attach a domain on the
+            Domains tab and deploy — or hit Modify to write the file
+            yourself.
+          </div>
+        </div>
+        <div v-else class="relative">
+          <!--
+            Modify button overlay matches the dokploy screenshot —
+            top-right above the editor. Hidden while editing because
+            the Save / Cancel actions move to the footer.
+          -->
+          <Button
+            v-if="!traefikEditing"
+            size="sm"
+            class="absolute right-2 top-2 z-10"
+            @click="beginModifyTraefik"
+          >
+            <Icon name="lucide:pencil" class="mr-2 h-3.5 w-3.5" />
+            Modify
+          </Button>
+          <SharedCodeEditor
+            v-model="traefikContent"
+            language="yaml"
+            class="h-72 rounded-md border"
+            :line-numbers="true"
+            :disabled="!traefikEditing"
+            placeholder="http:&#10;  routers:&#10;    ..."
+          />
+        </div>
+      </CardContent>
+
+      <CardFooter
+        v-if="traefikEditing"
+        class="justify-end gap-2 border-t bg-muted/30 px-4 py-2"
+      >
+        <Button
+          size="sm"
+          variant="outline"
+          :disabled="traefikSaving"
+          @click="cancelModifyTraefik"
+        >
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          :disabled="traefikSaving || !traefikDirty"
+          @click="saveTraefikConfig"
+        >
+          <Icon
+            v-if="traefikSaving"
             name="lucide:loader-2"
             class="mr-2 h-3.5 w-3.5 animate-spin"
           />
