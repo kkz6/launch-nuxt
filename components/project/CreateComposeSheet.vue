@@ -18,6 +18,7 @@ import {
   type CreateDockerComposeData,
   type DockerCompose,
   type DockerComposeSourceType,
+  type DockerRegistryCredential,
 } from "~/services/dockerService";
 
 interface Props {
@@ -57,6 +58,34 @@ const composeFilePath = ref("");
 
 const rawYAML = ref("");
 const isSubmitting = ref(false);
+
+// --- Registry credentials (many-to-many) ---------------------------
+//
+// Compose stacks can pull from N registries in one YAML. We track
+// selected IDs as a Set so toggle interaction stays O(1); on submit
+// the Set is serialized to an array. Empty selection → no `docker
+// login` step in the deploy script.
+const registryCredentials = ref<DockerRegistryCredential[]>([]);
+const selectedRegistryCredentialIds = ref<Set<string>>(new Set());
+
+const fetchRegistryCredentials = async () => {
+  try {
+    const res = await dockerService.registryCredentials.list();
+    registryCredentials.value = res.data;
+  } catch {
+    registryCredentials.value = [];
+  }
+};
+
+const toggleRegistryCredential = (id: string) => {
+  const next = new Set(selectedRegistryCredentialIds.value);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  selectedRegistryCredentialIds.value = next;
+};
 
 // ---- data loading -------------------------------------------------------
 const fetchSourceControls = async () => {
@@ -126,9 +155,11 @@ watch(isOpen, (open) => {
     rawYAML.value = "";
     repositorySearchTerm.value = "";
     repositories.value = [];
-    // Lazy load source-control accounts. The endpoint is cheap and
-    // results are cached server-side per team.
+    selectedRegistryCredentialIds.value = new Set();
+    // Lazy load source-control accounts + registry credentials. Both
+    // endpoints are cheap and idempotent.
     void fetchSourceControls();
+    void fetchRegistryCredentials();
   }
 });
 
@@ -179,6 +210,13 @@ const submit = async () => {
       return;
     }
     payload.raw_yaml = { contents: rawYAML.value };
+  }
+
+  // Many-to-many registry credentials. Only include the field when
+  // the user picked at least one — sending an empty array would be
+  // a no-op anyway, but omitting keeps the wire small.
+  if (selectedRegistryCredentialIds.value.size > 0) {
+    payload.registry_credential_ids = Array.from(selectedRegistryCredentialIds.value);
   }
 
   isSubmitting.value = true;
@@ -397,6 +435,64 @@ const submit = async () => {
             Stored as-is. Redeploy uses the same YAML — edit the stack
             to change it. Cap is 128 KB.
           </p>
+        </div>
+
+        <!--
+          Registry-credential multi-select. Compose stacks can pull
+          from N registries in one YAML (e.g. ghcr.io + quay), so the
+          picker takes 0..N saved credentials. Deploy script runs
+          `docker login` for each before `docker compose pull/up`,
+          then `docker logout` after. Empty selection = no auth step.
+        -->
+        <div class="space-y-2 rounded-md border bg-muted/20 p-3">
+          <div class="flex items-center justify-between">
+            <Label class="text-sm font-medium">Registry credentials</Label>
+            <span class="text-[11px] text-muted-foreground">
+              {{ selectedRegistryCredentialIds.size }} selected
+            </span>
+          </div>
+          <p class="text-[11px] text-muted-foreground">
+            Pick the saved registry logins this stack needs. Manage
+            them in Settings → Connections.
+          </p>
+          <div
+            v-if="registryCredentials.length === 0"
+            class="rounded border border-dashed p-3 text-center text-[11px] text-muted-foreground"
+          >
+            No saved registry credentials yet — all images in this
+            stack must be public.
+          </div>
+          <div v-else class="space-y-1">
+            <button
+              v-for="c in registryCredentials"
+              :key="c.id"
+              type="button"
+              class="flex w-full items-start justify-between rounded-md border px-3 py-2 text-left text-xs transition"
+              :class="
+                selectedRegistryCredentialIds.has(c.id)
+                  ? 'border-primary bg-primary/5'
+                  : 'border-muted hover:border-foreground/40'
+              "
+              @click="toggleRegistryCredential(c.id)"
+            >
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 font-medium">
+                  <Icon
+                    :name="
+                      selectedRegistryCredentialIds.has(c.id)
+                        ? 'lucide:check-square'
+                        : 'lucide:square'
+                    "
+                    class="h-3.5 w-3.5"
+                  />
+                  {{ c.name }}
+                </div>
+                <p class="ml-5 text-[11px] text-muted-foreground">
+                  {{ c.registry_url || 'Docker Hub' }} · {{ c.username }}
+                </p>
+              </div>
+            </button>
+          </div>
         </div>
 
         <DialogFooter>

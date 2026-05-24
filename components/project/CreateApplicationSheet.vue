@@ -17,6 +17,7 @@ import {
   dockerService,
   type CreateDockerApplicationData,
   type DockerApplication,
+  type DockerRegistryCredential,
   type DockerSourceType,
 } from "~/services/dockerService";
 
@@ -64,6 +65,35 @@ const gitBuildType = ref<"auto" | "nixpacks" | "dockerfile">("auto");
 const gitDockerfilePath = ref("");
 
 const dockerfileContents = ref("");
+
+// --- Registry authentication (image source only) -------------------
+//
+// Three mutually-exclusive modes:
+//   - "public"  → no auth; backend skips `docker login`
+//   - "saved"   → pick a Settings → Connections credential by id
+//   - "inline"  → enter username + password (+ optional URL) on this
+//                 row. Encrypted at rest on the application model.
+//
+// Default to "public" since most demo deploys are public images.
+// When a saved credential is available we still default to public —
+// the user has to opt in to send credentials, same shape dokploy
+// uses (their Docker provider tab is empty by default).
+type RegistryAuthMode = "public" | "saved" | "inline";
+const registryAuthMode = ref<RegistryAuthMode>("public");
+const registryCredentials = ref<DockerRegistryCredential[]>([]);
+const selectedRegistryCredentialId = ref<string>("");
+const inlineRegistryUsername = ref("");
+const inlineRegistryPassword = ref("");
+const inlineRegistryUrl = ref("");
+
+const fetchRegistryCredentials = async () => {
+  try {
+    const res = await dockerService.registryCredentials.list();
+    registryCredentials.value = res.data;
+  } catch {
+    registryCredentials.value = [];
+  }
+};
 
 const isSubmitting = ref(false);
 
@@ -130,9 +160,18 @@ watch(isOpen, (open) => {
     gitBuildType.value = "auto";
     gitDockerfilePath.value = "";
     dockerfileContents.value = "";
-    // Pre-load source controls so the combobox is ready when the
-    // user clicks "Git repo". Idempotent — bails if already loaded.
+    // Reset registry-auth picker so opening a fresh sheet doesn't
+    // accidentally carry credentials from a previous session.
+    registryAuthMode.value = "public";
+    selectedRegistryCredentialId.value = "";
+    inlineRegistryUsername.value = "";
+    inlineRegistryPassword.value = "";
+    inlineRegistryUrl.value = "";
+    // Pre-load source controls + registry credentials so the pickers
+    // are ready when the user picks "Git repo" / "Image". Both calls
+    // are idempotent and cheap.
     void fetchSourceControls();
+    void fetchRegistryCredentials();
   }
 });
 
@@ -163,6 +202,27 @@ const submit = async () => {
         return;
       }
       payload.image = { image: v };
+      // Tack on registry auth based on the picker mode. The backend
+      // enforces at-most-one-of (saved vs inline) — we just send the
+      // fields the user filled in. Inline mode requires BOTH
+      // username + password; surface the validation here so the
+      // toast is friendlier than the backend 400.
+      if (registryAuthMode.value === "saved" &&
+          selectedRegistryCredentialId.value) {
+        payload.image.registry_credential_id = selectedRegistryCredentialId.value;
+      } else if (registryAuthMode.value === "inline") {
+        const u = inlineRegistryUsername.value.trim();
+        const p = inlineRegistryPassword.value;
+        if (!u || !p) {
+          toast.error("Inline registry auth requires both username AND password");
+          return;
+        }
+        payload.image.registry_username = u;
+        payload.image.registry_password = p;
+        if (inlineRegistryUrl.value.trim()) {
+          payload.image.registry_url = inlineRegistryUrl.value.trim();
+        }
+      }
       break;
     }
     case "git": {
@@ -296,17 +356,150 @@ const submit = async () => {
         </div>
 
         <!-- Image source -->
-        <div v-if="sourceType === 'image'" class="space-y-2">
-          <Label for="app-image">Image reference</Label>
-          <Input
-            id="app-image"
-            v-model="imageRef"
-            placeholder="nginx:1.27 or ghcr.io/acme/api:v3"
-            autocomplete="off"
-          />
-          <p class="text-xs text-muted-foreground">
-            Include a specific tag — we don't silently use <code>:latest</code>.
-          </p>
+        <div v-if="sourceType === 'image'" class="space-y-4">
+          <div class="space-y-2">
+            <Label for="app-image">Image reference</Label>
+            <Input
+              id="app-image"
+              v-model="imageRef"
+              placeholder="nginx:1.27 or ghcr.io/acme/api:v3"
+              autocomplete="off"
+            />
+            <p class="text-xs text-muted-foreground">
+              Include a specific tag — we don't silently use <code>:latest</code>.
+            </p>
+          </div>
+
+          <!--
+            Registry authentication picker. Three modes:
+              - public: no auth (default; works for nginx, hello-world, etc.)
+              - saved: pick a Settings → Connections credential by id
+              - inline: enter username + password + optional URL
+                        this application only.
+            Backend enforces at-most-one-of saved/inline.
+          -->
+          <div class="space-y-2 rounded-md border bg-muted/20 p-3">
+            <Label class="text-sm font-medium">Image authentication</Label>
+            <div class="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+              <button
+                type="button"
+                class="rounded-md border px-3 py-2 text-left text-xs transition"
+                :class="
+                  registryAuthMode === 'public'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-foreground/40'
+                "
+                @click="registryAuthMode = 'public'"
+              >
+                <div class="flex items-center gap-1.5 font-medium">
+                  <Icon name="lucide:globe" class="h-3.5 w-3.5" /> Public
+                </div>
+                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                  No login.
+                </p>
+              </button>
+              <button
+                type="button"
+                class="rounded-md border px-3 py-2 text-left text-xs transition"
+                :class="
+                  registryAuthMode === 'saved'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-foreground/40'
+                "
+                @click="registryAuthMode = 'saved'"
+              >
+                <div class="flex items-center gap-1.5 font-medium">
+                  <Icon name="lucide:key-round" class="h-3.5 w-3.5" /> Saved
+                </div>
+                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                  From Settings.
+                </p>
+              </button>
+              <button
+                type="button"
+                class="rounded-md border px-3 py-2 text-left text-xs transition"
+                :class="
+                  registryAuthMode === 'inline'
+                    ? 'border-primary bg-primary/5'
+                    : 'border-muted hover:border-foreground/40'
+                "
+                @click="registryAuthMode = 'inline'"
+              >
+                <div class="flex items-center gap-1.5 font-medium">
+                  <Icon name="lucide:lock" class="h-3.5 w-3.5" /> Inline
+                </div>
+                <p class="mt-0.5 text-[11px] text-muted-foreground">
+                  One-off creds.
+                </p>
+              </button>
+            </div>
+
+            <!-- Saved-credential dropdown -->
+            <div v-if="registryAuthMode === 'saved'" class="space-y-1.5 pt-2">
+              <div
+                v-if="registryCredentials.length === 0"
+                class="rounded border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-amber-900 dark:text-amber-200"
+              >
+                <Icon
+                  name="lucide:triangle-alert"
+                  class="mr-1 inline-block h-3 w-3 align-text-bottom"
+                />
+                No saved registry credentials. Add one in Settings →
+                Connections, or switch to Inline.
+              </div>
+              <select
+                v-else
+                v-model="selectedRegistryCredentialId"
+                class="h-9 w-full rounded-md border bg-background px-2 text-sm"
+              >
+                <option value="">Pick a saved credential…</option>
+                <option
+                  v-for="c in registryCredentials"
+                  :key="c.id"
+                  :value="c.id"
+                >
+                  {{ c.name }} — {{ c.registry_url || 'Docker Hub' }} / {{ c.username }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Inline credentials -->
+            <div v-if="registryAuthMode === 'inline'" class="space-y-2 pt-2">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div class="space-y-1">
+                  <Label for="reg-inline-user" class="text-xs">Username</Label>
+                  <Input
+                    id="reg-inline-user"
+                    v-model="inlineRegistryUsername"
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="space-y-1">
+                  <Label for="reg-inline-pass" class="text-xs">Password</Label>
+                  <Input
+                    id="reg-inline-pass"
+                    v-model="inlineRegistryPassword"
+                    type="password"
+                    autocomplete="new-password"
+                  />
+                </div>
+              </div>
+              <div class="space-y-1">
+                <Label for="reg-inline-url" class="text-xs">
+                  Registry URL
+                  <span class="font-normal text-muted-foreground">
+                    (leave blank for Docker Hub)
+                  </span>
+                </Label>
+                <Input
+                  id="reg-inline-url"
+                  v-model="inlineRegistryUrl"
+                  placeholder="ghcr.io"
+                  autocomplete="off"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Git source — same picker AddSite uses: connected provider

@@ -90,7 +90,18 @@ export interface CreateDockerApplicationData {
   internal_port?: number;
   image?: {
     image: string;
+    /**
+     * Saved-credential path. Mutually exclusive with the inline
+     * username/password fields below — the backend rejects "both
+     * set" as 400. Leave all four empty for a public image.
+     */
     registry_credential_id?: string;
+    /** Inline username (encrypted at rest on the application row). */
+    registry_username?: string;
+    /** Inline password (encrypted at rest on the application row). */
+    registry_password?: string;
+    /** Inline registry URL — empty / undefined means Docker Hub. */
+    registry_url?: string;
   };
   git?: {
     repo: string;
@@ -392,6 +403,53 @@ export interface DockerApplicationTraefikConfig {
   content: string;
 }
 
+/**
+ * Saved docker-registry login. Password is write-only over the
+ * wire — the response carries `has_password` (boolean) so the edit
+ * form can show "•••• change?" instead of a blank input that looks
+ * like the password got cleared. Username is returned decrypted.
+ */
+export interface DockerRegistryCredential {
+  id: string;
+  team_id: string;
+  user_id?: string | null;
+  name: string;
+  /** Empty / null means Docker Hub. */
+  registry_url?: string | null;
+  username: string;
+  has_password: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerRegistryCredentialData {
+  name: string;
+  /** Omit / empty for Docker Hub. */
+  registry_url?: string;
+  username: string;
+  password: string;
+}
+
+export interface UpdateDockerRegistryCredentialData {
+  name?: string;
+  /** Empty string clears it (= Docker Hub). */
+  registry_url?: string;
+  username?: string;
+  /** Omit to leave the stored password alone; empty string is rejected. */
+  password?: string;
+}
+
+/**
+ * Trimmed shape embedded on a DockerCompose response — just enough
+ * to render the "attached credentials" chips on the compose detail
+ * page without a second fetch. Username never embedded.
+ */
+export interface DockerRegistryCredentialSummary {
+  id: string;
+  name: string;
+  registry_url?: string | null;
+}
+
 export interface UpdateDockerAdvancedData {
   cpu_limit?: string;
   memory_limit?: string;
@@ -560,6 +618,13 @@ export interface DockerCompose {
   last_deployed_at?: string | null;
   created_at?: string;
   updated_at?: string;
+  /**
+   * Saved registry credentials attached to this stack (summary shape
+   * — no secrets). Only populated when the backend preloaded the
+   * many-to-many; empty/undefined means "no auth attached or no
+   * preload happened".
+   */
+  registry_credentials?: DockerRegistryCredentialSummary[];
 }
 
 export interface CreateDockerComposeData {
@@ -574,6 +639,12 @@ export interface CreateDockerComposeData {
   raw_yaml?: {
     contents: string;
   };
+  /**
+   * IDs of saved registry credentials to attach to this stack. The
+   * deploy script runs `docker login` for each before
+   * `docker compose pull/up`. nil / empty = no auth.
+   */
+  registry_credential_ids?: string[];
 }
 
 export interface UpdateDockerComposeData {
@@ -586,6 +657,12 @@ export interface UpdateDockerComposeData {
   // (deploy reverts to default), non-empty sets the docker suffix
   // verbatim.
   run_command?: string;
+  /**
+   * Replace the stack's attached registry credentials in one shot.
+   * `undefined` = leave unchanged; `[]` = detach all; non-empty =
+   * replace with this exact set. Each ID must belong to the team.
+   */
+  registry_credential_ids?: string[];
 }
 
 // ---- Managed databases ----------------------------------------------------
@@ -1781,6 +1858,38 @@ export const dockerService = {
           `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/env-vars/${envVarId}`,
         );
       },
+    },
+  },
+
+  // --- Docker registry credentials --------------------------------
+  //
+  // Team-scoped saved logins for private docker registries. Managed
+  // in Settings → Connections; picked from application + compose
+  // create dialogs. Password is write-only over the wire — the
+  // response carries `has_password` so the edit form can render
+  // "•••• change?" instead of an empty input.
+  registryCredentials: {
+    list: () => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerRegistryCredential[]>>("/registry-credentials");
+    },
+    create: (data: CreateDockerRegistryCredentialData) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerRegistryCredential>>(
+        "/registry-credentials",
+        data,
+      );
+    },
+    update: (id: string, data: UpdateDockerRegistryCredentialData) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerRegistryCredential>>(
+        `/registry-credentials/${id}`,
+        data,
+      );
+    },
+    delete: (id: string) => {
+      const { delete: del } = useApi();
+      return del(`/registry-credentials/${id}`);
     },
   },
 };
