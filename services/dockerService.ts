@@ -232,14 +232,26 @@ export type DockerVolumeType = "bind" | "volume" | "file" | "named";
 
 export interface DockerVolume {
   id: string;
-  application_id: string;
+  /**
+   * Polymorphic owner: exactly one of `application_id` / `compose_id`
+   * is set per row. The other is omitted by the API (the field is
+   * `omitempty` on the backend) so a missing key is the normal case
+   * for the non-owning flavour.
+   */
+  application_id?: string | null;
+  compose_id?: string | null;
   name: string;
   mount_path: string;
   type: DockerVolumeType;
   host_path?: string | null;
   /** Body written to disk for type=file. */
   content?: string | null;
-  /** On-host filename for type=file (under the deploy dir). */
+  /**
+   * On-host filename for type=file. For applications this is relative
+   * to the application's deploy directory; for compose stacks it lives
+   * under `${STACK_DIR}/files/` so the YAML can reference it via
+   * `./files/<file_path>`.
+   */
   file_path?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -1250,6 +1262,60 @@ export const dockerService = {
       return get<ApiResponse<{ command: string }>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/default-command`,
       );
+    },
+
+    // Compose volumes — same persistence row as application volumes
+    // (polymorphic by owner column on the backend), exposed under the
+    // stack URL. Three flavours match dokploy's mount surface:
+    //   - bind / volume → informational; operator wires them into
+    //     their YAML themselves. The platform doesn't rewrite
+    //     docker-compose.yml.
+    //   - file          → backend materializes to
+    //     `${STACK_DIR}/files/<file_path>` before `docker compose up`,
+    //     and YAML can reference it via `./files/<file_path>`.
+    volumes: {
+      list: (serverId: string, projectId: string, composeId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<DockerVolume[]>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/volumes`,
+        );
+      },
+      create: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        data: CreateDockerVolumeData,
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<DockerVolume>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/volumes`,
+          data,
+        );
+      },
+      update: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        volumeId: string,
+        data: UpdateDockerVolumeData,
+      ) => {
+        const { patch } = useApi();
+        return patch<ApiResponse<DockerVolume>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/volumes/${volumeId}`,
+          data,
+        );
+      },
+      delete: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        volumeId: string,
+      ) => {
+        const { delete: del } = useApi();
+        return del(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/volumes/${volumeId}`,
+        );
+      },
     },
   },
 

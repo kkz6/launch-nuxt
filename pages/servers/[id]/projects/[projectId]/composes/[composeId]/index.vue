@@ -23,14 +23,20 @@ const isDeploying = ref(false);
 
 // Compose subtabs mirror the application's where the concept maps
 // 1:1 at the stack level. Per-service tabs (Domains, Redirects,
-// Volumes, Schedulers) are deliberately skipped — the YAML owns
-// those, and surfacing a service picker for each of them is its
-// own slice. Logs gets a service picker inside the component since
-// every compose stack has multiple containers.
+// Schedulers) are deliberately skipped — the YAML owns those, and
+// surfacing a service picker for each of them is its own slice.
+// Logs gets a service picker inside the component since every
+// compose stack has multiple containers.
+//
+// Volumes is included — the same polymorphic mounts table that
+// backs application volumes is reused for compose. file-type rows
+// get materialized to `${STACK_DIR}/files/` before deploy;
+// bind/volume rows are tracking-only (operator wires them into YAML).
 const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", icon: "lucide:key" },
+  { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
 ] as const;
@@ -43,6 +49,7 @@ const READY_SUBTABS: Record<string, boolean> = {
   general: true,
   deployments: true,
   environment: true,
+  volumes: true,
   logs: true,
   advanced: true,
 };
@@ -174,6 +181,11 @@ const statusBadge = computed(() => {
 
     <ComposeEnvironment
       v-else-if="subTab === 'environment'"
+      :compose="compose"
+    />
+
+    <ComposeVolumes
+      v-else-if="subTab === 'volumes'"
       :compose="compose"
     />
 

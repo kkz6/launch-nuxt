@@ -539,15 +539,20 @@ const applicationSubTabs = [
 // Compose subtabs mirror the application tabs where they make sense
 // at the stack level. Skipped:
 //   - Domains / Redirects → per-service config, lives in the YAML
-//   - Volumes              → declared in the YAML
 //   - Schedulers           → per-container; needs a service selector
 // Logs has a service selector inside the component so the user can
 // pick which container's stdout to stream when the stack has more
 // than one service.
+//
+// Volumes is included even though compose stacks declare mounts in
+// the YAML — the same surface as applications, but bind/volume rows
+// are tracking-only (operator wires them into YAML) and file rows
+// are materialized under `${STACK_DIR}/files/` before deploy.
 const composeSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
+  { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];
