@@ -579,27 +579,15 @@ onMounted(() => {
         />
       </div>
 
+      <!--
+        Always render the populated layout — rows render only when
+        there are credentials, otherwise we drop straight to the flat
+        Connect button. Visual matches the populated Storage / DNS
+        sections (row cards + flat button) rather than carrying a
+        separate centered empty-state container.
+      -->
       <template v-else>
-        <div
-          v-if="registryCredentials.length === 0"
-          class="rounded-lg border p-4"
-        >
-          <div class="flex flex-col items-center gap-3 py-2">
-            <Icon name="lucide:container" class="h-8 w-8 text-muted-foreground" />
-            <span class="text-sm text-muted-foreground">
-              No docker registry credentials saved
-            </span>
-            <!-- Same outline + size=sm "Connect" pattern the other
-                 sections (Source Control, Storage, DNS) use for their
-                 "Add" affordance. -->
-            <Button variant="outline" size="sm" @click="openCreateRegistryDialog">
-              <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
-              Connect
-            </Button>
-          </div>
-        </div>
-
-        <div v-else class="space-y-3">
+        <div class="space-y-3">
           <div
             v-for="c in registryCredentials"
             :key="c.id"
@@ -619,8 +607,7 @@ onMounted(() => {
               delete because their credentials are OAuth-style (no
               user-rotatable secret); registry logins genuinely need
               an edit affordance for password rotation, so we keep
-              both. Both use the same ghost+sm style the others use
-              for their delete button.
+              both. Same ghost+sm style the others use for delete.
             -->
             <div class="flex items-center gap-1">
               <Button
