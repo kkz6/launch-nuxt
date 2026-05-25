@@ -26,5 +26,13 @@ defineProps<Props>()
       v-if="activeSubTab === 'traefik' && server.type === 'docker'"
       :server-id="server.id"
     />
+    <!--
+      Maintenance panel — docker-only. Currently hosts orphaned-compose
+      cleanup; the home for future host-level maintenance actions.
+    -->
+    <ServerDockerOrphanCleanup
+      v-if="activeSubTab === 'maintenance' && server.type === 'docker'"
+      :server-id="server.id"
+    />
   </div>
 </template>

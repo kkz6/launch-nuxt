@@ -72,7 +72,7 @@ watch(sitesRefreshKey, () => {
 // Accepted Advanced sub-tabs across all server types. Per-type filtering
 // (e.g. only docker shows 'traefik', only PHP shows 'backups'/'packages')
 // happens in Navbar.advancedSubTabs — this list is the union.
-const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services", "traefik"];
+const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services", "traefik", "maintenance"];
 
 const allValidTabs = computed(() =>
   getServerTypeRules(server.value?.type).tabs.map((t) => t.value),

@@ -333,6 +333,11 @@ const advancedSubTabs = computed(() => {
   // day-to-day workflow.
   if (isDockerServer.value) {
     tabs.push({ value: "traefik", label: "Traefik", query: "traefik", icon: "simple-icons:traefikproxy" });
+    // Maintenance — orphaned-resource cleanup + future host-level
+    // maintenance actions. Buried under Advanced (not a top-level tab)
+    // because most users will never need it: the label-based teardown
+    // means new compose deletes don't strand containers anymore.
+    tabs.push({ value: "maintenance", label: "Maintenance", query: "maintenance", icon: "lucide:wrench" });
   }
   return tabs;
 });
