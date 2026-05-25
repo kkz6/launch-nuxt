@@ -114,6 +114,19 @@ onMounted(fetchDatabase);
 // button click registers.
 const server = ref<Server | null>(null);
 const isTerminalOpen = useState("serverTerminalOpen", () => false);
+
+// Bound to the navbar's "Connection info" Actions item. The dialog
+// lives here so it can read the already-loaded `database` row
+// without a second fetch.
+const databaseConnectionDialogOpen = useState<boolean>(
+  "databaseConnectionDialogOpen",
+  () => false,
+);
+// Belt-and-braces: ensure the flag is reset on page enter so a stale
+// `true` from a previous visit doesn't pop the dialog immediately.
+onMounted(() => {
+  databaseConnectionDialogOpen.value = false;
+});
 const loadServer = async () => {
   try {
     const res = await $api<{ data: Server }>(`/servers/${serverId.value}`);
@@ -215,6 +228,19 @@ const statusBadge = computed(() => {
       :is-open="isTerminalOpen"
       :container="db?.container_name || ''"
       @close="isTerminalOpen = false"
+    />
+
+    <!--
+      Connection info dialog — triggered from the navbar's Actions
+      dropdown via the shared `databaseConnectionDialogOpen` flag.
+      Mounted here so it has access to the already-loaded `db` row.
+      Only renders when the database is loaded to avoid handing
+      `null` into the dialog's props.
+    -->
+    <DatabaseConnectionDialog
+      v-if="db"
+      v-model:open="databaseConnectionDialogOpen"
+      :database="db"
     />
   </div>
 </template>
