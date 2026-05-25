@@ -328,7 +328,16 @@ const exposeDirty = computed(() => {
 
 <template>
   <Dialog v-model:open="open">
-    <DialogContent class="sm:max-w-2xl">
+    <!--
+      `dialog-smooth-resize` (defined in <style> below) opts the
+      content into smooth height changes — when the URL wraps to a
+      second line after Reveal, or the Public Access port row
+      animates in, the dialog grows on a 200ms ease-out curve
+      instead of snapping. Uses `interpolate-size: allow-keywords`
+      so `height: auto` is transitionable on modern Chromium /
+      Firefox; older browsers fall back to the previous snap.
+    -->
+    <DialogContent class="dialog-smooth-resize sm:max-w-2xl">
       <DialogHeader>
         <DialogTitle>Connection</DialogTitle>
         <DialogDescription>
@@ -426,15 +435,13 @@ const exposeDirty = computed(() => {
             </div>
           </div>
           <!--
-            truncate (not overflow-x-auto) so a longer revealed URL
-            doesn't pop a horizontal scrollbar that adds ~16px of
-            vertical chrome and jolts the dialog height. The Copy
-            button still grabs the full URL — visible characters are
-            for orientation, not full reading.
+            URL can wrap when the revealed password is long enough
+            that the whole string doesn't fit on one line. Dialog
+            grows to accommodate — see the transition wrapper on
+            DialogContent below for the smooth resize.
           -->
           <code
-            class="block w-full truncate rounded bg-muted/60 px-2 py-1.5 font-mono text-xs transition-colors duration-150"
-            :title="activeConnectionURL"
+            class="block w-full whitespace-pre-wrap break-all rounded bg-muted/60 px-2 py-1.5 font-mono text-xs"
           >{{ activeConnectionURL }}</code>
         </div>
 
@@ -605,3 +612,24 @@ const exposeDirty = computed(() => {
     </DialogContent>
   </Dialog>
 </template>
+
+<style scoped>
+/*
+ * Smooth height transitions on the dialog content. CSS can't
+ * natively interpolate to/from `height: auto` — `interpolate-size:
+ * allow-keywords` (Chrome 129+ / Firefox 130+) opts in. Browsers
+ * without support fall back to the existing snap behaviour.
+ *
+ * Targets the [data-reka-dialog-content] selector reka-ui stamps on
+ * the rendered DialogContent root. We use :deep because that
+ * element sits outside this component's scope.
+ *
+ * 200ms feels right — long enough to read as motion, short enough
+ * that clicking Reveal a second time doesn't lag.
+ */
+:deep([data-reka-dialog-content].dialog-smooth-resize),
+:deep([data-reka-dialog-content]).dialog-smooth-resize {
+  interpolate-size: allow-keywords;
+  transition: height 200ms ease-out, min-height 200ms ease-out;
+}
+</style>
