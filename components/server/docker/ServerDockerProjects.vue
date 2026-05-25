@@ -2,7 +2,6 @@
 import { toast } from "vue-sonner";
 import type { Server } from "~/types";
 import { dockerService, type DockerProject } from "~/services/dockerService";
-import ServerDockerOrphanCleanup from "~/components/server/docker/ServerDockerOrphanCleanup.vue";
 
 interface Props {
   server: Server;
@@ -171,16 +170,9 @@ onMounted(fetchProjects);
     </div>
 
     <!-- The create dialog lives in ServerDockerCreateProject (mounted
-         from the navbar), so nothing more here. -->
-
-    <!--
-      Orphan cleanup — renders BELOW the project list (never visible in
-      the Containers tab). For compose stacks deleted before the label-
-      based teardown fix was shipped, the containers can still be running
-      on the host. This card re-queues the same cleanup job, driven by
-      the compose project name alone.
-    -->
-    <ServerDockerOrphanCleanup :server-id="server.id" />
+         from the navbar), so nothing more here. The orphan-cleanup
+         action is intentionally NOT here — it lives under Advanced →
+         Maintenance so the Projects tab stays focused on browsing. -->
   </div>
 </template>
 
