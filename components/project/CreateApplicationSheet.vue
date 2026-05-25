@@ -653,15 +653,21 @@ const submit = async () => {
           </div>
         </div>
 
-        <!-- Dockerfile source -->
+        <!-- Dockerfile source. Uses SharedCodeEditor for syntax
+             highlighting + line numbers — same path the Traefik
+             editor + compose YAML viewer use. Falls back to a plain
+             textarea look-and-feel with monospaced font + dark
+             editor chrome; no language pack for Dockerfile so we
+             use the `shell` mode (closest match — Dockerfile syntax
+             is bash-flavored for RUN/CMD lines). -->
         <div v-else class="space-y-2">
           <Label for="app-dockerfile">Dockerfile contents</Label>
-          <Textarea
-            id="app-dockerfile"
+          <SharedCodeEditor
             v-model="dockerfileContents"
-            rows="10"
-            class="font-mono text-xs"
-            placeholder="FROM alpine:3.20&#10;CMD [\&quot;echo\&quot;, \&quot;hello\&quot;]"
+            language="shell"
+            class="h-72 rounded-md border"
+            :line-numbers="true"
+            placeholder="FROM alpine:3.20&#10;CMD [&quot;echo&quot;, &quot;hello&quot;]"
           />
           <p class="text-xs text-muted-foreground">
             The Dockerfile is stored as-is; deploying re-uses it
