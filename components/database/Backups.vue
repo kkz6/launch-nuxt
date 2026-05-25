@@ -55,9 +55,34 @@ const deleting = ref(false);
 // Dialog + sheet open flags ----------------------------------------
 const dialogOpen = ref(false);
 const historySheetOpen = ref(false);
+// Restore-from-snapshot dialog state. Held here (rather than inside
+// the dialog component) so the history sheet's per-row Restore button
+// can both open it AND tell it which run to operate on. Reset when
+// closed so a stale `restoreRun` value doesn't leak between opens.
+const restoreDialogOpen = ref(false);
+const restoreRun = ref<DockerDatabaseBackupRun | null>(null);
+const openRestoreDialog = (run: DockerDatabaseBackupRun) => {
+  restoreRun.value = run;
+  restoreDialogOpen.value = true;
+};
+watch(restoreDialogOpen, (isOpen) => {
+  if (!isOpen) {
+    // Don't clear restoreRun synchronously — the dialog's close
+    // transition still needs the data to render its body. nextTick
+    // is enough to wait out the unmount.
+    nextTick(() => {
+      restoreRun.value = null;
+    });
+  }
+});
 
 // Form state — seeded when dialog opens, discarded on cancel -------
 const storageProviderId = ref<number | null>(null);
+// Optional in-engine database override. Empty string means "use the
+// database the row was provisioned with" — that's the historical
+// behaviour and what we want for backwards-compat with existing
+// configs created before this field existed.
+const databaseName = ref("");
 const path = ref("");
 const retention = ref<number>(10);
 const cronSchedule = ref("0 3 * * *");
@@ -120,6 +145,7 @@ onMounted(load);
 const openDialog = () => {
   if (backup.value) {
     storageProviderId.value = backup.value.storage_provider_id;
+    databaseName.value = backup.value.database_name ?? "";
     path.value = backup.value.path ?? "";
     retention.value = backup.value.retention ?? 10;
     cronSchedule.value = backup.value.cron_schedule ?? "0 3 * * *";
@@ -128,6 +154,7 @@ const openDialog = () => {
     enabled.value = backup.value.enabled;
   } else {
     storageProviderId.value = providers.value[0]?.id ?? null;
+    databaseName.value = "";
     path.value = "";
     retention.value = 10;
     cronSchedule.value = "0 3 * * *";
@@ -151,6 +178,11 @@ const saveConfig = async () => {
       props.database.id,
       {
         storage_provider_id: storageProviderId.value,
+        // Send undefined for blank input so the backend treats it as
+        // "clear the override" rather than persisting an empty string.
+        // The backend also normalises whitespace-only values to nil,
+        // belt-and-braces.
+        database_name: databaseName.value.trim() || undefined,
         path: path.value.trim() || undefined,
         retention: retention.value,
         notify_on_success: notifyOnSuccess.value,
@@ -418,6 +450,23 @@ const currentProviderLabel = computed(() => {
         <dl class="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-[140px_1fr]">
           <dt class="text-muted-foreground">Storage provider</dt>
           <dd class="font-medium">{{ currentProviderLabel }}</dd>
+          <!--
+            Effective target database — what the dump command actually
+            runs against. Falls back to the row's name when no override
+            is set (matches what the backend computes via
+            EffectiveDatabaseName). Shown so the user can verify their
+            backup targets the right DB without opening the dialog.
+          -->
+          <dt class="text-muted-foreground">Database</dt>
+          <dd class="break-all font-mono text-[11px]">
+            {{ backup!.database_name || props.database.name }}
+            <span
+              v-if="!backup!.database_name"
+              class="ml-1 text-muted-foreground"
+            >
+              (default)
+            </span>
+          </dd>
           <dt class="text-muted-foreground">Path</dt>
           <dd class="break-all font-mono text-[11px]">
             {{ backup!.path || "(bucket root)" }}
@@ -498,6 +547,42 @@ const currentProviderLabel = computed(() => {
             <p class="text-[11px] text-muted-foreground">
               S3 / R2 / B2 / MinIO connections from
               <strong>Settings → Connections</strong>.
+            </p>
+          </div>
+
+          <!--
+            Database name — optional override. By default a docker DB
+            row tracks ONE logical database inside the engine (the one
+            provisioned when the row was created), and the dump
+            command targets it via `pg_dump <db>` / `mysqldump <db>`.
+            If the user manually created extra databases inside the
+            engine, this field lets them point the backup at one of
+            those instead. Empty = today's behaviour.
+
+            Note for Mongo / Redis: the dump commands don't currently
+            scope by database name (Mongo dumps everything via
+            --archive; Redis dumps the whole RDB), so the override is
+            effectively a no-op for those engines. We still allow it
+            so the row is consistent across engines.
+          -->
+          <div class="space-y-1">
+            <Label for="bk-dbname" class="text-xs">
+              Database Name
+              <span class="text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="bk-dbname"
+              v-model="databaseName"
+              class="h-9 font-mono text-sm"
+              :placeholder="props.database.name"
+              autocomplete="off"
+            />
+            <p class="text-[11px] text-muted-foreground">
+              Which database inside the engine to back up. Leave empty
+              to back up the database created with this row
+              (<span class="font-mono">{{ props.database.name }}</span>).
+              Set this if you've manually created additional databases
+              on the engine and want to target one of them instead.
             </p>
           </div>
 
@@ -695,10 +780,49 @@ const currentProviderLabel = computed(() => {
               >
                 {{ r.error }}
               </div>
+
+              <!--
+                Restore action — only rendered for successful runs
+                with an object_key (failed / running rows aren't
+                restorable, and a row missing its object_key is a
+                bug to investigate, not a snapshot to replay).
+                Sits at the bottom of the row card so users see the
+                pill / time / size context FIRST and only reach
+                "Restore" after they've identified the right run.
+              -->
+              <div
+                v-if="r.status === 'success' && r.object_key"
+                class="flex justify-end pt-1"
+              >
+                <Button
+                  size="sm"
+                  variant="outline"
+                  class="h-7 px-2 text-[11px]"
+                  @click="openRestoreDialog(r)"
+                >
+                  <Icon name="lucide:rotate-ccw" class="mr-1.5 h-3 w-3" />
+                  Restore
+                </Button>
+              </div>
             </div>
           </div>
         </ScrollArea>
       </SheetContent>
     </Sheet>
+
+    <!--
+      Restore-from-snapshot dialog. Mounted at the page level (rather
+      than inside the Sheet) so its z-index isn't trapped under the
+      Sheet's portal — Sheet → Dialog stacking gets messy fast in
+      reka-ui. The dialog reads `restoreRun` to decide which snapshot
+      it's operating on; setting it to null on close (via watch above)
+      keeps the dialog body from rendering stale data after the
+      transition completes.
+    -->
+    <DatabaseRestoreBackupDialog
+      v-model:open="restoreDialogOpen"
+      :source-database="props.database"
+      :run="restoreRun"
+    />
   </div>
 </template>

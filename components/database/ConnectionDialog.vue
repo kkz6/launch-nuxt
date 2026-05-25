@@ -43,7 +43,11 @@ const showPassword = ref(false);
 
 const reveal = async () => {
   if (revealed.value) {
-    showPassword.value = !showPassword.value;
+    // Show ↔ Hide. Mask change re-flows the URL line wrap and the
+    // password row — wrap so the dialog grows / shrinks smoothly.
+    await withSmoothResize(() => {
+      showPassword.value = !showPassword.value;
+    });
     return;
   }
   isRevealing.value = true;
@@ -54,8 +58,13 @@ const reveal = async () => {
       props.database.id,
       { reveal: true },
     );
-    revealed.value = res.data;
-    showPassword.value = true;
+    // First reveal — biggest size change of all (placeholder dots
+    // are short, real password can wrap the URL). Wrap so the
+    // dialog animates open instead of snapping.
+    await withSmoothResize(() => {
+      revealed.value = res.data;
+      showPassword.value = true;
+    });
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to load credentials");
@@ -184,6 +193,16 @@ const hasExternal = computed(() => Boolean(props.database.external_port));
 type ConnectionMode = "internal" | "external";
 const connectionMode = ref<ConnectionMode>("internal");
 
+// Switching modes can change the URL length (server IP usually
+// shorter than container DNS, or vice versa) so wrap the change
+// through the smooth-resize helper for consistency with Reveal.
+const setConnectionMode = (mode: ConnectionMode) => {
+  if (mode === connectionMode.value) return;
+  void withSmoothResize(() => {
+    connectionMode.value = mode;
+  });
+};
+
 const activeHost = computed(() =>
   connectionMode.value === "external"
     ? externalHost.value
@@ -276,10 +295,15 @@ watch(
 );
 
 const onExposeToggle = (next: boolean) => {
-  exposeEnabled.value = next;
-  if (next && !exposePort.value) {
-    exposePort.value = defaultExposePort.value;
-  }
+  // Toggling on shows the port input + Save row; toggling off may
+  // remove them (only if the toggle isn't dirty). Either way the
+  // dialog's body height changes — animate through it.
+  void withSmoothResize(() => {
+    exposeEnabled.value = next;
+    if (next && !exposePort.value) {
+      exposePort.value = defaultExposePort.value;
+    }
+  });
 };
 
 const saveExpose = async () => {
@@ -324,18 +348,98 @@ const exposeDirty = computed(() => {
   if (exposeEnabled.value && exposePort.value !== wasPort) return true;
   return false;
 });
+
+// --- Smooth height transitions on the dialog --------------------
+//
+// History on this: the pure-CSS path (`interpolate-size:
+// allow-keywords`) only landed in Chrome/Firefox 129+ and Safari
+// hasn't shipped it. A previous attempt used a ResizeObserver +
+// Web Animations API as a reactive after-the-fact animator, but in
+// practice the animation either didn't fire (selector mismatch with
+// reka-ui's stamped attributes) or fought with `overflow-auto` so
+// the new-size content peeked out during the animation.
+//
+// New plan — FLIP technique:
+//   First (capture old height) → Last (let DOM update) →
+//   Invert (snap back via inline style) → Play (transition to new).
+//
+// We expose a `withSmoothResize` helper that takes the state change
+// as a thunk, runs it, then animates from the measured before-height
+// to the measured after-height. Every UI knob that changes the
+// dialog body's size routes through this helper (Reveal toggle,
+// connection-mode switch, expose toggle), so the dialog grows /
+// shrinks on a 200ms curve regardless of which control fired.
+const SMOOTH_RESIZE_SELECTOR = ".dialog-smooth-resize";
+
+async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
+  const el = document.querySelector(
+    SMOOTH_RESIZE_SELECTOR,
+  ) as HTMLElement | null;
+  if (!el) return await fn();
+
+  // 1. Capture before height + pin it inline so the browser can't
+  //    paint a frame at the natural new size while Vue is patching.
+  //    overflow:hidden keeps the new (larger) content from peeking
+  //    out beyond the pinned box during measurement.
+  const fromH = el.offsetHeight;
+  el.style.height = `${fromH}px`;
+  el.style.overflow = "hidden";
+
+  // 2. Run the state change. Vue queues a re-render.
+  const result = await fn();
+
+  // 3. Wait for Vue's DOM patch.
+  await nextTick();
+
+  // 4. Briefly release the pin to measure natural height, then
+  //    re-pin so the browser doesn't paint at the new size yet.
+  el.style.height = "";
+  const toH = el.offsetHeight;
+  el.style.height = `${fromH}px`;
+
+  if (Math.abs(toH - fromH) < 2) {
+    el.style.height = "";
+    el.style.overflow = "";
+    return result;
+  }
+
+  // 5. Cancel any in-flight resize animation (so quick double-clicks
+  //    on Reveal/Hide don't stack), then animate via WAAPI.
+  el.getAnimations().forEach((a) => a.cancel());
+  const anim = el.animate(
+    [{ height: `${fromH}px` }, { height: `${toH}px` }],
+    { duration: 200, easing: "ease-out", fill: "forwards" },
+  );
+  // Restore natural sizing once the animation settles. `fill: forwards`
+  // keeps the end height applied during the fill phase — calling
+  // `cancel()` after finish drops that hold so future external
+  // content changes (e.g. WS refresh) can resize the dialog freely.
+  const cleanup = () => {
+    el.style.height = "";
+    el.style.overflow = "";
+    try {
+      anim.cancel();
+    } catch {
+      /* already cancelled */
+    }
+  };
+  anim.addEventListener("finish", cleanup, { once: true });
+  anim.addEventListener("cancel", cleanup, { once: true });
+
+  return result;
+}
 </script>
 
 <template>
   <Dialog v-model:open="open">
     <!--
-      `dialog-smooth-resize` (defined in <style> below) opts the
-      content into smooth height changes — when the URL wraps to a
-      second line after Reveal, or the Public Access port row
-      animates in, the dialog grows on a 200ms ease-out curve
-      instead of snapping. Uses `interpolate-size: allow-keywords`
-      so `height: auto` is transitionable on modern Chromium /
-      Firefox; older browsers fall back to the previous snap.
+      `dialog-smooth-resize` is a marker class — the script-side
+      ResizeObserver finds the dialog by this selector in the portal,
+      watches its size, and animates from the previous height to the
+      new height via the Web Animations API on every change (Reveal
+      expanding, URL wrapping, port row sliding in). 200ms ease-out.
+      No CSS transition here — the JS path runs everywhere including
+      Safari, which doesn't yet ship `interpolate-size`.
     -->
     <DialogContent class="dialog-smooth-resize sm:max-w-2xl">
       <DialogHeader>
@@ -364,7 +468,7 @@ const exposeDirty = computed(() => {
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground'
             "
-            @click="connectionMode = 'internal'"
+            @click="setConnectionMode('internal')"
           >
             <Icon name="lucide:network" class="mr-1.5 inline h-3.5 w-3.5" />
             Internal
@@ -383,7 +487,7 @@ const exposeDirty = computed(() => {
                 ? undefined
                 : 'No external port — enable it from the Advanced tab'
             "
-            @click="hasExternal && (connectionMode = 'external')"
+            @click="hasExternal && setConnectionMode('external')"
           >
             <Icon name="lucide:globe" class="mr-1.5 inline h-3.5 w-3.5" />
             External
@@ -613,23 +717,3 @@ const exposeDirty = computed(() => {
   </Dialog>
 </template>
 
-<style scoped>
-/*
- * Smooth height transitions on the dialog content. CSS can't
- * natively interpolate to/from `height: auto` — `interpolate-size:
- * allow-keywords` (Chrome 129+ / Firefox 130+) opts in. Browsers
- * without support fall back to the existing snap behaviour.
- *
- * Targets the [data-reka-dialog-content] selector reka-ui stamps on
- * the rendered DialogContent root. We use :deep because that
- * element sits outside this component's scope.
- *
- * 200ms feels right — long enough to read as motion, short enough
- * that clicking Reveal a second time doesn't lag.
- */
-:deep([data-reka-dialog-content].dialog-smooth-resize),
-:deep([data-reka-dialog-content]).dialog-smooth-resize {
-  interpolate-size: allow-keywords;
-  transition: height 200ms ease-out, min-height 200ms ease-out;
-}
-</style>
