@@ -518,6 +518,23 @@ const workloadParentTab = computed(() => {
 // arrays so a refactor here keeps the navbar + page in sync. The
 // `query` value matches the `?subtab=` URL param the pages already
 // read on mount.
+// Workload subtabs share a canonical order across all three types:
+//
+//   1. General      — overview / identity
+//   2. Deployments  — recent activity (high-frequency; app + compose only)
+//   3. Environment  — runtime config
+//   4. Domains      — public access (app + compose)
+//   5. Redirects    — extends Domains (app only)
+//   6. Volumes      — persistence (app + compose)
+//   7. Schedules    — cron (app only)
+//   8. Backups      — periodic dumps (database only)
+//   9. Logs         — observability (always late so config is in front)
+//   10. Advanced    — settings + danger zone (always last)
+//
+// Each list below is a sparse view of this canonical sequence —
+// keep them in the same relative order whenever a tab is added so
+// the three detail pages don't drift again.
+
 const databaseSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
   { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
@@ -531,9 +548,9 @@ const applicationSubTabs = [
   { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
   { value: "domains", label: "Domains", query: "domains", icon: "lucide:globe" },
   { value: "redirects", label: "Redirects", query: "redirects", icon: "lucide:corner-up-right" },
-  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
   { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
   { value: "schedules", label: "Schedulers", query: "schedules", icon: "lucide:clock" },
+  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];
 // Compose subtabs mirror the application tabs where they make sense
@@ -548,6 +565,9 @@ const applicationSubTabs = [
 // the YAML — the same surface as applications, but bind/volume rows
 // are tracking-only (operator wires them into YAML) and file rows
 // are materialized under `${STACK_DIR}/files/` before deploy.
+// Already in the canonical order (see top-of-file comment). Compose
+// skips Redirects (per-service / lives in YAML), Schedules (per-
+// container, needs a service selector) and Backups (database only).
 const composeSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
