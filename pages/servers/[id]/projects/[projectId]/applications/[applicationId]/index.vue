@@ -21,15 +21,18 @@ const applicationId = computed(() => route.params.applicationId as string);
 const app = ref<DockerApplication | null>(null);
 const isLoading = ref(true);
 
+// Canonical order — must match the same sequence in
+// components/layout/Navbar.vue applicationSubTabs. See that file's
+// top-of-file comment for the canonical workload tab ordering.
 const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", icon: "lucide:key" },
   { value: "domains", label: "Domains", icon: "lucide:globe" },
   { value: "redirects", label: "Redirects", icon: "lucide:corner-up-right" },
-  { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
   { value: "schedules", label: "Schedules", icon: "lucide:clock" },
+  { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
 ] as const;
 type SubTabId = (typeof SUBTABS)[number]["value"];
