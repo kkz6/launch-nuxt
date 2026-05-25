@@ -425,8 +425,16 @@ const exposeDirty = computed(() => {
               </button>
             </div>
           </div>
+          <!--
+            truncate (not overflow-x-auto) so a longer revealed URL
+            doesn't pop a horizontal scrollbar that adds ~16px of
+            vertical chrome and jolts the dialog height. The Copy
+            button still grabs the full URL — visible characters are
+            for orientation, not full reading.
+          -->
           <code
-            class="block w-full overflow-x-auto rounded bg-muted/60 px-2 py-1.5 font-mono text-xs"
+            class="block w-full truncate rounded bg-muted/60 px-2 py-1.5 font-mono text-xs transition-colors duration-150"
+            :title="activeConnectionURL"
           >{{ activeConnectionURL }}</code>
         </div>
 
