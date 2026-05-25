@@ -117,13 +117,43 @@ const confirmationDialog = ref<
 >(null);
 
 // Local edit state — only used for inline value edits. Keyed by row
-// id so a Cancel on one row doesn't disturb others.
-const editing = ref<Record<string, { value: string }>>({});
+// id so a Cancel on one row doesn't disturb others. Carries both the
+// value-in-progress AND the working `is_secret` flag so the user can
+// flip the mask-by-default toggle as part of the same Save.
+const editing = ref<
+  Record<string, { value: string; isSecret: boolean }>
+>({});
+
+// Client-side reveal state. Lets the user see a secret value
+// temporarily WITHOUT changing the persistent `is_secret` flag on
+// the row. Previously the only way to see a secret was to flip
+// is_secret off — which was both noisy (other team members saw the
+// row un-mask permanently) and confusing (the eye icon called
+// `onUpdate({ is_secret: false })` even though it looked like a
+// view-only toggle).
+//
+// Reset implicitly by being keyed on row id — if a row is deleted or
+// its id changes, the stale entry becomes inert. We don't proactively
+// prune to keep this simple.
+const revealed = ref<Record<string, boolean>>({});
+
+const toggleReveal = (v: EnvVarRow) => {
+  revealed.value = {
+    ...revealed.value,
+    [v.id]: !revealed.value[v.id],
+  };
+};
 
 const startEdit = (v: EnvVarRow) => {
   // Don't pre-fill the masked value into the edit box for secret
-  // rows. Empty box = user must explicitly type.
-  editing.value[v.id] = { value: v.is_secret ? "" : v.value };
+  // rows that haven't been revealed. For revealed secrets (user
+  // already proved they can see it) and plain rows, pre-fill so
+  // they can tweak without retyping the whole thing.
+  const prefill = v.is_secret && !revealed.value[v.id] ? "" : v.value;
+  editing.value[v.id] = {
+    value: prefill,
+    isSecret: v.is_secret,
+  };
   // Focus the input once the v-if branch swaps in the DOM. Lets the
   // user start typing immediately and adds an Esc-to-cancel handler
   // via the input's keyboard binding below.
@@ -138,15 +168,53 @@ const cancelEdit = (id: string) => {
 const saveEdit = async (v: EnvVarRow) => {
   const next = editing.value[v.id];
   if (!next) return;
+  // Build the patch lazily so we only send fields that ACTUALLY
+  // changed. Keeps the API audit log clean and avoids overwriting a
+  // value with an empty string on a "I just want to flip the secret
+  // flag" save — we treat blank input as "no value change" when the
+  // row is secret + un-revealed (the user couldn't see it anyway).
+  const patch: UpdatePatch = {};
+  const userTypedValue = next.value !== "" || (!v.is_secret || !!revealed.value[v.id]);
+  if (userTypedValue && next.value !== v.value) {
+    patch.value = next.value;
+  }
+  if (next.isSecret !== v.is_secret) {
+    patch.is_secret = next.isSecret;
+  }
+  if (Object.keys(patch).length === 0) {
+    // Nothing to save — just close the editor.
+    cancelEdit(v.id);
+    return;
+  }
   try {
-    const updated = await props.onUpdate(v.id, { value: next.value });
+    const updated = await props.onUpdate(v.id, patch);
     syncRow(updated);
+    // If the user flipped the row to non-secret as part of the save,
+    // clear any stale reveal-state for it. Mostly cosmetic — the
+    // template hides the eye when !is_secret anyway.
+    if (!updated.is_secret) {
+      delete revealed.value[v.id];
+      revealed.value = { ...revealed.value };
+    }
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to update env var");
     return;
   }
   cancelEdit(v.id);
+};
+
+const copyValue = async (v: EnvVarRow) => {
+  if (!v.value) {
+    toast.error("Nothing to copy");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(v.value);
+    toast.success(`${v.key} copied`);
+  } catch {
+    toast.error("Clipboard write failed");
+  }
 };
 
 const addVar = async () => {
@@ -175,13 +243,23 @@ const addVar = async () => {
   }
 };
 
+// Persistent is_secret toggle. Fires on chip click (the "secret" /
+// "not secret" badge next to the key) and on edit-form checkbox
+// changes — NOT on the row-action eye, which is now a client-side
+// reveal toggle. Splitting reveal (view-only) from is_secret (DB
+// state) was the core fix for the "marking secret still shows the
+// value" bug: previously the eye was conflated with is_secret, so
+// a user toggling visibility was unknowingly mutating server state.
 const toggleSecret = async (v: EnvVarRow) => {
   try {
     const updated = await props.onUpdate(v.id, { is_secret: !v.is_secret });
     syncRow(updated);
-    // Confirm the change so the user knows the silent toggle actually
-    // wrote to the server. Without this the row just visually flips
-    // and it's not clear whether the click landed.
+    // If we just MARKED a row secret, drop any stale reveal entry so
+    // the value is actually hidden on the next render.
+    if (updated.is_secret) {
+      delete revealed.value[v.id];
+      revealed.value = { ...revealed.value };
+    }
     toast.success(
       updated.is_secret
         ? `${v.key} is now masked`
@@ -530,111 +608,206 @@ const sortVars = (vars: EnvVarRow[]) =>
       "
     />
 
-    <div v-else class="overflow-hidden rounded-lg border">
-      <table class="w-full text-sm">
-        <thead
-          class="bg-muted/50 text-left text-[10px] uppercase tracking-wide text-muted-foreground"
-        >
-          <tr>
-            <th class="px-4 py-2">Key</th>
-            <th class="px-4 py-2">Value</th>
-            <th class="w-32 px-4 py-2" />
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="v in vars" :key="v.id" class="border-t">
-            <td class="px-4 py-2 align-top font-mono text-xs">
-              {{ v.key }}
-              <span
-                v-if="v.is_secret"
-                class="ml-2 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
-              >
-                secret
-              </span>
-            </td>
-            <td class="px-4 py-2 align-top">
-              <!--
-                Inline edit: constrain the input width so an edit on
-                a wide screen doesn't sprawl across the whole row.
-                max-w-md is roughly what a typical env value needs;
-                long values still wrap when displayed in read mode.
-              -->
-              <div v-if="editing[v.id]" class="flex max-w-md items-center gap-2">
-                <Input
-                  :id="`env-edit-${v.id}`"
-                  v-model="editing[v.id].value"
-                  :type="v.is_secret ? 'password' : 'text'"
-                  class="h-8 flex-1 font-mono text-xs"
-                  autocomplete="off"
-                  spellcheck="false"
-                  @keyup.enter="saveEdit(v)"
-                  @keyup.esc="cancelEdit(v.id)"
-                />
-                <Button size="sm" @click="saveEdit(v)">Save</Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  @click="cancelEdit(v.id)"
-                >
-                  Cancel
-                </Button>
-              </div>
-              <!--
-                Read mode: hover-only edit-pencil so the button looks
-                like a real interactive thing instead of plain text.
-                rounded box on hover gives a subtle hit indicator.
-              -->
-              <button
-                v-else
-                :title="v.is_secret ? 'Click to replace (secret)' : 'Click to edit'"
-                class="group/value -mx-2 flex w-full max-w-full items-center gap-2 rounded px-2 py-1 text-left transition-colors hover:bg-muted"
-                @click="startEdit(v)"
-              >
-                <span class="truncate font-mono text-xs text-muted-foreground group-hover/value:text-foreground">
-                  {{ v.value || "(empty)" }}
-                </span>
-                <Icon
-                  name="lucide:pencil"
-                  class="ml-auto h-3 w-3 shrink-0 text-muted-foreground/0 transition-opacity group-hover/value:text-muted-foreground"
-                />
-              </button>
-            </td>
-            <td class="w-24 px-2 py-2 text-right align-top">
-              <!--
-                Row actions hidden while the row is being edited —
-                otherwise eye / trash sit next to Save / Cancel and
-                the user can't tell which set governs the inline
-                input. group-hover keeps the buttons subtle when
-                idle; tooltips spell out the state-specific verb.
-              -->
-              <div v-if="!editing[v.id]" class="flex justify-end gap-0.5">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  :title="v.is_secret ? 'Stop masking this value' : 'Mask this value'"
-                  :aria-label="v.is_secret ? 'Stop masking' : 'Mask value'"
-                  @click="toggleSecret(v)"
-                >
-                  <Icon
-                    :name="v.is_secret ? 'lucide:eye-off' : 'lucide:eye'"
-                    class="h-3.5 w-3.5"
-                  />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  title="Remove env var"
-                  aria-label="Remove env var"
-                  class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                  @click="removeVar(v)"
-                >
-                  <Icon name="lucide:trash-2" class="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <!--
+      Rows render as CSS-grid containers (NOT a <table>) so column
+      widths stay LOCKED regardless of whether a row is in read or
+      edit mode. The old <table> implementation let the value cell
+      absorb Save/Cancel buttons in edit mode, which shifted the
+      adjacent actions cell to an empty 96px stripe — the visible
+      "alignment issue" the user reported.
+
+      Three tracks:
+        [key | value | actions]
+         220px  1fr   168px
+
+      Same widths in read AND edit modes; only what FILLS each
+      track changes.
+    -->
+    <div class="overflow-hidden rounded-lg border">
+      <!-- Header row uses the same grid so column boundaries line up
+           with the data rows below regardless of zoom or font scale. -->
+      <div
+        class="grid grid-cols-[220px_1fr_168px] gap-2 border-b bg-muted/50 px-4 py-2 text-[10px] uppercase tracking-wide text-muted-foreground"
+      >
+        <div>Key</div>
+        <div>Value</div>
+        <div class="text-right">Actions</div>
+      </div>
+
+      <div
+        v-for="v in vars"
+        :key="v.id"
+        class="grid grid-cols-[220px_1fr_168px] items-center gap-2 border-b px-4 py-2 last:border-b-0"
+      >
+        <!-- KEY column. Truncates long keys with overflow-hidden +
+             title so the row never widens past 220px. The secret
+             chip is a small click-target: clicking it flips
+             is_secret on the server. Mouse hint says so. -->
+        <div class="flex min-w-0 items-center gap-1.5">
+          <code
+            class="truncate font-mono text-xs"
+            :title="v.key"
+          >
+            {{ v.key }}
+          </code>
+          <button
+            type="button"
+            class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-colors"
+            :class="
+              v.is_secret
+                ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400'
+                : 'bg-muted text-muted-foreground hover:bg-muted/70'
+            "
+            :title="
+              v.is_secret
+                ? 'Click to stop masking this value (it will be visible to your team)'
+                : 'Click to mask this value (treat as secret)'
+            "
+            @click="toggleSecret(v)"
+          >
+            {{ v.is_secret ? "secret" : "plain" }}
+          </button>
+        </div>
+
+        <!-- VALUE column. Two branches:
+               - editing[v.id] truthy → Input + (optional) inline
+                 "treat as secret" checkbox below
+               - otherwise         → masked dots OR raw value, with a
+                                     ghost-pencil hover indicator -->
+        <div class="min-w-0">
+          <!-- Edit mode -->
+          <div v-if="editing[v.id]" class="space-y-1.5">
+            <Input
+              :id="`env-edit-${v.id}`"
+              v-model="editing[v.id].value"
+              :type="editing[v.id].isSecret && !revealed[v.id] ? 'password' : 'text'"
+              class="h-9 w-full font-mono text-xs"
+              :placeholder="v.is_secret && !revealed[v.id] ? '(leave blank to keep current)' : ''"
+              autocomplete="off"
+              spellcheck="false"
+              @keyup.enter="saveEdit(v)"
+              @keyup.esc="cancelEdit(v.id)"
+            />
+            <label
+              class="flex w-fit cursor-pointer items-center gap-2 text-[11px] text-muted-foreground"
+            >
+              <input
+                v-model="editing[v.id].isSecret"
+                type="checkbox"
+                class="h-3 w-3 rounded border-input accent-primary"
+              />
+              Treat as secret (mask in list)
+            </label>
+          </div>
+
+          <!-- Read mode -->
+          <button
+            v-else
+            type="button"
+            :title="v.is_secret && !revealed[v.id] ? 'Click to edit (value hidden)' : 'Click to edit'"
+            class="group/value -mx-1 flex w-full max-w-full items-center gap-1.5 rounded px-1 py-1 text-left transition-colors hover:bg-muted/60"
+            @click="startEdit(v)"
+          >
+            <span
+              v-if="v.is_secret && !revealed[v.id]"
+              class="select-none truncate font-mono text-xs tracking-widest text-muted-foreground"
+              aria-label="Value hidden"
+            >
+              ••••••••
+            </span>
+            <span
+              v-else
+              class="truncate font-mono text-xs text-muted-foreground group-hover/value:text-foreground"
+            >
+              {{ v.value || "(empty)" }}
+            </span>
+            <Icon
+              name="lucide:pencil"
+              class="ml-auto h-3 w-3 shrink-0 text-muted-foreground/0 transition-opacity group-hover/value:text-muted-foreground"
+            />
+          </button>
+        </div>
+
+        <!-- ACTIONS column — fixed width, right-aligned. The
+             two-mode swap below preserves column width so the row
+             doesn't jitter when toggling edit. All buttons use
+             `icon-sm` (h-9) so they vertically match the h-9 input
+             in edit mode (fixes the "buttons stick out below the
+             input" alignment regression). -->
+        <div class="flex justify-end gap-0.5">
+          <!-- Edit mode: just Save + Cancel. icon-only keeps the
+               column the same width as the read-mode toolbar. -->
+          <template v-if="editing[v.id]">
+            <Button
+              variant="default"
+              size="icon-sm"
+              title="Save changes"
+              aria-label="Save changes"
+              @click="saveEdit(v)"
+            >
+              <Icon name="lucide:check" class="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="Cancel edit"
+              aria-label="Cancel edit"
+              @click="cancelEdit(v.id)"
+            >
+              <Icon name="lucide:x" class="h-3.5 w-3.5" />
+            </Button>
+          </template>
+
+          <!-- Read mode toolbar: Reveal (secrets only) | Copy | Edit
+               | Delete. Up to 4 icons; for non-secret rows the eye
+               is dropped (no value is hidden). All ghost variant so
+               the row reads calmly when idle. -->
+          <template v-else>
+            <Button
+              v-if="v.is_secret"
+              variant="ghost"
+              size="icon-sm"
+              :title="revealed[v.id] ? 'Hide value' : 'Reveal value'"
+              :aria-label="revealed[v.id] ? 'Hide value' : 'Reveal value'"
+              @click="toggleReveal(v)"
+            >
+              <Icon
+                :name="revealed[v.id] ? 'lucide:eye-off' : 'lucide:eye'"
+                class="h-3.5 w-3.5"
+              />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="Copy value"
+              aria-label="Copy value"
+              :disabled="!v.value"
+              @click="copyValue(v)"
+            >
+              <Icon name="lucide:copy" class="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="Edit"
+              aria-label="Edit"
+              @click="startEdit(v)"
+            >
+              <Icon name="lucide:pencil" class="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="Remove env var"
+              aria-label="Remove env var"
+              class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              @click="removeVar(v)"
+            >
+              <Icon name="lucide:trash-2" class="h-3.5 w-3.5" />
+            </Button>
+          </template>
+        </div>
+      </div>
     </div>
 
     <p class="text-[11px] text-muted-foreground">
