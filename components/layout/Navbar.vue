@@ -1185,6 +1185,18 @@ const openComposeYamlDialog = () => {
   composeYamlDialogOpen.value = true;
 };
 
+// Database "Connection info" dialog — same shared-flag pattern as
+// composeYamlDialogOpen. Navbar item flips the flag; the database
+// detail page mounts the actual dialog (so it has access to the
+// already-loaded database row without a second fetch).
+const databaseConnectionDialogOpen = useState<boolean>(
+  'databaseConnectionDialogOpen',
+  () => false,
+);
+const openDatabaseConnectionDialog = () => {
+  databaseConnectionDialogOpen.value = true;
+};
+
 // Cross-component bus for the project detail tabs' "New X" buttons.
 // Pages bind their create sheets' v-model:open to these flags; the
 // navbar trigger flips the flag, the page reacts. Keeps the navbar
@@ -2009,6 +2021,17 @@ onMounted(fetchTeams);
                     :class="['mr-2 h-4 w-4', workloadActionInFlight === 'restart' && 'animate-spin']"
                   />
                   Restart
+                </DropdownMenuItem>
+                <!--
+                  Connection info — opens the credentials dialog the
+                  database detail page mounts. Same shared-flag bridge
+                  the compose YAML viewer uses, so the dialog has
+                  access to the already-loaded database row.
+                -->
+                <DropdownMenuSeparator />
+                <DropdownMenuItem @select="openDatabaseConnectionDialog">
+                  <Icon name="lucide:link" class="mr-2 h-4 w-4" />
+                  Connection info
                 </DropdownMenuItem>
               </template>
 
