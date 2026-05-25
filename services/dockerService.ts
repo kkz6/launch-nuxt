@@ -745,6 +745,18 @@ export interface DockerDatabaseBackup {
    * Settings → Connections, reuse it across every database backup.
    */
   storage_provider_id: number;
+  /**
+   * Optional override for which database INSIDE the engine the dump
+   * command targets. Empty / null means "use the database the
+   * docker_databases row was provisioned with" (today's behaviour).
+   * Set when the user manually created extra databases on the engine
+   * (e.g. `CREATE DATABASE analytics;` on the same Postgres
+   * container) and wants this backup to point at one of those.
+   * Only Postgres / MySQL / MariaDB consult this field meaningfully —
+   * Mongo dumps everything via `--archive` and Redis dumps the whole
+   * RDB regardless.
+   */
+  database_name?: string | null;
   /** Bucket sub-folder where this database's dumps land. */
   path?: string | null;
   /** Number of past run rows to keep. Older rows are pruned. */
@@ -771,6 +783,13 @@ export interface DockerDatabaseBackupRun {
 
 export interface ConfigureDockerBackupData {
   storage_provider_id: number;
+  /**
+   * Optional database-name override. Leave undefined / empty to back
+   * up the database that was provisioned with the docker_databases
+   * row. See `DockerDatabaseBackup.database_name` for the full
+   * semantics + engine caveats.
+   */
+  database_name?: string;
   path?: string;
   retention: number;
   notify_on_success: boolean;
@@ -1615,6 +1634,38 @@ export const dockerService = {
         { contents },
       );
     },
+
+    /**
+     * Purge orphaned compose resources by project name. Queues the
+     * same label-based RemoveComposeJob used during a normal compose
+     * delete, but works even when the compose DB row is already gone.
+     *
+     * Use case: a compose stack was deleted while the old broken
+     * teardown script was in place, leaving containers running on
+     * the host. The job removes containers, networks, and optionally
+     * volumes carrying the `com.docker.compose.project` label.
+     *
+     * projectName  — the `com.docker.compose.project` label value
+     *                (e.g. "test-testing-compose")
+     * projectSlug  — optional path segment for stack-dir cleanup
+     * composeSlug  — optional path segment for stack-dir + Traefik cleanup
+     * removeVolumes — opt-in to wiping named volumes (default false)
+     */
+    purgeComposeResources: (
+      serverId: string,
+      data: {
+        project_name: string;
+        project_slug?: string;
+        compose_slug?: string;
+        remove_volumes?: boolean;
+      },
+    ) => {
+      const { post } = useApi();
+      return post(
+        `/servers/${serverId}/docker/purge-compose-resources`,
+        data,
+      );
+    },
   },
 
   databases: {
@@ -1629,6 +1680,21 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerDatabase[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/databases`,
+      );
+    },
+
+    /**
+     * List every docker database on a server, across projects. Used
+     * by the backup-restore dialog's "target database" picker — most
+     * "restore prod → staging" workflows put the source and target
+     * in different projects, so a server-level list is the right
+     * scope. Credentials are stripped server-side; the list is just
+     * for picking a target by name + engine.
+     */
+    listForServer: (serverId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDatabase[]>>(
+        `/servers/${serverId}/docker/databases`,
       );
     },
 
@@ -1802,11 +1868,23 @@ export const dockerService = {
       projectId: string,
       databaseId: string,
       runId: string,
+      /**
+       * Optional override — when set, the backup is restored into a
+       * DIFFERENT docker_databases row (must live on the same server
+       * and use the same engine). Useful for "copy prod snapshot to
+       * staging" without a manual dump/import cycle. Omit to restore
+       * into the source database (today's default).
+       */
+      targetDatabaseId?: string,
     ) => {
       const { post } = useApi();
+      const payload: Record<string, unknown> = { run_id: runId };
+      if (targetDatabaseId) {
+        payload.target_database_id = targetDatabaseId;
+      }
       return post<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup/restore`,
-        { run_id: runId },
+        payload,
       );
     },
 
