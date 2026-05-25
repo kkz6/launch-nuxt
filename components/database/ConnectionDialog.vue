@@ -138,12 +138,26 @@ const passwordDisplay = computed(() => {
     : "•".repeat(Math.min(16, revealed.value.credentials.password.length));
 });
 
+// The password slot in the connection URL respects the same
+// reveal+show state as the standalone password field. Three states:
+//
+//   - Not revealed yet → "<password>" literal placeholder. Clear
+//     signal that the URL isn't usable until reveal.
+//   - Revealed but hidden → dot mask. The toggle is now actually
+//     doing something to the URL view; Hide really hides.
+//   - Revealed and shown → real password.
+//
+// Mirrors `passwordDisplay`'s logic so the two fields can never
+// disagree about what state they're in.
+const urlPasswordSlot = computed(() => {
+  if (!revealed.value) return "<password>";
+  if (!showPassword.value) return "•".repeat(8);
+  return rawPassword.value;
+});
+
 const buildConnectionURL = (host: string, port: number) => {
   const u = username.value;
-  // Use the real password when revealed; otherwise emit a clear
-  // placeholder that survives in copy/paste so the user notices
-  // they need to reveal first.
-  const p = rawPassword.value || "<password>";
+  const p = urlPasswordSlot.value;
   const d = databaseName.value;
   switch (props.database.engine) {
     case "postgres":
@@ -180,9 +194,38 @@ const activeConnectionURL = computed(() =>
   buildConnectionURL(activeHost.value, activePort.value),
 );
 
-// Disable Connection-URL copy until reveal so users don't paste a
-// `<password>` placeholder into a config and wonder why their app
-// can't connect.
+// Copy-the-URL builds with the REAL password regardless of whether
+// the password field is currently masked. The toggle controls what's
+// on screen (shoulder-surfing protection); Copy is for "I want to
+// use this URL." Once revealed, the user has already consented to
+// the password being in memory — masking is purely visual.
+//
+// Both branches still gate on `revealed.value` so we don't ship a
+// `<password>` placeholder into the clipboard.
+const copyableConnectionURL = computed(() => {
+  if (!revealed.value) return "";
+  const host = activeHost.value;
+  const port = activePort.value;
+  const u = username.value;
+  const p = rawPassword.value;
+  const d = databaseName.value;
+  switch (props.database.engine) {
+    case "postgres":
+      return `postgres://${u}:${p}@${host}:${port}/${d}`;
+    case "mysql":
+    case "mariadb":
+      return `mysql://${u}:${p}@${host}:${port}/${d}`;
+    case "redis":
+      return `redis://:${p}@${host}:${port}`;
+    case "mongo":
+      return `mongodb://${u}:${p}@${host}:${port}`;
+    default:
+      return "";
+  }
+});
+
+// Copy-Connection-URL stays disabled until reveal so users don't
+// paste a `<password>` placeholder into a config.
 const urlCopyDisabled = computed(() => !revealed.value);
 </script>
 
@@ -278,7 +321,7 @@ const urlCopyDisabled = computed(() => !revealed.value);
                     ? 'Reveal credentials before copying'
                     : 'Copy connection URL'
                 "
-                @click="copyValue('Connection URL', activeConnectionURL)"
+                @click="copyValue('Connection URL', copyableConnectionURL)"
               >
                 <Icon name="lucide:copy" class="h-3.5 w-3.5" />
                 Copy
