@@ -162,6 +162,16 @@ const scrollIfStuckToBottom = () => {
   containerRef.value.scrollTop = containerRef.value.scrollHeight;
 };
 
+// Bound to the "Jump to latest" pill that floats over the terminal
+// body when the user has scrolled up. Snaps to the bottom and the
+// scroll handler will flip isAtBottom back to true so auto-follow
+// re-engages on the next incoming line.
+const jumpToBottom = () => {
+  if (!containerRef.value) return;
+  containerRef.value.scrollTop = containerRef.value.scrollHeight;
+  isAtBottom.value = true;
+};
+
 const onScroll = () => {
   const el = containerRef.value;
   if (!el) return;
@@ -203,67 +213,19 @@ onBeforeUnmount(disconnect);
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-semibold">Logs</h2>
-        <p class="mt-1 text-sm text-muted-foreground">
-          Live container output. Most recent 200 lines on connect, then
-          tails as new lines arrive.
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <!--
-          `header-actions` slot lets callers inject extra controls
-          inline with the Live/Clear/Pause buttons. Compose Logs uses
-          it for the service picker so the page has one header strip
-          instead of two stacked rows (which broke the visual rhythm
-          with the application Logs page). The slot is left of the
-          built-in controls so the picker reads first.
-        -->
-        <slot name="header-actions" />
-        <span
-          class="flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs"
-          :class="
-            wsOpen
-              ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400'
-              : isConnecting
-                ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
-                : 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300'
-          "
-        >
-          <span
-            class="h-1.5 w-1.5 rounded-full"
-            :class="
-              wsOpen
-                ? 'bg-emerald-500'
-                : isConnecting
-                  ? 'bg-amber-500'
-                  : 'bg-zinc-500'
-            "
-          />
-          {{ wsOpen ? "Live" : isConnecting ? "Connecting" : "Disconnected" }}
-        </span>
-        <Button
-          variant="outline"
-          size="sm"
-          :disabled="lines.length === 0"
-          @click="clearBuffer"
-        >
-          <Icon name="lucide:eraser" class="mr-2 h-4 w-4" />
-          Clear
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          @click="isPaused = !isPaused"
-        >
-          <Icon
-            :name="isPaused ? 'lucide:play' : 'lucide:pause'"
-            class="mr-2 h-4 w-4"
-          />
-          {{ isPaused ? "Resume" : "Pause" }}
-        </Button>
-      </div>
+    <!--
+      Page header is now just the title + subtitle (no buttons /
+      pickers). Both stream controls (pause / clear) AND any caller-
+      injected controls (compose service picker) live inside the
+      terminal chrome bar at the top of the log block — keeps one
+      visual strip instead of two.
+    -->
+    <div>
+      <h2 class="text-xl font-semibold">Logs</h2>
+      <p class="mt-1 text-sm text-muted-foreground">
+        Live container output. Most recent 200 lines on connect, then
+        tails as new lines arrive.
+      </p>
     </div>
 
     <div
@@ -280,27 +242,134 @@ onBeforeUnmount(disconnect);
       </p>
     </div>
 
+    <!--
+      Terminal-style block with two layers:
+        1. Chrome bar (zinc-900) — macOS-style traffic-light dots on
+           the left for visual familiarity, connection indicator
+           middle, stream controls (pause + clear) icon-only on the
+           right. Icons are subtler than buttons + match the dark
+           chrome aesthetic.
+        2. Body (zinc-950) — unchanged from before; the actual log
+           output lives here.
+    -->
     <div
       v-else
-      ref="containerRef"
-      class="h-[60vh] overflow-auto rounded-lg border bg-zinc-950 p-3 font-mono text-xs leading-relaxed text-zinc-100"
-      @scroll="onScroll"
+      class="relative overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950 shadow-sm"
     >
-      <div v-if="lines.length === 0" class="py-8 text-center text-zinc-500">
-        <Icon
-          v-if="isConnecting || wsOpen"
-          name="lucide:loader-2"
-          class="h-5 w-5 animate-spin"
-        />
-        <span v-else>No log lines yet.</span>
-      </div>
+      <!--
+        Chrome bar — slimmer (py-1.5) without the traffic-light dots.
+        Just the connection indicator on the left + pause/clear icons
+        on the right.
+      -->
       <div
-        v-for="(line, idx) in lines"
-        :key="idx"
-        class="whitespace-pre-wrap break-all"
+        class="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-1.5"
       >
-        {{ line }}
+        <div class="flex items-center gap-3">
+          <div
+            class="flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide"
+            :class="
+              wsOpen
+                ? 'text-emerald-400'
+                : isConnecting
+                  ? 'text-amber-400'
+                  : 'text-zinc-500'
+            "
+          >
+            <span
+              class="h-1.5 w-1.5 rounded-full"
+              :class="[
+                wsOpen
+                  ? 'bg-emerald-400'
+                  : isConnecting
+                    ? 'bg-amber-400'
+                    : 'bg-zinc-500',
+                wsOpen && 'animate-pulse',
+              ]"
+            />
+            {{
+              wsOpen
+                ? "Live"
+                : isConnecting
+                  ? "Connecting"
+                  : "Disconnected"
+            }}
+          </div>
+          <!--
+            Caller-injected chrome controls (compose mode uses this
+            for the service picker). Lives next to the Live indicator
+            so all query-level + status controls cluster on the left;
+            stream controls (pause / clear) stay on the right.
+          -->
+          <slot name="header-actions" />
+        </div>
+
+        <div class="flex items-center gap-0.5">
+          <!-- Stream controls — icon-only ghost buttons that blend
+               into the chrome. Pause flips to play while paused;
+               Clear is disabled when the buffer is empty. Tooltips
+               ride on the native title attribute. -->
+          <button
+            type="button"
+            class="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+            :title="isPaused ? 'Resume stream' : 'Pause stream'"
+            @click="isPaused = !isPaused"
+          >
+            <Icon
+              :name="isPaused ? 'lucide:play' : 'lucide:pause'"
+              class="h-3.5 w-3.5"
+            />
+          </button>
+          <button
+            type="button"
+            class="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
+            title="Clear buffer"
+            :disabled="lines.length === 0"
+            @click="clearBuffer"
+          >
+            <Icon name="lucide:eraser" class="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
+
+      <!-- Terminal body. -->
+      <div
+        ref="containerRef"
+        class="h-[60vh] overflow-auto p-3 font-mono text-xs leading-relaxed text-zinc-100"
+        @scroll="onScroll"
+      >
+        <div v-if="lines.length === 0" class="py-8 text-center text-zinc-500">
+          <Icon
+            v-if="isConnecting || wsOpen"
+            name="lucide:loader-2"
+            class="h-5 w-5 animate-spin"
+          />
+          <span v-else>No log lines yet.</span>
+        </div>
+        <div
+          v-for="(line, idx) in lines"
+          :key="idx"
+          class="whitespace-pre-wrap break-all"
+        >
+          {{ line }}
+        </div>
+      </div>
+
+      <!--
+        "Jump to bottom" affordance — only renders when the user has
+        scrolled up away from the live tail. Clicking snaps back to
+        the bottom and re-engages auto-follow. Floats over the
+        bottom-right of the terminal body so it never blocks log
+        lines.
+      -->
+      <button
+        v-if="!isAtBottom && lines.length > 0"
+        type="button"
+        class="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-zinc-800 px-3 py-1 text-[11px] font-medium text-zinc-100 shadow-md transition-colors hover:bg-zinc-700"
+        @click="jumpToBottom"
+      >
+        <Icon name="lucide:arrow-down" class="h-3 w-3" />
+        Jump to latest
+      </button>
     </div>
   </div>
 </template>

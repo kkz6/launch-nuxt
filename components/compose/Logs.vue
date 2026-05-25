@@ -7,7 +7,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Button } from "~/components/ui/button";
 import {
   dockerService,
   type DockerCompose,
@@ -83,9 +82,18 @@ onMounted(fetchServices);
     :service="selected === '__all__' ? '' : selected"
     empty-state-message="Deploy this compose stack first; logs start streaming once at least one service is running."
   >
+    <!--
+      Slot lands inside ApplicationLogs's terminal chrome bar — dark
+      background, slim height. Restyled the picker + refresh to
+      match: 24px tall, transparent over the chrome with a zinc-800
+      border, small refresh icon button instead of an outline
+      button.
+    -->
     <template #header-actions>
       <Select v-model="selected">
-        <SelectTrigger class="h-8 min-w-[180px] text-sm">
+        <SelectTrigger
+          class="h-6 min-w-[140px] border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-200 hover:bg-zinc-800 focus:ring-0 focus:ring-offset-0"
+        >
           <SelectValue placeholder="All services" />
         </SelectTrigger>
         <SelectContent>
@@ -95,25 +103,25 @@ onMounted(fetchServices);
           </SelectItem>
         </SelectContent>
       </Select>
-      <Button
-        variant="outline"
-        size="sm"
-        :disabled="isLoadingServices"
+      <button
+        type="button"
+        class="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
         :title="
           isLoadingServices
             ? 'Re-fetching service list…'
             : 'Re-fetch the service list (after a deploy)'
         "
+        :disabled="isLoadingServices"
         @click="refresh"
       >
         <Icon
           :name="
             isLoadingServices ? 'lucide:loader-2' : 'lucide:refresh-cw'
           "
-          class="h-4 w-4"
+          class="h-3.5 w-3.5"
           :class="isLoadingServices ? 'animate-spin' : ''"
         />
-      </Button>
+      </button>
     </template>
   </ApplicationLogs>
 </template>
