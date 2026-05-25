@@ -7,6 +7,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Switch } from "~/components/ui/switch";
+import { Button } from "~/components/ui/button";
 import {
   dockerService,
   type DockerDatabase,
@@ -227,6 +231,99 @@ const copyableConnectionURL = computed(() => {
 // Copy-Connection-URL stays disabled until reveal so users don't
 // paste a `<password>` placeholder into a config.
 const urlCopyDisabled = computed(() => !revealed.value);
+
+// --- Public Access (expose-to-internet toggle) --------------------
+//
+// Moved here from the Advanced tab. The Connection dialog is where
+// users see "External" is disabled and naturally ask "how do I
+// enable it?" — having the toggle right here closes that loop
+// instead of pushing them to a different tab. Backend wiring is
+// unchanged: POST /expose recreates the container with/without the
+// `-p` flag.
+
+const exposeEnabled = ref(Boolean(props.database.external_port));
+const exposePort = ref<number | undefined>(
+  props.database.external_port ?? undefined,
+);
+const exposeSaving = ref(false);
+
+// Engine default port — placeholder + auto-fill when toggling on.
+const defaultExposePort = computed(() => {
+  switch (props.database.engine) {
+    case "postgres":
+      return 5432;
+    case "mysql":
+    case "mariadb":
+      return 3306;
+    case "redis":
+      return 6379;
+    case "mongo":
+      return 27017;
+    default:
+      return undefined;
+  }
+});
+
+// Re-seed from the prop when the parent refetches (the WS event
+// after a successful recreate updates props.database). Without
+// this, the toggle keeps its stale local value after the round-trip.
+watch(
+  () => props.database.external_port,
+  (port) => {
+    exposeEnabled.value = Boolean(port);
+    exposePort.value = port ?? undefined;
+  },
+);
+
+const onExposeToggle = (next: boolean) => {
+  exposeEnabled.value = next;
+  if (next && !exposePort.value) {
+    exposePort.value = defaultExposePort.value;
+  }
+};
+
+const saveExpose = async () => {
+  if (exposeEnabled.value && !exposePort.value) {
+    toast.error("Port is required to expose this database");
+    return;
+  }
+  exposeSaving.value = true;
+  try {
+    await dockerService.databases.setExpose(
+      props.database.server_id,
+      props.database.project_id,
+      props.database.id,
+      {
+        enabled: exposeEnabled.value,
+        port: exposeEnabled.value ? exposePort.value : null,
+      },
+    );
+    toast.success(
+      exposeEnabled.value
+        ? "Database is being recreated with the external port"
+        : "Database is being recreated without an external port",
+    );
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to update expose setting");
+    // Roll back the local state to what the backend last persisted.
+    exposeEnabled.value = Boolean(props.database.external_port);
+    exposePort.value = props.database.external_port ?? undefined;
+  } finally {
+    exposeSaving.value = false;
+  }
+};
+
+// Dirty flag — Save button only enabled when the toggle / port has
+// changed from what the backend currently has. Keeps the user from
+// firing a no-op recreate.
+const exposeDirty = computed(() => {
+  const wasEnabled = Boolean(props.database.external_port);
+  const wasPort = props.database.external_port ?? undefined;
+  if (exposeEnabled.value !== wasEnabled) return true;
+  if (exposeEnabled.value && exposePort.value !== wasPort) return true;
+  return false;
+});
 </script>
 
 <template>
@@ -427,6 +524,75 @@ const urlCopyDisabled = computed(() => !revealed.value);
             host firewall allows the external port.
           </template>
         </p>
+
+        <!--
+          Public Access — moved here from the Advanced tab.
+          This is the natural place: the External tab next to the
+          Internal one is disabled when no external port is set, and
+          users immediately ask "how do I enable it?". Toggle right
+          here closes that loop. Backend wiring unchanged
+          (POST /expose recreates the container).
+        -->
+        <div class="rounded-lg border bg-card">
+          <div class="flex items-start justify-between gap-4 px-4 py-3">
+            <div class="min-w-0 space-y-0.5">
+              <div class="flex items-center gap-2">
+                <Icon name="lucide:globe" class="h-4 w-4 text-muted-foreground" />
+                <Label class="text-sm font-medium">
+                  Expose to the internet
+                </Label>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                Publish the database on the host's public IP so
+                clients outside the docker network can connect.
+                Toggling triggers a container recreate.
+              </p>
+            </div>
+            <Switch
+              :model-value="exposeEnabled"
+              :disabled="exposeSaving"
+              class="mt-0.5 shrink-0"
+              @update:model-value="onExposeToggle"
+            />
+          </div>
+
+          <!-- Port input + Save are part of the same card so the
+               two settings sit visually together. Port slot is
+               only rendered when the toggle is on; Save is only
+               enabled when something actually changed (no no-op
+               recreates). -->
+          <div
+            v-if="exposeEnabled || exposeDirty"
+            class="flex items-end gap-3 border-t px-4 py-3"
+          >
+            <div class="flex-1 space-y-1">
+              <Label for="db-expose-port" class="text-[11px] uppercase tracking-wide text-muted-foreground">
+                External Port
+              </Label>
+              <Input
+                id="db-expose-port"
+                v-model.number="exposePort"
+                type="number"
+                class="h-8 text-sm"
+                :disabled="!exposeEnabled"
+                :placeholder="defaultExposePort?.toString() || 'e.g. 5432'"
+                autocomplete="off"
+              />
+            </div>
+            <Button
+              size="sm"
+              :disabled="exposeSaving || !exposeDirty"
+              @click="saveExpose"
+            >
+              <Icon
+                v-if="exposeSaving"
+                name="lucide:loader-2"
+                class="mr-1.5 h-3.5 w-3.5 animate-spin"
+              />
+              Save
+            </Button>
+          </div>
+        </div>
       </div>
     </DialogContent>
   </Dialog>
