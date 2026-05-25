@@ -45,40 +45,19 @@ const memoryReservation = ref<string>(
 );
 const runtimeSaving = ref(false);
 
-// Public Access — external_port on the row IS the source of truth.
-// Toggle triggers a container recreate via POST /expose.
-const exposeEnabled = ref(Boolean(props.database.external_port));
-const exposePort = ref<number | undefined>(
-  props.database.external_port ?? undefined,
-);
-const exposeSaving = ref(false);
+// Public Access lives in the Connection dialog (navbar Actions →
+// Connection info), next to the External tab it unlocks. That's
+// where the user naturally asks "how do I enable external access?"
+// — keeping the toggle adjacent to the answer beats stashing it on
+// Advanced.
 
 const rebuildLoading = ref(false);
 const deleteLoading = ref(false);
-
-// Engine default port for the placeholder + auto-fill when toggling on.
-const defaultExposePort = computed(() => {
-  switch (props.database.engine) {
-    case "postgres":
-      return 5432;
-    case "mysql":
-    case "mariadb":
-      return 3306;
-    case "redis":
-      return 6379;
-    case "mongo":
-      return 27017;
-    default:
-      return undefined;
-  }
-});
 
 // Re-seed when the parent refetches (status events, rebuild lands).
 watch(
   () => props.database,
   (db) => {
-    exposeEnabled.value = Boolean(db.external_port);
-    exposePort.value = db.external_port ?? undefined;
     restartPolicy.value =
       ((db.build_config?.restart_policy as RestartPolicy) ||
         "unless-stopped") as RestartPolicy;
@@ -90,44 +69,6 @@ watch(
   },
   { deep: true },
 );
-
-const onExposeToggle = (next: boolean) => {
-  exposeEnabled.value = next;
-  if (next && !exposePort.value) {
-    exposePort.value = defaultExposePort.value;
-  }
-};
-
-const saveExpose = async () => {
-  if (exposeEnabled.value && !exposePort.value) {
-    toast.error("Port is required to expose this database");
-    return;
-  }
-  exposeSaving.value = true;
-  try {
-    await dockerService.databases.setExpose(
-      props.database.server_id,
-      props.database.project_id,
-      props.database.id,
-      {
-        enabled: exposeEnabled.value,
-        port: exposeEnabled.value ? exposePort.value : null,
-      },
-    );
-    toast.success(
-      exposeEnabled.value
-        ? "Database is being recreated with the external port"
-        : "Database is being recreated without an external port",
-    );
-  } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update expose setting");
-    exposeEnabled.value = Boolean(props.database.external_port);
-    exposePort.value = props.database.external_port ?? undefined;
-  } finally {
-    exposeSaving.value = false;
-  }
-};
 
 // Single save for the merged Container Runtime card — covers both
 // the resources fields and the restart policy. Backend treats empty
@@ -252,79 +193,20 @@ const deleteDatabase = async () => {
 
 <template>
   <!--
-    Grouped-cards redesign:
-      1. Public Access   — toggle + port  → POST /expose (recreate)
-      2. Storage         — read-only data volume info
-      3. Container Runtime — resources + restart policy combined
+    Grouped-cards layout:
+      1. Storage         — read-only data volume info
+      2. Container Runtime — resources + restart policy combined
                             → PATCH /advanced (docker update)
-      4. Danger Zone     — Rebuild + Delete, destructive border tint
+      3. Danger Zone     — Rebuild + Delete, destructive border tint
 
-    Each editable card has Header (title + description), Content (form),
-    Footer (right-aligned Save). Storage has no footer — read-only.
+    "Public Access" lives in the Connection dialog now (navbar
+    Actions → Connection info) so it sits next to the Internal /
+    External tabs it unlocks. Old shape: a card here + a separate
+    External tab in the dialog — required tab-hopping to reason
+    about. New shape: one place, one mental model.
   -->
   <div class="space-y-4">
     <SharedConfirmationDialog ref="confirmationDialog" />
-
-    <!-- ─── Public Access ─────────────────────────────────────── -->
-    <Card>
-      <CardHeader class="p-4">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:globe" class="h-4 w-4 text-muted-foreground" />
-          Public Access
-        </CardTitle>
-        <CardDescription class="text-xs">
-          Expose this database on the host's public IP so clients
-          outside the docker network can connect. Off by default.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent class="space-y-3 p-4 pt-0">
-        <!-- Toggle row -->
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0 space-y-0.5">
-            <Label class="text-sm font-medium">Expose to the internet</Label>
-            <p class="text-xs text-muted-foreground">
-              When on, the container gets a
-              <code class="text-[11px]">-p &lt;port&gt;:&lt;internal&gt;</code>
-              mapping. Toggling triggers a recreate.
-            </p>
-          </div>
-          <Switch
-            :model-value="exposeEnabled"
-            :disabled="exposeSaving"
-            class="mt-0.5 shrink-0"
-            @update:model-value="onExposeToggle"
-          />
-        </div>
-
-        <!-- Port input — only when exposing. -->
-        <div v-if="exposeEnabled" class="space-y-1.5 border-t pt-3 sm:max-w-xs">
-          <Label for="db-expose-port" class="text-xs">External Port</Label>
-          <Input
-            id="db-expose-port"
-            v-model.number="exposePort"
-            type="number"
-            class="h-9"
-            :placeholder="defaultExposePort?.toString() || 'e.g. 5432'"
-            autocomplete="off"
-          />
-          <p class="text-[11px] text-muted-foreground">
-            Host port that maps to the database's internal port.
-          </p>
-        </div>
-      </CardContent>
-
-      <CardFooter class="justify-end border-t bg-muted/30 px-4 py-2">
-        <Button size="sm" :disabled="exposeSaving" @click="saveExpose">
-          <Icon
-            v-if="exposeSaving"
-            name="lucide:loader-2"
-            class="mr-2 h-3.5 w-3.5 animate-spin"
-          />
-          Save
-        </Button>
-      </CardFooter>
-    </Card>
 
     <!-- ─── Storage ───────────────────────────────────────────── -->
     <Card>
