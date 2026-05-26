@@ -16,6 +16,18 @@ export type ServerTypeId =
   | "docker"
   | (string & {}); // tolerate forward-compatible types from the API
 
+/**
+ * A top-level tab on the server detail page. The `query` value is what we
+ * write to `?tab=…` in the URL; `value` is the canonical identifier the
+ * page component reads.
+ */
+export interface ServerDetailTab {
+  value: string;
+  label: string;
+  query: string;
+  icon: string;
+}
+
 export interface ServerTypeRules {
   /** Whether the PHP version field is meaningful for this server type. */
   showsPhp: boolean;
@@ -28,7 +40,65 @@ export interface ServerTypeRules {
    * helper text under the type selector.
    */
   description: string;
+  /**
+   * Top-level tabs shown on the server detail page. Order matters — first
+   * entry is the default landing tab when no `?tab=` query is present.
+   * Single source of truth: Navbar.vue and pages/servers/[id]/index.vue
+   * both read from here.
+   */
+  tabs: ServerDetailTab[];
 }
+
+// Tab presets per server type. Keep these as data so adding a new type only
+// requires extending RULES — no Navbar/page logic changes.
+const PHP_TABS: ServerDetailTab[] = [
+  { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
+  { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
+  { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
+  { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
+  { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
+  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+];
+
+const LOADBALANCER_TABS: ServerDetailTab[] = [
+  { value: "upstreams", label: "Upstreams", query: "upstreams", icon: "lucide:git-fork" },
+  { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
+  { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
+  { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
+  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+];
+
+// Docker server has its own world: Projects group docker workloads
+// (applications, compose, databases). Containers/Volumes give
+// server-level visibility into the docker host. Schedulers exposes
+// host-level cron jobs (e.g. `docker system prune`, custom
+// maintenance commands) — same backend the PHP servers use; the
+// commands just run on a docker host instead of a PHP one. Traefik
+// config editing lives under Advanced — admin escape hatch, not a
+// day-to-day tab.
+//
+// Networks deliberately omitted: Launch installs `launch-network` and
+// every app joins it automatically. Customers don't create custom
+// networks via the UI (no creator flow exists, and the SaaS model
+// doesn't need one), so the tab was empty for everyone — see
+// docs/plans/2026-05-22-docker-server-menus-design.md.
+// Volumes deliberately omitted at the docker-server level: per-app
+// volume management lives on the application detail page (the
+// dokploy-style bind / volume / file mount picker). A flat host-
+// wide list of docker volumes doesn't add operational value beyond
+// what the Application → Volumes tab already shows, and surfacing
+// orphaned volumes from `docker volume ls` invites accidental
+// cleanup of volumes belonging to running apps. Drop the tab; the
+// underlying `ServerDockerVolumes.vue` component is gone too.
+const DOCKER_TABS: ServerDetailTab[] = [
+  { value: "projects", label: "Projects", query: "projects", icon: "lucide:folder-tree" },
+  { value: "containers", label: "Containers", query: "containers", icon: "lucide:container" },
+  { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
+  { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
+  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+];
 
 const RULES: Record<string, ServerTypeRules> = {
   php: {
@@ -36,25 +106,29 @@ const RULES: Record<string, ServerTypeRules> = {
     showsDatabase: true,
     showsAgentToggle: true,
     description: "PHP stack with Caddy and optional MySQL/PostgreSQL.",
+    tabs: PHP_TABS,
   },
   database: {
     showsPhp: false,
     showsDatabase: true,
     showsAgentToggle: true,
     description: "Dedicated database server (MySQL or PostgreSQL).",
+    tabs: PHP_TABS,
   },
   loadbalancer: {
     showsPhp: false,
     showsDatabase: false,
     showsAgentToggle: true,
     description: "Caddy load balancer routing to backend application servers.",
+    tabs: LOADBALANCER_TABS,
   },
   docker: {
     showsPhp: false,
     showsDatabase: false,
     showsAgentToggle: true,
     description:
-      "Docker CE + Swarm + Traefik reverse proxy. Run apps as containers.",
+      "Docker CE + Traefik reverse proxy with docker-label discovery. Run apps as containers.",
+    tabs: DOCKER_TABS,
   },
 };
 
@@ -63,6 +137,7 @@ const FALLBACK: ServerTypeRules = {
   showsDatabase: true,
   showsAgentToggle: true,
   description: "",
+  tabs: PHP_TABS,
 };
 
 /**

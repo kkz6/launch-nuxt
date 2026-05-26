@@ -346,8 +346,27 @@ onMounted(() => {
                 v-if="server.status === 'running'"
                 class="flex items-center gap-1.5 text-muted-foreground"
               >
-                <Icon name="lucide:globe" class="h-3.5 w-3.5" />
-                <span>{{ server.sites_count ?? 0 }} sites</span>
+                <!--
+                  Docker servers don't have rows in the Laravel
+                  `sites` table — their workloads (applications +
+                  composes + managed databases) live in the docker
+                  module. Swap the icon + label so the card shows a
+                  meaningful count instead of always "0 sites".
+                -->
+                <template v-if="server.type === 'docker'">
+                  <Icon name="lucide:container" class="h-3.5 w-3.5" />
+                  <span>
+                    {{ server.workloads_count ?? 0 }}
+                    {{ (server.workloads_count ?? 0) === 1 ? 'workload' : 'workloads' }}
+                  </span>
+                </template>
+                <template v-else>
+                  <Icon name="lucide:globe" class="h-3.5 w-3.5" />
+                  <span>
+                    {{ server.sites_count ?? 0 }}
+                    {{ (server.sites_count ?? 0) === 1 ? 'site' : 'sites' }}
+                  </span>
+                </template>
               </div>
               <div class="flex items-center gap-1.5">
                 <span

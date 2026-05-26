@@ -289,11 +289,80 @@ const deleteDnsProvider = async (provider: DnsProvider) => {
   }
 }
 
+// --- Docker registry credentials ----------------------------------
+//
+// Saved docker-image logins. Picked from the application + compose
+// create dialogs; deploy scripts run `docker login` for each before
+// pulling private images. Same row-card shape the storage/dns
+// sections use; the add+edit dialog component handles both modes.
+
+import {
+  dockerService,
+  type DockerRegistryCredential,
+} from '~/services/dockerService'
+
+const registryCredentials = ref<DockerRegistryCredential[]>([])
+const isRegistryCredentialsLoading = ref(true)
+const editingRegistryCredential = ref<DockerRegistryCredential | undefined>(undefined)
+const isRegistryDialogOpen = ref(false)
+
+const fetchRegistryCredentials = async () => {
+  isRegistryCredentialsLoading.value = true
+  try {
+    const res = await dockerService.registryCredentials.list()
+    registryCredentials.value = res.data
+  } catch {
+    toast.error('Failed to load registry credentials')
+  } finally {
+    isRegistryCredentialsLoading.value = false
+  }
+}
+
+const openCreateRegistryDialog = () => {
+  editingRegistryCredential.value = undefined
+  isRegistryDialogOpen.value = true
+}
+
+const editRegistryCredential = (c: DockerRegistryCredential) => {
+  editingRegistryCredential.value = c
+  isRegistryDialogOpen.value = true
+}
+
+const handleRegistryDialogClosed = () => {
+  editingRegistryCredential.value = undefined
+}
+
+const deleteRegistryCredential = async (c: DockerRegistryCredential) => {
+  if (!confirmationDialog.value) return
+  const result = await confirmationDialog.value.show({
+    title: 'Delete Registry Credential',
+    description: `Delete "${c.name}"? Applications referencing it will be disconnected (their next deploy will run without auth); compose stacks will silently drop the link.`,
+    confirmText: 'Delete',
+    cancelText: 'Cancel',
+    destructive: true,
+  })
+  if (!result.ok) return
+  try {
+    await dockerService.registryCredentials.delete(c.id)
+    registryCredentials.value = registryCredentials.value.filter((x) => x.id !== c.id)
+    toast.success('Registry credential deleted')
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } }
+    toast.error(e.data?.message || 'Failed to delete credential')
+  }
+}
+
+const registryDisplayHost = (c: DockerRegistryCredential): string => {
+  if (c.registry_url && c.registry_url.trim()) return c.registry_url
+  return 'Docker Hub'
+}
+
 onMounted(() => {
   fetchGitProviders()
   fetchServerProviders()
   fetchStorageProviders()
   fetchDnsProviders()
+  fetchRegistryCredentials()
 })
 </script>
 
@@ -444,7 +513,7 @@ onMounted(() => {
     </div>
 
     <!-- DNS Providers Section -->
-    <div class="px-6 pt-6">
+    <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">DNS Providers</h3>
 
       <div v-if="isDnsProvidersLoading" class="flex items-center justify-center py-4">
@@ -478,6 +547,105 @@ onMounted(() => {
             </Button>
           </div>
           <SettingsAddDnsProvider @created="fetchDnsProviders" />
+        </div>
+      </template>
+    </div>
+
+    <!--
+      Docker Registry Credentials. Same row-card shape as Storage /
+      DNS Providers. The dialog handles both create + edit modes; on
+      edit, leaving the password input blank keeps the stored value
+      so users can rotate the label / username / URL without
+      retyping the secret.
+    -->
+    <!--
+      Last section in ConnectionsTab — uses pt-6 only (no bottom
+      padding) because divide-y on the parent doesn't draw a line
+      below the last child, and the outer container's bottom padding
+      handles the rest. Same convention DNS Providers used to follow
+      when it was the last section.
+    -->
+    <div class="px-6 pt-6">
+      <!--
+        Heading uses mb-2 (not the mb-4 the other sections use)
+        because this section sits below the heading with no
+        intermediate row card buffering the gap when there are zero
+        credentials. mb-4 leaves an awkward void; mb-2 keeps the
+        Connect button visually anchored to the heading.
+      -->
+      <h3 class="mb-2 text-base font-semibold">Docker Registry Credentials</h3>
+
+      <SettingsRegistryCredentialDialog
+        v-model:open="isRegistryDialogOpen"
+        :credential="editingRegistryCredential"
+        @created="fetchRegistryCredentials"
+        @updated="fetchRegistryCredentials"
+        @update:open="(v) => { if (!v) handleRegistryDialogClosed() }"
+      />
+
+      <div
+        v-if="isRegistryCredentialsLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
+      </div>
+
+      <!--
+        Always render the populated layout — rows render only when
+        there are credentials, otherwise we drop straight to the flat
+        Connect button. Visual matches the populated Storage / DNS
+        sections (row cards + flat button) rather than carrying a
+        separate centered empty-state container.
+      -->
+      <template v-else>
+        <div class="space-y-3">
+          <div
+            v-for="c in registryCredentials"
+            :key="c.id"
+            class="flex items-center justify-between rounded-lg border p-4"
+          >
+            <div class="flex items-center gap-3">
+              <Icon name="lucide:container" class="h-5 w-5" />
+              <div>
+                <span class="text-sm font-medium">{{ c.name }}</span>
+                <p class="text-xs text-muted-foreground">
+                  {{ registryDisplayHost(c) }} · {{ c.username }}
+                </p>
+              </div>
+            </div>
+            <!--
+              Edit + delete actions. Other sections only carry a
+              delete because their credentials are OAuth-style (no
+              user-rotatable secret); registry logins genuinely need
+              an edit affordance for password rotation, so we keep
+              both. Same ghost+sm style the others use for delete.
+            -->
+            <div class="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Edit"
+                @click="editRegistryCredential(c)"
+              >
+                <Icon name="lucide:pencil" class="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                @click="deleteRegistryCredential(c)"
+              >
+                <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" @click="openCreateRegistryDialog">
+            <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
+            Connect
+          </Button>
         </div>
       </template>
     </div>

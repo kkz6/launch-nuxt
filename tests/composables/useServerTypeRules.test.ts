@@ -34,7 +34,7 @@ describe("getServerTypeRules", () => {
     expect(r.showsAgentToggle).toBe(true);
     // The description must mention the docker stack so users understand the
     // empty advanced-options panel.
-    expect(r.description.toLowerCase()).toMatch(/docker|swarm|traefik/);
+    expect(r.description.toLowerCase()).toMatch(/docker|traefik/);
   });
 
   it("falls back to permissive defaults for unknown types", () => {
@@ -148,5 +148,58 @@ describe("getProviderIcon", () => {
     expect(getProviderIcon("future-cloud")).toBe("lucide:cloud");
     expect(getProviderIcon(null)).toBe("lucide:cloud");
     expect(getProviderIcon(undefined)).toBe("lucide:cloud");
+  });
+});
+
+describe("tabs per server type", () => {
+  it("docker servers default to Projects and don't carry Sites/Databases/Daemons", () => {
+    // Driving tabs from the composable is what stops Navbar.vue from
+    // showing the PHP-stack tabs on a docker server. Lock the docker tab
+    // set so a refactor doesn't silently regress.
+    const tabs = getServerTypeRules("docker").tabs.map((t) => t.value);
+    expect(tabs[0]).toBe("projects");
+    expect(tabs).toContain("containers");
+    // Volumes was dropped at the host level — per-app volume management
+    // lives on the Application → Volumes subtab now. See
+    // useServerTypeRules.ts for the rationale.
+    expect(tabs).not.toContain("volumes");
+    // Schedulers (host-level cron) shares the backend with PHP — we
+    // expose the same UI here for things like `docker system prune`
+    // on a schedule.
+    expect(tabs).toContain("schedulers");
+    expect(tabs).toContain("advanced");
+    expect(tabs).not.toContain("sites");
+    expect(tabs).not.toContain("databases");
+    expect(tabs).not.toContain("daemons");
+    // Traefik moved into Advanced as a sub-tab — it shouldn't be a
+    // top-level docker tab anymore.
+    expect(tabs).not.toContain("traefik");
+    // Networks removed: Launch manages launch-network for the user,
+    // and there's no Create-network flow, so the tab was empty for
+    // every customer. SSH covers any remaining debugging needs.
+    expect(tabs).not.toContain("networks");
+  });
+
+  it("php servers default to Sites and include Databases", () => {
+    const tabs = getServerTypeRules("php").tabs.map((t) => t.value);
+    expect(tabs[0]).toBe("sites");
+    expect(tabs).toContain("databases");
+  });
+
+  it("loadbalancer defaults to Upstreams and skips Sites/Databases", () => {
+    const tabs = getServerTypeRules("loadbalancer").tabs.map((t) => t.value);
+    expect(tabs[0]).toBe("upstreams");
+    expect(tabs).not.toContain("sites");
+    expect(tabs).not.toContain("databases");
+  });
+
+  it("every server type carries Advanced as its final tab", () => {
+    // Advanced is the catch-all for things that don't belong in a primary
+    // tab. If a refactor drops it from any type's list, settings become
+    // unreachable in the navbar.
+    for (const type of ["php", "database", "loadbalancer", "docker"]) {
+      const tabs = getServerTypeRules(type).tabs;
+      expect(tabs[tabs.length - 1].value).toBe("advanced");
+    }
   });
 });

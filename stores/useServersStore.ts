@@ -193,6 +193,60 @@ export const useServersStore = defineStore('servers', () => {
         }
         return
 
+      case 'server.provision_step':
+        // Patch `progress_step` inline so the ProvisionLogsSheet's
+        // watcher (which keys on `progress_step`) fires immediately.
+        // Previously this event fell into the default-case
+        // `scheduleRefetch()` which fired a 300ms-debounced GET /servers,
+        // and the sheet then did *another* 300ms-debounced GET
+        // /servers/:id/provision-status off the resulting store change.
+        // With rapid step bursts (Configure Swap → Firewall →
+        // Essential Packages can fire within ~1s on a fast box) the
+        // chained debouncing collapsed multiple updates into one and
+        // the "current step" indicator looked stuck.
+        //
+        // The list-endpoint response doesn't include the full
+        // completed_provision_steps array — that lives on the
+        // provision-status endpoint which the sheet pulls. So we just
+        // bump `progress_step` to invalidate the watcher; the sheet
+        // re-fetches the proper step list (with timestamps + status)
+        // off its own watcher.
+        if (id && typeof data.step === 'string') {
+          patch(id, { progress_step: data.step })
+          // Also kick the background refetch so status (e.g.
+          // provisioning → running on the last step) reconciles.
+          scheduleRefetch()
+        }
+        return
+
+      case 'server.software_installed':
+        // Same shape as provision_step but for the trailing "Installing
+        // Docker / Traefik / Launch Agent" pseudo-steps. The sheet
+        // refetches its status off any `progress_step` change, so
+        // stamping a synthetic value here is enough to trigger it.
+        if (id && typeof data.software === 'string') {
+          patch(id, { progress_step: `software:${data.software}` })
+          scheduleRefetch()
+        }
+        return
+
+      case 'server.provisioning':
+        // Provision job has started. Flip status badge immediately so
+        // the spinner/banner shows the moment the user clicks
+        // Provision. The refetch picks up any extra fields the backend
+        // stamped (e.g. progress=0).
+        if (id) patch(id, { status: 'provisioning' })
+        scheduleRefetch()
+        return
+
+      case 'server.provisioned':
+      case 'server.connected':
+        // Terminal-success states. Flip status inline; refetch for the
+        // full row (provisioned_at, public_ip changes, etc.).
+        if (id) patch(id, { status: 'running' })
+        scheduleRefetch()
+        return
+
       case 'server.created':
       case 'server.updated':
       case 'server.unarchived':
@@ -204,9 +258,8 @@ export const useServersStore = defineStore('servers', () => {
         return
 
       default:
-        // Catch-all for the rest of the lifecycle events
-        // (server.provision_step, .provisioning, .connected, etc.).
-        // They imply a status change we don't have data for inline.
+        // Catch-all for the rest of the lifecycle events. They imply a
+        // status change we don't have data for inline.
         scheduleRefetch()
     }
   }

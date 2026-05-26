@@ -7,11 +7,26 @@ interface Props {
   serverId: string
   username?: string
   isMaximized?: boolean
+  /**
+   * When set, the backend wraps the session in
+   * `docker exec -it <container> sh` instead of starting the user's
+   * host login shell. Used by the workload detail pages so the
+   * Terminal button opens a shell inside the container.
+   */
+  container?: string
+  /**
+   * Picks the shell exec'd inside the container. "bash" / "sh" call
+   * /bin/bash and /bin/sh directly; empty falls back to the auto-detect
+   * wrapper. Only meaningful when `container` is set.
+   */
+  shell?: '' | 'bash' | 'sh'
 }
 
 const props = withDefaults(defineProps<Props>(), {
   username: 'launcher',
   isMaximized: false,
+  container: '',
+  shell: '',
 })
 
 const emit = defineEmits<{
@@ -112,6 +127,20 @@ const initializeTerminal = () => {
   urlParams.set('serverId', props.serverId)
   urlParams.set('username', props.username)
   urlParams.set('token', token.value || '')
+  // When container is set, the WS handler runs `docker exec -it
+  // <container> sh` instead of opening the host shell. Sending it
+  // verbatim — the backend validates against a strict charset
+  // before splicing into the docker command, so injection is blocked
+  // there.
+  if (props.container) {
+    urlParams.set('container', props.container)
+    // Empty shell → backend auto-detects (`bash || sh` wrapper). Bare
+    // values map to /bin/bash and /bin/sh respectively. The backend
+    // already whitelists this — anything else is ignored there.
+    if (props.shell) {
+      urlParams.set('shell', props.shell)
+    }
+  }
   const teamId = getCurrentTeamId()
   if (teamId) {
     urlParams.set('team_id', teamId)

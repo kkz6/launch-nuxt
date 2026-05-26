@@ -22,7 +22,18 @@ const deleteLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 const siteCount = ref(0)
 
-const canDelete = computed(() => siteCount.value === 0)
+// Projects only exist on docker servers — backend returns
+// `projects_count` on the server response, defaulting to 0 for the
+// PHP / database / loadbalancer types. We read it off the prop so the
+// guard works on first render without an extra HTTP roundtrip.
+const projectsCount = computed(() => Number(props.server.projects_count ?? 0))
+const isDockerServer = computed(() => props.server.type === 'docker')
+
+const canDelete = computed(() => {
+  if (siteCount.value > 0) return false
+  if (isDockerServer.value && projectsCount.value > 0) return false
+  return true
+})
 
 onMounted(async () => {
   try {
@@ -56,6 +67,17 @@ const updateServer = async () => {
 const deleteServer = async () => {
   if (siteCount.value > 0) {
     toast.error('Cannot delete server with active sites. Please delete all sites first.')
+    return
+  }
+  // Docker servers carry projects (which carry apps / compose / db
+  // workloads). Refuse the delete here so the user gets immediate
+  // feedback — the backend re-validates the same condition and would
+  // 422 otherwise, but a toast on click is friendlier than a roundtrip.
+  if (isDockerServer.value && projectsCount.value > 0) {
+    const noun = projectsCount.value === 1 ? 'project' : 'projects'
+    toast.error(
+      `Cannot delete server with ${projectsCount.value} Docker ${noun}. Remove every project (and the workloads inside) first.`,
+    )
     return
   }
 
@@ -146,14 +168,23 @@ const deleteServer = async () => {
         </p>
       </div>
 
+      <!-- Reason copy depends on what's blocking the delete. We check
+           sites first (PHP servers can't have projects), then docker
+           projects (which only apply when isDockerServer is true). The
+           backend re-validates both — this banner is the proactive UX. -->
       <div v-if="!canDelete" class="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/50">
         <div class="space-y-1">
           <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
             Cannot delete server
           </p>
-          <p class="text-sm text-yellow-700 dark:text-yellow-300">
+          <p v-if="siteCount > 0" class="text-sm text-yellow-700 dark:text-yellow-300">
             This server has {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }}.
             Please delete all sites before removing the server.
+          </p>
+          <p v-else class="text-sm text-yellow-700 dark:text-yellow-300">
+            This server has {{ projectsCount }} Docker project{{ projectsCount !== 1 ? 's' : '' }}.
+            Remove every project (and the apps, compose stacks, and databases
+            inside it) before removing the server.
           </p>
         </div>
       </div>
