@@ -26,4 +26,13 @@ COPY --from=build /app/.output ./.output
 
 EXPOSE 3000
 
+# Kamal v2 reads container.State.Health to gate rolling deploys.
+# Without HEALTHCHECK, docker inspect returns null and Kamal fails
+# the deploy even when Nitro is up.
+# 127.0.0.1 (not localhost) — alpine resolves localhost to ::1 first,
+# but Nitro binds to 0.0.0.0 (IPv4) per NITRO_HOST.
+# wget is provided by alpine's busybox.
+HEALTHCHECK --interval=5s --timeout=3s --start-period=15s --retries=3 \
+  CMD wget -q --spider http://127.0.0.1:3000/ || exit 1
+
 CMD ["node", ".output/server/index.mjs"]
