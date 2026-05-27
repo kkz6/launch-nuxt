@@ -41,8 +41,11 @@ export default defineNuxtConfig({
   runtimeConfig: {
     backendBase: process.env.NUXT_BACKEND_BASE || "http://localhost:8080",
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080/api",
-      wsBase: process.env.NUXT_PUBLIC_WS_BASE || "ws://localhost:8080/api",
+      // No /api suffix — Go app routes live at the root since we dropped
+      // the /api group. Prod overrides via NUXT_PUBLIC_API_BASE
+      // (https://api.<domain>) and NUXT_PUBLIC_WS_BASE (wss://ws.<domain>).
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080",
+      wsBase: process.env.NUXT_PUBLIC_WS_BASE || "ws://localhost:8080",
     },
   },
 

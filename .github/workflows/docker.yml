@@ -36,13 +36,15 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=sha
+            type=sha,prefix=,format=long
+            type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
+          platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: |
@@ -50,3 +52,19 @@ jobs:
             service=launch-nuxt
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      - name: Dispatch deploy to launch-deploy
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          # Fine-grained PAT with `Actions: Read & write` on kkz6/launch-deploy.
+          # Stored as a secret in this repo. No code access.
+          token: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
+          repository: kkz6/launch-deploy
+          event-type: deploy-nuxt
+          client-payload: |
+            {
+              "image_tag": "${{ github.sha }}",
+              "source_repo": "${{ github.repository }}",
+              "source_sha": "${{ github.sha }}"
+            }
