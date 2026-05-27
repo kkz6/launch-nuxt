@@ -64,27 +64,24 @@ export const useServersStore = defineStore('servers', () => {
   /**
    * Apply a fresh full list (from an HTTP fetch). Preserves object
    * identity per ID where possible so `:key`-based v-for diffs don't
-   * thrash. Removes any server not in the new list.
+   * thrash, but the final order matches the response (newest first —
+   * the API sorts created_at DESC).
+   *
+   * Earlier version mutated in place and only appended new IDs, which
+   * pinned the existing rows at their original positions and dropped
+   * freshly-created servers at the bottom of the list.
    */
   const replaceAll = (next: Server[]) => {
-    const nextById = new Map(next.map(s => [s.id, s]))
-
-    // Update / remove existing entries
-    for (let i = servers.value.length - 1; i >= 0; i--) {
-      const current = servers.value[i]
-      const incoming = nextById.get(current.id)
-      if (incoming) {
-        Object.assign(current, incoming)
-        nextById.delete(current.id)
-      } else {
-        servers.value.splice(i, 1)
+    const currentById = new Map(servers.value.map(s => [s.id, s]))
+    const merged = next.map((incoming) => {
+      const existing = currentById.get(incoming.id)
+      if (existing) {
+        Object.assign(existing, incoming)
+        return existing
       }
-    }
-    // Append any newly added entries (preserves insertion order from the
-    // response, which the API sorts by created_at DESC).
-    for (const s of nextById.values()) {
-      servers.value.push(s)
-    }
+      return incoming
+    })
+    servers.value.splice(0, servers.value.length, ...merged)
   }
 
   /** Insert a single server if it's not already present. */
