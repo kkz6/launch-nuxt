@@ -32,14 +32,16 @@ const emit = defineEmits<{
   deleted: [serverId: string]
   viewLogs: [server: Server]
   retryProvision: [server: Server]
+  connected: [server: Server]
 }>()
 
 const showDeleteDialog = ref(false)
 const isDeleting = ref(false)
+const isTryingConnection = ref(false)
 
 // Check if server can be deleted (not during active provisioning)
 const canDelete = computed(() => {
-  return ['new', 'starting', 'failed'].includes(props.server.status)
+  return ['new', 'starting', 'failed', 'awaiting_connection'].includes(props.server.status)
 })
 
 // Check if this is a custom server that needs manual provisioning
@@ -47,10 +49,30 @@ const isCustomServerPending = computed(() => {
   return props.server.provider === 'custom_server' && props.server.provision_command
 })
 
+// Custom servers sit in awaiting_connection until the user pastes the
+// provision script and clicks "Try Connection". We don't auto-poll.
+const canTryConnection = computed(() => {
+  return props.server.status === 'awaiting_connection' && props.server.provider === 'custom_server'
+})
+
 // Check if retry provision is available (failed status + connected)
 const canRetryProvision = computed(() => {
   return props.server.status === 'failed' && props.server.connected
 })
+
+const handleTryConnection = async () => {
+  isTryingConnection.value = true
+  try {
+    await serverService.tryConnection(props.server.id)
+    toast.success('Connected — provisioning started')
+    emit('connected', props.server)
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || 'Could not reach server. Make sure the provision script ran successfully and try again.')
+  } finally {
+    isTryingConnection.value = false
+  }
+}
 
 const handleProvision = () => {
   emit('provision', props.server)
@@ -111,9 +133,28 @@ const handleDelete = async () => {
     <!-- All other transitional states (new, starting, custom-server pending)
          keep the compact dots menu so the card doesn't grow taller. -->
     <template v-else>
+      <!-- Try Connection — shown for custom servers sitting in
+           awaiting_connection. Replaces the old auto-polling flow: user
+           pastes the provision script themselves, then clicks here to
+           hand off to the platform. -->
+      <Button
+        v-if="canTryConnection"
+        variant="default"
+        size="sm"
+        class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
+        :disabled="isTryingConnection"
+        @click.prevent="handleTryConnection"
+      >
+        <Icon
+          :name="isTryingConnection ? 'lucide:loader-2' : 'lucide:plug-zap'"
+          :class="['h-3 w-3', isTryingConnection && 'animate-spin']"
+        />
+        Try Connection
+      </Button>
+
       <!-- Primary Provision Button (for custom servers) -->
       <Button
-        v-if="isCustomServerPending"
+        v-else-if="isCustomServerPending"
         variant="outline"
         size="sm"
         class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
@@ -133,7 +174,7 @@ const handleDelete = async () => {
             size="sm"
             :class="[
               'h-7 w-7 p-0',
-              isCustomServerPending ? 'rounded-l-none' : ''
+              (canTryConnection || isCustomServerPending) ? 'rounded-l-none' : ''
             ]"
             aria-label="More actions"
             title="More actions"

@@ -72,9 +72,15 @@ const handleRetryProvision = async (server: Server) => {
   }
 };
 
+const handleConnected = async () => {
+  // Try Connection succeeded; the server is now in provisioning.
+  // Pull the fresh list so the row flips out of awaiting_connection.
+  await serversStore.fetchAll();
+};
+
 // Check if server needs pending actions UI
 const needsPendingActions = (server: Server): boolean => {
-  return ['new', 'starting', 'failed'].includes(server.status);
+  return ['new', 'starting', 'failed', 'awaiting_connection'].includes(server.status);
 };
 
 // Watch for refresh trigger (e.g., after team switch)
@@ -126,6 +132,7 @@ const getStatusColor = (server: Server): string => {
     case "provisioning":
     case "new":
     case "starting":
+    case "awaiting_connection":
       return "bg-yellow-500";
     case "failed":
     case "unknown":
@@ -147,6 +154,7 @@ const getStatusLabel = (server: Server): string => {
     failed: "Failed",
     deleting: "Deleting",
     unknown: "Unknown",
+    awaiting_connection: "Awaiting Connection",
   };
   return labels[server.status] || server.status;
 };
@@ -168,8 +176,11 @@ watch(servers, (newServers) => {
   const updated = newServers.find(s => s.id === selectedServer.value!.id)
   if (!updated) return
 
-  // Close provision command dialog when server starts provisioning
-  if (showProvisionDialog.value && updated.status !== 'new') {
+  // Close provision command dialog once the server moves past the
+  // pre-connect states. Cloud servers start in 'new' and flip when the
+  // wait-for-connect job sees SSH; custom servers start in
+  // 'awaiting_connection' and flip when the user clicks Try Connection.
+  if (showProvisionDialog.value && !['new', 'awaiting_connection'].includes(updated.status)) {
     showProvisionDialog.value = false
   }
 
@@ -400,6 +411,7 @@ onMounted(() => {
                   @view-logs="openLogsDialog"
                   @deleted="handleServerDeleted"
                   @retry-provision="handleRetryProvision"
+                  @connected="handleConnected"
                 />
               </div>
             </div>

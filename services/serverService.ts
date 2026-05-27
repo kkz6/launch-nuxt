@@ -132,6 +132,17 @@ export const serverService = {
   },
 
   /**
+   * Try the SSH connection to a custom (BYO) server. The user calls this
+   * after pasting the provision script into their box. On success the
+   * server advances to provisioning automatically; on failure the API
+   * returns an error message we surface in a toast.
+   */
+  tryConnection: (id: string) => {
+    const { post } = useApi();
+    return post<ApiResponse<null>>(`/servers/${id}/try-connection`);
+  },
+
+  /**
    * Get provision status for a server
    */
   getProvisionStatus: (id: string) => {

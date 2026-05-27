@@ -286,7 +286,7 @@ const currentStepLabel = computed(() => {
         </div>
         <!-- Custom Server Provision Command -->
         <div
-          v-if="server.status === 'new' && server.provider === 'custom_server' && server.provision_command"
+          v-if="(server.status === 'awaiting_connection' || server.status === 'new') && server.provider === 'custom_server' && server.provision_command"
           class="space-y-4 rounded-lg border bg-muted/30 p-4"
         >
           <div>
