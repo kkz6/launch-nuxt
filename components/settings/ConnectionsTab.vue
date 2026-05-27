@@ -3,13 +3,16 @@ import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
-import { format } from 'date-fns'
+import { differenceInDays, format, formatDistanceToNow } from 'date-fns'
+import { certificateService } from '~/services/certificateService'
+import type { CertificateUsage, StoredCertificate } from '~/types'
 
 // Loading states
 const isGitLoading = ref(true)
 const isServerProvidersLoading = ref(true)
 const isStorageProvidersLoading = ref(true)
 const isDnsProvidersLoading = ref(true)
+const isStoredCertificatesLoading = ref(true)
 
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
@@ -289,6 +292,162 @@ const deleteDnsProvider = async (provider: DnsProvider) => {
   }
 }
 
+// --- Stored SSL Certificates --------------------------------------
+//
+// Team-scoped SSL certificate library. Manages user-provided PEM bundles
+// that PHP site SSL settings + Docker domain settings pick from. This
+// section is the CRUD surface; the picker components and the actual
+// hook-up at the site / docker-domain dialogs land in later phases.
+const storedCertificates = ref<StoredCertificate[]>([])
+const isAddCertificateOpen = ref(false)
+const editingCertificate = ref<StoredCertificate | undefined>(undefined)
+const isEditCertificateOpen = ref(false)
+
+const fetchStoredCertificates = async () => {
+  isStoredCertificatesLoading.value = true
+  try {
+    const res = await certificateService.list()
+    storedCertificates.value = res.data
+  } catch {
+    toast.error('Failed to load SSL certificates')
+  } finally {
+    isStoredCertificatesLoading.value = false
+  }
+}
+
+const editCertificate = (cert: StoredCertificate) => {
+  editingCertificate.value = cert
+  isEditCertificateOpen.value = true
+}
+
+// Wired to the AddCertificate sheet's `viewExisting` event — fired when
+// the duplicate-fingerprint toast's action button is clicked. We open
+// the existing certificate in the Edit sheet so the user can update its
+// name / notes instead of being stuck on the duplicate.
+const viewExistingCertificate = async (id: string) => {
+  const existing = storedCertificates.value.find((c) => c.id === id)
+  if (existing) {
+    editCertificate(existing)
+    return
+  }
+  // Library not yet refreshed — fetch the cert directly.
+  try {
+    const res = await certificateService.get(id)
+    editCertificate(res.data)
+  } catch {
+    toast.error('Failed to open existing certificate')
+  }
+}
+
+const handleCertificateCreated = (cert: StoredCertificate) => {
+  storedCertificates.value = [cert, ...storedCertificates.value]
+}
+
+const handleCertificateUpdated = (cert: StoredCertificate) => {
+  storedCertificates.value = storedCertificates.value.map((c) =>
+    c.id === cert.id ? cert : c,
+  )
+}
+
+// Relative expiry summary. <0 days → "expired"; 0..30 days → amber;
+// >30 days → plain muted. Uses date-fns formatDistanceToNow for the
+// "expires in N days" copy and a falls back to absolute date when the
+// cert is more than ~3 months out (matches what people scan for in
+// dashboards).
+const certificateExpiryInfo = (cert: StoredCertificate) => {
+  const notAfter = new Date(cert.not_after)
+  const daysUntil = differenceInDays(notAfter, new Date())
+  let label: string
+  if (daysUntil < 0) {
+    label = `expired ${formatDistanceToNow(notAfter, { addSuffix: true })}`
+  } else if (daysUntil <= 90) {
+    label = `expires ${formatDistanceToNow(notAfter, { addSuffix: true })}`
+  } else {
+    label = `expires ${format(notAfter, 'MMM d, yyyy')}`
+  }
+  // Tailwind class for the expiry text only — surrounding subtitle text
+  // stays muted-foreground.
+  let className = 'text-muted-foreground'
+  if (daysUntil < 0) {
+    className = 'text-destructive'
+  } else if (daysUntil <= 30) {
+    className = 'text-amber-600 dark:text-amber-400'
+  }
+  return { label, className }
+}
+
+const certificatePrimaryDomain = (cert: StoredCertificate): string => {
+  if (cert.common_name && cert.common_name.trim()) return cert.common_name
+  if (cert.domains && cert.domains.length > 0) return cert.domains[0]
+  return cert.name
+}
+
+const certificateSubtitleSegments = (cert: StoredCertificate): string[] => {
+  const segments: string[] = [certificatePrimaryDomain(cert)]
+  if (cert.issuer && cert.issuer.trim()) segments.push(cert.issuer)
+  return segments
+}
+
+const deleteCertificate = async (
+  cert: StoredCertificate,
+  opts: { force?: boolean } = {},
+) => {
+  if (!confirmationDialog.value) return
+
+  // First pass: ask the user. On 409 we'll re-prompt with the usage
+  // list and a force-delete affordance.
+  if (!opts.force) {
+    const result = await confirmationDialog.value.show({
+      title: 'Delete SSL Certificate',
+      description: `Delete "${cert.name}"? You can't undo this.`,
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+      destructive: true,
+    })
+    if (!result.ok) return
+  }
+
+  try {
+    await certificateService.delete(cert.id, opts)
+    storedCertificates.value = storedCertificates.value.filter((c) => c.id !== cert.id)
+    toast.success(
+      opts.force ? 'Certificate deleted, dependents reset to Let\'s Encrypt' : 'Certificate deleted',
+    )
+  } catch (err: unknown) {
+    const e = err as {
+      response?: { status?: number }
+      data?: { message?: string; usages?: CertificateUsage[] }
+    }
+
+    if (e.response?.status === 409 && e.data?.usages?.length) {
+      // In use. Surface the usages list and offer force-delete.
+      const usages = e.data.usages
+      const siteCount = usages.filter((u) => u.kind === 'site').length
+      const domainCount = usages.filter((u) => u.kind === 'docker_domain').length
+      const parts: string[] = []
+      if (siteCount > 0) parts.push(`${siteCount} site${siteCount === 1 ? '' : 's'}`)
+      if (domainCount > 0) parts.push(`${domainCount} docker domain${domainCount === 1 ? '' : 's'}`)
+      const usedBy = parts.join(' and ')
+
+      if (!confirmationDialog.value) return
+      const forceResult = await confirmationDialog.value.show({
+        title: 'Certificate in Use',
+        description: `"${cert.name}" is currently used by ${usedBy}. Force delete will reset all dependents to Let's Encrypt and queue redeploys.`,
+        confirmText: 'Force Delete & Reset',
+        cancelText: 'Cancel',
+        destructive: true,
+        warning: usages.slice(0, 5).map((u) => `${u.kind === 'site' ? 'Site' : 'Docker domain'}: ${u.name}`).join(' · ') + (usages.length > 5 ? ` · …and ${usages.length - 5} more` : ''),
+      })
+      if (forceResult.ok) {
+        await deleteCertificate(cert, { force: true })
+      }
+      return
+    }
+
+    toast.error(e.data?.message || 'Failed to delete certificate')
+  }
+}
+
 // --- Docker registry credentials ----------------------------------
 //
 // Saved docker-image logins. Picked from the application + compose
@@ -362,6 +521,7 @@ onMounted(() => {
   fetchServerProviders()
   fetchStorageProviders()
   fetchDnsProviders()
+  fetchStoredCertificates()
   fetchRegistryCredentials()
 })
 </script>
@@ -547,6 +707,120 @@ onMounted(() => {
             </Button>
           </div>
           <SettingsAddDnsProvider @created="fetchDnsProviders" />
+        </div>
+      </template>
+    </div>
+
+    <!--
+      Stored SSL Certificates. Team library of user-provided certs that
+      PHP site SSL settings and Docker domain settings will pick from
+      (Phases 4 and 5). The empty state mirrors the bordered-card
+      pattern other sections use; the populated state shows each cert
+      as a row with name, primary domain, issuer, and a relative-time
+      expiry indicator coloured amber under 30 days and red on expiry.
+    -->
+    <div class="px-6 py-6">
+      <h3 class="mb-4 text-base font-semibold">SSL Certificates</h3>
+
+      <SettingsAddCertificate
+        v-model:open="isAddCertificateOpen"
+        @created="(cert) => handleCertificateCreated(cert)"
+        @view-existing="viewExistingCertificate"
+      />
+      <SettingsEditCertificate
+        v-if="editingCertificate"
+        :key="editingCertificate.id"
+        v-model:open="isEditCertificateOpen"
+        :certificate="editingCertificate"
+        @updated="(cert) => handleCertificateUpdated(cert)"
+      />
+
+      <div
+        v-if="isStoredCertificatesLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
+      </div>
+
+      <template v-else>
+        <div
+          v-if="storedCertificates.length === 0"
+          class="rounded-lg border p-4"
+        >
+          <div class="flex flex-col items-center gap-3 py-2">
+            <Icon
+              name="lucide:shield-check"
+              class="h-8 w-8 text-muted-foreground"
+            />
+            <span class="text-sm text-muted-foreground">
+              No SSL certificates stored
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              @click="isAddCertificateOpen = true"
+            >
+              <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
+              Add certificate
+            </Button>
+          </div>
+        </div>
+
+        <div v-else class="space-y-3">
+          <div
+            v-for="cert in storedCertificates"
+            :key="cert.id"
+            class="flex items-center justify-between rounded-lg border p-4"
+          >
+            <div class="flex items-center gap-3">
+              <Icon name="lucide:shield-check" class="h-5 w-5" />
+              <div>
+                <span class="text-sm font-medium">{{ cert.name }}</span>
+                <p class="text-xs text-muted-foreground">
+                  <template
+                    v-for="(segment, idx) in certificateSubtitleSegments(cert)"
+                    :key="idx"
+                  >
+                    <span v-if="idx > 0"> · </span>
+                    {{ segment }}
+                  </template>
+                  <span> · </span>
+                  <span :class="certificateExpiryInfo(cert).className">
+                    {{ certificateExpiryInfo(cert).label }}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div class="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Edit"
+                @click="editCertificate(cert)"
+              >
+                <Icon name="lucide:pencil" class="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Delete"
+                @click="deleteCertificate(cert)"
+              >
+                <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            @click="isAddCertificateOpen = true"
+          >
+            <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
+            Add certificate
+          </Button>
         </div>
       </template>
     </div>

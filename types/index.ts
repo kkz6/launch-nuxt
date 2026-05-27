@@ -679,3 +679,37 @@ export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
 }
+
+// ---------------------------------------------------------------------------
+// Stored SSL Certificates (team library — managed in Settings → Connections,
+// picked from PHP site SSL + docker domain dialogs).
+//
+// The backend never sends the private_key over the wire (`json:"-"` on the
+// model) — it lives only on the server for deploy-time material. The
+// `certificate` field carries the leaf + chain PEM bundle and is safe to
+// surface in the UI for fingerprint / domain inspection.
+// ---------------------------------------------------------------------------
+export interface StoredCertificate {
+  id: string;
+  team_id: string;
+  user_id?: string;
+  name: string;
+  notes?: string;
+  certificate: string;
+  domains: string[];
+  common_name?: string;
+  issuer?: string;
+  not_before: string;
+  not_after: string;
+  serial_number?: string;
+  fingerprint_sha256?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+}
+
+export interface CertificateUsage {
+  kind: "site" | "docker_domain";
+  id: string;
+  name: string;
+}
