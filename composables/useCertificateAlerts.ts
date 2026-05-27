@@ -1,17 +1,22 @@
 import { differenceInDays } from "date-fns";
 
+import { useCertificateEvents } from "~/composables/useChannelEvents";
 import { certificateService } from "~/services/certificateService";
 import type { StoredCertificate } from "~/types";
 
-// useCertificateAlerts polls the stored-certificate library and
-// surfaces the ones expiring in the next 30 days. The dashboard banner
-// reads from this to nudge the user toward Settings → Connections.
+// useCertificateAlerts surfaces stored certs expiring in the next 30
+// days. The dashboard banner reads from this to nudge users toward
+// Settings → Connections.
 //
-// Why polling: the backend emits certificate.expiring_soon once a day
-// via the certificate:warn_expiring job, but a fresh page load might
-// land between two ticks. A lightweight list on mount catches those
-// rows; the WebSocket events are then layered on top to keep the
-// banner live as new certs cross the 30-day threshold.
+// Two refresh paths layered together so the banner stays live without
+// a hard refresh:
+//
+//   - Initial fetch on mount.
+//   - WebSocket subscription: certificate.created / .updated /
+//     .deleted / .expiring_soon / .fanout_required all trigger a
+//     re-list. The daily warn job emits .expiring_soon once a cert
+//     crosses the 30-day threshold; this composable picks that up
+//     without re-mounting the page.
 export function useCertificateAlerts() {
   const expiringSoon = ref<StoredCertificate[]>([]);
   const isLoading = ref(true);
@@ -37,6 +42,18 @@ export function useCertificateAlerts() {
   };
 
   onMounted(refresh);
+
+  // Subscribe to certificate events on the team channel. Any event
+  // (created / updated / deleted / expiring_soon / fanout_required)
+  // can change the banner contents, so we just re-list on every one
+  // — cheap (single small GET) and avoids per-event diffing.
+  const { user } = useAuth();
+  const teamId = computed(() => user.value?.current_team?.id || "");
+  if (teamId.value) {
+    useCertificateEvents(teamId, () => {
+      refresh();
+    });
+  }
 
   return {
     expiringSoon: readonly(expiringSoon),
