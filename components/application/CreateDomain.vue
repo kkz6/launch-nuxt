@@ -58,8 +58,11 @@ const containerPort = ref<number | undefined>(
   props.domain?.container_port ?? props.application.internal_port ?? 80,
 );
 const https = ref(props.domain?.https ?? true);
-const certificateProvider = ref<"letsencrypt">(
-  (props.domain?.certificate_provider as "letsencrypt") || "letsencrypt",
+const certificateProvider = ref<"letsencrypt" | "stored">(
+  (props.domain?.certificate_provider as "letsencrypt" | "stored") || "letsencrypt",
+);
+const storedCertificateId = ref<string | null>(
+  (props.domain as { stored_certificate_id?: string | null })?.stored_certificate_id || null,
 );
 
 // Domain verification — same shape AddSite.vue uses. The endpoint
@@ -85,7 +88,9 @@ const resetForm = () => {
     props.domain?.container_port ?? props.application.internal_port ?? 80;
   https.value = props.domain?.https ?? true;
   certificateProvider.value =
-    (props.domain?.certificate_provider as "letsencrypt") || "letsencrypt";
+    (props.domain?.certificate_provider as "letsencrypt" | "stored") || "letsencrypt";
+  storedCertificateId.value =
+    (props.domain as { stored_certificate_id?: string | null })?.stored_certificate_id || null;
   errors.value = {};
   domainVerification.value = null;
   createDnsRecord.value = false;
@@ -225,6 +230,10 @@ const onSubmit = async () => {
           container_port: containerPort.value,
           https: https.value,
           certificate_provider: certificateProvider.value,
+          stored_certificate_id:
+            certificateProvider.value === "stored"
+              ? storedCertificateId.value
+              : "",
         },
       );
       toast.success("Domain updated");
@@ -242,6 +251,10 @@ const onSubmit = async () => {
           container_port: containerPort.value,
           https: https.value,
           certificate_provider: certificateProvider.value,
+          stored_certificate_id:
+            certificateProvider.value === "stored"
+              ? storedCertificateId.value
+              : null,
           create_dns_record:
             createDnsRecord.value &&
             !!domainVerification.value?.can_create_record,
@@ -472,7 +485,9 @@ watch(open, (isOpen) => {
           <Switch v-model="https" class="mt-0.5 shrink-0" />
         </div>
 
-        <!-- Certificate Provider (only when HTTPS=true) -->
+        <!-- Certificate Provider (only when HTTPS=true). 'stored' picks
+             from the team's certificate library; the picker is shown
+             below when selected. -->
         <div v-if="https" class="space-y-2">
           <Label for="domain-cert-provider">Certificate Provider</Label>
           <Select v-model="certificateProvider">
@@ -480,9 +495,18 @@ watch(open, (isOpen) => {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="letsencrypt">Let's Encrypt</SelectItem>
+              <SelectItem value="letsencrypt">Let's Encrypt (auto)</SelectItem>
+              <SelectItem value="stored">Use a stored certificate</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        <div v-if="https && certificateProvider === 'stored'" class="space-y-2">
+          <Label>Stored certificate</Label>
+          <SharedCertificatePicker v-model="storedCertificateId" />
+          <p v-if="errors.stored_certificate_id" class="text-xs text-destructive">
+            {{ errors.stored_certificate_id }}
+          </p>
         </div>
 
         <DialogFooter>

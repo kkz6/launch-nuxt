@@ -205,6 +205,10 @@ const getUserInitials = (name: string): string => {
           <h1 class="text-xl font-semibold">{{ greeting }}, {{ firstName }}</h1>
         </div>
 
+        <!-- SSL certificate expiry banner — renders nothing when no
+             certs are expiring. Self-fetches via the composable. -->
+        <DashboardCertificateExpiryBanner class="mb-6" />
+
         <!-- Empty State -->
         <div v-if="servers.length === 0" class="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed py-16">
           <Icon name="lucide:server" class="h-12 w-12 text-muted-foreground" />

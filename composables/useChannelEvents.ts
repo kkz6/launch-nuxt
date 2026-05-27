@@ -566,3 +566,43 @@ export const usePlatformUpdateEvents = (
     onEvent,
   )
 }
+
+
+/**
+ * Composable to subscribe to stored-certificate library events.
+ *
+ * Fires on the team channel. The certificate module broadcasts:
+ *
+ * - certificate.created / certificate.updated / certificate.deleted:
+ *   library CRUD operations on /api/certificates.
+ * - certificate.expiring_soon: emitted daily by the
+ *   certificate:warn_expiring job for every cert whose not_after
+ *   falls in the next 30 days. Payload carries certificate_id, name,
+ *   not_after, days_remaining. Drives the dashboard expiring-soon
+ *   banner.
+ * - certificate.fanout_required: stored cert content changed; the
+ *   referenced sites / docker domains need their PEM files re-pushed
+ *   before the new cert is served. Wiring TBD (Phase 6 follow-up).
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a certificate event is received
+ */
+export const useCertificateEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    [
+      'certificate.created',
+      'certificate.updated',
+      'certificate.deleted',
+      'certificate.expiring_soon',
+      'certificate.fanout_required',
+    ],
+    onEvent,
+  )
+}
