@@ -39,32 +39,49 @@ const isOpen = ref(false)
 const isLoading = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
+// `stored` is a client-only label; the backend treats it as `custom`
+// with a stored_certificate_id. We submit `stored` and let the SSL
+// service coerce, so the UI can distinguish on round-trip if needed.
 const sslSchema = toTypedSchema(
   z.object({
     tls_setting: z.string(),
     private_key: z.string().optional(),
     certificate: z.string().optional(),
+    stored_certificate_id: z.string().optional().nullable(),
   }).refine(
     (data) => {
       if (data.tls_setting === 'custom') {
         return !!data.private_key || !!data.certificate
       }
+      if (data.tls_setting === 'stored') {
+        return !!data.stored_certificate_id
+      }
       return true
     },
     {
-      message: 'Private key and certificate are required for custom SSL',
-      path: ['certificate'],
+      message: 'Pick a stored certificate (or paste one under Custom)',
+      path: ['stored_certificate_id'],
     }
   )
 )
 
-const { handleSubmit, values, setFieldError, resetForm } = useForm({
+// Pre-pick the stored cert if the site's active certificate was
+// sourced from one — the FK rides on activeCertificate.stored_certificate_id.
+const initialStoredCertId
+  = (props.site as any).activeCertificate?.stored_certificate_id || null
+
+const initialTlsSetting = initialStoredCertId
+  ? 'stored'
+  : (props.site.tls_setting || 'auto')
+
+const { handleSubmit, values, setFieldError, resetForm, setFieldValue } = useForm({
   validationSchema: sslSchema,
   validateOnMount: false,
   initialValues: {
-    tls_setting: props.site.tls_setting || 'auto',
+    tls_setting: initialTlsSetting,
     private_key: (props.site as any).activeCertificate?.private_key || '',
     certificate: (props.site as any).activeCertificate?.certificate || '',
+    stored_certificate_id: initialStoredCertId,
   },
 })
 
@@ -77,8 +94,12 @@ const tlsLabels: Record<string, { label: string; description: string }> = {
     label: 'Disabled',
     description: 'No SSL/TLS encryption. Site will only be accessible via HTTP',
   },
+  stored: {
+    label: 'Use a stored certificate',
+    description: 'Pick from your team\'s SSL Certificate library',
+  },
   custom: {
-    label: 'Custom Certificate',
+    label: 'Custom certificate (paste once)',
     description: 'Use your own SSL certificate and private key',
   },
 }
@@ -172,6 +193,21 @@ const onSubmit = handleSubmit(async (formValues) => {
             <FormMessage />
           </FormItem>
         </FormField>
+
+        <template v-if="values.tls_setting === 'stored'">
+          <FormField name="stored_certificate_id">
+            <FormItem>
+              <FormLabel>Stored certificate</FormLabel>
+              <FormControl>
+                <SharedCertificatePicker
+                  :model-value="values.stored_certificate_id"
+                  @update:model-value="(v) => setFieldValue('stored_certificate_id', v)"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          </FormField>
+        </template>
 
         <template v-if="values.tls_setting === 'custom'">
           <FormField v-slot="{ componentField }" name="private_key">
