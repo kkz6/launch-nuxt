@@ -103,7 +103,10 @@ const handleDelete = async () => {
 </script>
 
 <template>
-  <div class="pointer-events-auto flex items-center gap-1.5">
+  <div :class="[
+    'pointer-events-auto flex items-center',
+    (canTryConnection || isCustomServerPending) ? 'gap-0' : 'gap-1.5'
+  ]">
     <!-- Failed servers get inline, discoverable actions. View logs is the
          primary affordance (it opens the friendly error sheet with the
          Try-again / Manage-credentials buttons), Delete is destructive and
