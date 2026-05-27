@@ -150,8 +150,9 @@ export interface DockerDomain {
    */
   container_port?: number | null;
   https: boolean;
-  certificate_provider: "letsencrypt" | string;
+  certificate_provider: "letsencrypt" | "stored" | string;
   certificate_id?: string | null;
+  stored_certificate_id?: string | null;
   /**
    * Compose-only — names the YAML service the domain routes to. The
    * Traefik renderer resolves it to the compose-managed container
@@ -170,7 +171,8 @@ export interface CreateDockerDomainData {
   strip_path?: boolean;
   container_port?: number;
   https?: boolean;
-  certificate_provider?: "letsencrypt";
+  certificate_provider?: "letsencrypt" | "stored";
+  stored_certificate_id?: string | null;
   /**
    * Mirrors AddSite — when true and the host's base domain is
    * registered in the DNS module, the API creates an A record
@@ -191,7 +193,13 @@ export interface UpdateDockerDomainData {
   strip_path?: boolean;
   container_port?: number;
   https?: boolean;
-  certificate_provider?: "letsencrypt";
+  certificate_provider?: "letsencrypt" | "stored";
+  /**
+   * Empty string clears the link back to the stored library; a 26-char
+   * ULID sets it. Send "" alongside certificate_provider: "letsencrypt"
+   * when switching off the stored option for a domain.
+   */
+  stored_certificate_id?: string | null;
   /**
    * Retarget a compose domain at a different YAML service. Empty
    * string is rejected at the backend (clearing is not allowed on a
