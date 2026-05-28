@@ -47,10 +47,17 @@ const handleTryConnection = async () => {
     open.value = false
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } }
-    toast.error(
-      err.data?.message
-      || 'Could not reach server. Make sure the provision command ran successfully and try again.',
-    )
+    const raw = (err.data?.message || '').trim()
+    // Backend errors here are long — SSH handshake failures concatenate
+    // host:port, handshake stage, attempted auth methods, and a hint
+    // into one string (~300+ chars). Putting that into toast.error's
+    // single title slot stretched the toast to fill the screen. Split
+    // into a short bold title and the verbose detail in description,
+    // where Sonner renders it as secondary text with proper wrapping.
+    toast.error('Try Connection failed', {
+      description: raw || 'Make sure the provision command ran successfully and try again.',
+      duration: 10000,
+    })
   } finally {
     isTryingConnection.value = false
   }
