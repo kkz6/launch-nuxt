@@ -139,6 +139,18 @@ export interface Server {
   storage_in_gb?: string;
   operating_system: string;
   operating_system_label?: string;
+  // Detected* mirror what the detect_os provision step pulled from
+  // /etc/os-release + uname on the actual box. Distinct from
+  // operating_system above (the user's dashboard pick). UI surfaces
+  // both so any mismatch is visible — particularly useful for custom
+  // (BYO) servers where customers sometimes select Ubuntu in the
+  // dropdown but bring a Debian VPS.
+  detected_os_id?: string;
+  detected_os_version?: string;
+  detected_os_version_codename?: string;
+  detected_arch?: string;
+  detected_kernel?: string;
+  detected_at?: string;
   status: string;
   status_label?: string;
   public_ipv4: string;

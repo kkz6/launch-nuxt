@@ -294,6 +294,20 @@ onMounted(() => {
                       <span class="text-muted-foreground">OS</span>
                       <span>{{ server.operating_system_label }}</span>
                     </template>
+                    <!--
+                      Detected row only appears once the detect_os
+                      provision step has actually run (legacy servers
+                      from before the step existed come back with
+                      every detected_* field as null). When it's
+                      present we render it as a single compact line
+                      so the tooltip doesn't bloat.
+                    -->
+                    <template v-if="server.detected_os_id">
+                      <span class="text-muted-foreground">Detected</span>
+                      <span>
+                        {{ server.detected_os_id }}<template v-if="server.detected_os_version"> {{ server.detected_os_version }}</template><template v-if="server.detected_os_version_codename"> ({{ server.detected_os_version_codename }})</template><template v-if="server.detected_arch"> · {{ server.detected_arch }}</template><template v-if="server.detected_kernel"> · kernel {{ server.detected_kernel }}</template>
+                      </span>
+                    </template>
                     <template v-if="server.cpu_cores">
                       <span class="text-muted-foreground">CPU</span>
                       <span>{{ server.cpu_cores }} cores</span>
