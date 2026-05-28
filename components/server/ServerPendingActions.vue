@@ -85,13 +85,20 @@ const handleDelete = async () => {
 <template>
   <div :class="[
     'pointer-events-auto flex items-center',
-    isCustomServerPending ? 'gap-0' : 'gap-1.5'
+    // gap-0 is the joined split-button look — only applies when the
+    // Provision pill is glued to the dots menu in custom-server pending
+    // states. Every other state (failed shows two independent buttons,
+    // new/starting shows just the dots menu) wants the standard 1.5
+    // gap so the buttons don't visually merge.
+    server.status !== 'failed' && isCustomServerPending ? 'gap-0' : 'gap-1.5'
   ]">
-    <!-- Failed servers get inline, discoverable actions. View logs is the
+    <!-- Failed servers get inline, discoverable actions. View Logs is the
          primary affordance (it opens the friendly error sheet with the
          Try-again / Manage-credentials buttons), Delete is destructive and
          confirmed in a dialog. Hiding these behind a dots menu tested badly
-         — users didn't notice them at all. -->
+         — users didn't notice them at all. Label intentionally matches the
+         dots-menu entry ("View Logs") so the two surfaces aren't naming the
+         same action two different ways. -->
     <template v-if="server.status === 'failed'">
       <Button
         variant="outline"
@@ -100,7 +107,7 @@ const handleDelete = async () => {
         @click.prevent="handleViewLogs"
       >
         <Icon name="lucide:scroll-text" class="h-3 w-3" />
-        View details
+        View Logs
       </Button>
       <Button
         variant="outline"
