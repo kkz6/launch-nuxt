@@ -6,10 +6,7 @@ import { Label } from '~/components/ui/label'
 import { Textarea } from '~/components/ui/textarea'
 import { Switch } from '~/components/ui/switch'
 import { Separator } from '~/components/ui/separator'
-import { useServersStore } from '~/stores/useServersStore'
 import type { Server } from '~/types'
-
-const serversStore = useServersStore()
 
 interface Props {
   server: Server
@@ -103,17 +100,6 @@ const deleteServer = async () => {
     await $api(`/servers/${props.server.id}`, {
       method: 'DELETE',
     })
-    // Optimistically remove the server from the cached store before the
-    // redirect. The backend flips the row to status="deleting" and runs
-    // the actual hard-delete + provider teardown asynchronously, so the
-    // authoritative `server.deleted` WS event can take 5–30s to arrive
-    // (cloud provider API call). Without this, the user lands on the
-    // server list with the deleted row still visible — exactly the
-    // race the customer hit. If deletion fails server-side, the
-    // backend broadcasts `server.deletion_failed` and the store flips
-    // the status back; if the row really is gone, this just preempts
-    // the WS-driven remove.
-    serversStore.remove(props.server.id)
     toast.success('Server deleted successfully')
     navigateTo('/servers')
   } catch (error: unknown) {
