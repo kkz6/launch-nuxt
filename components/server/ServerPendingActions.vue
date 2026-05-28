@@ -136,15 +136,45 @@ const handleDelete = async () => {
     <!-- All other transitional states (new, starting, custom-server pending)
          keep the compact dots menu so the card doesn't grow taller. -->
     <template v-else>
-      <!-- Try Connection — shown for custom servers sitting in
-           awaiting_connection. Replaces the old auto-polling flow: user
-           pastes the provision script themselves, then clicks here to
-           hand off to the platform. -->
+      <!--
+        Custom-server pending order: Provision script FIRST, Try Connection
+        second. Both buttons render side-by-side for an awaiting_connection
+        custom server because the workflow is genuinely two steps —
+        (1) open the dialog to copy the provision command and run it on the
+        target host, then (2) click Try Connection so the platform can
+        reach the now-installed agent. The old layout showed only Try
+        Connection at this stage and buried Provision in the dots menu,
+        which left new users clicking Try Connection on a server they
+        never installed the script on. The Provision button uses the
+        primary (filled) variant so it reads as "do this first."
+      -->
       <Button
-        v-if="canTryConnection"
+        v-if="isCustomServerPending"
         variant="default"
         size="sm"
-        class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
+        :class="[
+          'h-7 gap-1.5 px-2.5 text-xs',
+          'rounded-r-none border-r-0',
+        ]"
+        @click.prevent="handleProvision"
+      >
+        <Icon name="lucide:terminal" class="h-3 w-3" />
+        Provision
+      </Button>
+
+      <!--
+        Try Connection — adjacent to Provision when the server is awaiting
+        connection. Outline variant so Provision keeps primary emphasis;
+        the user shouldn't reach for this before running the script.
+      -->
+      <Button
+        v-if="canTryConnection"
+        variant="outline"
+        size="sm"
+        :class="[
+          'h-7 gap-1.5 px-2.5 text-xs',
+          isCustomServerPending ? 'rounded-none border-r-0' : 'rounded-r-none border-r-0',
+        ]"
         :disabled="isTryingConnection"
         @click.prevent="handleTryConnection"
       >
@@ -153,18 +183,6 @@ const handleDelete = async () => {
           :class="['h-3 w-3', isTryingConnection && 'animate-spin']"
         />
         Try Connection
-      </Button>
-
-      <!-- Primary Provision Button (for custom servers) -->
-      <Button
-        v-else-if="isCustomServerPending"
-        variant="outline"
-        size="sm"
-        class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
-        @click.prevent="handleProvision"
-      >
-        <Icon name="lucide:terminal" class="h-3 w-3" />
-        Provision
       </Button>
 
       <!-- Dropdown Menu — uses the conventional "more actions" dots icon
@@ -187,15 +205,6 @@ const handleDelete = async () => {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" class="w-40">
-          <!-- Provision option (shown for non-custom servers or as backup) -->
-          <DropdownMenuItem
-            v-if="isCustomServerPending"
-            @click.prevent="handleProvision"
-          >
-            <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
-            Provision
-          </DropdownMenuItem>
-
           <!-- View Logs -->
           <DropdownMenuItem @click.prevent="handleViewLogs">
             <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
