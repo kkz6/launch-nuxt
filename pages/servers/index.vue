@@ -26,7 +26,7 @@ useHead({
 // where every page had its own fetch+merge+subscribe — see
 // stores/useServersStore.ts for the rationale.
 const serversStore = useServersStore();
-const { servers, isLoading } = storeToRefs(serversStore);
+const { servers, isLoading, hasFetched } = storeToRefs(serversStore);
 
 // Provision dialog state
 const showProvisionDialog = ref(false);
@@ -208,7 +208,18 @@ onMounted(() => {
 
 <template>
   <div class="pb-10">
-    <div v-if="isLoading" class="flex items-center justify-center py-12">
+    <!--
+      The spinner condition includes `!hasFetched` so the very first
+      render frame after a hard refresh shows the loader, not the
+      "No servers" empty state. Without the guard, the initial render
+      saw `isLoading=false` (the store hasn't started fetching yet —
+      onMounted runs *after* the first paint) and `servers=[]`, so the
+      empty state flashed for one frame before fetchAll() flipped
+      isLoading to true. `hasFetched` flips to true once at the end of
+      the first successful fetch and stays true, so subsequent refetches
+      (from WS reconcile, manual retry, etc.) behave the same as before.
+    -->
+    <div v-if="isLoading || !hasFetched" class="flex items-center justify-center py-12">
       <Icon
         name="lucide:loader-2"
         class="h-8 w-8 animate-spin text-muted-foreground"
@@ -282,6 +293,20 @@ onMounted(() => {
                     <template v-if="server.operating_system_label">
                       <span class="text-muted-foreground">OS</span>
                       <span>{{ server.operating_system_label }}</span>
+                    </template>
+                    <!--
+                      Detected row only appears once the detect_os
+                      provision step has actually run (legacy servers
+                      from before the step existed come back with
+                      every detected_* field as null). When it's
+                      present we render it as a single compact line
+                      so the tooltip doesn't bloat.
+                    -->
+                    <template v-if="server.detected_os_id">
+                      <span class="text-muted-foreground">Detected</span>
+                      <span>
+                        {{ server.detected_os_id }}<template v-if="server.detected_os_version"> {{ server.detected_os_version }}</template><template v-if="server.detected_os_version_codename"> ({{ server.detected_os_version_codename }})</template><template v-if="server.detected_arch"> · {{ server.detected_arch }}</template><template v-if="server.detected_kernel"> · kernel {{ server.detected_kernel }}</template>
+                      </span>
                     </template>
                     <template v-if="server.cpu_cores">
                       <span class="text-muted-foreground">CPU</span>
@@ -411,7 +436,6 @@ onMounted(() => {
                   @view-logs="openLogsDialog"
                   @deleted="handleServerDeleted"
                   @retry-provision="handleRetryProvision"
-                  @connected="handleConnected"
                 />
               </div>
             </div>
@@ -429,6 +453,7 @@ onMounted(() => {
       v-model:open="showProvisionDialog"
       :server-id="selectedServer.id"
       :provision-command="selectedServer.provision_command || null"
+      @connected="handleConnected"
     />
 
     <!-- Provision Logs Sheet -->

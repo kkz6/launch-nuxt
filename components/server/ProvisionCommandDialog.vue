@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
@@ -14,6 +15,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '~/components/ui/collapsible'
+import { serverService } from '~/services/serverService'
 
 interface Props {
   serverId: string
@@ -22,7 +24,44 @@ interface Props {
 
 const props = defineProps<Props>()
 
+const emit = defineEmits<{
+  connected: []
+}>()
+
 const open = defineModel<boolean>('open', { default: false })
+
+const isTryingConnection = ref(false)
+
+// Try the SSH connection from inside the dialog so the entire
+// "copy the script → run it on your box → confirm reachability"
+// loop lives in one place. The card outside used to carry a parallel
+// Try Connection button, which split the flow: users would dismiss
+// the script dialog, click Try on the card, fail, reopen the dialog,
+// copy again. One workflow surface is cleaner.
+const handleTryConnection = async () => {
+  isTryingConnection.value = true
+  try {
+    await serverService.tryConnection(props.serverId)
+    toast.success('Connected — provisioning started')
+    emit('connected')
+    open.value = false
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    const raw = (err.data?.message || '').trim()
+    // Backend errors here are long — SSH handshake failures concatenate
+    // host:port, handshake stage, attempted auth methods, and a hint
+    // into one string (~300+ chars). Putting that into toast.error's
+    // single title slot stretched the toast to fill the screen. Split
+    // into a short bold title and the verbose detail in description,
+    // where Sonner renders it as secondary text with proper wrapping.
+    toast.error('Try Connection failed', {
+      description: raw || 'Make sure the provision command ran successfully and try again.',
+      duration: 10000,
+    })
+  } finally {
+    isTryingConnection.value = false
+  }
+}
 
 const isDev = import.meta.dev
 
@@ -210,11 +249,43 @@ watch(showScriptContent, (isOpen) => {
               Server pending provisioning
             </p>
             <p class="text-sm text-amber-700 dark:text-amber-300">
-              Run the provision command on your server to allow Launch to connect and manage it.
+              Run the provision command on your server. Once it finishes,
+              click <strong>Try Connection</strong> below and Launch will take
+              over from there.
             </p>
           </div>
         </div>
       </div>
+
+      <DialogFooter class="gap-2 sm:gap-2">
+        <Button
+          variant="outline"
+          :disabled="isTryingConnection"
+          @click="open = false"
+        >
+          Close
+        </Button>
+        <!--
+          Picks up the same amber palette as the warning banner directly
+          above so the dialog reads as one coherent "this is the pending
+          action" surface. Darker than the secondary variant (amber-100
+          fill vs secondary gray) with a visible border so it's
+          unmistakably the primary CTA next to Close, and so it carries
+          the same bordered look as the Provision button that opened
+          this dialog in the first place.
+        -->
+        <Button
+          :disabled="isTryingConnection"
+          class="border border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700/60 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-800/60"
+          @click="handleTryConnection"
+        >
+          <Icon
+            :name="isTryingConnection ? 'lucide:loader-2' : 'lucide:plug-zap'"
+            :class="['mr-2 h-4 w-4', isTryingConnection && 'animate-spin']"
+          />
+          Try Connection
+        </Button>
+      </DialogFooter>
     </DialogContent>
   </Dialog>
 </template>
