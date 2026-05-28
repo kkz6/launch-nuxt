@@ -152,6 +152,37 @@ const statusLabel = (status: string): string => {
   }
 };
 
+// See components/application/Deployments.vue#failureSummary for the
+// full rationale. Same helper, same `::LAUNCH::deploy_step::` marker
+// parsing — keeps the two views consistent (a customer scanning an
+// app row and a compose row gets the same shape of error chip).
+type FailureSummary = { step: string; detail: string };
+const failureSummary = (raw?: string | null): FailureSummary | null => {
+  if (!raw) return null;
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  let step = "";
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/^::LAUNCH::deploy_step::([a-z0-9_]+)/);
+    if (m) {
+      step = m[1].replace(/_/g, " ");
+      break;
+    }
+  }
+  const noise =
+    /^(WARNING!|Configure a credential|See https?:\/\/|Login Succeeded|\+ |::LAUNCH::|\s*$)/i;
+  let detail = "";
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!noise.test(lines[i])) {
+      detail = lines[i];
+      break;
+    }
+  }
+  if (!detail) detail = lines[lines.length - 1];
+  if (!step && !detail) return null;
+  return { step, detail };
+};
+
 const openLogs = (d: DockerDeployment) => {
   if (!d.task_id) return;
   logSheetTaskId.value = d.task_id;
@@ -231,16 +262,35 @@ onMounted(fetchDeployments);
               />
             </span>
 
-            <!-- Error from the deploy task — the only secondary info
-                 we have for compose stacks (no commit, no image_ref).
-                 Clamped to 2 lines; full text in the title attr. -->
-            <span
-              v-if="d.error && d.status === 'failed'"
-              class="mt-0.5 line-clamp-2 text-sm text-red-600 dark:text-red-400"
-              :title="d.error"
-            >
-              {{ d.error }}
-            </span>
+            <!--
+              Failed deploy summary — see
+              components/application/Deployments.vue for the same
+              treatment. Raw script transcript stays in `:title`
+              + behind View Logs; the row gets a one-liner.
+            -->
+            <template v-if="d.status === 'failed'">
+              <span
+                v-if="failureSummary(d.error)"
+                class="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-red-600 dark:text-red-400"
+                :title="d.error || ''"
+              >
+                <span
+                  v-if="failureSummary(d.error)?.step"
+                  class="shrink-0 rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs"
+                >
+                  {{ failureSummary(d.error)?.step }}
+                </span>
+                <span class="truncate">
+                  {{ failureSummary(d.error)?.detail }}
+                </span>
+              </span>
+              <span
+                v-else
+                class="mt-0.5 text-sm text-red-600 dark:text-red-400"
+              >
+                Deploy failed. Click View Logs for details.
+              </span>
+            </template>
           </div>
 
           <div class="flex shrink-0 flex-col items-end gap-2">

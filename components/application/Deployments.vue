@@ -174,6 +174,62 @@ const shortSha = (sha?: string | null): string => {
   return sha.substring(0, 7);
 };
 
+// Pull a clean one-line failure summary out of the deploy script's
+// raw output blob. The backend stores stderr+stdout verbatim on
+// docker_deployments.error (think: every `set -x` echo, every
+// warning, ANSI sequences, the docker-daemon error response, the
+// trailing newline soup). Dumping that into the list row inline
+// — even with line-clamp — looks like a spilled stack trace. We
+// keep two affordances instead:
+//
+//   1) Surface the actionable bit on the row: which step failed
+//      (parsed out of `::LAUNCH::deploy_step::<name>` markers the
+//      deploy script emits) and the last non-empty error line.
+//   2) Park the full transcript behind "View Logs" — which already
+//      opens a modal with proper monospace + scroll.
+//
+// Returns "" when there's nothing useful to show. Callers should
+// check explicitly so the row doesn't render an empty stripe.
+type FailureSummary = { step: string; detail: string };
+const failureSummary = (raw?: string | null): FailureSummary | null => {
+  if (!raw) return null;
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+
+  // Last LAUNCH marker = the step that was in flight when things
+  // went sideways. Strip the `::LAUNCH::deploy_step::` prefix and
+  // hyphenate so it reads as English on the chip.
+  let step = "";
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/^::LAUNCH::deploy_step::([a-z0-9_]+)/);
+    if (m) {
+      step = m[1].replace(/_/g, " ");
+      break;
+    }
+  }
+
+  // The actionable detail is usually the LAST non-noise line —
+  // skip generic warnings, "Login Succeeded", `+ shell echoes`,
+  // and the marker lines themselves. We're after the actual
+  // failure ("Error response from daemon: ...", a 4xx body, etc).
+  const noise =
+    /^(WARNING!|Configure a credential|See https?:\/\/|Login Succeeded|\+ |::LAUNCH::|\s*$)/i;
+  let detail = "";
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!noise.test(lines[i])) {
+      detail = lines[i];
+      break;
+    }
+  }
+  // Don't repeat the step name. If detail is empty (every line was
+  // noise), fall back to the literal last line so we say something
+  // rather than nothing.
+  if (!detail) detail = lines[lines.length - 1];
+
+  if (!step && !detail) return null;
+  return { step, detail };
+};
+
 const openLogs = (d: DockerDeployment) => {
   if (!d.task_id) return;
   logSheetTaskId.value = d.task_id;
@@ -305,13 +361,39 @@ onMounted(fetchDeployments);
             >
               {{ commitHeading(d.commit_msg) }}
             </span>
-            <span
-              v-else-if="d.error && d.status === 'failed'"
-              class="line-clamp-2 text-sm text-red-600 dark:text-red-400"
-              :title="d.error"
+            <!--
+              Failed deploy: render a clean one-line summary —
+              "Failed at <step> — <detail>" — instead of dumping
+              the entire script transcript inline. The full raw
+              output stays one click away in "View Logs". `:title`
+              still carries the unedited blob so hovering surfaces
+              the original for power users.
+            -->
+            <template
+              v-else-if="d.status === 'failed'"
             >
-              {{ d.error }}
-            </span>
+              <span
+                v-if="failureSummary(d.error)"
+                class="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-red-600 dark:text-red-400"
+                :title="d.error || ''"
+              >
+                <span
+                  v-if="failureSummary(d.error)?.step"
+                  class="shrink-0 rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs"
+                >
+                  {{ failureSummary(d.error)?.step }}
+                </span>
+                <span class="truncate">
+                  {{ failureSummary(d.error)?.detail }}
+                </span>
+              </span>
+              <span
+                v-else
+                class="text-sm text-red-600 dark:text-red-400"
+              >
+                Deploy failed. Click View Logs for details.
+              </span>
+            </template>
           </div>
 
           <div class="flex shrink-0 flex-col items-end gap-2">
