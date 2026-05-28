@@ -245,6 +245,25 @@ onMounted(fetchDeployments);
               >
                 {{ shortSha(d.commit_sha) }}
               </span>
+              <!--
+                Slice G of the GHA-builds feature. Show a small badge
+                when this deployment was initiated by a GitHub Actions
+                workflow notify, linking to the run page on github.com.
+                Manual + webhook auto-deploys carry no badge — they
+                already telegraph their origin via task_id presence.
+              -->
+              <a
+                v-if="d.trigger_source === 'github_actions' && d.gha_run_url"
+                :href="d.gha_run_url"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center gap-1 rounded-md border border-input bg-background px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                @click.stop
+              >
+                <Icon name="simple-icons:github" class="h-3 w-3" />
+                via GitHub Actions
+                <Icon name="lucide:external-link" class="h-3 w-3" />
+              </a>
             </div>
 
             <span

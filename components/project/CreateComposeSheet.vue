@@ -54,6 +54,10 @@ const sourceControlId = ref("");
 const selectedRepo = ref<Repository | null>(null);
 const gitRepoFallback = ref(""); // when no provider connected, paste URL
 const gitBranch = ref("main");
+// Mirror of the application sheet's gitBuildLocation toggle. Only
+// meaningful when sourceType === 'git'. See the matching ref in
+// CreateApplicationSheet.vue for the rationale.
+const gitBuildLocation = ref<"server" | "github_actions">("server");
 const composeFilePath = ref("");
 
 const rawYAML = ref("");
@@ -151,6 +155,7 @@ watch(isOpen, (open) => {
     selectedRepo.value = null;
     gitRepoFallback.value = "";
     gitBranch.value = "main";
+    gitBuildLocation.value = "server";
     composeFilePath.value = "";
     rawYAML.value = "";
     repositorySearchTerm.value = "";
@@ -196,12 +201,19 @@ const submit = async () => {
       toast.error("Pick a repository and branch");
       return;
     }
+    if (gitBuildLocation.value === "github_actions" && !sourceControlId.value) {
+      toast.error("GitHub Actions builds require a connected GitHub source control");
+      return;
+    }
     payload.git = {
       repo: repoUrl,
       branch,
       ...(sourceControlId.value ? { source_control_id: sourceControlId.value } : {}),
       ...(composeFilePath.value.trim()
         ? { compose_file_path: composeFilePath.value.trim() }
+        : {}),
+      ...(gitBuildLocation.value !== "server"
+        ? { build_location: gitBuildLocation.value }
         : {}),
     };
   } else {
@@ -419,6 +431,65 @@ const submit = async () => {
                 Optional. Relative to the repository root.
               </p>
             </div>
+          </div>
+
+          <!-- Build location picker — same shape as CreateApplicationSheet.
+               For composes the GHA workflow matrix-builds every service
+               declared with a `build:` directive in the compose file and
+               pushes each as a service-tagged image to GHCR. If the
+               compose has only `image:` services (everything prebuilt),
+               selecting GitHub Actions is harmless: the bootstrap job
+               still commits the workflow file but the matrix lands
+               empty and the build job is skipped at run time. -->
+          <div class="space-y-2 rounded-md border bg-muted/40 p-4">
+            <Label>Build location</Label>
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                :class="[
+                  'flex flex-col items-start gap-1 rounded-md border p-3 text-left transition-colors',
+                  gitBuildLocation === 'server'
+                    ? 'border-primary bg-background ring-1 ring-primary'
+                    : 'border-input bg-background hover:bg-accent/40',
+                ]"
+                @click="gitBuildLocation = 'server'"
+              >
+                <span class="flex items-center gap-2 text-sm font-medium">
+                  <Icon name="lucide:server" class="h-4 w-4" />
+                  On the server
+                </span>
+                <span class="text-xs text-muted-foreground">
+                  Worker SSHes into the docker host and runs the compose
+                  build there. Default.
+                </span>
+              </button>
+              <button
+                type="button"
+                :class="[
+                  'flex flex-col items-start gap-1 rounded-md border p-3 text-left transition-colors',
+                  gitBuildLocation === 'github_actions'
+                    ? 'border-primary bg-background ring-1 ring-primary'
+                    : 'border-input bg-background hover:bg-accent/40',
+                ]"
+                @click="gitBuildLocation = 'github_actions'"
+              >
+                <span class="flex items-center gap-2 text-sm font-medium">
+                  <Icon name="simple-icons:github" class="h-4 w-4" />
+                  GitHub Actions
+                </span>
+                <span class="text-xs text-muted-foreground">
+                  Matrix build per service with a <code>build:</code> in
+                  the compose file. Images push to GHCR.
+                </span>
+              </button>
+            </div>
+            <p
+              v-if="gitBuildLocation === 'github_actions' && !sourceControlId"
+              class="text-xs text-amber-700 dark:text-amber-300"
+            >
+              <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
+              Requires a connected GitHub source control above.
+            </p>
           </div>
         </div>
 

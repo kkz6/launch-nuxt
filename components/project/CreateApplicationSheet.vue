@@ -63,6 +63,14 @@ const gitRepoFallback = ref("");
 const gitBranch = ref("main");
 const gitBuildType = ref<"auto" | "nixpacks" | "dockerfile">("auto");
 const gitDockerfilePath = ref("");
+// Where the docker build runs. Server-side is today's default — the
+// worker SSHes onto the host and runs `docker build` there. GitHub
+// Actions delegates the build to a workflow Launch commits into the
+// customer's repo; on success the workflow calls our webhook and the
+// existing image-pull deploy path takes over. Only meaningful when
+// source_type === "git" (image / dockerfile sources have no repo to
+// commit a workflow into).
+const gitBuildLocation = ref<"server" | "github_actions">("server");
 
 const dockerfileContents = ref("");
 
@@ -158,6 +166,7 @@ watch(isOpen, (open) => {
     gitRepoFallback.value = "";
     gitBranch.value = "main";
     gitBuildType.value = "auto";
+    gitBuildLocation.value = "server";
     gitDockerfilePath.value = "";
     dockerfileContents.value = "";
     // Reset registry-auth picker so opening a fresh sheet doesn't
@@ -258,7 +267,22 @@ const submit = async () => {
         ...(gitDockerfilePath.value.trim()
           ? { dockerfile_path: gitDockerfilePath.value.trim() }
           : {}),
+        // Only ship build_location when the user picked something
+        // other than the default. Keeps the wire payload small and
+        // makes the server-side log line "github_actions selected" a
+        // clean signal that the workflow bootstrap will fire.
+        ...(gitBuildLocation.value !== "server"
+          ? { build_location: gitBuildLocation.value }
+          : {}),
       };
+      // The GHA path requires a connected GitHub source control —
+      // the backend's bootstrap job needs an installation token to
+      // commit the workflow file. Refuse here so the user sees a
+      // friendlier message than the 422 they'd otherwise hit.
+      if (gitBuildLocation.value === "github_actions" && !sourceControlId.value) {
+        toast.error("GitHub Actions builds require a connected GitHub source control");
+        return;
+      }
       break;
     }
     case "dockerfile": {
@@ -649,6 +673,64 @@ const submit = async () => {
             <p class="text-xs text-muted-foreground">
               Relative to the repository root. Leave blank for
               <code>./Dockerfile</code>.
+            </p>
+          </div>
+
+          <!-- Build location: server (default, runs `docker build`
+               on the docker host) vs GitHub Actions (Launch commits a
+               workflow into the customer's repo via the GitHub App;
+               GHA builds + pushes to GHCR + webhooks Launch which
+               deploys the resulting image). The radio is only
+               meaningful when source = git, which is the parent
+               v-else-if branch we're inside. -->
+          <div class="space-y-2 rounded-md border bg-muted/40 p-4">
+            <Label>Build location</Label>
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                :class="[
+                  'flex flex-col items-start gap-1 rounded-md border p-3 text-left transition-colors',
+                  gitBuildLocation === 'server'
+                    ? 'border-primary bg-background ring-1 ring-primary'
+                    : 'border-input bg-background hover:bg-accent/40',
+                ]"
+                @click="gitBuildLocation = 'server'"
+              >
+                <span class="flex items-center gap-2 text-sm font-medium">
+                  <Icon name="lucide:server" class="h-4 w-4" />
+                  On the server
+                </span>
+                <span class="text-xs text-muted-foreground">
+                  Worker SSHes into the docker host and runs the build there.
+                  Default — works for any size repo.
+                </span>
+              </button>
+              <button
+                type="button"
+                :class="[
+                  'flex flex-col items-start gap-1 rounded-md border p-3 text-left transition-colors',
+                  gitBuildLocation === 'github_actions'
+                    ? 'border-primary bg-background ring-1 ring-primary'
+                    : 'border-input bg-background hover:bg-accent/40',
+                ]"
+                @click="gitBuildLocation = 'github_actions'"
+              >
+                <span class="flex items-center gap-2 text-sm font-medium">
+                  <Icon name="simple-icons:github" class="h-4 w-4" />
+                  GitHub Actions
+                </span>
+                <span class="text-xs text-muted-foreground">
+                  Launch commits a workflow into your repo. CI builds + pushes
+                  to GHCR; we deploy the image. Recommended for large apps.
+                </span>
+              </button>
+            </div>
+            <p
+              v-if="gitBuildLocation === 'github_actions' && !sourceControlId"
+              class="text-xs text-amber-700 dark:text-amber-300"
+            >
+              <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
+              Requires a connected GitHub source control above.
             </p>
           </div>
         </div>

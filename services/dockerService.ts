@@ -109,6 +109,17 @@ export interface CreateDockerApplicationData {
     source_control_id?: string;
     build_type?: "nixpacks" | "dockerfile";
     dockerfile_path?: string;
+    /**
+     * Where the docker build runs:
+     *   - "server" (default): the worker SSHes onto the docker host
+     *     and runs `docker build` there.
+     *   - "github_actions": commits a workflow file into the customer's
+     *     repo via the GitHub App, the workflow builds + pushes to
+     *     GHCR, and on success calls back into Launch to deploy the
+     *     resulting image.
+     * Only meaningful when source_type === "git".
+     */
+    build_location?: "server" | "github_actions";
   };
   dockerfile?: {
     contents: string;
@@ -643,6 +654,12 @@ export interface CreateDockerComposeData {
     branch: string;
     source_control_id?: string;
     compose_file_path?: string;
+    /**
+     * Mirror of CreateDockerApplicationData.git.build_location.
+     * "server" (default) or "github_actions". Only meaningful when
+     * compose_source_type === "git".
+     */
+    build_location?: "server" | "github_actions";
   };
   raw_yaml?: {
     contents: string;
@@ -843,6 +860,21 @@ export interface DockerDeployment {
   error?: string | null;
   created_at?: string;
   updated_at?: string;
+  /**
+   * How this deployment was initiated.
+   *   - "manual": user clicked Deploy in the UI.
+   *   - "auto": webhook-driven auto-deploy on git push (when wired).
+   *   - "github_actions": a GHA workflow notified our webhook on
+   *     a successful build+push.
+   * Defaults to "manual" for pre-existing rows via the migration default.
+   */
+  trigger_source?: "manual" | "auto" | "github_actions";
+  /**
+   * Deep link to the GitHub Actions run that produced this
+   * deployment. Only set when trigger_source === "github_actions".
+   * The deployment-list badge uses this as the click target.
+   */
+  gha_run_url?: string | null;
 }
 
 /**
