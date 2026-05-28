@@ -103,10 +103,23 @@ export const useChannelEvents = (
     }
   }, { immediate: true })
 
-  // Clean up on unmount (only if called within a component)
-  if (getCurrentInstance()) {
-    onUnmounted(cleanup)
-  }
+  // Bind cleanup to the *current effect scope*, not the component
+  // instance. In a component's setup() the active scope IS the
+  // component, so this still fires on unmount (same behaviour as
+  // before). But when called from a Pinia store's detached
+  // `effectScope(true).run(...)` — which is exactly how
+  // useServersStore subscribes — the active scope is that detached
+  // scope, NOT the page component that happened to trigger the
+  // store call. With the previous `onUnmounted` + `getCurrentInstance`
+  // wiring, the store's WS subscription got torn down the moment the
+  // user navigated away from /servers (e.g. into a server detail
+  // page); a subsequent return to /servers found the store's
+  // `subscribed` flag still true and never re-subscribed, so events
+  // like `server.deleted` were silently dropped and rows stayed in
+  // the list forever. `onScopeDispose` respects whichever scope is
+  // actually responsible for the lifecycle, and is a safe no-op when
+  // called outside any scope.
+  onScopeDispose(cleanup)
 
   return {
     isConnected,
