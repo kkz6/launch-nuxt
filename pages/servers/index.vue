@@ -26,7 +26,7 @@ useHead({
 // where every page had its own fetch+merge+subscribe — see
 // stores/useServersStore.ts for the rationale.
 const serversStore = useServersStore();
-const { servers, isLoading } = storeToRefs(serversStore);
+const { servers, isLoading, hasFetched } = storeToRefs(serversStore);
 
 // Provision dialog state
 const showProvisionDialog = ref(false);
@@ -208,7 +208,18 @@ onMounted(() => {
 
 <template>
   <div class="pb-10">
-    <div v-if="isLoading" class="flex items-center justify-center py-12">
+    <!--
+      The spinner condition includes `!hasFetched` so the very first
+      render frame after a hard refresh shows the loader, not the
+      "No servers" empty state. Without the guard, the initial render
+      saw `isLoading=false` (the store hasn't started fetching yet —
+      onMounted runs *after* the first paint) and `servers=[]`, so the
+      empty state flashed for one frame before fetchAll() flipped
+      isLoading to true. `hasFetched` flips to true once at the end of
+      the first successful fetch and stays true, so subsequent refetches
+      (from WS reconcile, manual retry, etc.) behave the same as before.
+    -->
+    <div v-if="isLoading || !hasFetched" class="flex items-center justify-center py-12">
       <Icon
         name="lucide:loader-2"
         class="h-8 w-8 animate-spin text-muted-foreground"
