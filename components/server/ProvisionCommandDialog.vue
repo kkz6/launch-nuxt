@@ -259,7 +259,7 @@ watch(showScriptContent, (isOpen) => {
           Close
         </Button>
         <Button
-          variant="default"
+          variant="secondary"
           :disabled="isTryingConnection"
           @click="handleTryConnection"
         >

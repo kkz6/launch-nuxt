@@ -127,7 +127,7 @@ const handleDelete = async () => {
       -->
       <Button
         v-if="isCustomServerPending"
-        variant="default"
+        variant="secondary"
         size="sm"
         class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
         @click.prevent="handleProvision"
