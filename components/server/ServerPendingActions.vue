@@ -125,11 +125,19 @@ const handleDelete = async () => {
         clicking Try Connection on the card before they've even seen
         the script they were supposed to run.
       -->
+      <!--
+        Tint matches the yellow dot the server card already shows in
+        awaiting_connection state (see pages/servers/index.vue:135-136).
+        Same colour family = same "you have a pending action" signal,
+        so the user's eye threads dot → button without a translation
+        step. Full border (not the variant default's borderless filled
+        look) so the split with the adjacent dots menu reads as one
+        joined control instead of a button next to a bordered orphan.
+      -->
       <Button
         v-if="isCustomServerPending"
-        variant="secondary"
         size="sm"
-        class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
+        class="h-7 gap-1.5 rounded-r-none border border-r-0 border-yellow-300 bg-yellow-50 px-2.5 text-xs text-yellow-900 hover:bg-yellow-100 dark:border-yellow-800/60 dark:bg-yellow-950/40 dark:text-yellow-200 dark:hover:bg-yellow-900/40"
         @click.prevent="handleProvision"
       >
         <Icon name="lucide:terminal" class="h-3 w-3" />
@@ -138,7 +146,9 @@ const handleDelete = async () => {
 
       <!-- Dropdown Menu — uses the conventional "more actions" dots icon
            instead of a generic chevron-down, which read as an "expand row"
-           affordance in user testing. -->
+           affordance in user testing. When the Provision tint is on the
+           left, the dots button picks up the same yellow border colour
+           so the split-button looks like a single unified control. -->
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button
@@ -146,7 +156,9 @@ const handleDelete = async () => {
             size="sm"
             :class="[
               'h-7 w-7 p-0',
-              isCustomServerPending ? 'rounded-l-none' : ''
+              isCustomServerPending
+                ? 'rounded-l-none border-yellow-300 dark:border-yellow-800/60'
+                : ''
             ]"
             aria-label="More actions"
             title="More actions"
