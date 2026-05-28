@@ -840,14 +840,7 @@ onMounted(() => {
       when it was the last section.
     -->
     <div class="px-6 pt-6">
-      <!--
-        Heading uses mb-2 (not the mb-4 the other sections use)
-        because this section sits below the heading with no
-        intermediate row card buffering the gap when there are zero
-        credentials. mb-4 leaves an awkward void; mb-2 keeps the
-        Connect button visually anchored to the heading.
-      -->
-      <h3 class="mb-2 text-base font-semibold">Docker Registry Credentials</h3>
+      <h3 class="mb-4 text-base font-semibold">Docker Registry Credentials</h3>
 
       <SettingsRegistryCredentialDialog
         v-model:open="isRegistryDialogOpen"
@@ -868,14 +861,37 @@ onMounted(() => {
       </div>
 
       <!--
-        Always render the populated layout — rows render only when
-        there are credentials, otherwise we drop straight to the flat
-        Connect button. Visual matches the populated Storage / DNS
-        sections (row cards + flat button) rather than carrying a
-        separate centered empty-state container.
+        Empty + populated states mirror the SSL Certificates section
+        above: a centered card with icon + label + Connect button
+        when there are no credentials, and row cards + a flat Connect
+        button once at least one is stored. Keeps the two sections
+        visually consistent within the same tab.
       -->
       <template v-else>
-        <div class="space-y-3">
+        <div
+          v-if="registryCredentials.length === 0"
+          class="rounded-lg border p-4"
+        >
+          <div class="flex flex-col items-center gap-3 py-2">
+            <Icon
+              name="lucide:container"
+              class="h-8 w-8 text-muted-foreground"
+            />
+            <span class="text-sm text-muted-foreground">
+              No Docker registry credentials
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              @click="openCreateRegistryDialog"
+            >
+              <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
+              Connect
+            </Button>
+          </div>
+        </div>
+
+        <div v-else class="space-y-3">
           <div
             v-for="c in registryCredentials"
             :key="c.id"
