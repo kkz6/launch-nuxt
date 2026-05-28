@@ -263,34 +263,17 @@ onMounted(fetchDeployments);
             </span>
 
             <!--
-              Failed deploy summary — see
-              components/application/Deployments.vue for the same
-              treatment. Raw script transcript stays in `:title`
-              + behind View Logs; the row gets a one-liner.
+              Just a small step pill on failure — same treatment as
+              components/application/Deployments.vue. The full
+              transcript is one click away in View Logs.
             -->
-            <template v-if="d.status === 'failed'">
-              <span
-                v-if="failureSummary(d.error)"
-                class="mt-0.5 flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-red-600 dark:text-red-400"
-                :title="d.error || ''"
-              >
-                <span
-                  v-if="failureSummary(d.error)?.step"
-                  class="shrink-0 rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs"
-                >
-                  {{ failureSummary(d.error)?.step }}
-                </span>
-                <span class="truncate">
-                  {{ failureSummary(d.error)?.detail }}
-                </span>
-              </span>
-              <span
-                v-else
-                class="mt-0.5 text-sm text-red-600 dark:text-red-400"
-              >
-                Deploy failed. Click View Logs for details.
-              </span>
-            </template>
+            <span
+              v-if="d.status === 'failed' && failureSummary(d.error)?.step"
+              class="mt-0.5 inline-flex w-fit items-center rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs text-red-600 dark:text-red-400"
+              :title="d.error || ''"
+            >
+              Failed at {{ failureSummary(d.error)?.step }}
+            </span>
           </div>
 
           <div class="flex shrink-0 flex-col items-end gap-2">

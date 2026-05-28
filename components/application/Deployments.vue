@@ -362,38 +362,20 @@ onMounted(fetchDeployments);
               {{ commitHeading(d.commit_msg) }}
             </span>
             <!--
-              Failed deploy: render a clean one-line summary —
-              "Failed at <step> — <detail>" — instead of dumping
-              the entire script transcript inline. The full raw
-              output stays one click away in "View Logs". `:title`
-              still carries the unedited blob so hovering surfaces
-              the original for power users.
+              Failed deploys get a small "which step blew up" pill
+              and nothing else. The full transcript already lives
+              behind View Logs (right side of the row) — dumping it
+              inline made the list look like a stack trace. The
+              `:title` keeps the raw blob accessible on hover for
+              power users who want it without opening the sheet.
             -->
-            <template
-              v-else-if="d.status === 'failed'"
+            <span
+              v-else-if="d.status === 'failed' && failureSummary(d.error)?.step"
+              class="mt-0.5 inline-flex w-fit items-center rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs text-red-600 dark:text-red-400"
+              :title="d.error || ''"
             >
-              <span
-                v-if="failureSummary(d.error)"
-                class="flex min-w-0 flex-wrap items-center gap-1.5 text-sm text-red-600 dark:text-red-400"
-                :title="d.error || ''"
-              >
-                <span
-                  v-if="failureSummary(d.error)?.step"
-                  class="shrink-0 rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs"
-                >
-                  {{ failureSummary(d.error)?.step }}
-                </span>
-                <span class="truncate">
-                  {{ failureSummary(d.error)?.detail }}
-                </span>
-              </span>
-              <span
-                v-else
-                class="text-sm text-red-600 dark:text-red-400"
-              >
-                Deploy failed. Click View Logs for details.
-              </span>
-            </template>
+              Failed at {{ failureSummary(d.error)?.step }}
+            </span>
           </div>
 
           <div class="flex shrink-0 flex-col items-end gap-2">
