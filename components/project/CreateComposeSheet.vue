@@ -500,38 +500,39 @@ const submit = async () => {
               visibility to Public after the first build or attach
               a PAT-backed registry credential.
             -->
+            <!-- See components/project/CreateApplicationSheet.vue for the
+                 verified limitation. Same situation for compose,
+                 multiplied by the number of services since each
+                 buildable service publishes a separate package. -->
             <div
               v-if="gitBuildLocation === 'github_actions'"
               class="rounded-md border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-900 dark:text-blue-200"
             >
               <div class="mb-1 flex items-center gap-1.5 font-medium">
                 <Icon name="lucide:info" class="h-3.5 w-3.5" />
-                A note on private GHCR packages
+                After the first build, pick how Launch pulls from GHCR
               </div>
               <p class="mb-2 text-blue-900/90 dark:text-blue-200/90">
-                The workflow we commit pushes one image per buildable
-                service to
+                The workflow we commit publishes one image per
+                buildable service to
                 <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;/&lt;service&gt;</span>.
-                The deploy worker pulls them back using the GitHub
-                App's installation token. That works for
-                <span class="font-medium">org-owned</span> repositories
-                and <span class="font-medium">public</span> packages,
-                but <span class="font-medium">not</span> for private
-                packages owned by a
-                <span class="font-medium">user account</span> — GHCR
-                doesn't grant App installations access to user-owned
-                packages, even with
-                <span class="font-mono">packages:read</span>.
+                GitHub Packages doesn't currently let a GitHub App's
+                installation token pull <em>private</em> GHCR images.
+                You have one of two options to get past the first
+                deploy:
               </p>
-              <p class="text-blue-900/90 dark:text-blue-200/90">
-                If your repository is under a personal account, after
-                the first build either set each service's package to
-                <span class="font-mono">Public</span> visibility, or
-                attach a registry credential carrying a personal
-                access token with
-                <span class="font-mono">read:packages</span> to this
-                stack.
-              </p>
+              <ul class="ml-4 list-disc space-y-1 text-blue-900/90 dark:text-blue-200/90">
+                <li>
+                  Flip each service's package to
+                  <span class="font-mono">Public</span> visibility on
+                  GitHub.
+                </li>
+                <li>
+                  Or attach a Personal Access Token (classic) with
+                  <span class="font-mono">read:packages</span> as a
+                  Registry Credential on this stack.
+                </li>
+              </ul>
             </div>
           </div>
         </div>
