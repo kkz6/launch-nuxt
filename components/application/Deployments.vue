@@ -82,8 +82,41 @@ const scheduleRefetch = () => {
   if (refetchTimer) clearTimeout(refetchTimer);
   refetchTimer = setTimeout(() => fetchDeployments(true), 300);
 };
+
+// Two parallel event streams feed this view:
+//
+//   1) `docker.application.*` on the team channel — fired by the
+//      service layer when the workload's overall lifecycle moves
+//      (created / deploying / deployed / failed / gha_synced …).
+//      These are the "an application thing happened" events.
+//
+//   2) `deployment.*` on the same team channel — fired by the
+//      deploy_application job for the *row-level* deployment
+//      lifecycle (started / progress / finished / failed / timeout).
+//      Critically, the GHA-initiated webhook path enqueues a
+//      deploy_application job whose terminal `.finished` / `.failed`
+//      events ride this stream, NOT the docker.application stream.
+//      Without this second subscription, GHA-triggered deployments
+//      land silently and the user has to manually refresh to see the
+//      row turn green / red.
+const isMine = (
+  data: { application_id?: string; deployment_id?: string; target_id?: string; target_type?: string },
+): boolean => {
+  if (data.application_id === props.application.id) return true;
+  // deployment events carry target_type + target_id rather than a
+  // typed application_id — match either shape.
+  if (data.target_type === "application" && data.target_id === props.application.id) {
+    return true;
+  }
+  return false;
+};
+
 useDockerApplicationEvents(teamId, (data) => {
-  if (data.application_id !== props.application.id) return;
+  if (!isMine(data)) return;
+  scheduleRefetch();
+});
+useDeploymentEvents(teamId, (data) => {
+  if (!isMine(data)) return;
   scheduleRefetch();
 });
 

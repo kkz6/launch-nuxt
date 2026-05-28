@@ -77,6 +77,22 @@ export interface DockerApplication {
   last_deployed_at?: string | null;
   created_at?: string;
   updated_at?: string;
+  /**
+   * "server" (default) — worker SSHes into the docker host and runs
+   * `docker build` there. "github_actions" — Launch committed a GHA
+   * workflow into the repo; CI builds + pushes to GHCR, then notifies
+   * Launch to deploy. Mirrors docker_applications.build_location.
+   */
+  build_location?: "server" | "github_actions";
+  /**
+   * Derived backend-side from (build_location=github_actions) AND
+   * (a deploy token has been minted) AND (a workflow SHA has been
+   * persisted). True means the GHA pipeline is fully provisioned;
+   * false means setup is incomplete (typical right after creation,
+   * before the bootstrap job has run) and the GHA subtab should show
+   * the "bootstrap is provisioning…" / "broken install" affordances.
+   */
+  gha_build_ready?: boolean;
 }
 
 /**
@@ -644,6 +660,17 @@ export interface DockerCompose {
    * preload happened".
    */
   registry_credentials?: DockerRegistryCredentialSummary[];
+  /**
+   * "server" (default) — worker SSHes into the docker host and runs
+   * `docker compose up --build` there. "github_actions" — Launch
+   * committed a GHA workflow that builds each service image, pushes to
+   * GHCR, then notifies Launch which rewrites the compose file's
+   * `image:` refs and runs `docker compose up`. Mirrors
+   * docker_composes.build_location.
+   */
+  build_location?: "server" | "github_actions";
+  /** Same derived flag as on DockerApplication. */
+  gha_build_ready?: boolean;
 }
 
 export interface CreateDockerComposeData {
@@ -1051,6 +1078,58 @@ export const dockerService = {
       );
     },
 
+    // ---- GitHub Actions builds management (slice I polish) ----
+    //
+    // Only meaningful when build_location === "github_actions". All
+    // three endpoints return immediately after queuing the bootstrap
+    // job; the real work happens on the worker. The UI subscribes to
+    // docker.application.gha_synced / .gha_install_broken /
+    // .gha_disabled on the team channel to refresh state.
+
+    /**
+     * Mint a fresh deploy token, hash it, push the new value as the
+     * `LAUNCH_DEPLOY_TOKEN` Actions secret on the repo, and rotate the
+     * stored hash on the row. Use when a token is suspected leaked or
+     * just on a routine cadence.
+     */
+    rotateGhaToken: (serverId: string, projectId: string, applicationId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<{ status: string; message: string }>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/gha/rotate-token`,
+        {},
+      );
+    },
+
+    /**
+     * Re-render the workflow YAML from the current template, PUT it
+     * back over the existing file on the repo, and re-sync secrets +
+     * variables. No-op on the GitHub side if nothing actually changed
+     * (the underlying PutContents uses an If-Match against the stored
+     * SHA so we don't churn commits).
+     */
+    resyncGhaWorkflow: (serverId: string, projectId: string, applicationId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/gha/resync`,
+        {},
+      );
+    },
+
+    /**
+     * Flip build_location back to "server", clear the token hash and
+     * GHA fields in source_config. Doesn't touch the workflow file on
+     * the customer's repo (intentional — they can delete it manually
+     * if they want; we don't take silent destructive actions on their
+     * code).
+     */
+    disableGha: (serverId: string, projectId: string, applicationId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/gha/disable`,
+        {},
+      );
+    },
+
     listDomains: (serverId: string, projectId: string, applicationId: string) => {
       const { get } = useApi();
       return get<ApiResponse<DockerDomain[]>>(
@@ -1440,6 +1519,33 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerDeployment[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments`,
+      );
+    },
+
+    // ---- GitHub Actions builds management (compose mirror) ----
+    // See applications.rotateGhaToken/resyncGhaWorkflow/disableGha for the contract.
+
+    rotateGhaToken: (serverId: string, projectId: string, composeId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<{ status: string; message: string }>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/rotate-token`,
+        {},
+      );
+    },
+
+    resyncGhaWorkflow: (serverId: string, projectId: string, composeId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/resync`,
+        {},
+      );
+    },
+
+    disableGha: (serverId: string, projectId: string, composeId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/disable`,
+        {},
       );
     },
 

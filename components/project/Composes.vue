@@ -105,6 +105,22 @@ const relative = (iso?: string | null): string => {
   }
 };
 
+// See components/project/Applications.vue#lastDeployText for the
+// rationale. Same semantics for compose stacks — status pill +
+// timestamp must not contradict each other.
+const lastDeployText = (c: DockerCompose): string => {
+  if (c.last_deployed_at) {
+    return `Deployed ${relative(c.last_deployed_at)}`;
+  }
+  if (c.status === "building") {
+    return "Deploying…";
+  }
+  if (c.status === "failed") {
+    return "Last deploy failed";
+  }
+  return "Never deployed";
+};
+
 // WS so status badges + names stay live across renames and deploys.
 // The backend's composeBroadcast helper guarantees every event
 // carries compose_id alongside id — see compose_service.go.
@@ -180,7 +196,18 @@ onMounted(fetchComposes);
               />
             </div>
             <div class="min-w-0 flex-1">
-              <h3 class="truncate font-semibold">{{ c.name }}</h3>
+              <div class="flex items-center gap-2">
+                <h3 class="truncate font-semibold">{{ c.name }}</h3>
+                <!-- GHA pill — see components/project/Applications.vue for rationale. -->
+                <span
+                  v-if="c.build_location === 'github_actions'"
+                  class="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  title="Builds run in GitHub Actions"
+                >
+                  <Icon name="simple-icons:github" class="h-3 w-3" />
+                  GHA
+                </span>
+              </div>
               <p class="line-clamp-1 text-sm text-muted-foreground">
                 {{ sourceSummary(c) }}
               </p>
@@ -203,7 +230,7 @@ onMounted(fetchComposes);
               {{ c.status }}
             </span>
             <span class="text-xs text-muted-foreground">
-              {{ c.last_deployed_at ? `Deployed ${relative(c.last_deployed_at)}` : "Never deployed" }}
+              {{ lastDeployText(c) }}
             </span>
           </div>
         </div>

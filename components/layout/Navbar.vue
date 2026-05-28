@@ -37,7 +37,8 @@ interface Team {
 
 const { user, logout, fetchUser } = useAuth();
 const { setCurrentTeamId } = useApi();
-const { reconnect: reconnectWebSocket } = useWebSocket();
+const { reconnect: reconnectWebSocket, isConnected: isWsConnected } =
+  useWebSocket();
 const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
@@ -547,6 +548,10 @@ const databaseSubTabs = [
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];
+// `gha` only renders when this specific workload is build_location=
+// github_actions. See workloadSubTabs below for the conditional —
+// keeping the canonical order here means the filter doesn't have to
+// reorder when it adds the tab in.
 const applicationSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
@@ -555,6 +560,7 @@ const applicationSubTabs = [
   { value: "redirects", label: "Redirects", query: "redirects", icon: "lucide:corner-up-right" },
   { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
   { value: "schedules", label: "Schedulers", query: "schedules", icon: "lucide:clock" },
+  { value: "gha", label: "GitHub Actions", query: "gha", icon: "simple-icons:github" },
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];
@@ -579,6 +585,7 @@ const composeSubTabs = [
   { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
   { value: "domains", label: "Domains", query: "domains", icon: "lucide:globe" },
   { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
+  { value: "gha", label: "GitHub Actions", query: "gha", icon: "simple-icons:github" },
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
 ];
@@ -593,8 +600,17 @@ const workloadSubTabs = computed(() => {
       }
       return databaseSubTabs;
     case "application":
+      // Hide the GitHub Actions tab on server-built apps. Same
+      // visibility rule the detail page applies — keep the chrome
+      // honest with the workload's actual build_location.
+      if (workloadBuildLocation.value !== "github_actions") {
+        return applicationSubTabs.filter((t) => t.value !== "gha");
+      }
       return applicationSubTabs;
     case "compose":
+      if (workloadBuildLocation.value !== "github_actions") {
+        return composeSubTabs.filter((t) => t.value !== "gha");
+      }
       return composeSubTabs;
     default:
       return [];
@@ -777,6 +793,11 @@ const workloadStatus = ref<string | null>(null);
 const workloadEngine = ref<string | null>(null);
 const workloadVersion = ref<string | null>(null);
 const workloadExternalPort = ref<number | null>(null);
+// build_location for application + compose workloads. Drives whether
+// the "GitHub Actions" subtab appears in the strip — we hide it for
+// server-built workloads to keep the chrome clean for the common case.
+// Null when the field isn't applicable (databases) or hasn't loaded.
+const workloadBuildLocation = ref<string | null>(null);
 
 const projectDetailTabs = [
   { value: 'overview', label: 'Overview', query: 'overview', icon: 'lucide:layout-dashboard' },
@@ -1012,6 +1033,7 @@ watch(
           engine?: string;
           engine_version?: string;
           external_port?: number | null;
+          build_location?: string | null;
         };
       }>(path);
       workloadName.value = res.data.name;
@@ -1019,12 +1041,14 @@ watch(
       workloadEngine.value = res.data.engine ?? null;
       workloadVersion.value = res.data.engine_version ?? null;
       workloadExternalPort.value = res.data.external_port ?? null;
+      workloadBuildLocation.value = res.data.build_location ?? null;
     } catch {
       workloadName.value = null;
       workloadStatus.value = null;
       workloadEngine.value = null;
       workloadVersion.value = null;
       workloadExternalPort.value = null;
+      workloadBuildLocation.value = null;
     }
   },
   { immediate: true },
@@ -1409,6 +1433,31 @@ onMounted(fetchTeams);
           <Icon name="lucide:arrow-right" class="h-3.5 w-3.5" />
         </span>
       </div>
+
+      <!--
+        WS disconnected banner. The reconnect logic in useWebSocket
+        does its best (exponential backoff up to ~5 min; auto-resumes
+        on `visibilitychange` / `online`), but if all that fails we
+        owe the customer a visible signal + a click-to-retry — without
+        this they'd stare at a stale page assuming nothing's
+        happening. ClientOnly because `isWsConnected` is false during
+        SSR by design and we don't want a flash on hydrate.
+      -->
+      <ClientOnly>
+        <button
+          v-if="!isWsConnected"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/25 dark:text-amber-400"
+          title="Live updates aren't connected. Click to reconnect."
+          @click="reconnectWebSocket"
+        >
+          <Icon name="lucide:wifi-off" class="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">Live updates paused</span>
+          <span class="text-amber-700/70 underline dark:text-amber-400/70">
+            Reconnect
+          </span>
+        </button>
+      </ClientOnly>
 
       <div class="flex items-center space-x-2">
         <!-- User Menu (with Teams) -->

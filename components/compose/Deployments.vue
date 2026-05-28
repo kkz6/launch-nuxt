@@ -96,6 +96,22 @@ useChannelEvents(
   },
 );
 
+// Row-level deployment lifecycle (same rationale as
+// components/application/Deployments.vue): GHA-triggered deploys
+// surface their progress on the per-deployment event stream
+// (deployment.started / .finished / .failed), NOT on the
+// docker.compose.* one. Subscribe to both so the row turns
+// green / red without a manual refresh.
+useDeploymentEvents(teamId, (data) => {
+  if (
+    data.compose_id !== props.compose.id &&
+    !(data.target_type === "compose" && data.target_id === props.compose.id)
+  ) {
+    return;
+  }
+  scheduleRefetch();
+});
+
 // Status palette mirrors application Deployments.vue. The dot is what
 // users actually scan for, so we pick saturated colors and reserve
 // the animate-pulse for in-flight states.

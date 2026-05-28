@@ -24,6 +24,10 @@ const isLoading = ref(true);
 // Canonical order — must match the same sequence in
 // components/layout/Navbar.vue applicationSubTabs. See that file's
 // top-of-file comment for the canonical workload tab ordering.
+// `gha` only appears when the workload is actually GHA-backed —
+// declared in the canonical list so navbar / order stays consistent,
+// but filtered out of the rendered subtab strip by `visibleSubtabs`
+// below for server-side builds. (Show: SUBTABS, Render: visibleSubtabs.)
 const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
@@ -32,6 +36,7 @@ const SUBTABS = [
   { value: "redirects", label: "Redirects", icon: "lucide:corner-up-right" },
   { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
   { value: "schedules", label: "Schedules", icon: "lucide:clock" },
+  { value: "gha", label: "GitHub Actions", icon: "simple-icons:github" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
 ] as const;
@@ -124,8 +129,22 @@ const READY_SUBTABS: Record<string, boolean> = {
   environment: true,
   volumes: true,
   schedules: true,
+  gha: true,
   advanced: true,
 };
+
+// GHA subtab only renders for github_actions-backed apps. Hiding it
+// for "server" apps keeps the strip uncluttered for the common case
+// (most workloads aren't GHA-backed) and avoids the dead-end where a
+// user clicks an irrelevant tab and sees an empty state.
+const isGHA = computed(() => app.value?.build_location === "github_actions");
+const visibleSubtabs = computed(() =>
+  SUBTABS.filter((t) => t.value !== "gha" || isGHA.value),
+);
+// Expose to a child <Navbar> or layout in future; for now the local
+// SUBTABS array drives the strip via the layout's slot.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _exposedSubtabs = visibleSubtabs;
 
 // Refetch the application when WS events tell us its status changed —
 // the header status badge stays accurate without a manual refresh.
@@ -206,6 +225,12 @@ useDockerApplicationEvents(teamId, (data) => {
     <ApplicationSchedules
       v-else-if="subTab === 'schedules'"
       :application="app"
+    />
+
+    <ApplicationGHA
+      v-else-if="subTab === 'gha'"
+      :application="app"
+      @updated="fetchApp"
     />
 
     <ApplicationAdvanced
