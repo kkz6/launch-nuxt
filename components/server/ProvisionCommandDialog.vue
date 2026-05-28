@@ -258,9 +258,18 @@ watch(showScriptContent, (isOpen) => {
         >
           Close
         </Button>
+        <!--
+          Picks up the same amber palette as the warning banner directly
+          above so the dialog reads as one coherent "this is the pending
+          action" surface. Darker than the secondary variant (amber-100
+          fill vs secondary gray) with a visible border so it's
+          unmistakably the primary CTA next to Close, and so it carries
+          the same bordered look as the Provision button that opened
+          this dialog in the first place.
+        -->
         <Button
-          variant="secondary"
           :disabled="isTryingConnection"
+          class="border border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700/60 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-800/60"
           @click="handleTryConnection"
         >
           <Icon
