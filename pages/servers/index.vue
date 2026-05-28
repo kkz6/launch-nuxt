@@ -422,7 +422,6 @@ onMounted(() => {
                   @view-logs="openLogsDialog"
                   @deleted="handleServerDeleted"
                   @retry-provision="handleRetryProvision"
-                  @connected="handleConnected"
                 />
               </div>
             </div>
@@ -440,6 +439,7 @@ onMounted(() => {
       v-model:open="showProvisionDialog"
       :server-id="selectedServer.id"
       :provision-command="selectedServer.provision_command || null"
+      @connected="handleConnected"
     />
 
     <!-- Provision Logs Sheet -->

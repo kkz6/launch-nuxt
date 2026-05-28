@@ -32,47 +32,27 @@ const emit = defineEmits<{
   deleted: [serverId: string]
   viewLogs: [server: Server]
   retryProvision: [server: Server]
-  connected: [server: Server]
 }>()
 
 const showDeleteDialog = ref(false)
 const isDeleting = ref(false)
-const isTryingConnection = ref(false)
 
 // Check if server can be deleted (not during active provisioning)
 const canDelete = computed(() => {
   return ['new', 'starting', 'failed', 'awaiting_connection'].includes(props.server.status)
 })
 
-// Check if this is a custom server that needs manual provisioning
+// Check if this is a custom server that needs manual provisioning.
+// Drives the Provision button on the card; the dialog it opens now
+// owns the Try Connection step as well.
 const isCustomServerPending = computed(() => {
   return props.server.provider === 'custom_server' && props.server.provision_command
-})
-
-// Custom servers sit in awaiting_connection until the user pastes the
-// provision script and clicks "Try Connection". We don't auto-poll.
-const canTryConnection = computed(() => {
-  return props.server.status === 'awaiting_connection' && props.server.provider === 'custom_server'
 })
 
 // Check if retry provision is available (failed status + connected)
 const canRetryProvision = computed(() => {
   return props.server.status === 'failed' && props.server.connected
 })
-
-const handleTryConnection = async () => {
-  isTryingConnection.value = true
-  try {
-    await serverService.tryConnection(props.server.id)
-    toast.success('Connected — provisioning started')
-    emit('connected', props.server)
-  } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Could not reach server. Make sure the provision script ran successfully and try again.')
-  } finally {
-    isTryingConnection.value = false
-  }
-}
 
 const handleProvision = () => {
   emit('provision', props.server)
@@ -105,7 +85,7 @@ const handleDelete = async () => {
 <template>
   <div :class="[
     'pointer-events-auto flex items-center',
-    (canTryConnection || isCustomServerPending) ? 'gap-0' : 'gap-1.5'
+    isCustomServerPending ? 'gap-0' : 'gap-1.5'
   ]">
     <!-- Failed servers get inline, discoverable actions. View logs is the
          primary affordance (it opens the friendly error sheet with the
@@ -137,52 +117,23 @@ const handleDelete = async () => {
          keep the compact dots menu so the card doesn't grow taller. -->
     <template v-else>
       <!--
-        Custom-server pending order: Provision script FIRST, Try Connection
-        second. Both buttons render side-by-side for an awaiting_connection
-        custom server because the workflow is genuinely two steps —
-        (1) open the dialog to copy the provision command and run it on the
-        target host, then (2) click Try Connection so the platform can
-        reach the now-installed agent. The old layout showed only Try
-        Connection at this stage and buried Provision in the dots menu,
-        which left new users clicking Try Connection on a server they
-        never installed the script on. The Provision button uses the
-        primary (filled) variant so it reads as "do this first."
+        Single Provision button for custom servers awaiting connection.
+        Try Connection lives inside the dialog this opens — the user
+        copies the command, runs it on their box, and clicks Try
+        Connection right there without ever leaving the dialog. Keeping
+        both actions in one workflow surface stops new users from
+        clicking Try Connection on the card before they've even seen
+        the script they were supposed to run.
       -->
       <Button
         v-if="isCustomServerPending"
         variant="default"
         size="sm"
-        :class="[
-          'h-7 gap-1.5 px-2.5 text-xs',
-          'rounded-r-none border-r-0',
-        ]"
+        class="h-7 gap-1.5 rounded-r-none border-r-0 px-2.5 text-xs"
         @click.prevent="handleProvision"
       >
         <Icon name="lucide:terminal" class="h-3 w-3" />
         Provision
-      </Button>
-
-      <!--
-        Try Connection — adjacent to Provision when the server is awaiting
-        connection. Outline variant so Provision keeps primary emphasis;
-        the user shouldn't reach for this before running the script.
-      -->
-      <Button
-        v-if="canTryConnection"
-        variant="outline"
-        size="sm"
-        :class="[
-          'h-7 gap-1.5 px-2.5 text-xs',
-          isCustomServerPending ? 'rounded-none border-r-0' : 'rounded-r-none border-r-0',
-        ]"
-        :disabled="isTryingConnection"
-        @click.prevent="handleTryConnection"
-      >
-        <Icon
-          :name="isTryingConnection ? 'lucide:loader-2' : 'lucide:plug-zap'"
-          :class="['h-3 w-3', isTryingConnection && 'animate-spin']"
-        />
-        Try Connection
       </Button>
 
       <!-- Dropdown Menu — uses the conventional "more actions" dots icon
@@ -195,7 +146,7 @@ const handleDelete = async () => {
             size="sm"
             :class="[
               'h-7 w-7 p-0',
-              (canTryConnection || isCustomServerPending) ? 'rounded-l-none' : ''
+              isCustomServerPending ? 'rounded-l-none' : ''
             ]"
             aria-label="More actions"
             title="More actions"
