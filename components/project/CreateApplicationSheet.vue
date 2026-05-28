@@ -732,6 +732,55 @@ const submit = async () => {
               <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
               Requires a connected GitHub source control above.
             </p>
+
+            <!--
+              GHCR + GitHub App permission disclosure. The GHA workflow
+              we commit pushes images to ghcr.io/<owner>/<repo> using
+              the workflow's GITHUB_TOKEN. To pull on the deploy host,
+              the worker uses the Launch GitHub App's installation
+              token. The combination of "user-owned package" +
+              "private visibility" + "App installation token" is
+              specifically the one case that doesn't work — verified
+              live on kkz6/launch-gha-test (the install token gets
+              401 from GHCR's token-exchange because user-owned
+              packages don't grant access to App installations).
+
+              Surfacing this in the create flow is cheaper than
+              shipping the customer to a Sentry stack trace later.
+              Same note rendered on the compose create sheet.
+            -->
+            <div
+              v-if="gitBuildLocation === 'github_actions'"
+              class="rounded-md border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-900 dark:text-blue-200"
+            >
+              <div class="mb-1 flex items-center gap-1.5 font-medium">
+                <Icon name="lucide:info" class="h-3.5 w-3.5" />
+                A note on private GHCR packages
+              </div>
+              <p class="mb-2 text-blue-900/90 dark:text-blue-200/90">
+                The workflow we commit pushes built images to
+                <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;</span>.
+                The Launch deploy worker pulls them back using the
+                GitHub App's installation token. That works for
+                <span class="font-medium">org-owned</span> repositories
+                and for <span class="font-medium">public</span>
+                packages. It does <span class="font-medium">not</span>
+                work for private packages owned by a
+                <span class="font-medium">user account</span> — GHCR
+                doesn't grant App installations access to user-owned
+                packages, even with
+                <span class="font-mono">packages:read</span>.
+              </p>
+              <p class="text-blue-900/90 dark:text-blue-200/90">
+                If your repository is under a personal account, after
+                the first build either set the package to
+                <span class="font-mono">Public</span> visibility, or
+                attach a personal access token with
+                <span class="font-mono">read:packages</span> as a
+                saved Registry Credential on this application and
+                we'll use that to pull instead.
+              </p>
+            </div>
           </div>
         </div>
 

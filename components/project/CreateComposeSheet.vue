@@ -490,6 +490,49 @@ const submit = async () => {
               <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
               Requires a connected GitHub source control above.
             </p>
+
+            <!--
+              Same GHCR + GitHub App permission disclosure as the
+              application create sheet. See that file's comment for
+              the full rationale — short version: install token
+              can't pull private user-owned GHCR packages, so for
+              user-account repos either flip the per-service package
+              visibility to Public after the first build or attach
+              a PAT-backed registry credential.
+            -->
+            <div
+              v-if="gitBuildLocation === 'github_actions'"
+              class="rounded-md border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-900 dark:text-blue-200"
+            >
+              <div class="mb-1 flex items-center gap-1.5 font-medium">
+                <Icon name="lucide:info" class="h-3.5 w-3.5" />
+                A note on private GHCR packages
+              </div>
+              <p class="mb-2 text-blue-900/90 dark:text-blue-200/90">
+                The workflow we commit pushes one image per buildable
+                service to
+                <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;/&lt;service&gt;</span>.
+                The deploy worker pulls them back using the GitHub
+                App's installation token. That works for
+                <span class="font-medium">org-owned</span> repositories
+                and <span class="font-medium">public</span> packages,
+                but <span class="font-medium">not</span> for private
+                packages owned by a
+                <span class="font-medium">user account</span> — GHCR
+                doesn't grant App installations access to user-owned
+                packages, even with
+                <span class="font-mono">packages:read</span>.
+              </p>
+              <p class="text-blue-900/90 dark:text-blue-200/90">
+                If your repository is under a personal account, after
+                the first build either set each service's package to
+                <span class="font-mono">Public</span> visibility, or
+                attach a registry credential carrying a personal
+                access token with
+                <span class="font-mono">read:packages</span> to this
+                stack.
+              </p>
+            </div>
           </div>
         </div>
 
