@@ -654,6 +654,12 @@ export interface CreateDockerComposeData {
     branch: string;
     source_control_id?: string;
     compose_file_path?: string;
+    /**
+     * Mirror of CreateDockerApplicationData.git.build_location.
+     * "server" (default) or "github_actions". Only meaningful when
+     * compose_source_type === "git".
+     */
+    build_location?: "server" | "github_actions";
   };
   raw_yaml?: {
     contents: string;
