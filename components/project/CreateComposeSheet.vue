@@ -500,39 +500,28 @@ const submit = async () => {
               visibility to Public after the first build or attach
               a PAT-backed registry credential.
             -->
-            <!-- See components/project/CreateApplicationSheet.vue for the
-                 verified limitation. Same situation for compose,
-                 multiplied by the number of services since each
-                 buildable service publishes a separate package. -->
+            <!-- Same per-build GHCR bearer the application path uses
+                 — one bearer covers every service's package since
+                 they share the repo namespace. -->
             <div
               v-if="gitBuildLocation === 'github_actions'"
-              class="rounded-md border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-900 dark:text-blue-200"
+              class="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-900 dark:text-emerald-200"
             >
               <div class="mb-1 flex items-center gap-1.5 font-medium">
-                <Icon name="lucide:info" class="h-3.5 w-3.5" />
-                After the first build, pick how Launch pulls from GHCR
+                <Icon name="lucide:check-circle" class="h-3.5 w-3.5" />
+                Private GHCR packages work automatically
               </div>
-              <p class="mb-2 text-blue-900/90 dark:text-blue-200/90">
-                The workflow we commit publishes one image per
-                buildable service to
-                <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;/&lt;service&gt;</span>.
-                GitHub Packages doesn't currently let a GitHub App's
-                installation token pull <em>private</em> GHCR images.
-                You have one of two options to get past the first
-                deploy:
+              <p class="text-emerald-900/90 dark:text-emerald-200/90">
+                Each workflow run mints a short-lived
+                (<span class="font-mono">~1 hour</span>) GHCR pull
+                token scoped to this repository and includes it in
+                the deploy callback. One bearer covers every service
+                image since they share the same
+                <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;</span>
+                namespace. Keep your packages
+                <span class="font-mono">Private</span> — no PAT, no
+                visibility flip needed.
               </p>
-              <ul class="ml-4 list-disc space-y-1 text-blue-900/90 dark:text-blue-200/90">
-                <li>
-                  Flip each service's package to
-                  <span class="font-mono">Public</span> visibility on
-                  GitHub.
-                </li>
-                <li>
-                  Or attach a Personal Access Token (classic) with
-                  <span class="font-mono">read:packages</span> as a
-                  Registry Credential on this stack.
-                </li>
-              </ul>
             </div>
           </div>
         </div>

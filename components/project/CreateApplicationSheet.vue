@@ -750,50 +750,33 @@ const submit = async () => {
               Same note rendered on the compose create sheet.
             -->
             <!--
-              Verified-twice GHCR limitation. The first draft of this
-              note said "org-owned packages work" — that was wrong.
-              GitHub Apps' install tokens get 404 on GHCR for private
-              packages regardless of whether the owner is a user or
-              an org. The package's access list doesn't include App
-              installations by default and there's no UI to add them.
-              Only two paths that actually work in production:
-                1. Flip the package's visibility to Public
-                2. Attach a PAT-backed saved Registry Credential
-              Surfaced at create time so the customer doesn't hit a
-              confusing 403 in their first deploy log.
+              The workflow we commit mints a short-lived (~1h) GHCR
+              pull bearer per build via the token-exchange endpoint
+              and includes it in the success callback. The deploy
+              worker uses that bearer to pull — so both private and
+              public packages work without any customer setup. Kept
+              the note short + reassuring since this is no longer an
+              operational gotcha. (See PR launch-go #21 for the full
+              implementation + security analysis.)
             -->
             <div
               v-if="gitBuildLocation === 'github_actions'"
-              class="rounded-md border border-blue-500/30 bg-blue-500/10 p-3 text-xs text-blue-900 dark:text-blue-200"
+              class="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-900 dark:text-emerald-200"
             >
               <div class="mb-1 flex items-center gap-1.5 font-medium">
-                <Icon name="lucide:info" class="h-3.5 w-3.5" />
-                After the first build, pick how Launch pulls from GHCR
+                <Icon name="lucide:check-circle" class="h-3.5 w-3.5" />
+                Private GHCR packages work automatically
               </div>
-              <p class="mb-2 text-blue-900/90 dark:text-blue-200/90">
-                The workflow we commit pushes built images to
-                <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;</span>.
-                GitHub Packages doesn't currently let a GitHub App's
-                installation token pull a <em>private</em> GHCR image —
-                regardless of whether your repo is under a user or an
-                org. To get past the first deploy you have one of two
-                options:
+              <p class="text-emerald-900/90 dark:text-emerald-200/90">
+                Each workflow run mints a short-lived
+                (<span class="font-mono">~1 hour</span>) GHCR pull
+                token scoped to this repository and hands it to
+                Launch as part of the deploy callback. Your built
+                images can stay
+                <span class="font-mono">Private</span> on GitHub —
+                no Personal Access Token, no visibility flip, no
+                long-lived secret to rotate.
               </p>
-              <ul class="ml-4 list-disc space-y-1 text-blue-900/90 dark:text-blue-200/90">
-                <li>
-                  Flip your package to
-                  <span class="font-mono">Public</span> visibility on
-                  GitHub (path of least resistance — the registry path
-                  is hard to discover anyway).
-                </li>
-                <li>
-                  Or attach a Personal Access Token (classic) with
-                  <span class="font-mono">read:packages</span> scope
-                  as a saved Registry Credential on this application,
-                  and we'll use that to pull instead of the App
-                  token.
-                </li>
-              </ul>
             </div>
           </div>
         </div>
