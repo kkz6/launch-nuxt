@@ -16,13 +16,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import {
   Sheet,
@@ -378,10 +371,10 @@ const currentProviderLabel = computed(() => {
       </div>
 
       <!--
-        Top-right control:
-          - not configured  →  plain primary "Create Backup" button
-          - configured      →  Actions dropdown (Run now / View
-                               History / Edit / Delete)
+        Not configured → primary "Create Backup" button. When
+        configured, the actions live inline inside the card below
+        (Run now / View History / Edit / Delete) rather than a
+        separate top-right dropdown.
       -->
       <Button
         v-if="!isConfigured"
@@ -392,45 +385,6 @@ const currentProviderLabel = computed(() => {
         <Icon name="lucide:plus" class="mr-2 h-3.5 w-3.5" />
         Create Backup
       </Button>
-
-      <DropdownMenu v-else>
-        <DropdownMenuTrigger as-child>
-          <Button size="sm" variant="outline">
-            <Icon name="lucide:settings-2" class="mr-2 h-3.5 w-3.5" />
-            Actions
-            <Icon name="lucide:chevron-down" class="ml-2 h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" class="w-44">
-          <DropdownMenuItem :disabled="runningNow" @select="runNow">
-            <Icon
-              :name="runningNow ? 'lucide:loader-2' : 'lucide:play'"
-              :class="['mr-2 h-3.5 w-3.5', runningNow && 'animate-spin']"
-            />
-            Run now
-          </DropdownMenuItem>
-          <DropdownMenuItem @select="historySheetOpen = true">
-            <Icon name="lucide:history" class="mr-2 h-3.5 w-3.5" />
-            View History
-          </DropdownMenuItem>
-          <DropdownMenuItem @select="openDialog">
-            <Icon name="lucide:pencil" class="mr-2 h-3.5 w-3.5" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            class="text-destructive focus:bg-destructive/10 focus:text-destructive"
-            :disabled="deleting"
-            @select="deleteConfig"
-          >
-            <Icon
-              :name="deleting ? 'lucide:loader-2' : 'lucide:trash-2'"
-              :class="['mr-2 h-3.5 w-3.5', deleting && 'animate-spin']"
-            />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
 
     <!-- ─── No providers — shared empty state ────────────────────── -->
@@ -487,8 +441,8 @@ const currentProviderLabel = computed(() => {
         </CardTitle>
         <CardDescription class="text-xs">
           Snapshots upload to the linked storage provider on the cron
-          schedule. Use the Actions menu to run a backup now or view
-          past runs.
+          schedule. Run a backup now, view past runs, or edit the
+          schedule with the buttons below.
         </CardDescription>
       </CardHeader>
 
@@ -547,6 +501,43 @@ const currentProviderLabel = computed(() => {
             </button>
           </dd>
         </dl>
+
+        <!--
+          Inline actions — kept inside the card (instead of a separate
+          top-right Actions dropdown) so everything for this backup
+          lives in one place. Run now + View History are primary
+          affordances; Edit and Delete sit to the right.
+        -->
+        <div class="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
+          <Button size="sm" :disabled="runningNow" @click="runNow">
+            <Icon
+              :name="runningNow ? 'lucide:loader-2' : 'lucide:play'"
+              :class="['mr-1.5 h-3.5 w-3.5', runningNow && 'animate-spin']"
+            />
+            Run now
+          </Button>
+          <Button size="sm" variant="outline" @click="historySheetOpen = true">
+            <Icon name="lucide:history" class="mr-1.5 h-3.5 w-3.5" />
+            View History
+          </Button>
+          <Button size="sm" variant="outline" @click="openDialog">
+            <Icon name="lucide:pencil" class="mr-1.5 h-3.5 w-3.5" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            class="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
+            :disabled="deleting"
+            @click="deleteConfig"
+          >
+            <Icon
+              :name="deleting ? 'lucide:loader-2' : 'lucide:trash-2'"
+              :class="['mr-1.5 h-3.5 w-3.5', deleting && 'animate-spin']"
+            />
+            Delete
+          </Button>
+        </div>
       </CardContent>
     </Card>
 
