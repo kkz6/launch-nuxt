@@ -51,6 +51,17 @@ const historySheetOpen = ref(false);
 // Live-logs sheet (ServerLogViewer entity="task") for a single run.
 const logSheetOpen = ref(false);
 const logSheetTaskId = ref("");
+// Bumped when the viewed run finishes, to remount the log viewer so it
+// re-fetches the final stored output — covers very fast runs where the
+// live tail attaches after the task's log file is already gone.
+const logRefreshNonce = ref(0);
+// True between clicking "Run now" and the run.started event arriving:
+// the sheet is open but we don't have the task id yet, so it shows a
+// "starting…" state and auto-attaches the live stream once it lands.
+const awaitingRunLogs = ref(false);
+watch(logSheetOpen, (open) => {
+  if (!open) awaitingRunLogs.value = false;
+});
 // Restore-from-snapshot dialog state. Held here (rather than inside
 // the dialog component) so the history sheet's per-row Restore button
 // can both open it AND tell it which run to operate on. Reset when
@@ -155,6 +166,12 @@ const liveStep = ref("");
 
 useDockerBackupEvents(teamId, (data, event) => {
   if (String(data.database_id ?? "") !== props.database.id) return;
+  // Attach the just-opened live console to the run we triggered, as
+  // soon as the worker reports its task id (run.started carries it).
+  if (awaitingRunLogs.value && data.task_id) {
+    logSheetTaskId.value = String(data.task_id);
+    awaitingRunLogs.value = false;
+  }
   if (event === "docker.database.backup.run.progress") {
     if (data.type === "backup_step") liveStep.value = String(data.value ?? "");
     return;
@@ -164,6 +181,12 @@ useDockerBackupEvents(teamId, (data, event) => {
     event === "docker.database.backup.run.failed"
   ) {
     liveStep.value = "";
+    // Run finished — if its log console is open, remount the viewer so
+    // it re-fetches the final stored output (a fast run's live tail may
+    // have attached after the on-disk log file was already gone).
+    if (logSheetOpen.value && logSheetTaskId.value) {
+      setTimeout(() => logRefreshNonce.value++, 800);
+    }
   }
   // started / succeeded / failed → re-pull so the pills + history update.
   load();
@@ -248,6 +271,14 @@ const runNow = async () => {
     // useDockerBackupEvents subscription below).
     runs.value = [res.data, ...runs.value].slice(0, 50);
     toast.success("Backup triggered — running in the background");
+    // Mirror the deployment UX: pop the live log console open right
+    // away so the dump → upload streams as it happens, instead of
+    // making the user dig into View History. The task id arrives a
+    // beat later on the run.started event (handled in the WS
+    // subscription below), which attaches the live stream.
+    logSheetTaskId.value = "";
+    awaitingRunLogs.value = true;
+    logSheetOpen.value = true;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to run backup");
@@ -895,10 +926,18 @@ const currentProviderLabel = computed(() => {
         <div class="mt-4 h-[calc(100vh-140px)]">
           <ServerLogViewer
             v-if="logSheetOpen && logSheetTaskId"
+            :key="`${logSheetTaskId}-${logRefreshNonce}`"
             :server-id="props.database.server_id"
             entity="task"
             :entity-id="logSheetTaskId"
           />
+          <div
+            v-else-if="logSheetOpen"
+            class="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground"
+          >
+            <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+            Starting backup… waiting for output.
+          </div>
         </div>
       </SheetContent>
     </Sheet>
