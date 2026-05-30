@@ -916,24 +916,29 @@ const currentProviderLabel = computed(() => {
       the run is in flight, replayed from the stored output afterwards.
     -->
     <Sheet v-model:open="logSheetOpen">
-      <SheetContent class="w-full sm:max-w-3xl">
-        <SheetHeader>
+      <SheetContent
+        class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-3xl flex flex-col overflow-hidden outline-none"
+      >
+        <SheetHeader class="shrink-0">
           <SheetTitle>Backup Logs</SheetTitle>
           <SheetDescription>
             Dump &amp; upload output for this backup run.
           </SheetDescription>
         </SheetHeader>
-        <div class="mt-4 h-[calc(100vh-140px)]">
+        <div class="mt-4 flex flex-1 flex-col min-h-0">
           <ServerLogViewer
             v-if="logSheetOpen && logSheetTaskId"
             :key="`${logSheetTaskId}-${logRefreshNonce}`"
             :server-id="props.database.server_id"
             entity="task"
             :entity-id="logSheetTaskId"
+            :no-timestamp="true"
+            hide-options
+            container-class-name="h-full rounded-b-lg"
           />
           <div
             v-else-if="logSheetOpen"
-            class="flex h-full items-center justify-center gap-2 text-sm text-muted-foreground"
+            class="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground"
           >
             <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
             Starting backup… waiting for output.
