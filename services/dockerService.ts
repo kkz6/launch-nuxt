@@ -860,6 +860,9 @@ export interface DockerDatabaseBackupRun {
   object_key?: string | null;
   size_bytes?: number | null;
   error?: string | null;
+  // Links to the server-task running this backup; drives the live
+  // "View Logs" console (ServerLogViewer entity="task").
+  task_id?: string | null;
   created_at?: string;
 }
 
