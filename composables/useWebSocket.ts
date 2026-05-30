@@ -210,11 +210,60 @@ export const useWebSocket = () => {
     }
   }, { immediate: true })
 
+  // Bring the connection back when conditions change.
+  //
+  // Without this, after `maxReconnectAttempts` consecutive failures the
+  // client gives up forever — and the tab silently stops receiving
+  // events with no UI signal. Real-world trigger that surfaced this:
+  // the API process is restarted (deploy, dev restart, OS sleep),
+  // backoff exhausts during the few minutes it takes to come back up,
+  // and from then on every "deploying / deployed / failed" event lands
+  // on a dead socket. The user sees a frozen page until manual reload.
+  //
+  // We treat three signals as "operator just asked us to retry":
+  //   - the tab regains focus (`visibilitychange` -> visible)
+  //   - the OS regains network (`online`)
+  //   - the user clicks a manual reconnect affordance somewhere (kickReconnect)
+  // On any of them, reset the attempt counter so backoff starts fresh
+  // and immediately call connect(). connect() is idempotent — it's a
+  // no-op while OPEN/CONNECTING, so spamming this is safe.
+  if (import.meta.client) {
+    const wake = () => {
+      if (ws.value?.readyState === WebSocket.OPEN) return
+      reconnectAttempts.value = 0
+      if (reconnectTimeout.value) {
+        clearTimeout(reconnectTimeout.value)
+        reconnectTimeout.value = null
+      }
+      void connect()
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') wake()
+    }
+    // Listeners installed once per composable invocation. We don't
+    // remove them on unmount on purpose — useWebSocket is a singleton
+    // pattern; the connection outlives any one component instance.
+    window.addEventListener('visibilitychange', onVisibility, { passive: true })
+    window.addEventListener('online', wake, { passive: true })
+  }
+
+  // Exposed so a UI banner ("Live updates paused — click to retry")
+  // has something to call without reimplementing the wake logic.
+  const kickReconnect = () => {
+    reconnectAttempts.value = 0
+    if (reconnectTimeout.value) {
+      clearTimeout(reconnectTimeout.value)
+      reconnectTimeout.value = null
+    }
+    void connect()
+  }
+
   return {
     isConnected: readonly(isConnected),
     connect,
     disconnect,
     reconnect,
+    kickReconnect,
     subscribe,
     subscribeToChannel,
     unsubscribeFromChannel,

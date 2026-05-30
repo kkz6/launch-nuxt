@@ -490,6 +490,39 @@ const submit = async () => {
               <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
               Requires a connected GitHub source control above.
             </p>
+
+            <!--
+              Same GHCR + GitHub App permission disclosure as the
+              application create sheet. See that file's comment for
+              the full rationale — short version: install token
+              can't pull private user-owned GHCR packages, so for
+              user-account repos either flip the per-service package
+              visibility to Public after the first build or attach
+              a PAT-backed registry credential.
+            -->
+            <!-- Same per-build GHCR bearer the application path uses
+                 — one bearer covers every service's package since
+                 they share the repo namespace. -->
+            <div
+              v-if="gitBuildLocation === 'github_actions'"
+              class="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-900 dark:text-emerald-200"
+            >
+              <div class="mb-1 flex items-center gap-1.5 font-medium">
+                <Icon name="lucide:check-circle" class="h-3.5 w-3.5" />
+                Private GHCR packages work automatically
+              </div>
+              <p class="text-emerald-900/90 dark:text-emerald-200/90">
+                Each workflow run mints a short-lived
+                (<span class="font-mono">~1 hour</span>) GHCR pull
+                token scoped to this repository and includes it in
+                the deploy callback. One bearer covers every service
+                image since they share the same
+                <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;</span>
+                namespace. Keep your packages
+                <span class="font-mono">Private</span> — no PAT, no
+                visibility flip needed.
+              </p>
+            </div>
           </div>
         </div>
 

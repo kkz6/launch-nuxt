@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 200" fill="none">
+  <title>Docker</title>
+  <g fill="#2396ED">
+    <!-- container grid: 3 columns x 3 rows (top-left block + stacked) -->
+    <rect x="27"  y="84"  width="26" height="24" rx="2"/>
+    <rect x="59"  y="84"  width="26" height="24" rx="2"/>
+    <rect x="91"  y="84"  width="26" height="24" rx="2"/>
+    <rect x="123" y="84"  width="26" height="24" rx="2"/>
+    <rect x="59"  y="56"  width="26" height="24" rx="2"/>
+    <rect x="91"  y="56"  width="26" height="24" rx="2"/>
+    <rect x="123" y="56"  width="26" height="24" rx="2"/>
+    <rect x="91"  y="28"  width="26" height="24" rx="2"/>
+    <rect x="123" y="28"  width="26" height="24" rx="2"/>
+  </g>
+  <!-- whale body + spout -->
+  <path fill="#2396ED" d="M250 95c-6-4-19-5-29-3-1-9-7-17-15-23l-5-4-4 5c-5 7-7 17-4 25-3 1-7 2-12 2H7c-2 9-2 38 18 60 16 17 40 25 71 25 60 0 105-28 126-79 8 1 25 1 33-16 1-2 3-6 4-11l1-4-4-2zM73 116h17v17H73v-17z"/>
+  <g fill="#2396ED">
+    <rect x="36" y="116" width="17" height="17" rx="1.5" opacity=".85"/>
+    <rect x="59" y="116" width="17" height="17" rx="1.5"/>
+    <rect x="82" y="116" width="17" height="17" rx="1.5" opacity=".85"/>
+  </g>
+</svg>

@@ -262,6 +262,13 @@ const getDisplayStatus = (service: Service) => {
   }
 }
 
+// Prefer the live-probed version (e.g. the real launch-agent version)
+// over the stored value, which can be an install-time placeholder like
+// "latest".
+const displayVersion = (service: Service) => {
+  return getLiveStatus(service.id)?.version || service.version
+}
+
 // Map service types to image paths
 const getServiceImagePath = (service: Service) => {
   const imageMap: Record<string, string> = {
@@ -275,6 +282,10 @@ const getServiceImagePath = (service: Service) => {
     bun: '/images/services/bun.svg',
     node: '/images/services/node.svg',
     launch_agent: '/images/services/launch_agent.svg',
+    // Docker / Traefik are keyed by their ServiceType string (not the
+    // software name): container_runtime = Docker, reverse_proxy = Traefik.
+    container_runtime: '/images/services/docker.svg',
+    reverse_proxy: '/images/services/traefik.svg',
   }
 
   if (imageMap[service.type]) {
@@ -542,7 +553,7 @@ onMounted(() => {
                             </Tooltip>
                           </TooltipProvider>
                         </div>
-                        <div class="font-mono text-xs text-muted-foreground">v{{ service.version }}</div>
+                        <div class="font-mono text-xs text-muted-foreground">v{{ displayVersion(service) }}</div>
                       </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -636,7 +647,7 @@ onMounted(() => {
                                 <span>{{ getDisplayStatus(service).uptime }}</span>
                               </template>
                               <span class="text-muted-foreground">Version:</span>
-                              <span>{{ service.version }}</span>
+                              <span>{{ displayVersion(service) }}</span>
                             </div>
                             <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                               Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
@@ -671,7 +682,7 @@ onMounted(() => {
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                      <div class="text-xs text-muted-foreground">v{{ service.version }}</div>
+                      <div class="text-xs text-muted-foreground">v{{ displayVersion(service) }}</div>
                     </div>
                   </div>
 
@@ -703,7 +714,7 @@ onMounted(() => {
                                 <span>{{ getDisplayStatus(service).uptime }}</span>
                               </template>
                               <span class="text-muted-foreground">Version:</span>
-                              <span>{{ service.version }}</span>
+                              <span>{{ displayVersion(service) }}</span>
                             </div>
                             <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                               Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}

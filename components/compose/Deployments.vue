@@ -96,6 +96,22 @@ useChannelEvents(
   },
 );
 
+// Row-level deployment lifecycle (same rationale as
+// components/application/Deployments.vue): GHA-triggered deploys
+// surface their progress on the per-deployment event stream
+// (deployment.started / .finished / .failed), NOT on the
+// docker.compose.* one. Subscribe to both so the row turns
+// green / red without a manual refresh.
+useDeploymentEvents(teamId, (data) => {
+  if (
+    data.compose_id !== props.compose.id &&
+    !(data.target_type === "compose" && data.target_id === props.compose.id)
+  ) {
+    return;
+  }
+  scheduleRefetch();
+});
+
 // Status palette mirrors application Deployments.vue. The dot is what
 // users actually scan for, so we pick saturated colors and reserve
 // the animate-pulse for in-flight states.
@@ -134,6 +150,37 @@ const statusLabel = (status: string): string => {
     default:
       return status;
   }
+};
+
+// See components/application/Deployments.vue#failureSummary for the
+// full rationale. Same helper, same `::LAUNCH::deploy_step::` marker
+// parsing — keeps the two views consistent (a customer scanning an
+// app row and a compose row gets the same shape of error chip).
+type FailureSummary = { step: string; detail: string };
+const failureSummary = (raw?: string | null): FailureSummary | null => {
+  if (!raw) return null;
+  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  let step = "";
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const m = lines[i].match(/^::LAUNCH::deploy_step::([a-z0-9_]+)/);
+    if (m) {
+      step = m[1].replace(/_/g, " ");
+      break;
+    }
+  }
+  const noise =
+    /^(WARNING!|Configure a credential|See https?:\/\/|Login Succeeded|\+ |::LAUNCH::|\s*$)/i;
+  let detail = "";
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!noise.test(lines[i])) {
+      detail = lines[i];
+      break;
+    }
+  }
+  if (!detail) detail = lines[lines.length - 1];
+  if (!step && !detail) return null;
+  return { step, detail };
 };
 
 const openLogs = (d: DockerDeployment) => {
@@ -215,15 +262,17 @@ onMounted(fetchDeployments);
               />
             </span>
 
-            <!-- Error from the deploy task — the only secondary info
-                 we have for compose stacks (no commit, no image_ref).
-                 Clamped to 2 lines; full text in the title attr. -->
+            <!--
+              Just a small step pill on failure — same treatment as
+              components/application/Deployments.vue. The full
+              transcript is one click away in View Logs.
+            -->
             <span
-              v-if="d.error && d.status === 'failed'"
-              class="mt-0.5 line-clamp-2 text-sm text-red-600 dark:text-red-400"
-              :title="d.error"
+              v-if="d.status === 'failed' && failureSummary(d.error)?.step"
+              class="mt-0.5 inline-flex w-fit items-center rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs text-red-600 dark:text-red-400"
+              :title="d.error || ''"
             >
-              {{ d.error }}
+              Failed at {{ failureSummary(d.error)?.step }}
             </span>
           </div>
 

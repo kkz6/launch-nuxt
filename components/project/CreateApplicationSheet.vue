@@ -732,6 +732,52 @@ const submit = async () => {
               <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
               Requires a connected GitHub source control above.
             </p>
+
+            <!--
+              GHCR + GitHub App permission disclosure. The GHA workflow
+              we commit pushes images to ghcr.io/<owner>/<repo> using
+              the workflow's GITHUB_TOKEN. To pull on the deploy host,
+              the worker uses the Launch GitHub App's installation
+              token. The combination of "user-owned package" +
+              "private visibility" + "App installation token" is
+              specifically the one case that doesn't work — verified
+              live on kkz6/launch-gha-test (the install token gets
+              401 from GHCR's token-exchange because user-owned
+              packages don't grant access to App installations).
+
+              Surfacing this in the create flow is cheaper than
+              shipping the customer to a Sentry stack trace later.
+              Same note rendered on the compose create sheet.
+            -->
+            <!--
+              The workflow we commit mints a short-lived (~1h) GHCR
+              pull bearer per build via the token-exchange endpoint
+              and includes it in the success callback. The deploy
+              worker uses that bearer to pull — so both private and
+              public packages work without any customer setup. Kept
+              the note short + reassuring since this is no longer an
+              operational gotcha. (See PR launch-go #21 for the full
+              implementation + security analysis.)
+            -->
+            <div
+              v-if="gitBuildLocation === 'github_actions'"
+              class="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-900 dark:text-emerald-200"
+            >
+              <div class="mb-1 flex items-center gap-1.5 font-medium">
+                <Icon name="lucide:check-circle" class="h-3.5 w-3.5" />
+                Private GHCR packages work automatically
+              </div>
+              <p class="text-emerald-900/90 dark:text-emerald-200/90">
+                Each workflow run mints a short-lived
+                (<span class="font-mono">~1 hour</span>) GHCR pull
+                token scoped to this repository and hands it to
+                Launch as part of the deploy callback. Your built
+                images can stay
+                <span class="font-mono">Private</span> on GitHub —
+                no Personal Access Token, no visibility flip, no
+                long-lived secret to rotate.
+              </p>
+            </div>
           </div>
         </div>
 

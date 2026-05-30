@@ -144,6 +144,36 @@ const relative = (iso?: string | null): string => {
   }
 };
 
+// Right-side "last deploy" subtext. The status pill on the left
+// already shows the lifecycle state; this column should add the
+// *time dimension* — when did the last attempt land, did it succeed.
+//
+// The old version said "Never deployed" whenever `last_deployed_at`
+// was null, even if status was "failed" — visually two states (Failed
+// + Never deployed) side-by-side and the customer couldn't tell which
+// was authoritative. lastDeployText fixes that by branching:
+//   1. We have a successful deploy timestamp → "Deployed <ago>"
+//   2. In-flight (deploying/building) → "Deploying…"
+//   3. Last attempt failed, never succeeded → "Last deploy failed"
+//   4. Otherwise idle → "Never deployed"
+const lastDeployText = (app: DockerApplication): string => {
+  if (app.last_deployed_at) {
+    return `Deployed ${relative(app.last_deployed_at)}`;
+  }
+  // `building` is the in-flight state on the row while the worker is
+  // running the deploy task; `running` only flips on after the
+  // container has come up, which also sets last_deployed_at — so the
+  // above branch wins. (There's no separate "deploying" enum value
+  // even though the team-channel event is named that.)
+  if (app.status === "building") {
+    return "Deploying…";
+  }
+  if (app.status === "failed") {
+    return "Last deploy failed";
+  }
+  return "Never deployed";
+};
+
 // WS keeps the list live across deploy lifecycle. The backend
 // broadcasts deploying / deployed / failed with the application's
 // id; we refetch silently so status badges + last_deployed_at stay
@@ -225,7 +255,24 @@ onMounted(fetchApps);
               />
             </div>
             <div class="min-w-0 flex-1">
-              <h3 class="truncate font-semibold">{{ app.name }}</h3>
+              <div class="flex items-center gap-2">
+                <h3 class="truncate font-semibold">{{ app.name }}</h3>
+                <!--
+                  GHA pill on the card — quickly signals to operators
+                  scanning the list which workloads have a CI pipeline
+                  attached, vs. the server-build default. Click target
+                  is the whole card so we don't make the pill itself
+                  a link (keeps the card click area uniform).
+                -->
+                <span
+                  v-if="app.build_location === 'github_actions'"
+                  class="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                  title="Builds run in GitHub Actions"
+                >
+                  <Icon name="simple-icons:github" class="h-3 w-3" />
+                  GHA
+                </span>
+              </div>
               <p class="line-clamp-1 text-sm text-muted-foreground">
                 {{ sourceSummary(app) }}
               </p>
@@ -247,12 +294,18 @@ onMounted(fetchApps);
             >
               {{ app.status }}
             </span>
+            <!--
+              Right-side timestamp text. The old version showed both
+              "Failed" (status) and "Never deployed" (last_deployed_at
+              is null) when a workload's only deploy attempt failed —
+              two mutually-exclusive states side by side. lastDeployText
+              encodes the actual semantics: "Never deployed" only fires
+              when status is idle; failure-without-success says so
+              explicitly; in-flight states show "Deploying…" without
+              also implying a successful deploy timestamp.
+            -->
             <span class="text-xs text-muted-foreground">
-              {{
-                app.last_deployed_at
-                  ? `Deployed ${relative(app.last_deployed_at)}`
-                  : "Never deployed"
-              }}
+              {{ lastDeployText(app) }}
             </span>
           </div>
         </div>

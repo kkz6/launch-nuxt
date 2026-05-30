@@ -39,12 +39,16 @@ const isDeploying = ref(false);
 // backs application volumes is reused for compose. file-type rows
 // get materialized to `${STACK_DIR}/files/` before deploy;
 // bind/volume rows are tracking-only (operator wires them into YAML).
+// `gha` only renders for github_actions-backed stacks — see
+// pages/.../applications/[applicationId]/index.vue for the same
+// pattern. Hidden for server-built stacks to keep the chrome clean.
 const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", icon: "lucide:key" },
   { value: "domains", label: "Domains", icon: "lucide:globe" },
   { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
+  { value: "gha", label: "GitHub Actions", icon: "simple-icons:github" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
 ] as const;
@@ -59,6 +63,7 @@ const READY_SUBTABS: Record<string, boolean> = {
   environment: true,
   domains: true,
   volumes: true,
+  gha: true,
   logs: true,
   advanced: true,
 };
@@ -216,6 +221,12 @@ const statusBadge = computed(() => {
     <ComposeVolumes
       v-else-if="subTab === 'volumes'"
       :compose="compose"
+    />
+
+    <ComposeGHA
+      v-else-if="subTab === 'gha'"
+      :compose="compose"
+      @updated="fetchCompose"
     />
 
     <ComposeLogs v-else-if="subTab === 'logs'" :compose="compose" />

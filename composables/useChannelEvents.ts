@@ -342,6 +342,9 @@ export const useServerEvents = (
  * - docker.application.deploying  (deploy job started)
  * - docker.application.deployed   (deploy succeeded, container running)
  * - docker.application.failed     (deploy failed)
+ * - docker.application.gha_synced            (bootstrap job committed workflow file)
+ * - docker.application.gha_install_broken    (GitHub App install gone / 404 from GitHub)
+ * - docker.application.gha_disabled          (build_location flipped back to server)
  */
 export const useDockerApplicationEvents = (
   teamId: string | Ref<string>,
@@ -366,6 +369,16 @@ export const useDockerApplicationEvents = (
       'docker.application.schedule.updated',
       'docker.application.schedule.deleted',
       'docker.application.schedule.ran',
+      // GHA-builds lifecycle. The bootstrap job fires gha_synced on
+      // successful repo commit; gha_install_broken when the GitHub
+      // App installation has been removed customer-side; gha_disabled
+      // when the user flips build_location back to "server" via the
+      // GHA subtab. UI subscribes here so the subtab can refetch the
+      // workflow status / show a broken-install banner / clear the
+      // GHA pill without polling.
+      'docker.application.gha_synced',
+      'docker.application.gha_install_broken',
+      'docker.application.gha_disabled',
     ],
     onEvent,
   )
@@ -421,6 +434,12 @@ export const useDockerComposeEvents = (
       'docker.compose.deployed',
       'docker.compose.failed',
       'docker.compose.removed',
+      // GHA-builds lifecycle — same contract as the application path.
+      // See useDockerApplicationEvents above for what each event means;
+      // the broadcast names just swap `application` → `compose`.
+      'docker.compose.gha_synced',
+      'docker.compose.gha_install_broken',
+      'docker.compose.gha_disabled',
     ],
     onEvent,
   )
