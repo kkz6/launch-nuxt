@@ -268,6 +268,36 @@ export interface SetDockerEnvVarsData {
 }
 
 /**
+ * Build-time secret. Values are mounted into `docker build` via
+ * BuildKit's `--mount=type=secret`. Distinct from DockerEnvVar in two
+ * ways: (a) they're available during build, not at runtime; (b) the
+ * value is never returned by any API endpoint — we only ever know
+ * whether one is set via `has_value`. Owner field is either
+ * `application_id` or `compose_id` depending on which endpoint
+ * returned the row (the other is omitted from JSON).
+ */
+export interface DockerBuildSecret {
+  id: string;
+  application_id?: string;
+  compose_id?: string;
+  name: string;
+  has_value: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateDockerBuildSecretData {
+  name: string;
+  value: string;
+}
+
+/** PATCH body. Value-only — name is immutable (Dockerfile references
+ *  would silently break if it changed). Delete + Create to "rename". */
+export interface UpdateDockerBuildSecretData {
+  value: string;
+}
+
+/**
  * Project-scoped env var. Same shape as DockerEnvVar but owned by a
  * project — referenced from container envs via `${{project.<KEY>}}`.
  */
@@ -1308,6 +1338,62 @@ export const dockerService = {
       );
     },
 
+    // Build-time secrets. The backend never returns values, so the
+    // list+create+update responses contain only metadata (name, has_value,
+    // timestamps). When the application is GHA-backed, the backend also
+    // queues a workflow re-sync on every create/update/delete so the
+    // generated YAML stays in lock-step with the LAUNCH_BUILD_<NAME>
+    // repo secrets.
+    listBuildSecrets: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerBuildSecret[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/build-secrets`,
+      );
+    },
+
+    createBuildSecret: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      data: CreateDockerBuildSecretData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerBuildSecret>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/build-secrets`,
+        data,
+      );
+    },
+
+    updateBuildSecret: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      buildSecretId: string,
+      data: UpdateDockerBuildSecretData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerBuildSecret>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/build-secrets/${buildSecretId}`,
+        data,
+      );
+    },
+
+    deleteBuildSecret: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      buildSecretId: string,
+    ) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/build-secrets/${buildSecretId}`,
+      );
+    },
+
     // volumes
     listVolumes: (
       serverId: string,
@@ -1546,6 +1632,60 @@ export const dockerService = {
       return post<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/disable`,
         {},
+      );
+    },
+
+    // Build-time secrets for the compose stack. Same write-only
+    // semantics as the application path: values are never returned by
+    // any endpoint. Re-syncs the workflow file + repo secrets on
+    // every save when build_location=github_actions.
+    listBuildSecrets: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerBuildSecret[]>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/build-secrets`,
+      );
+    },
+
+    createBuildSecret: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      data: CreateDockerBuildSecretData,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerBuildSecret>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/build-secrets`,
+        data,
+      );
+    },
+
+    updateBuildSecret: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      buildSecretId: string,
+      data: UpdateDockerBuildSecretData,
+    ) => {
+      const { patch } = useApi();
+      return patch<ApiResponse<DockerBuildSecret>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/build-secrets/${buildSecretId}`,
+        data,
+      );
+    },
+
+    deleteBuildSecret: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      buildSecretId: string,
+    ) => {
+      const { delete: del } = useApi();
+      return del(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/build-secrets/${buildSecretId}`,
       );
     },
 

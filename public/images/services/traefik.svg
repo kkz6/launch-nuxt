@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
+  <title>Traefik</title>
+  <!-- rounded badge -->
+  <rect x="8" y="8" width="240" height="240" rx="48" fill="#24A1C1"/>
+  <!-- reverse-proxy routing: one inbound lane fanning out to three backends -->
+  <g stroke="#ffffff" stroke-width="12" stroke-linecap="round" fill="none">
+    <!-- inbound -->
+    <path d="M40 128 H104"/>
+    <!-- fan-out to three endpoints -->
+    <path d="M104 128 C140 128 140 72 176 72"/>
+    <path d="M104 128 H176"/>
+    <path d="M104 128 C140 128 140 184 176 184"/>
+  </g>
+  <!-- central routing hub -->
+  <circle cx="104" cy="128" r="20" fill="#FFA64D"/>
+  <!-- backend nodes -->
+  <g fill="#ffffff">
+    <circle cx="190" cy="72" r="14"/>
+    <circle cx="190" cy="128" r="14"/>
+    <circle cx="190" cy="184" r="14"/>
+  </g>
+</svg>

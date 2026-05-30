@@ -424,6 +424,19 @@ const syncRow = (updated: EnvVarRow) => {
 
 const sortVars = (vars: EnvVarRow[]) =>
   [...vars].sort((a, b) => a.key.localeCompare(b.key));
+
+// Resolved empty-state description. Computed in script (not inlined in a
+// `{{ }}` mustache) because the default copy contains the literal
+// `${{project.KEY}}` token, and Vue's mustache parser treats the inner
+// `{{` as a new interpolation opener — yields "Unterminated string
+// constant". Building the string in JS keeps the dollar-double-brace
+// literal away from the template tokenizer.
+const resolvedEmptyDescription = computed(() => {
+  if (props.emptyDescription) return props.emptyDescription;
+  return props.showProjectHint
+    ? "Add per-container config like DATABASE_URL or NODE_ENV. Already have a .env file? Use Paste .env above."
+    : "Add shared config that any workload under this project can reference via ${{project.KEY}}.";
+});
 </script>
 
 <template>
@@ -432,7 +445,24 @@ const sortVars = (vars: EnvVarRow[]) =>
 
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0 space-y-1">
-        <h2 class="text-base font-semibold">{{ title }}</h2>
+        <div class="flex items-center gap-2">
+          <h2 class="text-base font-semibold">{{ title }}</h2>
+          <!--
+            Encryption reassurance chip. Surfaces what's already true:
+            values are AES-256-GCM encrypted in our DB via
+            internal/pkg/dbtype/encrypted.go. The same chip is shown on
+            every editor (project / application / database) because the
+            same dbtype wraps all three models. Tooltip carries the
+            longer-form explanation so the header stays compact.
+          -->
+          <span
+            class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400"
+            title="Values are encrypted at rest with AES-256-GCM in the Launch database. They reach the container at deploy time via a 0600 env file on the host (tmpfs) — never as cleartext command-line args."
+          >
+            <Icon name="lucide:shield-check" class="h-3 w-3" />
+            Encrypted at rest
+          </span>
+        </div>
         <p class="text-xs text-muted-foreground">{{ description }}</p>
       </div>
       <div class="flex shrink-0 gap-2">
@@ -500,6 +530,28 @@ const sortVars = (vars: EnvVarRow[]) =>
           class="rounded bg-sky-500/15 px-1 py-0.5 text-[11px]"
         >${{project.KEY}}</code>
         — resolved at deploy / run time.
+      </p>
+    </div>
+
+    <!--
+      Runtime-vs-build clarification. These env vars are passed to
+      `docker run` via --env-file at deploy time. They are NOT
+      available during `docker build` — a Dockerfile that needs a
+      credential for an install step (private npm/pip/composer registry,
+      private git clone in a multi-stage build, etc.) needs a separate
+      build-time secret. This banner shows on every editor variant so
+      a user landing on Environment doesn't assume runtime values flow
+      backwards into the build.
+    -->
+    <div
+      class="flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
+    >
+      <Icon name="lucide:info" class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <p>
+        Values here are passed to <span class="font-mono">docker run</span>
+        only — they're <strong>not available during build</strong>.
+        For credentials a <span class="font-mono">RUN</span> step needs
+        at build time, use Build-time secrets on the GitHub Actions tab.
       </p>
     </div>
 
@@ -592,22 +644,6 @@ const sortVars = (vars: EnvVarRow[]) =>
       </form>
     </Transition>
 
-    <div v-if="loading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
-    </div>
-
-    <SharedEmptyState
-      v-else-if="vars.length === 0"
-      icon="lucide:key"
-      title="No env vars yet"
-      :description="
-        emptyDescription
-          ?? (showProjectHint
-            ? 'Add per-container config like DATABASE_URL or NODE_ENV. Already have a .env file? Use Paste .env above.'
-            : 'Add shared config that any workload under this project can reference via ${{project.KEY}}.')
-      "
-    />
-
     <!--
       Rows render as CSS-grid containers (NOT a <table>) so column
       widths stay LOCKED regardless of whether a row is in read or
@@ -622,23 +658,62 @@ const sortVars = (vars: EnvVarRow[]) =>
 
       Same widths in read AND edit modes; only what FILLS each
       track changes.
+
+      Loader + empty state branch INSIDE this single bordered card so
+      we don't end up with two stacked card-like surfaces (the bug
+      the user spotted in the screenshot: an empty-state pane visible
+      above a still-rendered "KEY / VALUE / ACTIONS" header strip
+      with no rows underneath).
     -->
     <div class="overflow-hidden rounded-lg border">
-      <!-- Header row uses the same grid so column boundaries line up
-           with the data rows below regardless of zoom or font scale. -->
-      <div
-        class="grid grid-cols-[220px_1fr_168px] gap-2 border-b bg-muted/50 px-4 py-2 text-[10px] uppercase tracking-wide text-muted-foreground"
-      >
-        <div>Key</div>
-        <div>Value</div>
-        <div class="text-right">Actions</div>
+      <!-- Loading: centered spinner, no header strip yet. -->
+      <div v-if="loading" class="flex items-center justify-center py-16">
+        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
       </div>
 
+      <!--
+        Empty: inline state inside the card. We DON'T use
+        SharedEmptyState here because that component renders its own
+        dashed border + muted background — putting it inside this
+        solid-bordered card visually duplicated the surface (the
+        original screenshot bug). The inline version is visually
+        flatter and reads as "this card is empty" rather than "an
+        empty pane next to a separate card".
+      -->
       <div
-        v-for="v in vars"
-        :key="v.id"
-        class="grid grid-cols-[220px_1fr_168px] items-center gap-2 border-b px-4 py-2 last:border-b-0"
+        v-else-if="vars.length === 0"
+        class="flex flex-col items-center justify-center px-6 py-12 text-center"
       >
+        <div class="flex h-11 w-11 items-center justify-center rounded-lg border border-border/40 bg-muted/30">
+          <Icon name="lucide:key" class="h-5 w-5 text-muted-foreground/70" />
+        </div>
+        <h3 class="mt-3 text-sm font-medium text-foreground/80">No env vars yet</h3>
+        <p class="mt-1 max-w-md text-xs text-muted-foreground/80">
+          {{ resolvedEmptyDescription }}
+        </p>
+      </div>
+
+      <!--
+        Has rows: header strip + one row per env var. Header is only
+        rendered in this branch so the empty + loading states above
+        don't get a dangling column-label bar.
+      -->
+      <template v-else>
+        <!-- Header row uses the same grid so column boundaries line up
+             with the data rows below regardless of zoom or font scale. -->
+        <div
+          class="grid grid-cols-[220px_1fr_168px] gap-2 border-b bg-muted/50 px-4 py-2 text-[10px] uppercase tracking-wide text-muted-foreground"
+        >
+          <div>Key</div>
+          <div>Value</div>
+          <div class="text-right">Actions</div>
+        </div>
+
+        <div
+          v-for="v in vars"
+          :key="v.id"
+          class="grid grid-cols-[220px_1fr_168px] items-center gap-2 border-b px-4 py-2 last:border-b-0"
+        >
         <!-- KEY column. Truncates long keys with overflow-hidden +
              title so the row never widens past 220px. The secret
              chip is a small click-target: clicking it flips
@@ -807,7 +882,8 @@ const sortVars = (vars: EnvVarRow[]) =>
             </Button>
           </template>
         </div>
-      </div>
+        </div>
+      </template>
     </div>
 
     <p class="text-[11px] text-muted-foreground">
