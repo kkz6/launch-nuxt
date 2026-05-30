@@ -474,6 +474,7 @@ export const useDockerBackupEvents = (
       'docker.database.backup.deleted',
       'docker.database.backup.restored',
       'docker.database.backup.run.started',
+      'docker.database.backup.run.progress',
       'docker.database.backup.run.succeeded',
       'docker.database.backup.run.failed',
     ],

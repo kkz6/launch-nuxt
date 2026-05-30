@@ -142,6 +142,31 @@ const load = async () => {
 
 onMounted(load);
 
+// Live updates. "Run now" is async — the worker dumps + uploads in the
+// background and emits run events over the team channel. Refresh the
+// history when a run for THIS database starts / finishes, and surface
+// the current step (dumping / uploading / done) live from progress
+// markers so the user sees motion instead of a frozen "triggered" pill.
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+const liveStep = ref("");
+
+useDockerBackupEvents(teamId, (data, event) => {
+  if (String(data.database_id ?? "") !== props.database.id) return;
+  if (event === "docker.database.backup.run.progress") {
+    if (data.type === "backup_step") liveStep.value = String(data.value ?? "");
+    return;
+  }
+  if (
+    event === "docker.database.backup.run.succeeded" ||
+    event === "docker.database.backup.run.failed"
+  ) {
+    liveStep.value = "";
+  }
+  // started / succeeded / failed → re-pull so the pills + history update.
+  load();
+});
+
 const openDialog = () => {
   if (backup.value) {
     storageProviderId.value = backup.value.storage_provider_id;
@@ -215,12 +240,12 @@ const runNow = async () => {
       props.database.project_id,
       props.database.id,
     );
+    // Async now: the API returns a "triggered" run immediately; the
+    // worker dumps + uploads in the background and the run flips to
+    // running → success/failed live over WebSocket (see the
+    // useDockerBackupEvents subscription below).
     runs.value = [res.data, ...runs.value].slice(0, 50);
-    toast.success(
-      res.data.status === "success"
-        ? "Backup completed"
-        : `Backup queued (status: ${res.data.status})`,
-    );
+    toast.success("Backup triggered — running in the background");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to run backup");
@@ -289,6 +314,11 @@ const runStatusConfig: Record<string, { icon: string; label: string; class: stri
     icon: "lucide:check-circle-2",
     label: "Finished",
     class: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  },
+  triggered: {
+    icon: "lucide:loader-2",
+    label: "Triggered",
+    class: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   },
   running: {
     icon: "lucide:loader-2",
@@ -437,6 +467,13 @@ const currentProviderLabel = computed(() => {
             "
           >
             {{ backup!.enabled ? "Active" : "Paused" }}
+          </span>
+          <span
+            v-if="liveStep"
+            class="inline-flex items-center gap-1 rounded bg-blue-500/15 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-400"
+          >
+            <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin" />
+            {{ liveStep }}…
           </span>
         </CardTitle>
         <CardDescription class="text-xs">
