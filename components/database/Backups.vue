@@ -55,6 +55,9 @@ const deleting = ref(false);
 // Dialog + sheet open flags ----------------------------------------
 const dialogOpen = ref(false);
 const historySheetOpen = ref(false);
+// Live-logs sheet (ServerLogViewer entity="task") for a single run.
+const logSheetOpen = ref(false);
+const logSheetTaskId = ref("");
 // Restore-from-snapshot dialog state. Held here (rather than inside
 // the dialog component) so the history sheet's per-row Restore button
 // can both open it AND tell it which run to operate on. Reset when
@@ -64,6 +67,12 @@ const restoreRun = ref<DockerDatabaseBackupRun | null>(null);
 const openRestoreDialog = (run: DockerDatabaseBackupRun) => {
   restoreRun.value = run;
   restoreDialogOpen.value = true;
+};
+
+const openRunLogs = (run: DockerDatabaseBackupRun) => {
+  if (!run.task_id) return;
+  logSheetTaskId.value = run.task_id;
+  logSheetOpen.value = true;
 };
 watch(restoreDialogOpen, (isOpen) => {
   if (!isOpen) {
@@ -828,10 +837,27 @@ const currentProviderLabel = computed(() => {
                 "Restore" after they've identified the right run.
               -->
               <div
-                v-if="r.status === 'success' && r.object_key"
-                class="flex justify-end pt-1"
+                v-if="r.task_id || (r.status === 'success' && r.object_key)"
+                class="flex justify-end gap-2 pt-1"
               >
+                <!--
+                  View Logs — streams the run's dump/upload output live
+                  while running (and replays it after) via the same
+                  task-logs websocket deployments use. Shown whenever the
+                  run has a linked task.
+                -->
                 <Button
+                  v-if="r.task_id"
+                  size="sm"
+                  variant="ghost"
+                  class="h-7 px-2 text-[11px]"
+                  @click="openRunLogs(r)"
+                >
+                  <Icon name="lucide:scroll-text" class="mr-1.5 h-3 w-3" />
+                  View Logs
+                </Button>
+                <Button
+                  v-if="r.status === 'success' && r.object_key"
                   size="sm"
                   variant="outline"
                   class="h-7 px-2 text-[11px]"
@@ -861,5 +887,29 @@ const currentProviderLabel = computed(() => {
       :source-database="props.database"
       :run="restoreRun"
     />
+
+    <!--
+      Live backup logs. Streams the run's dump → upload output via the
+      task-logs websocket (ServerLogViewer entity="task") — live while
+      the run is in flight, replayed from the stored output afterwards.
+    -->
+    <Sheet v-model:open="logSheetOpen">
+      <SheetContent class="w-full sm:max-w-3xl">
+        <SheetHeader>
+          <SheetTitle>Backup Logs</SheetTitle>
+          <SheetDescription>
+            Dump &amp; upload output for this backup run.
+          </SheetDescription>
+        </SheetHeader>
+        <div class="mt-4 h-[calc(100vh-140px)]">
+          <ServerLogViewer
+            v-if="logSheetOpen && logSheetTaskId"
+            :server-id="props.database.server_id"
+            entity="task"
+            :entity-id="logSheetTaskId"
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
   </div>
 </template>
