@@ -18,11 +18,17 @@ export const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },
+      // One consistent control height across sizes so buttons never
+      // mismatch when placed in the same row (text + icon, or
+      // default + sm). Common controls are 36px (h-9 / size-9); large
+      // is 44px. Sizes differ by padding/shape, NOT height — the
+      // earlier scale (default h-8/32px, sm h-9/36px, icon h-10/40px)
+      // was the source of the app-wide "buttons are different heights".
       size: {
-        "default": "h-8 px-4 rounded-sm py-2",
+        "default": "h-9 px-4 rounded-md py-2",
         "sm": "h-9 rounded-md px-3",
         "lg": "h-11 rounded-md px-8",
-        "icon": "h-10 w-10",
+        "icon": "size-9",
         "icon-sm": "size-9",
         "icon-lg": "size-11",
       },
