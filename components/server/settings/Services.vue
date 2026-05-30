@@ -68,6 +68,16 @@ const loadingAction = ref<{ software: string; action: string } | null>(null)
 const isInstallDialogOpen = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
+// Launch Agent update banner
+interface AgentVersionInfo {
+  service_id: string
+  installed: string
+  latest: string
+  update_available: boolean
+}
+const agentVersion = ref<AgentVersionInfo | null>(null)
+const isUpdatingAgent = ref(false)
+
 // Status dialog state
 const isStatusDialogOpen = ref(false)
 const selectedServiceForStatus = ref<Service | null>(null)
@@ -310,6 +320,40 @@ const fetchServices = async () => {
   }
 }
 
+const fetchAgentVersion = async () => {
+  try {
+    const data = await $api<{ data: AgentVersionInfo }>(`/servers/${props.serverId}/agent-version`)
+    agentVersion.value = data.data || null
+  } catch {
+    // Non-fatal: GitHub lookup unavailable or agent not installed —
+    // the banner just doesn't render.
+    agentVersion.value = null
+  }
+}
+
+const updateAgent = async () => {
+  const info = agentVersion.value
+  if (!info?.service_id) return
+
+  isUpdatingAgent.value = true
+  try {
+    await $api(`/servers/${props.serverId}/services/${info.service_id}/update`, {
+      method: 'POST',
+    })
+    toast.success(`Updating Launch Agent to v${info.latest}…`)
+    // The install runs over SSH; give it a moment, then refresh the
+    // services list + re-check the version so the banner clears.
+    setTimeout(() => {
+      fetchServices()
+      fetchAgentVersion()
+    }, 4000)
+  } catch {
+    toast.error('Failed to start Launch Agent update')
+  } finally {
+    isUpdatingAgent.value = false
+  }
+}
+
 const serviceAction = async (service: Service, action: 'start' | 'stop' | 'restart') => {
   if (!confirmationDialog.value) return
 
@@ -391,12 +435,37 @@ const sortedServices = computed(() =>
 onMounted(() => {
   fetchServices()
   fetchLogs()
+  fetchAgentVersion()
 })
 </script>
 
 <template>
   <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!-- Launch Agent update banner -->
+    <div
+      v-if="agentVersion?.update_available"
+      class="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800/60 dark:bg-amber-950/30"
+    >
+      <div class="flex items-start gap-2.5">
+        <Icon name="lucide:arrow-up-circle" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div class="text-sm">
+          <p class="font-medium text-amber-900 dark:text-amber-200">
+            Launch Agent update available
+          </p>
+          <p class="text-amber-700 dark:text-amber-300/90">
+            Version <span class="font-semibold">v{{ agentVersion.latest }}</span> is available<template v-if="agentVersion.installed">
+              — this server runs <span class="font-semibold">v{{ agentVersion.installed }}</span></template>.
+          </p>
+        </div>
+      </div>
+      <Button size="sm" :disabled="isUpdatingAgent" class="shrink-0" @click="updateAgent">
+        <Icon v-if="isUpdatingAgent" name="lucide:loader-2" class="mr-1.5 h-3.5 w-3.5 animate-spin" />
+        <Icon v-else name="lucide:download" class="mr-1.5 h-3.5 w-3.5" />
+        {{ isUpdatingAgent ? 'Updating…' : `Update to v${agentVersion.latest}` }}
+      </Button>
+    </div>
 
     <!-- Install Service Dialog -->
     <ServerSettingsInstallServiceDialog
