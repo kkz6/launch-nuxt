@@ -114,7 +114,10 @@ const recentActivity = computed<Activity[]>(() => {
       kind: "application",
       name: a.name,
       status: a.status,
-      icon: sourceIcon(a.source_type),
+      // A docker application is a container workload — show the app icon,
+      // not its source-control icon (a git-sourced app is still an app,
+      // not a repo). Matches the section header + empty-state icon.
+      icon: "lucide:box",
       to: `/servers/${props.serverId}/projects/${props.project.id}/applications/${a.id}`,
       timestamp: a.last_deployed_at ?? a.updated_at ?? a.created_at ?? null,
     });
@@ -149,18 +152,6 @@ const recentActivity = computed<Activity[]>(() => {
   return rows.slice(0, 6);
 });
 
-function sourceIcon(t: string): string {
-  switch (t) {
-    case "image":
-      return "simple-icons:docker";
-    case "git":
-      return "lucide:git-branch";
-    case "dockerfile":
-      return "lucide:file-code";
-    default:
-      return "lucide:box";
-  }
-}
 function engineIcon(engine: string): string {
   switch (engine) {
     case "postgres":

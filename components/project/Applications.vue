@@ -3,7 +3,6 @@ import { toast } from "vue-sonner";
 import {
   dockerService,
   type DockerApplication,
-  type DockerSourceType,
 } from "~/services/dockerService";
 
 interface Props {
@@ -84,17 +83,6 @@ const deleteApp = async (app: DockerApplication) => {
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to delete application");
-  }
-};
-
-const sourceIcon = (t: DockerSourceType): string => {
-  switch (t) {
-    case "image":
-      return "simple-icons:docker";
-    case "git":
-      return "lucide:git-branch";
-    case "dockerfile":
-      return "lucide:file-code";
   }
 };
 
@@ -250,7 +238,7 @@ onMounted(fetchApps);
               class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
             >
               <Icon
-                :name="sourceIcon(app.source_type)"
+                name="lucide:box"
                 class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
               />
             </div>
