@@ -79,8 +79,28 @@ const initialUser = computed(() => {
   return defaultUser.value;
 });
 
-const height = ref(400);
+// Persistent terminal height — survives page reloads so users don't
+// have to drag back to their preferred size each session. Hard
+// minimum keeps the header + warning + a usable terminal area on
+// screen; max keeps a sliver of the page above the terminal visible.
+const TERMINAL_HEIGHT_KEY = "launch:terminal-height";
+const MIN_TERMINAL_HEIGHT = 160;
+const TERMINAL_TOP_PADDING = 60;
+
+const loadPersistedHeight = (): number => {
+  if (typeof window === "undefined") return 400;
+  const raw = window.localStorage.getItem(TERMINAL_HEIGHT_KEY);
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < MIN_TERMINAL_HEIGHT) return 400;
+  return n;
+};
+
+const height = ref(loadPersistedHeight());
 const isMaximized = ref(false);
+// Disable the height CSS transition while the user is actively
+// dragging the resize handle — without this the cursor visibly lags
+// the panel edge by ~300ms and the resize feels broken.
+const isResizing = ref(false);
 const connectionStatus = ref<ConnectionStatus>("connecting");
 const selectedUser = ref(initialUser.value);
 // Container-mode shell. Mirrors dokploy's "Select way to connect" toggle.
@@ -103,12 +123,87 @@ const terminalRef = ref<InstanceType<typeof ServerTerminal> | null>(null);
 
 const toggleMaximize = () => {
   if (isMaximized.value) {
-    height.value = 400;
+    // Restore the user's persisted size, falling back to 400 the
+    // first time around.
+    height.value = loadPersistedHeight();
   } else {
     height.value = window.innerHeight - 100;
   }
   isMaximized.value = !isMaximized.value;
 };
+
+// Drag-to-resize handle on the top edge of the panel.
+//
+// Mouse + touch are both wired; pointer events would be the modern
+// API but supporting iOS Safari without extra polyfills is simpler
+// with the dual listeners. The window-level listeners ensure the
+// drag keeps tracking even if the cursor moves over the xterm canvas
+// (which would otherwise eat the move events). We also flip
+// `isResizing` so the height transition switches off during the
+// drag — without that the cursor visibly leads the panel edge.
+const startResize = (event: MouseEvent | TouchEvent) => {
+  event.preventDefault();
+  isResizing.value = true;
+  // Drag implicitly exits maximize mode — otherwise the next click
+  // on the maximize button would restore to a "saved" 400 that no
+  // longer reflects what the user actually wants.
+  if (isMaximized.value) isMaximized.value = false;
+
+  const maxHeight = () => window.innerHeight - TERMINAL_TOP_PADDING;
+
+  const onMove = (ev: MouseEvent | TouchEvent) => {
+    const clientY =
+      "touches" in ev ? ev.touches[0]?.clientY ?? 0 : ev.clientY;
+    const next = window.innerHeight - clientY;
+    height.value = Math.min(maxHeight(), Math.max(MIN_TERMINAL_HEIGHT, next));
+  };
+
+  const onEnd = () => {
+    isResizing.value = false;
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(
+        TERMINAL_HEIGHT_KEY,
+        String(Math.round(height.value)),
+      );
+    }
+    window.removeEventListener("mousemove", onMove);
+    window.removeEventListener("mouseup", onEnd);
+    window.removeEventListener("touchmove", onMove);
+    window.removeEventListener("touchend", onEnd);
+    window.removeEventListener("touchcancel", onEnd);
+    document.body.style.removeProperty("cursor");
+    document.body.style.removeProperty("user-select");
+  };
+
+  // Globally pin the resize cursor + suppress text selection until
+  // the drag ends — keeps the experience smooth even when the cursor
+  // strays off the handle while moving.
+  document.body.style.cursor = "ns-resize";
+  document.body.style.userSelect = "none";
+
+  window.addEventListener("mousemove", onMove);
+  window.addEventListener("mouseup", onEnd);
+  window.addEventListener("touchmove", onMove, { passive: false });
+  window.addEventListener("touchend", onEnd);
+  window.addEventListener("touchcancel", onEnd);
+};
+
+// Keep the terminal from growing past the viewport when the window
+// itself shrinks (rotating an iPad, dragging a desktop window). We
+// clamp on every resize event so the user always sees the full
+// header/footer chrome.
+const clampToViewport = () => {
+  const max = window.innerHeight - TERMINAL_TOP_PADDING;
+  if (height.value > max) height.value = max;
+};
+
+onMounted(() => {
+  window.addEventListener("resize", clampToViewport);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", clampToViewport);
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const handleUserChange = (user: any) => {
@@ -192,9 +287,31 @@ onBeforeUnmount(() => {
     <Transition name="slide-up">
       <div
         v-if="isOpen"
-        class="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-lg border-t border-zinc-800 bg-zinc-900 transition-[height] duration-300 ease-in-out"
+        class="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-lg border-t border-zinc-800 bg-zinc-900 ease-in-out"
+        :class="isResizing ? '' : 'transition-[height] duration-300'"
         :style="{ height: `${height}px` }"
       >
+        <!--
+          Drag handle for resizing the terminal vertically. Sits as a
+          thin strip at the very top edge of the panel; a small
+          "grabber" pill is centred horizontally to make it visually
+          discoverable on hover. The handle's hit area is wider than
+          the visible pill (8px tall) so users don't have to be
+          pixel-perfect to grab it.
+        -->
+        <div
+          class="group absolute inset-x-0 -top-1.5 z-10 flex h-3 cursor-ns-resize items-center justify-center"
+          role="separator"
+          aria-orientation="horizontal"
+          aria-label="Resize terminal"
+          @mousedown="startResize"
+          @touchstart="startResize"
+        >
+          <div
+            class="h-1 w-12 rounded-full bg-zinc-700 transition-colors group-hover:bg-zinc-500"
+            :class="isResizing ? 'bg-zinc-400' : ''"
+          />
+        </div>
         <!-- Header -->
         <div
           class="flex h-10 flex-shrink-0 items-center justify-between border-b border-zinc-800 px-4"
