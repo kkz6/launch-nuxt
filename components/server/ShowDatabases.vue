@@ -84,6 +84,33 @@ const syncDatabases = async () => {
   }
 }
 
+// Trigger a manual run of the first backup configured for this
+// database. Most servers have a single backup per database; if there
+// are multiple, we pick the first enabled one. Mirrors the row action
+// on the Advanced → Backups tab — same POST endpoint, same async
+// task flow — so the user can kick off a backup without leaving the
+// Databases tab where they're already focused.
+const isRunningBackup = ref<string | null>(null)
+const runDatabaseBackup = async (database: Database) => {
+  const backups = database.backups ?? []
+  if (backups.length === 0) return
+  // Prefer an enabled backup; fall back to the first one — a disabled
+  // backup is still runnable from the UI (the scheduler just doesn't
+  // fire it automatically).
+  const target = backups.find((b) => b.enabled) ?? backups[0]
+  isRunningBackup.value = database.id
+  try {
+    await $api(`/servers/${props.serverId}/backups/${target.id}/run`, {
+      method: 'POST',
+    })
+    toast.success(`Backup started for ${database.name}`)
+  } catch {
+    toast.error(`Failed to start backup for ${database.name}`)
+  } finally {
+    isRunningBackup.value = null
+  }
+}
+
 const deleteDatabase = async (database: Database) => {
   if (!confirmationDialog.value) return
 
@@ -198,9 +225,9 @@ onMounted(fetchData)
           :actions="[
             {
               label: 'Run Backup',
-              icon: 'lucide:rotate-ccw',
-              onClick: () => {},
-              show: (db: Database) => Boolean((db as any).backups?.length),
+              icon: 'lucide:play',
+              onClick: runDatabaseBackup,
+              show: (db: Database) => (db.backups?.length ?? 0) > 0,
             },
             {
               label: 'Delete',

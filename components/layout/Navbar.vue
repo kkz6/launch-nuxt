@@ -1687,10 +1687,17 @@ onMounted(fetchTeams);
           />
         </div>
       </div>
+      <!--
+        -ml-3 pulls the nav left so the first tab's internal px-3
+        padding stops creating a visible 12px gap between the
+        breadcrumb (which starts flush with the container) and the
+        first tab's icon. The sliding underline indicator computes its
+        position relative to this same nav, so it tracks correctly.
+      -->
       <nav
         v-if="isServerDataLoaded"
         ref="serverNavRef"
-        class="relative -mb-px flex gap-1 overflow-x-auto"
+        class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
         :class="{ '-mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-border mb-0': isAdvancedTabActive }"
       >
         <NuxtLink
@@ -1717,8 +1724,9 @@ onMounted(fetchTeams);
       <nav v-else class="relative -mb-px flex gap-1 overflow-x-auto">
         <div v-for="i in 6" :key="i" class="h-9 w-20 animate-pulse rounded bg-muted px-3 py-2" />
       </nav>
-      <!-- Advanced Sub-tabs -->
-      <nav v-if="isAdvancedTabActive" ref="advancedNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">
+      <!-- Advanced Sub-tabs — -ml-3 mirrors the parent server-tabs nav
+           so the first sub-tab's icon lines up with the breadcrumb. -->
+      <nav v-if="isAdvancedTabActive" ref="advancedNavRef" class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto">
         <NuxtLink
           v-for="subtab in advancedSubTabs"
           :key="subtab.value"
@@ -1797,7 +1805,7 @@ onMounted(fetchTeams);
           />
         </div>
       </div>
-      <nav ref="siteNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">
+      <nav ref="siteNavRef" class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto">
         <NuxtLink
           v-for="tab in siteDetailTabs"
           :key="tab.value"

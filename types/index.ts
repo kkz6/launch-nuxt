@@ -385,10 +385,20 @@ export interface SSHKey {
   updated_at: string;
 }
 
+export interface DatabaseBackupBrief {
+  id: string;
+  path: string;
+  enabled: boolean;
+}
+
 export interface Database extends InstallationStatus {
   id: string;
   name: string;
   created_at: string;
+  // Server-level backup configurations that include this database in
+  // their dump set — populated by the API when listing databases for
+  // the server's Databases tab. Drives the per-row "Run Backup" action.
+  backups?: DatabaseBackupBrief[];
 }
 
 export interface DatabaseUser extends InstallationStatus {
