@@ -483,6 +483,31 @@ export const useDockerBackupEvents = (
 }
 
 /**
+ * Composable to subscribe to server-level backup run events on the team
+ * channel — fired by the backup module's RunManualBackupJob. The
+ * Advanced → Backups tab uses these to auto-open + attach the live log
+ * console on a manual Run Backup and refresh the row on finish.
+ *
+ * Events:
+ * - backup.run.started   (worker created the task; payload carries task_id)
+ * - backup.run.succeeded (tar + upload completed)
+ * - backup.run.failed    (any step bailed; payload carries error message)
+ */
+export const useBackupEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(
+    channel,
+    ['backup.run.started', 'backup.run.succeeded', 'backup.run.failed'],
+    onEvent,
+  )
+}
+
+/**
  * Composable to subscribe to load balancer upstream and backend events
  *
  * @param teamId - The team ID
