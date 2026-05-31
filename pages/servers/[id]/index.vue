@@ -216,10 +216,10 @@ onMounted(async () => {
       <ServerShowDatabases :server-id="server.id" />
     </div>
 
-    <!-- 'networks' here is the PHP/loadbalancer firewall-rules view.
-         Docker servers don't expose this tab at all (Launch manages
-         the launch-network overlay for them); the route guard in
-         useServerTypeRules filters it out of DOCKER_TABS. -->
+    <!-- 'networks' is the host UFW firewall-rules view — same
+         component for PHP, load-balancer and docker servers.
+         (Docker's `launch-network` overlay is auto-managed and
+         lives off this UI; this tab is strictly the host firewall.) -->
     <div v-else-if="activeTab === 'networks'">
       <ServerShowNetworks :server-id="server.id" />
     </div>

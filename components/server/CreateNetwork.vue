@@ -155,9 +155,12 @@ const onSubmit = async () => {
           await updateServerSSHPort(data.port)
         }
       } else {
-        // Only name changed — patch
+        // Only name changed — server route is registered as PUT
+        // (UpdateNested), not PATCH; sending PATCH used to come back
+        // 405 Method Not Allowed and the UI toasted a generic
+        // "Failed to update firewall rule".
         await $api(`/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`, {
-          method: 'PATCH',
+          method: 'PUT',
           body: { name: data.name },
         })
       }

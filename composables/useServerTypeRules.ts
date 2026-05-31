@@ -79,11 +79,17 @@ const LOADBALANCER_TABS: ServerDetailTab[] = [
 // config editing lives under Advanced — admin escape hatch, not a
 // day-to-day tab.
 //
-// Networks deliberately omitted: Launch installs `launch-network` and
-// every app joins it automatically. Customers don't create custom
-// networks via the UI (no creator flow exists, and the SaaS model
-// doesn't need one), so the tab was empty for everyone — see
-// docs/plans/2026-05-22-docker-server-menus-design.md.
+// Networks (UFW firewall) and Daemons (host-level supervisord
+// processes) ARE wanted on docker servers — Networks is *not* about
+// docker overlay networks (launch-network is auto-joined and there's
+// no creator flow), it's about the host's UFW rules. A docker host
+// still needs explicit inbound rules for the ports Traefik publishes
+// (80/443) and for any container that exposes its own port; same
+// shape as PHP hosts. Daemons covers host-level processes that run
+// alongside docker — log shippers, monitoring agents, cleanup
+// scripts. Both tabs reuse the same backend the PHP server uses
+// (servers/:id/firewall-rules and servers/:id/daemons).
+//
 // Volumes deliberately omitted at the docker-server level: per-app
 // volume management lives on the application detail page (the
 // dokploy-style bind / volume / file mount picker). A flat host-
@@ -95,6 +101,8 @@ const LOADBALANCER_TABS: ServerDetailTab[] = [
 const DOCKER_TABS: ServerDetailTab[] = [
   { value: "projects", label: "Projects", query: "projects", icon: "lucide:folder-tree" },
   { value: "containers", label: "Containers", query: "containers", icon: "lucide:container" },
+  { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
+  { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
   { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
   { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
   { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
