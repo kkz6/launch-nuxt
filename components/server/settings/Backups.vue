@@ -12,6 +12,10 @@ interface BackupJob {
   size: number
   size_in_mb: number
   error?: string
+  // task_id is set by the worker once the SSH task is created — drives
+  // the View Logs button in the history sheet (ServerLogViewer
+  // entity="task"). Absent on legacy rows pre-task-tracking.
+  task_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -245,6 +249,7 @@ onMounted(fetchBackups)
       v-if="selectedBackupForHistory"
       v-model:open="isHistorySheetOpen"
       :backup="selectedBackupForHistory"
+      :server-id="serverId"
     />
 
     <!-- Edit Backup Dialog -->
