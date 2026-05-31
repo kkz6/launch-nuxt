@@ -407,7 +407,12 @@ const connectWebSocket = async () => {
 
   ws.onmessage = (e) => {
     rawLogs.value += e.data
-    isLoading.value = false
+    // Don't flip isLoading=false here. The watch(rawLogs) below parses
+    // into filteredLogs on the next microtask; flipping synchronously
+    // would briefly render the "No logs found" empty-state for one
+    // frame before the parsed lines appear ("connecting → no logs →
+    // logs visible" flicker the user sees app-wide). Let the parse
+    // watcher own the transition.
     if (noDataTimeout) clearTimeout(noDataTimeout)
   }
 
@@ -435,6 +440,10 @@ watch(rawLogs, () => {
   filteredLogs.value = typeFilter.value.length > 0
     ? logs.filter((log) => typeFilter.value.includes(log.type))
     : logs
+  // Logs parsed — only NOW the loading indicator can hand off to either
+  // the rendered list or the "No logs found" empty state. Flipping in
+  // ws.onmessage flickered the empty state for one frame on every load.
+  isLoading.value = false
 })
 
 watch(filteredLogs, () => {
