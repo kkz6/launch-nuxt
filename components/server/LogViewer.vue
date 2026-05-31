@@ -53,7 +53,9 @@ const linesString = computed({
 const search = ref('')
 const typeFilter = ref<string[]>([])
 const scrollRef = ref<HTMLDivElement | null>(null)
-const isLoading = ref(false)
+// Loading state is derived in the template from wsOpen + filteredLogs;
+// no separate isLoading boolean (removed to avoid the empty-state
+// flicker — see the template guard for the three explicit states).
 const wsOpen = ref(false)
 const logType = ref('output')
 const showTimestamp = ref(!props.noTimestamp)
@@ -357,9 +359,11 @@ const connectWebSocket = async () => {
     ws.close()
   }
 
-  isLoading.value = true
   rawLogs.value = ''
   filteredLogs.value = []
+  // wsOpen flips true on ws.onopen — the "Connecting…" state below
+  // renders until then. Don't pre-set isLoading; the template derives
+  // the loading state from wsOpen + filteredLogs (see below).
 
   // Wait for auth to be initialized before connecting
   await waitForAuth()
@@ -391,41 +395,33 @@ const connectWebSocket = async () => {
 
   ws = new WebSocket(wsUrl)
 
-  let noDataTimeout: NodeJS.Timeout | null = null
-
-  const resetTimeout = () => {
-    if (noDataTimeout) clearTimeout(noDataTimeout)
-    noDataTimeout = setTimeout(() => {
-      isLoading.value = false
-    }, 2000)
-  }
+  // Loading state is now derived from wsOpen + filteredLogs in the
+  // template — no more no-data timeout, no more isLoading boolean.
+  // The three states are:
+  //   !wsOpen                         → Connecting
+  //   wsOpen && no parsed lines yet   → Loading logs
+  //   parsed lines present            → render them
+  // We never hard-show "No logs found" because the brief window
+  // between WS-open and the first parsed message was the source of the
+  // flicker users saw.
 
   ws.onopen = () => {
     wsOpen.value = true
-    resetTimeout()
   }
 
   ws.onmessage = (e) => {
     rawLogs.value += e.data
-    // Don't flip isLoading=false here. The watch(rawLogs) below parses
-    // into filteredLogs on the next microtask; flipping synchronously
-    // would briefly render the "No logs found" empty-state for one
-    // frame before the parsed lines appear ("connecting → no logs →
-    // logs visible" flicker the user sees app-wide). Let the parse
-    // watcher own the transition.
-    if (noDataTimeout) clearTimeout(noDataTimeout)
+    // The watch(rawLogs) below parses into filteredLogs on the next
+    // microtask — that's what flips the rendered state from
+    // "Loading…" to the actual lines.
   }
 
   ws.onerror = () => {
     wsOpen.value = false
-    isLoading.value = false
-    if (noDataTimeout) clearTimeout(noDataTimeout)
   }
 
   ws.onclose = () => {
     wsOpen.value = false
-    isLoading.value = false
-    if (noDataTimeout) clearTimeout(noDataTimeout)
   }
 }
 
@@ -440,10 +436,8 @@ watch(rawLogs, () => {
   filteredLogs.value = typeFilter.value.length > 0
     ? logs.filter((log) => typeFilter.value.includes(log.type))
     : logs
-  // Logs parsed — only NOW the loading indicator can hand off to either
-  // the rendered list or the "No logs found" empty state. Flipping in
-  // ws.onmessage flickered the empty state for one frame on every load.
-  isLoading.value = false
+  // The template watches filteredLogs.length to drop the
+  // "Loading logs…" state; nothing else to do here.
 })
 
 watch(filteredLogs, () => {
@@ -517,12 +511,23 @@ onUnmounted(() => {
           ]"
           @scroll="handleScroll"
         >
-          <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-zinc-950/80">
-            <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-zinc-400" />
-          </div>
-
-          <div v-else-if="filteredLogs.length === 0" class="flex h-full items-center justify-center text-zinc-500">
-            No logs found
+          <!--
+            Three explicit states (replaces the old isLoading boolean
+            + "No logs found" empty state that flickered):
+              1. !wsOpen                         → Connecting…
+              2. wsOpen && no parsed lines yet   → Loading logs…
+              3. parsed lines present            → render the list
+            The empty "No logs found" state is intentionally removed —
+            for live runs there's always going to be output eventually,
+            and the brief window before the first parse was where the
+            flicker came from.
+          -->
+          <div
+            v-if="filteredLogs.length === 0"
+            class="absolute inset-0 flex items-center justify-center gap-2 bg-zinc-950/80 text-sm text-zinc-400"
+          >
+            <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+            <span>{{ wsOpen ? 'Loading logs…' : 'Connecting…' }}</span>
           </div>
 
           <div class="space-y-1 font-mono text-sm">
