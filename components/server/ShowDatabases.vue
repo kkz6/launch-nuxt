@@ -92,12 +92,25 @@ const syncDatabases = async () => {
 // Databases tab where they're already focused.
 const isRunningBackup = ref<string | null>(null)
 const runDatabaseBackup = async (database: Database) => {
+  if (!confirmationDialog.value) return
   const backups = database.backups ?? []
   if (backups.length === 0) return
   // Prefer an enabled backup; fall back to the first one — a disabled
   // backup is still runnable from the UI (the scheduler just doesn't
   // fire it automatically).
   const target = backups.find((b) => b.enabled) ?? backups[0]
+
+  // Confirmation dialog mirrors the Advanced → Backups tab's "Run
+  // Backup" flow so the action behaves consistently no matter where
+  // the user triggers it from.
+  const result = await confirmationDialog.value.show({
+    title: 'Run Backup',
+    description: `Are you sure you want to run the backup for "${database.name}" now?`,
+    confirmText: 'Run Backup',
+    cancelText: 'Cancel',
+  })
+  if (!result.ok) return
+
   isRunningBackup.value = database.id
   try {
     await $api(`/servers/${props.serverId}/backups/${target.id}/run`, {
