@@ -9,6 +9,12 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { Button } from '~/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '~/components/ui/tooltip'
 
 export interface Column<T> {
   key: keyof T | string
@@ -187,23 +193,41 @@ const mobileClass = computed(() => {
               <TableCell v-if="actions.length > 0 || $slots.actions" class="py-2">
                 <div class="flex items-center justify-center gap-1">
                   <slot name="actions" :item="item">
-                    <template v-for="(action, actionIndex) in actions" :key="actionIndex">
-                      <Button
-                        v-if="!action.show || action.show(item)"
-                        :variant="action.variant || 'ghost'"
-                        :size="action.size || 'icon'"
-                        :class="[
-                          'transition-all duration-150 hover:scale-105',
-                          action.destructive && 'hover:bg-destructive/90 hover:text-white',
-                          action.className,
-                        ]"
-                        :title="action.label"
-                        @click="action.onClick?.(item)"
-                      >
-                        <Icon v-if="action.icon" :name="action.icon" class="h-4 w-4" />
-                        <Icon v-else name="lucide:more-horizontal" class="h-4 w-4" />
-                      </Button>
-                    </template>
+                    <!--
+                      Each icon-only action button is wrapped in a Tooltip
+                      so users get a discoverable label on hover — the
+                      icon alone (trash, play, pencil, …) leaves people
+                      guessing what each row action does. The native
+                      `title` attribute is also set as a non-JS fallback.
+                      The mobile layout below shows the label inline and
+                      doesn't need a tooltip.
+                    -->
+                    <TooltipProvider :delay-duration="200">
+                      <template v-for="(action, actionIndex) in actions" :key="actionIndex">
+                        <Tooltip v-if="!action.show || action.show(item)">
+                          <TooltipTrigger as-child>
+                            <Button
+                              :variant="action.variant || 'ghost'"
+                              :size="action.size || 'icon'"
+                              :class="[
+                                'transition-all duration-150 hover:scale-105',
+                                action.destructive && 'hover:bg-destructive/90 hover:text-white',
+                                action.className,
+                              ]"
+                              :title="action.label"
+                              :aria-label="action.label"
+                              @click="action.onClick?.(item)"
+                            >
+                              <Icon v-if="action.icon" :name="action.icon" class="h-4 w-4" />
+                              <Icon v-else name="lucide:more-horizontal" class="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {{ action.label }}
+                          </TooltipContent>
+                        </Tooltip>
+                      </template>
+                    </TooltipProvider>
                   </slot>
                 </div>
               </TableCell>
