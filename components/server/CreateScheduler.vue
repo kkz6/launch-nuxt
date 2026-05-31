@@ -156,17 +156,36 @@ const onSubmit = async () => {
 
   isLoading.value = true
   try {
+    // The radio group's `frequency` value is the actual cron string
+    // for presets (e.g. "0 * * * *" for Hourly) or the literal
+    // "custom" sentinel — and the backend's CreateCronRequest /
+    // UpdateCronRequest expect the cron string under `expression`,
+    // not `frequency`. Sending `frequency` directly produced a 422
+    // {"errors":{"expression":["This field is required"]}} on every
+    // Create attempt, which the UI toasted as a generic failure.
+    const expression = data.frequency === 'custom'
+      ? (data.custom_expression || '').trim()
+      : data.frequency
+    const payload: Record<string, unknown> = {
+      command: data.command,
+      user: data.user,
+      expression,
+    }
     if (props.cron) {
       await $api(`/servers/${serverId.value}/crons/${props.cron.id}`, {
-        method: 'PATCH',
-        body: data,
+        // Backend route is `Put`, not `Patch` (see
+        // internal/modules/server/routes.go) — sending PATCH used
+        // to come back 405 Method Not Allowed and the toast just
+        // said "Failed".
+        method: 'PUT',
+        body: payload,
       })
       toast.success('Scheduler updated successfully')
       emit('updated')
     } else {
       await $api(`/servers/${serverId.value}/crons`, {
         method: 'POST',
-        body: data,
+        body: payload,
       })
       toast.success('Scheduler created successfully')
       emit('created')
