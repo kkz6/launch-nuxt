@@ -1,5 +1,8 @@
 <script setup lang="ts" generic="T extends TabItem">
-import { Icon } from '#components'
+// `Icon` (Nuxt Icon) and the script-setup macros (ref/computed/watch/
+// nextTick/onMounted/onBeforeUnmount) are Nuxt auto-imports — pulling
+// them in via `#components` worked at runtime but tripped vue-tsc
+// when invoked outside the project's prepared .nuxt/tsconfig.
 import type { RouteLocationRaw } from 'vue-router'
 
 /**
