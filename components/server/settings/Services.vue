@@ -78,6 +78,70 @@ interface AgentVersionInfo {
 const agentVersion = ref<AgentVersionInfo | null>(null)
 const isUpdatingAgent = ref(false)
 
+// Persistent "update in progress" timestamp so the banner + agent-row
+// status stay on "Updating" across reloads. The service-operation job
+// has no started-event broadcast yet, so the UI drives this state on
+// its own and polls the version endpoint until installed catches up to
+// latest (or the TTL expires as a safety net).
+const agentUpdateStorageKey = computed(() => `launch:agent-update:${props.serverId}`)
+const agentUpdateStartedAt = ref<number | null>(null)
+const AGENT_UPDATE_TTL_MS = 5 * 60 * 1000
+
+const readUpdateStarted = (): number | null => {
+  if (typeof window === 'undefined') return null
+  const raw = window.localStorage.getItem(agentUpdateStorageKey.value)
+  if (!raw) return null
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return null
+  if (Date.now() - n > AGENT_UPDATE_TTL_MS) {
+    window.localStorage.removeItem(agentUpdateStorageKey.value)
+    return null
+  }
+  return n
+}
+
+const writeUpdateStarted = (ts: number | null) => {
+  agentUpdateStartedAt.value = ts
+  if (typeof window === 'undefined') return
+  if (ts === null) {
+    window.localStorage.removeItem(agentUpdateStorageKey.value)
+  } else {
+    window.localStorage.setItem(agentUpdateStorageKey.value, String(ts))
+  }
+}
+
+// True from the moment the user triggers Update until the version
+// endpoint confirms installed === latest (or until the TTL elapses).
+const agentUpdateInProgress = computed(() => {
+  if (!agentUpdateStartedAt.value) return false
+  if (Date.now() - agentUpdateStartedAt.value > AGENT_UPDATE_TTL_MS) return false
+  const v = agentVersion.value
+  // If we don't know the latest yet, stay in "updating" — better to
+  // keep the spinner than to flash back to "update available".
+  if (!v) return true
+  if (v.update_available === false) return false
+  // update_available true but installed already matches latest → done.
+  if (v.installed && v.latest && v.installed === v.latest) return false
+  return true
+})
+
+let agentPollTimer: ReturnType<typeof setInterval> | null = null
+const stopAgentPoll = () => {
+  if (agentPollTimer) {
+    clearInterval(agentPollTimer)
+    agentPollTimer = null
+  }
+}
+const startAgentPoll = () => {
+  stopAgentPoll()
+  agentPollTimer = setInterval(() => {
+    fetchAgentVersion()
+    if (!agentUpdateInProgress.value) {
+      stopAgentPoll()
+    }
+  }, 5000)
+}
+
 // Status dialog state
 const isStatusDialogOpen = ref(false)
 const selectedServiceForStatus = ref<Service | null>(null)
@@ -251,6 +315,20 @@ const getLiveStatus = (serviceId: string) => {
 
 // Get display status (prefer live status over API status)
 const getDisplayStatus = (service: Service) => {
+  // While the agent self-upgrade is in flight the row should read
+  // "Updating" — the underlying systemd unit may still report Running
+  // (binary swap doesn't always stop the service), but the meaningful
+  // state for the user is "we're in the middle of swapping it out".
+  if (service.software === 'launch_agent' && agentUpdateInProgress.value) {
+    return {
+      status: 'updating',
+      label: 'Updating',
+      memory: undefined,
+      uptime: undefined,
+      pid: undefined,
+      isLive: false,
+    }
+  }
   const live = getLiveStatus(service.id)
   if (live) {
     return {
@@ -341,12 +419,14 @@ const updateAgent = async () => {
       method: 'POST',
     })
     toast.success(`Updating Launch Agent to v${info.latest}…`)
-    // The install runs over SSH; give it a moment, then refresh the
-    // services list + re-check the version so the banner clears.
-    setTimeout(() => {
-      fetchServices()
-      fetchAgentVersion()
-    }, 4000)
+    // Latch the "updating" state immediately so the banner + agent row
+    // status flip to "Updating" rather than continuing to show
+    // "Update available". The poll below clears it once the agent
+    // reports the new version.
+    writeUpdateStarted(Date.now())
+    fetchServices()
+    fetchAgentVersion()
+    startAgentPoll()
   } catch {
     toast.error('Failed to start Launch Agent update')
   } finally {
@@ -374,6 +454,14 @@ const serviceAction = async (service: Service, action: 'start' | 'stop' | 'resta
       method: 'POST',
     })
     toast.success(`${service.name} ${action} initiated`)
+    // Launch-Agent "update" path: latch the persistent updating state
+    // so the row badge + banner reflect "Updating" until the agent
+    // reports the new version (or the TTL elapses).
+    if (action === 'update' && service.software === 'launch_agent') {
+      writeUpdateStarted(Date.now())
+      fetchAgentVersion()
+      startAgentPoll()
+    }
     fetchServices()
   } catch {
     toast.error(`Failed to ${action} service`)
@@ -401,6 +489,7 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
     case 'pending':
     case 'installing':
     case 'uninstalling':
+    case 'updating':
       return 'warning'
     case 'installed':
       return 'default'
@@ -436,6 +525,29 @@ onMounted(() => {
   fetchServices()
   fetchLogs()
   fetchAgentVersion()
+  // Rehydrate updating state on remount so a reload doesn't drop us
+  // back to "Update available". If we land mid-update, restart the
+  // poll until the version catches up.
+  const persisted = readUpdateStarted()
+  if (persisted) {
+    agentUpdateStartedAt.value = persisted
+    startAgentPoll()
+  }
+})
+
+// Clear the persistent flag the moment the version endpoint confirms
+// we're back in sync — no point keeping the row badge on "Updating"
+// after the agent has restarted reporting the new version.
+watch(agentUpdateInProgress, (inProgress) => {
+  if (!inProgress && agentUpdateStartedAt.value !== null) {
+    writeUpdateStarted(null)
+    stopAgentPoll()
+    toast.success('Launch Agent updated')
+  }
+})
+
+onBeforeUnmount(() => {
+  stopAgentPoll()
 })
 </script>
 
@@ -443,9 +555,36 @@ onMounted(() => {
   <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!-- Launch Agent update banner -->
+    <!--
+      Launch Agent update banner.
+
+      Three states drive the banner:
+        1. "Updating…" — agentUpdateInProgress (sticky after Run via
+           the persisted timestamp; cleared once installed === latest
+           or the TTL elapses).
+        2. "Update available" — the version endpoint reports installed
+           !== latest and we haven't triggered the update yet.
+        3. Hidden — installed === latest.
+    -->
     <div
-      v-if="agentVersion?.update_available"
+      v-if="agentUpdateInProgress"
+      class="flex flex-col gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-blue-800/60 dark:bg-blue-950/30"
+    >
+      <div class="flex items-start gap-2.5">
+        <Icon name="lucide:loader-2" class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
+        <div class="text-sm">
+          <p class="font-medium text-blue-900 dark:text-blue-200">
+            Updating Launch Agent<template v-if="agentVersion?.latest">
+              to <span class="font-semibold">v{{ agentVersion.latest }}</span></template>…
+          </p>
+          <p class="text-blue-700 dark:text-blue-300/90">
+            The install script is running on this server. The status will refresh automatically.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div
+      v-else-if="agentVersion?.update_available"
       class="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800/60 dark:bg-amber-950/30"
     >
       <div class="flex items-start gap-2.5">
