@@ -99,6 +99,14 @@ useBackupEvents(teamId, (data, event) => {
     if (isLogSheetOpen.value && logSheetTaskId.value) {
       setTimeout(() => logRefreshNonce.value++, 800)
     }
+    // Explicit terminal-state toast so the user gets unambiguous
+    // success/failure feedback instead of having to read the row
+    // tooltip or scan the log console for an exit message.
+    if (event === 'backup.run.succeeded') {
+      toast.success('Backup completed')
+    } else {
+      toast.error('Backup failed — check the log console for details')
+    }
   }
 })
 
