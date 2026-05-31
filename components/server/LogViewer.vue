@@ -41,6 +41,15 @@ const config = useRuntimeConfig()
 const { token, isInitialized, waitForAuth } = useAuth()
 const { getCurrentTeamId } = useApi()
 const rawLogs = ref('')
+// `emptyConfirmed` flips true ~2.5s after the WS connects if we still
+// haven't received a single byte — at that point the log file is
+// genuinely empty (daemon hasn't printed anything yet, log got
+// truncated, etc) and we surface a friendly empty state instead of
+// spinning forever. The delay is long enough to cover normal WS
+// handshake + first-frame latency, so users who DO have logs don't
+// see this state flash on the way in.
+const emptyConfirmed = ref(false)
+let emptyConfirmTimer: ReturnType<typeof setTimeout> | null = null
 const filteredLogs = ref<LogLine[]>([])
 const autoScroll = ref(true)
 const lines = ref(100)
@@ -361,6 +370,11 @@ const connectWebSocket = async () => {
 
   rawLogs.value = ''
   filteredLogs.value = []
+  emptyConfirmed.value = false
+  if (emptyConfirmTimer) {
+    clearTimeout(emptyConfirmTimer)
+    emptyConfirmTimer = null
+  }
   // wsOpen flips true on ws.onopen — the "Connecting…" state below
   // renders until then. Don't pre-set isLoading; the template derives
   // the loading state from wsOpen + filteredLogs (see below).
@@ -407,10 +421,26 @@ const connectWebSocket = async () => {
 
   ws.onopen = () => {
     wsOpen.value = true
+    // Arm the empty-state timer — if we still haven't received any
+    // data after this window, swap the perpetual spinner for "No
+    // logs available". Cancelled on the first onmessage below.
+    if (emptyConfirmTimer) clearTimeout(emptyConfirmTimer)
+    emptyConfirmTimer = setTimeout(() => {
+      if (rawLogs.value.length === 0) {
+        emptyConfirmed.value = true
+      }
+    }, 2500)
   }
 
   ws.onmessage = (e) => {
     rawLogs.value += e.data
+    // First byte arrived — kill the empty-state timer so we don't
+    // race the "Loading…" → lines transition with an empty banner.
+    if (emptyConfirmTimer) {
+      clearTimeout(emptyConfirmTimer)
+      emptyConfirmTimer = null
+    }
+    emptyConfirmed.value = false
     // The watch(rawLogs) below parses into filteredLogs on the next
     // microtask — that's what flips the rendered state from
     // "Loading…" to the actual lines.
@@ -449,6 +479,10 @@ onMounted(connectWebSocket)
 onUnmounted(() => {
   if (ws) {
     ws.close()
+  }
+  if (emptyConfirmTimer) {
+    clearTimeout(emptyConfirmTimer)
+    emptyConfirmTimer = null
   }
 })
 </script>
@@ -512,22 +546,28 @@ onUnmounted(() => {
           @scroll="handleScroll"
         >
           <!--
-            Three explicit states (replaces the old isLoading boolean
-            + "No logs found" empty state that flickered):
-              1. !wsOpen                         → Connecting…
-              2. wsOpen && no parsed lines yet   → Loading logs…
-              3. parsed lines present            → render the list
-            The empty "No logs found" state is intentionally removed —
-            for live runs there's always going to be output eventually,
-            and the brief window before the first parse was where the
-            flicker came from.
+            Four-state machine for the empty overlay:
+              1. !wsOpen                                          → Connecting…
+              2. wsOpen && !emptyConfirmed && no parsed lines yet → Loading logs…
+              3. wsOpen && emptyConfirmed (no bytes after 2.5s)   → No logs available
+              4. parsed lines present                             → render the list
+            The "emptyConfirmed" timer prevents the spinner from
+            sitting forever on genuinely empty logs (daemon hasn't
+            printed anything, log file fresh), while still being long
+            enough to swallow normal WS-open + first-frame latency.
           -->
           <div
             v-if="filteredLogs.length === 0"
             class="absolute inset-0 flex items-center justify-center gap-2 bg-zinc-950/80 text-sm text-zinc-400"
           >
-            <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
-            <span>{{ wsOpen ? 'Loading logs…' : 'Connecting…' }}</span>
+            <template v-if="wsOpen && emptyConfirmed">
+              <Icon name="lucide:file-x" class="h-4 w-4" />
+              <span>No logs available</span>
+            </template>
+            <template v-else>
+              <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+              <span>{{ wsOpen ? 'Loading logs…' : 'Connecting…' }}</span>
+            </template>
           </div>
 
           <div class="space-y-1 font-mono text-sm">
