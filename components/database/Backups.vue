@@ -187,6 +187,13 @@ useDockerBackupEvents(teamId, (data, event) => {
     if (logSheetOpen.value && logSheetTaskId.value) {
       setTimeout(() => logRefreshNonce.value++, 800);
     }
+    // Explicit terminal-state toast so the user gets clear success /
+    // failure feedback instead of inferring from row pills alone.
+    if (event === "docker.database.backup.run.succeeded") {
+      toast.success("Backup completed");
+    } else {
+      toast.error("Backup failed — check the log console for details");
+    }
   }
   // started / succeeded / failed → re-pull so the pills + history update.
   load();
