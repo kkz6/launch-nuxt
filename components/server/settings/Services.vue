@@ -354,10 +354,10 @@ const updateAgent = async () => {
   }
 }
 
-const serviceAction = async (service: Service, action: 'start' | 'stop' | 'restart') => {
+const serviceAction = async (service: Service, action: 'start' | 'stop' | 'restart' | 'update') => {
   if (!confirmationDialog.value) return
 
-  const actionLabels: Record<string, string> = { start: 'Start', stop: 'Stop', restart: 'Restart' }
+  const actionLabels: Record<string, string> = { start: 'Start', stop: 'Stop', restart: 'Restart', update: 'Update' }
   const result = await confirmationDialog.value.show({
     title: `${actionLabels[action]} Service`,
     description: `Are you sure you want to ${action} "${service.name}"?`,
@@ -654,6 +654,23 @@ onMounted(() => {
                           <DropdownMenuItem @click="openStatusDialog(service)">
                             <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
                             View Details
+                          </DropdownMenuItem>
+                          <!--
+                            Manual "Update" / re-install for the Launch Agent. The
+                            agent-version-available banner only fires when the
+                            comparison says installed < latest, but legacy v1.0
+                            binaries report ">v0.8.0" semver-wise so the banner
+                            stays hidden. This action is the always-available
+                            escape hatch — runs the existing service-operation
+                            update action (re-runs the install script, which
+                            self-upgrades to the latest published build).
+                          -->
+                          <DropdownMenuItem
+                            v-if="service.software === 'launch_agent'"
+                            @click="serviceAction(service, 'update')"
+                          >
+                            <Icon name="lucide:download" class="mr-2 h-4 w-4" />
+                            Update Agent
                           </DropdownMenuItem>
                           <DropdownMenuItem v-if="logsByService.has(service.software)" @click="openLogSheet(service)">
                             <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
