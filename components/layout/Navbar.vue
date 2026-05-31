@@ -1100,6 +1100,27 @@ const isAdvancedSubTabActive = (query: string) => {
   return currentSubTab === query;
 };
 
+// Scalar active-key computeds for the LayoutTabStrip — picks the
+// route's `tab=` (server-detail) and `subtab=` (advanced) and falls
+// back to the first available tab when the query is absent. The
+// fallback matches the page's defaulting logic in
+// pages/servers/[id]/index.vue.
+const serverActiveTabKey = computed(() => {
+  const fromQuery = route.query.tab as string | undefined;
+  if (fromQuery && serverDetailTabs.value.some((t) => t.value === fromQuery)) {
+    return fromQuery;
+  }
+  return serverDetailTabs.value[0]?.value ?? 'sites';
+});
+
+const advancedActiveTabKey = computed(() => {
+  const fromQuery = route.query.subtab as string | undefined;
+  if (fromQuery && advancedSubTabs.value.some((t) => t.value === fromQuery)) {
+    return fromQuery;
+  }
+  return 'general';
+});
+
 const isSiteTabActive = (query: string) => {
   const currentTab = route.query.tab as string || 'general';
   return currentTab === query;
@@ -1688,66 +1709,38 @@ onMounted(fetchTeams);
         </div>
       </div>
       <!--
-        -ml-3 pulls the nav left so the first tab's internal px-3
-        padding stops creating a visible 12px gap between the
-        breadcrumb (which starts flush with the container) and the
-        first tab's icon. The sliding underline indicator computes its
-        position relative to this same nav, so it tracks correctly.
+        Server-detail tab strip. Replaced the hand-rolled nav (and
+        its sibling -ml-3 / sliding-indicator-refs / conditional
+        full-width border) with the shared LayoutTabStrip component.
+        Same component is used for the Advanced sub-tabs below, so
+        the icons in both strips line up under the breadcrumb above
+        regardless of which sub-strip is open.
       -->
-      <nav
+      <LayoutTabStrip
         v-if="isServerDataLoaded"
-        ref="serverNavRef"
-        class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
-        :class="{ '-mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-border mb-0': isAdvancedTabActive }"
-      >
-        <NuxtLink
-          v-for="tab in serverDetailTabs"
-          :key="tab.value"
-          :ref="(el) => setServerTabRef(tab.query, el)"
-          :to="{ path: `/servers/${serverId}`, query: tab.query === 'advanced' ? { tab: tab.query, subtab: 'general' } : { tab: tab.query } }"
-          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
-          :class="[
-            isServerTabActive(tab.query)
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
-          ]"
-        >
-          <Icon :name="tab.icon" class="h-4 w-4" />
-          {{ tab.label }}
-        </NuxtLink>
-        <!-- Sliding indicator -->
-        <span
-          class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-          :style="{ left: `${serverIndicatorLeft}px`, width: `${serverIndicatorWidth}px` }"
-        />
-      </nav>
+        :tabs="serverDetailTabs"
+        :active-key="serverActiveTabKey"
+        :to-link="(tab) => ({
+          path: `/servers/${serverId}`,
+          query: tab.query === 'advanced'
+            ? { tab: tab.query, subtab: 'general' }
+            : { tab: tab.query },
+        })"
+        :extend-border="isAdvancedTabActive"
+      />
       <nav v-else class="relative -mb-px flex gap-1 overflow-x-auto">
         <div v-for="i in 6" :key="i" class="h-9 w-20 animate-pulse rounded bg-muted px-3 py-2" />
       </nav>
-      <!-- Advanced Sub-tabs — -ml-3 mirrors the parent server-tabs nav
-           so the first sub-tab's icon lines up with the breadcrumb. -->
-      <nav v-if="isAdvancedTabActive" ref="advancedNavRef" class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto">
-        <NuxtLink
-          v-for="subtab in advancedSubTabs"
-          :key="subtab.value"
-          :ref="(el) => setAdvancedTabRef(subtab.query, el)"
-          :to="{ path: `/servers/${serverId}`, query: { tab: 'advanced', subtab: subtab.query } }"
-          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
-          :class="[
-            isAdvancedSubTabActive(subtab.query)
-              ? 'text-rose-500 dark:text-rose-300'
-              : 'text-muted-foreground hover:text-foreground'
-          ]"
-        >
-          <Icon :name="subtab.icon" class="h-4 w-4" />
-          {{ subtab.label }}
-        </NuxtLink>
-        <!-- Sliding indicator -->
-        <span
-          class="absolute bottom-0 h-0.5 bg-rose-400 transition-all duration-300 ease-out"
-          :style="{ left: `${advancedIndicatorLeft}px`, width: `${advancedIndicatorWidth}px` }"
-        />
-      </nav>
+      <LayoutTabStrip
+        v-if="isAdvancedTabActive"
+        :tabs="advancedSubTabs"
+        :active-key="advancedActiveTabKey"
+        :to-link="(tab) => ({
+          path: `/servers/${serverId}`,
+          query: { tab: 'advanced', subtab: tab.query },
+        })"
+        variant="rose"
+      />
     </div>
 
     <!-- Site Detail Navigation -->

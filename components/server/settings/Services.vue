@@ -313,6 +313,21 @@ const getLiveStatus = (serviceId: string) => {
   return liveStatuses.value.find(s => s.id === serviceId)
 }
 
+// Heuristic for "do we trust the persisted DB status?". The Services
+// API hands back the last cached status alongside last_status_check —
+// when that timestamp is stale (older than 5 min) the cached value is
+// likely a leftover (e.g. one failed daemon-supervisor probe months
+// ago that latched the Launch Agent service as Failed even though the
+// agent itself is running fine). Until the live status WS catches up,
+// show "Checking…" instead of broadcasting a misleading state.
+const STATUS_FRESHNESS_MS = 5 * 60 * 1000
+const isPersistedStatusFresh = (service: Service): boolean => {
+  if (!service.last_status_check) return false
+  const checkedAt = Date.parse(service.last_status_check)
+  if (Number.isNaN(checkedAt)) return false
+  return Date.now() - checkedAt < STATUS_FRESHNESS_MS
+}
+
 // Get display status (prefer live status over API status)
 const getDisplayStatus = (service: Service) => {
   // While the agent self-upgrade is in flight the row should read
@@ -338,6 +353,21 @@ const getDisplayStatus = (service: Service) => {
       uptime: live.uptime,
       pid: live.pid,
       isLive: true,
+    }
+  }
+  // No live status yet AND the persisted check is stale → surface a
+  // neutral "Checking…" rather than the cached (possibly wrong)
+  // status. This is what kills the "Failed → Installed" flash on the
+  // Launch Agent row when the supervised-daemon webhook had latched
+  // a months-old FATAL into the parent service.status.
+  if (!isPersistedStatusFresh(service)) {
+    return {
+      status: 'checking',
+      label: 'Checking…',
+      memory: undefined,
+      uptime: undefined,
+      pid: undefined,
+      isLive: false,
     }
   }
   return {
@@ -491,6 +521,10 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
     case 'uninstalling':
     case 'updating':
       return 'warning'
+    case 'checking':
+      // Neutral secondary while we wait for the live WS probe — not
+      // an alarming colour and not a "stable" one, just transitional.
+      return 'secondary'
     case 'installed':
       return 'default'
     default:
