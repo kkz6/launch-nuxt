@@ -43,14 +43,9 @@ useDockerProjectEvents(teamId, (data) => {
   void fetchProjects(true);
 });
 
-const formatDate = (iso?: string): string => {
-  if (!iso) return "";
-  try {
-    return new Date(iso).toLocaleDateString();
-  } catch {
-    return "";
-  }
-};
+// formatDate used to live here; replaced by SharedDateTooltip in
+// the template so the project's created_at shows live "X ago" with
+// a browser-TZ absolute tooltip on hover, same as everywhere else.
 
 // Click handler that pushes to the project detail page. We don't wrap
 // the card in <NuxtLink> because the inner delete button needs its own
@@ -161,9 +156,12 @@ onMounted(fetchProjects);
                 {{ project.databases_count }}
               </span>
             </div>
-            <span class="text-xs text-muted-foreground">
-              {{ formatDate(project.created_at) }}
-            </span>
+            <SharedDateTooltip
+              v-if="project.created_at"
+              :date="project.created_at"
+              class-name="text-xs"
+            />
+            <span v-else class="text-xs text-muted-foreground">—</span>
           </div>
         </div>
       </div>

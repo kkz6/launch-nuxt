@@ -185,33 +185,11 @@ const statusBadgeClass = (status: string): string => {
   }
 };
 
-const formatDate = (iso?: string): string => {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleDateString(undefined, {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return "—";
-  }
-};
-
-const relative = (iso: string | null): string => {
-  if (!iso) return "never";
-  try {
-    const d = typeof iso === "string" ? new Date(iso) : iso;
-    const diff = (Date.now() - d.getTime()) / 1000;
-    if (diff < 60) return "just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    if (diff < 86400 * 7) return `${Math.floor(diff / 86400)}d ago`;
-    return d.toLocaleDateString();
-  } catch {
-    return "";
-  }
-};
+// formatDate + relative used to live here as one-off helpers. Both
+// got replaced by SharedDateTooltip — it ticks via useNow(), shows
+// the absolute time in the browser's TZ in a hover tooltip, and
+// handles the same edge cases (null, invalid, future) consistently
+// across every place that renders a timestamp.
 
 // WS subscriptions so the overview reflects state changes from the
 // other tabs without polling. Filtered to this project so a sibling
@@ -397,11 +375,13 @@ onMounted(fetchAll);
           <div class="min-w-0 flex-1">
             <p class="text-sm text-muted-foreground">Last deploy</p>
             <p class="text-2xl font-semibold leading-tight text-foreground">
-              <span v-if="lastDeploy">{{ relative(lastDeploy.toISOString()) }}</span>
+              <SharedDateTooltip v-if="lastDeploy" :date="lastDeploy.toISOString()" />
               <span v-else>—</span>
             </p>
-            <p class="mt-1 text-xs text-muted-foreground">
-              Created {{ formatDate(project.created_at) }}
+            <p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <span>Created</span>
+              <SharedDateTooltip v-if="project.created_at" :date="project.created_at" />
+              <span v-else>—</span>
             </p>
           </div>
         </div>
@@ -456,9 +436,12 @@ onMounted(fetchAll);
                   {{ row.status }}
                 </span>
               </div>
-              <p class="mt-0.5 text-xs text-muted-foreground capitalize">
-                {{ row.kind }}
-                <span v-if="row.timestamp"> · {{ relative(row.timestamp) }}</span>
+              <p class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                <span class="capitalize">{{ row.kind }}</span>
+                <template v-if="row.timestamp">
+                  <span>·</span>
+                  <SharedDateTooltip :date="row.timestamp" />
+                </template>
               </p>
             </div>
             <Icon
