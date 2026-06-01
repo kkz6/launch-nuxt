@@ -109,6 +109,11 @@ const statusColor = (status: string): string => {
     case "building":
     case "idle":
       return "bg-amber-500/15 text-amber-700 dark:text-amber-400";
+    case "deleting":
+      // Distinct from "failed" — we're still mid-action, not done.
+      // Blue signals "in flight, no panic" the same way the agent
+      // update banner does.
+      return "bg-blue-500/15 text-blue-700 dark:text-blue-400";
     case "failed":
       return "bg-rose-500/15 text-rose-700 dark:text-rose-400";
     case "stopped":
@@ -145,6 +150,12 @@ const relative = (iso?: string | null): string => {
 //   3. Last attempt failed, never succeeded → "Last deploy failed"
 //   4. Otherwise idle → "Never deployed"
 const lastDeployText = (app: DockerApplication): string => {
+  // "Deleting" wins over every other subtext — when the operator
+  // clicked Delete they want clear feedback that the row is in
+  // flight; the deploy history is irrelevant during that window.
+  if (app.status === "deleting") {
+    return "Deleting…";
+  }
   if (app.last_deployed_at) {
     return `Deployed ${relative(app.last_deployed_at)}`;
   }
