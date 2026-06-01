@@ -89,7 +89,7 @@ const onSetBulk = async (
     :loading="isLoading"
     :show-project-hint="true"
     title="Environment"
-    description="Env vars passed to the container as -e KEY=VALUE. Changes take effect on the next deploy."
+    description="Env vars passed to the container as -e KEY=VALUE. Save, then Reload to apply them — Reload recreates the container with no rebuild. (Build-time secrets need a full Deploy.)"
     :on-create="onCreate"
     :on-update="onUpdate"
     :on-delete="onDelete"

@@ -639,7 +639,9 @@ const workloadActionInFlight = useState<
 //   - Deploy / Rebuild → POST /:id/deploy (rebuild is currently same
 //     pipeline; "rebuild" label kept so users coming from dokploy
 //     find what they expect)
-//   - Reload  → POST /:id/reload  (docker restart)
+//   - Reload  → POST /:id/reload  (recreate the container from the
+//     existing image with the current env/config — applies saved env
+//     changes with no rebuild; NOT a plain docker restart)
 //   - Stop    → POST /:id/stop    (docker stop)
 //   - Start   → POST /:id/start   (docker start)
 const runApplicationAction = async (
