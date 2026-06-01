@@ -198,12 +198,12 @@ onMounted(fetchRows);
                         <span class="text-muted-foreground">Container ID</span>
                         <span class="font-mono text-[11px]">{{ c.ID }}</span>
                       </div>
-                      <p
+                      <div
                         v-if="c.CreatedAt"
                         class="border-t pt-1.5 text-xs text-muted-foreground"
                       >
-                        Created: {{ c.CreatedAt }}
-                      </p>
+                        Created: <SharedDateTooltip :date="c.CreatedAt" class="inline" />
+                      </div>
                     </div>
                   </TooltipContent>
                 </Tooltip>
@@ -227,8 +227,18 @@ onMounted(fetchRows);
               </template>
               <template v-else>—</template>
             </td>
-            <td class="px-4 py-3 align-top text-muted-foreground">
-              {{ c.CreatedAt }}
+            <td class="px-4 py-3 align-top text-xs text-muted-foreground">
+              <!--
+                docker ps returns CreatedAt as an absolute string in
+                the server's timezone (e.g. "2026-05-30 11:11:15
+                +0200 CEST"). Render it through SharedDateTooltip
+                instead so the user sees a live "X minutes ago" badge
+                that ticks every 30s, and a tooltip with the absolute
+                time in their OWN browser's timezone — much friendlier
+                for operators in a different TZ than the host.
+              -->
+              <SharedDateTooltip v-if="c.CreatedAt" :date="c.CreatedAt" />
+              <template v-else>—</template>
             </td>
             <!--
               Inspect action. Icon-only to keep the row compact;
