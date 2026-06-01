@@ -129,14 +129,20 @@ onMounted(fetchProjects);
             </div>
             <div class="min-w-0 flex-1">
               <h3 class="truncate font-semibold">{{ project.name }}</h3>
+              <!--
+                Description is optional and rarely filled in for
+                quick experiments. When it's empty we render nothing
+                here rather than a "No description" placeholder —
+                the placeholder added visual noise without adding
+                information, and the card has enough other signals
+                (workload counts, created-at) to feel anchored even
+                without a subtitle line.
+              -->
               <p
                 v-if="project.description"
                 class="line-clamp-1 text-sm text-muted-foreground"
               >
                 {{ project.description }}
-              </p>
-              <p v-else class="text-sm text-muted-foreground">
-                No description
               </p>
             </div>
           </div>
