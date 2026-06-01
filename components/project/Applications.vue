@@ -123,20 +123,6 @@ const statusColor = (status: string): string => {
   }
 };
 
-const relative = (iso?: string | null): string => {
-  if (!iso) return "never";
-  try {
-    const d = new Date(iso);
-    const diff = (Date.now() - d.getTime()) / 1000;
-    if (diff < 60) return "just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return d.toLocaleDateString();
-  } catch {
-    return "";
-  }
-};
-
 // Right-side "last deploy" subtext. The status pill on the left
 // already shows the lifecycle state; this column should add the
 // *time dimension* — when did the last attempt land, did it succeed.
@@ -149,27 +135,26 @@ const relative = (iso?: string | null): string => {
 //   2. In-flight (deploying/building) → "Deploying…"
 //   3. Last attempt failed, never succeeded → "Last deploy failed"
 //   4. Otherwise idle → "Never deployed"
-const lastDeployText = (app: DockerApplication): string => {
+/**
+ * Static fallback text for rows that DON'T have a successful deploy
+ * timestamp to render. The deployed-timestamp branch is in the
+ * template directly so it can use SharedDateTooltip (live "Deployed
+ * 3 minutes ago" with a tooltip in the browser's TZ) instead of a
+ * frozen toLocaleDateString() string that never updates.
+ */
+const lastDeployFallback = (app: DockerApplication): string | null => {
   // "Deleting" wins over every other subtext — when the operator
   // clicked Delete they want clear feedback that the row is in
   // flight; the deploy history is irrelevant during that window.
-  if (app.status === "deleting") {
-    return "Deleting…";
-  }
-  if (app.last_deployed_at) {
-    return `Deployed ${relative(app.last_deployed_at)}`;
-  }
+  if (app.status === "deleting") return "Deleting…";
+  // The deployed-timestamp branch is handled in the template (it
+  // needs the live SharedDateTooltip component, not a string).
+  if (app.last_deployed_at) return null;
   // `building` is the in-flight state on the row while the worker is
-  // running the deploy task; `running` only flips on after the
-  // container has come up, which also sets last_deployed_at — so the
-  // above branch wins. (There's no separate "deploying" enum value
-  // even though the team-channel event is named that.)
-  if (app.status === "building") {
-    return "Deploying…";
-  }
-  if (app.status === "failed") {
-    return "Last deploy failed";
-  }
+  // running the deploy task. There's no separate "deploying" enum
+  // value even though the team-channel event is named that.
+  if (app.status === "building") return "Deploying…";
+  if (app.status === "failed") return "Last deploy failed";
   return "Never deployed";
 };
 
@@ -303,8 +288,24 @@ onMounted(fetchApps);
               explicitly; in-flight states show "Deploying…" without
               also implying a successful deploy timestamp.
             -->
-            <span class="text-xs text-muted-foreground">
-              {{ lastDeployText(app) }}
+            <!--
+              Deploy timestamp: when we have a successful deploy
+              the rendered text is "Deployed <X ago>" backed by
+              SharedDateTooltip — ticks every 30s, tooltip shows
+              the absolute time in the operator's browser TZ.
+              For every other lifecycle state (deleting / building /
+              failed / never deployed) we fall back to a plain
+              string from lastDeployFallback.
+            -->
+            <span
+              v-if="app.status !== 'deleting' && app.last_deployed_at"
+              class="flex items-center gap-1 text-xs text-muted-foreground"
+            >
+              <span>Deployed</span>
+              <SharedDateTooltip :date="app.last_deployed_at" />
+            </span>
+            <span v-else class="text-xs text-muted-foreground">
+              {{ lastDeployFallback(app) }}
             </span>
           </div>
         </div>

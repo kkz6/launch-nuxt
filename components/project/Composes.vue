@@ -91,33 +91,15 @@ const sourceSummary = (c: DockerCompose): string => {
   return "Inline YAML";
 };
 
-const relative = (iso?: string | null): string => {
-  if (!iso) return "never";
-  try {
-    const d = new Date(iso);
-    const diff = (Date.now() - d.getTime()) / 1000;
-    if (diff < 60) return "just now";
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return d.toLocaleDateString();
-  } catch {
-    return "";
-  }
-};
-
-// See components/project/Applications.vue#lastDeployText for the
-// rationale. Same semantics for compose stacks — status pill +
-// timestamp must not contradict each other.
-const lastDeployText = (c: DockerCompose): string => {
-  if (c.last_deployed_at) {
-    return `Deployed ${relative(c.last_deployed_at)}`;
-  }
-  if (c.status === "building") {
-    return "Deploying…";
-  }
-  if (c.status === "failed") {
-    return "Last deploy failed";
-  }
+// Static fallback for compose rows that don't have a successful
+// deploy timestamp to render. The deployed-timestamp branch lives
+// in the template directly so it can use SharedDateTooltip (live
+// "Deployed 3 minutes ago" with browser-TZ tooltip). Same shape as
+// components/project/Applications.vue#lastDeployFallback.
+const lastDeployFallback = (c: DockerCompose): string | null => {
+  if (c.last_deployed_at) return null;
+  if (c.status === "building") return "Deploying…";
+  if (c.status === "failed") return "Last deploy failed";
   return "Never deployed";
 };
 
@@ -230,7 +212,12 @@ onMounted(fetchComposes);
               {{ c.status }}
             </span>
             <span class="text-xs text-muted-foreground">
-              {{ lastDeployText(c) }}
+              <template v-if="c.last_deployed_at">
+                Deployed&nbsp;<SharedDateTooltip :date="c.last_deployed_at" />
+              </template>
+              <template v-else>
+                {{ lastDeployFallback(c) }}
+              </template>
             </span>
           </div>
         </div>
