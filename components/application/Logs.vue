@@ -26,7 +26,10 @@ interface Props {
 }
 const props = defineProps<Props>();
 
-const lines = ref<string[]>([]);
+// Each line caches its ANSI→HTML render so we don't re-parse the whole
+// buffer on every reactive update (live tails can hit thousands of
+// lines). `raw` is kept for search/clear; `html` is what we render.
+const lines = ref<{ raw: string; html: string }[]>([]);
 const wsOpen = ref(false);
 const isConnecting = ref(false);
 const isPaused = ref(false);
@@ -116,7 +119,10 @@ const connect = async () => {
         // Not control JSON — fall through and append.
       }
     }
-    lines.value.push(data);
+    // Render ANSI colour codes (zerolog console output etc.) to safe
+    // HTML once, here — otherwise the raw escape sequences (e.g.
+    // "[32mINF[0m") show as literal text in the viewer.
+    lines.value.push({ raw: data, html: parseAnsiToHtml(data) });
     // Trim the buffer if it grows huge. 10k lines @ avg 100 chars is
     // ~1 MB — beyond that the browser starts to chug.
     if (lines.value.length > 10000) {
@@ -349,9 +355,8 @@ onBeforeUnmount(disconnect);
           v-for="(line, idx) in lines"
           :key="idx"
           class="whitespace-pre-wrap break-all"
-        >
-          {{ line }}
-        </div>
+          v-html="line.html"
+        />
       </div>
 
       <!--
