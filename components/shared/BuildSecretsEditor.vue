@@ -34,6 +34,13 @@ interface Props {
   loading?: boolean;
   /** Owner label shown in confirmation copy — "application" or "stack". */
   ownerLabel?: string;
+  /**
+   * When true, the editor surfaces the GitHub Actions naming contract:
+   * each secret `FOO` is pushed to the repo as a `LAUNCH_BUILD_FOO`
+   * Actions secret (while the Dockerfile `id=` stays the short `FOO`).
+   * Off for the plain server-build path, where there's no repo secret.
+   */
+  githubActions?: boolean;
   onCreate: (data: CreateData) => Promise<BuildSecretRow>;
   onUpdate: (id: string, patch: UpdatePatch) => Promise<BuildSecretRow>;
   onDelete: (id: string) => Promise<void>;
@@ -42,7 +49,14 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
   ownerLabel: "application",
+  githubActions: false,
 });
+
+// Must match the backend: gha_bootstrap_workflow.go pushes each build
+// secret as ("LAUNCH_BUILD_" + name) verbatim, and the workflow YAML
+// references it via ${{ secrets.LAUNCH_BUILD_<NAME> }}. Keep in sync.
+const REPO_SECRET_PREFIX = "LAUNCH_BUILD_";
+const repoSecretName = (name: string) => REPO_SECRET_PREFIX + name;
 
 const emit = defineEmits<{
   /** Fires after every successful create/update/delete so the wrapper
@@ -234,6 +248,21 @@ const sortByName = (rows: BuildSecretRow[]) =>
             RUN --mount=type=secret,id={{ newSecret.name || "NPM_TOKEN" }} cat /run/secrets/{{ newSecret.name || "NPM_TOKEN" }}
           </code>.
         </p>
+        <p
+          v-if="githubActions"
+          class="flex items-start gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground"
+        >
+          <Icon name="lucide:key-round" class="mt-0.5 h-3 w-3 shrink-0" />
+          <span>
+            On GitHub Actions this is stored in your repository as the
+            Actions secret
+            <code class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-foreground">{{ repoSecretName(newSecret.name || "NPM_TOKEN") }}</code>
+            and passed to the build as
+            <code class="rounded bg-muted px-1 py-0.5 text-[10px]">{{ newSecret.name || "NPM_TOKEN" }}</code>
+            — so your Dockerfile <span class="font-mono">id=</span> stays
+            the short name.
+          </span>
+        </p>
         <div class="flex justify-end gap-2">
           <Button
             type="button"
@@ -302,9 +331,16 @@ const sortByName = (rows: BuildSecretRow[]) =>
           :key="s.id"
           class="grid grid-cols-[220px_1fr_140px] items-center gap-2 border-b px-4 py-2 last:border-b-0"
         >
-          <div class="flex min-w-0 items-center">
+          <div class="flex min-w-0 flex-col justify-center">
             <code class="truncate font-mono text-xs" :title="s.name">
               {{ s.name }}
+            </code>
+            <code
+              v-if="githubActions"
+              class="truncate font-mono text-[10px] text-muted-foreground/70"
+              :title="`Repository Actions secret: ${repoSecretName(s.name)}`"
+            >
+              {{ repoSecretName(s.name) }}
             </code>
           </div>
 
@@ -401,9 +437,14 @@ const sortByName = (rows: BuildSecretRow[]) =>
 
     <p class="text-[11px] text-muted-foreground">
       <Icon name="lucide:info" class="-mt-0.5 mr-1 inline-block h-3 w-3" />
-      Changes apply to the next build. On GitHub Actions, saving a
-      secret triggers a workflow re-sync so the YAML and your repo
-      secrets stay in lock-step.
+      Changes apply to the next build.
+      <template v-if="githubActions">
+        On GitHub Actions each secret is pushed to your repository as an
+        Actions secret named
+        <code class="rounded bg-muted px-1 py-0.5 text-[10px]">LAUNCH_BUILD_&lt;NAME&gt;</code>,
+        and saving triggers a workflow re-sync so the YAML and your repo
+        secrets stay in lock-step.
+      </template>
     </p>
   </div>
 </template>

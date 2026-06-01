@@ -429,6 +429,7 @@ useDockerComposeEvents(teamId, (data, event) => {
         :secrets="buildSecrets"
         :loading="isLoadingBuildSecrets"
         owner-label="stack"
+        github-actions
         :on-create="onCreateBuildSecret"
         :on-update="onUpdateBuildSecret"
         :on-delete="onDeleteBuildSecret"

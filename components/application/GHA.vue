@@ -484,6 +484,7 @@ useDockerApplicationEvents(teamId, (data, event) => {
         :secrets="buildSecrets"
         :loading="isLoadingBuildSecrets"
         owner-label="application"
+        github-actions
         :on-create="onCreateBuildSecret"
         :on-update="onUpdateBuildSecret"
         :on-delete="onDeleteBuildSecret"
