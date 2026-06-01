@@ -172,7 +172,7 @@ const onSetBulk = async (
     :vars="vars"
     :loading="isLoading"
     title="Environment"
-    description="Written to .env next to the compose file on each deploy. Compose uses it for ${VAR} substitution and passes matching keys to services."
+    description="Written to .env next to the compose file. Save, then Reload to apply — Reload re-ups the stack with no rebuild. Compose uses it for ${VAR} substitution and passes matching keys to services."
     empty-description="Add KEY=VALUE pairs (or paste a .env file) — they're written next to the compose file on every deploy and used by docker compose for ${VAR} substitution."
     :on-create="onCreate"
     :on-update="onUpdate"

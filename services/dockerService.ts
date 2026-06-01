@@ -1094,8 +1094,12 @@ export const dockerService = {
     },
 
     /**
-     * Lifecycle action against the running container. "reload" maps
-     * to docker restart server-side; "stop" / "start" are passthrough.
+     * Lifecycle action against the running container.
+     * - "reload" RECREATES the container from the image already on the
+     *   host with the current env/config (no rebuild) — this is how
+     *   saved env-var changes get applied. A plain docker-restart would
+     *   keep the env baked in at create time.
+     * - "stop" / "start" are passthrough docker stop/start.
      * Rebuild isn't here — Rebuild = Deploy (same endpoint above).
      */
     lifecycle: (
@@ -1607,6 +1611,19 @@ export const dockerService = {
       const { post } = useApi();
       return post<ApiResponse<DockerDeployment>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deploy`,
+        {},
+      );
+    },
+
+    /**
+     * Reload re-ups the stack (`docker compose up -d`) WITHOUT a rebuild,
+     * reusing the on-host images and applying the current .env — so saved
+     * env changes take effect fast. Build-time changes still need deploy().
+     */
+    reload: (serverId: string, projectId: string, composeId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<DockerDeployment>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/reload`,
         {},
       );
     },

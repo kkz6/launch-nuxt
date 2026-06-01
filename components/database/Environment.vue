@@ -85,7 +85,7 @@ const onDelete = async (id: string) => {
     :loading="isLoading"
     :show-project-hint="true"
     title="Environment"
-    description="Extra env vars layered on top of the engine credentials. Applied on next Restart / Rebuild."
+    description="Extra runtime env vars layered on top of the engine credentials. Save, then Restart to apply (recreates the container, keeps your data). Note: engine credential vars like POSTGRES_PASSWORD only apply on first init — Restart can't change them."
     :on-create="onCreate"
     :on-update="onUpdate"
     :on-delete="onDelete"

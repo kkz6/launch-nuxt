@@ -71,6 +71,28 @@ const triggerDeploy = async () => {
   }
 };
 
+// Reload re-ups the stack WITHOUT a rebuild — reuses the on-host images
+// and applies the current .env, so saved env changes take effect fast.
+// Build-time changes still need Deploy.
+const isReloading = ref(false);
+const triggerReload = async () => {
+  isReloading.value = true;
+  try {
+    const res = await dockerService.composes.reload(
+      props.compose.server_id,
+      props.compose.project_id,
+      props.compose.id,
+    );
+    deployments.value = [res.data, ...deployments.value];
+    toast.success("Reload started — applying current env");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to reload");
+  } finally {
+    isReloading.value = false;
+  }
+};
+
 // WS sync — debounced terminal-refetch pattern application
 // Deployments uses. Filter on compose_id so a sibling stack's
 // lifecycle doesn't refresh ours.
@@ -209,15 +231,29 @@ onMounted(fetchDeployments);
           history. Most recent first.
         </p>
       </div>
-      <Button :disabled="isDeploying" @click="triggerDeploy">
-        <Icon
-          v-if="isDeploying"
-          name="lucide:loader-2"
-          class="mr-2 h-4 w-4 animate-spin"
-        />
-        <Icon v-else name="lucide:rocket" class="mr-2 h-4 w-4" />
-        Deploy now
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button
+          variant="outline"
+          :disabled="isReloading || isDeploying"
+          title="Re-up the stack with the current env, no rebuild — applies saved env changes fast"
+          @click="triggerReload"
+        >
+          <Icon
+            :name="isReloading ? 'lucide:loader-2' : 'lucide:refresh-cw'"
+            :class="['mr-2 h-4 w-4', isReloading && 'animate-spin']"
+          />
+          Reload
+        </Button>
+        <Button :disabled="isDeploying || isReloading" @click="triggerDeploy">
+          <Icon
+            v-if="isDeploying"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          <Icon v-else name="lucide:rocket" class="mr-2 h-4 w-4" />
+          Deploy now
+        </Button>
+      </div>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
