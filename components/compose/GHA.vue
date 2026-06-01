@@ -71,10 +71,18 @@ const repoSettingsSecretsURL = computed(() => {
   return `https://github.com/${repoSlug.value}/settings/secrets/actions`;
 });
 
-const installBroken = ref(false);
+// installBroken / permissionsMissing — see components/application/GHA.vue
+// for the reasoning. Both are derived from the persistent
+// gha_install_status field so banners survive a hard refresh.
+const installBroken = computed(
+  () => props.compose.gha_install_status === "installation_gone",
+);
+const permissionsMissing = computed(
+  () => props.compose.gha_install_status === "permissions_missing",
+);
 
 type Status = {
-  kind: "ready" | "setting-up" | "incomplete" | "broken";
+  kind: "ready" | "setting-up" | "incomplete" | "broken" | "permissions";
   label: string;
   icon: string;
   iconClass: string;
@@ -93,6 +101,18 @@ const status = computed<Status>(() => {
         "bg-red-500/10 ring-1 ring-inset ring-red-500/40 text-red-700 dark:text-red-300",
       subtitle:
         "Reinstall the Launch GitHub App to restore workflow syncing and builds.",
+    };
+  }
+  if (permissionsMissing.value) {
+    return {
+      kind: "permissions",
+      label: "Missing permissions",
+      icon: "lucide:shield-alert",
+      iconClass: "text-amber-600 dark:text-amber-400",
+      badgeClass:
+        "bg-amber-500/10 ring-1 ring-inset ring-amber-500/40 text-amber-800 dark:text-amber-300",
+      subtitle:
+        "The Launch GitHub App is missing required repo permissions. Grant them in GitHub, then re-sync below.",
     };
   }
   if (!props.compose.gha_build_ready) {
@@ -258,18 +278,12 @@ const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 useDockerComposeEvents(teamId, (data, event) => {
   if (data.compose_id !== props.compose.id) return;
-  if (event === "docker.compose.gha_install_broken") {
-    installBroken.value = true;
-    emit("updated");
-    return;
-  }
-  if (event === "docker.compose.gha_synced") {
-    installBroken.value = false;
-    emit("updated");
-    return;
-  }
-  if (event === "docker.compose.gha_disabled") {
-    emit("updated");
+  switch (event) {
+    case "docker.compose.gha_installation_broken":
+    case "docker.compose.gha_permissions_missing":
+    case "docker.compose.gha_synced":
+    case "docker.compose.gha_disabled":
+      emit("updated");
   }
 });
 </script>
@@ -306,6 +320,51 @@ useDockerComposeEvents(teamId, (data, event) => {
           class="border-red-500/40 bg-white/60 text-red-700 hover:bg-red-500/10 hover:text-red-700 dark:bg-black/20 dark:text-red-300 dark:hover:text-red-200"
         >
           Open installations
+          <Icon name="lucide:external-link" class="ml-1.5 h-3 w-3 opacity-70" />
+        </Button>
+      </NuxtLink>
+    </div>
+
+    <!-- Permissions-missing banner — mirror of application/GHA.vue. -->
+    <div
+      v-if="permissionsMissing && !installBroken"
+      class="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-start sm:justify-between"
+    >
+      <div class="flex items-start gap-3">
+        <Icon
+          name="lucide:shield-alert"
+          class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+        />
+        <div class="min-w-0 space-y-2">
+          <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            GitHub App is missing required permissions
+          </h3>
+          <p class="text-xs text-amber-800/80 dark:text-amber-300/80">
+            GitHub blocked the workflow sync with
+            <span class="font-mono">403 "Resource not accessible by integration"</span>.
+            Grant these repository permissions to the Launch GitHub App,
+            accept the new permission set on the installation, then
+            click <span class="font-medium">Re-sync workflow file</span>
+            below (or wait — the webhook auto-retries on accept):
+          </p>
+          <ul
+            class="ml-4 list-disc text-xs text-amber-800/80 dark:text-amber-300/80"
+          >
+            <li>Contents — Read and write</li>
+            <li>Actions — Write</li>
+            <li>Secrets — Read and write</li>
+            <li>Variables — Read and write</li>
+            <li>Metadata — Read (default)</li>
+          </ul>
+        </div>
+      </div>
+      <NuxtLink to="https://github.com/settings/installations" target="_blank">
+        <Button
+          size="sm"
+          variant="outline"
+          class="border-amber-500/40 bg-white/60 text-amber-800 hover:bg-amber-500/10 hover:text-amber-800 dark:bg-black/20 dark:text-amber-300 dark:hover:text-amber-200"
+        >
+          Open App settings
           <Icon name="lucide:external-link" class="ml-1.5 h-3 w-3 opacity-70" />
         </Button>
       </NuxtLink>

@@ -93,6 +93,17 @@ export interface DockerApplication {
    * the "bootstrap is provisioning…" / "broken install" affordances.
    */
   gha_build_ready?: boolean;
+  /**
+   * Terminal status of the most recent gha:bootstrap_workflow run.
+   * Empty / undefined when bootstrap hasn't run yet (still in
+   * "Setting up") or when build_location === "server". The GHA tab
+   * uses this to render a status-aware banner that survives
+   * reloads (the matching WebSocket event keeps it fresh).
+   */
+  gha_install_status?:
+    | "ok"
+    | "permissions_missing"
+    | "installation_gone";
 }
 
 /**
@@ -701,6 +712,11 @@ export interface DockerCompose {
   build_location?: "server" | "github_actions";
   /** Same derived flag as on DockerApplication. */
   gha_build_ready?: boolean;
+  /** Same status field as on DockerApplication. */
+  gha_install_status?:
+    | "ok"
+    | "permissions_missing"
+    | "installation_gone";
 }
 
 export interface CreateDockerComposeData {

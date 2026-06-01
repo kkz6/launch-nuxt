@@ -342,9 +342,10 @@ export const useServerEvents = (
  * - docker.application.deploying  (deploy job started)
  * - docker.application.deployed   (deploy succeeded, container running)
  * - docker.application.failed     (deploy failed)
- * - docker.application.gha_synced            (bootstrap job committed workflow file)
- * - docker.application.gha_install_broken    (GitHub App install gone / 404 from GitHub)
- * - docker.application.gha_disabled          (build_location flipped back to server)
+ * - docker.application.gha_synced              (bootstrap job committed workflow file)
+ * - docker.application.gha_installation_broken (GitHub App install gone / 404 from GitHub)
+ * - docker.application.gha_permissions_missing (GitHub App missing required repo perms / 403)
+ * - docker.application.gha_disabled            (build_location flipped back to server)
  */
 export const useDockerApplicationEvents = (
   teamId: string | Ref<string>,
@@ -370,14 +371,22 @@ export const useDockerApplicationEvents = (
       'docker.application.schedule.deleted',
       'docker.application.schedule.ran',
       // GHA-builds lifecycle. The bootstrap job fires gha_synced on
-      // successful repo commit; gha_install_broken when the GitHub
-      // App installation has been removed customer-side; gha_disabled
+      // successful repo commit; gha_installation_broken when the
+      // GitHub App installation has been removed customer-side;
+      // gha_permissions_missing when the App is installed but lacks
+      // the required repo permissions (403 from GitHub); gha_disabled
       // when the user flips build_location back to "server" via the
       // GHA subtab. UI subscribes here so the subtab can refetch the
-      // workflow status / show a broken-install banner / clear the
+      // workflow status / show a status-aware banner / clear the
       // GHA pill without polling.
+      //
+      // Event names must match the backend broadcasts in
+      // launch-go/internal/modules/docker/jobs/gha_bootstrap_workflow.go
+      // exactly — useChannelEvents drops anything not in this list,
+      // so a typo silently breaks the UI freshness path.
       'docker.application.gha_synced',
-      'docker.application.gha_install_broken',
+      'docker.application.gha_installation_broken',
+      'docker.application.gha_permissions_missing',
       'docker.application.gha_disabled',
     ],
     onEvent,
@@ -438,7 +447,8 @@ export const useDockerComposeEvents = (
       // See useDockerApplicationEvents above for what each event means;
       // the broadcast names just swap `application` → `compose`.
       'docker.compose.gha_synced',
-      'docker.compose.gha_install_broken',
+      'docker.compose.gha_installation_broken',
+      'docker.compose.gha_permissions_missing',
       'docker.compose.gha_disabled',
     ],
     onEvent,

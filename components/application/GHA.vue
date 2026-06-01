@@ -80,19 +80,27 @@ const repoSettingsSecretsURL = computed(() => {
   return `https://github.com/${repoSlug.value}/settings/secrets/actions`;
 });
 
-// installBroken is latched by the gha_install_broken WS event. Session-
-// only — there's no persistent backend flag, so a page reload clears
-// it (which is fine; the next sync attempt will re-fire the event if
-// the install is still broken). When the event arrives we show a top-
-// of-page banner so the customer sees what's wrong, instead of a stuck
-// "Setting up…" with no explanation.
-const installBroken = ref(false);
+// installBroken / permissionsMissing are latched by the matching
+// WS events AND seeded from the persistent gha_install_status field
+// on the application response — so a hard reload still shows the
+// banner. The bootstrap job's success path writes
+// gha_install_status="ok" which clears both refs via the WS event.
+//
+// Two separate refs (rather than one tri-state) so the template can
+// render distinct banners without branching on a string discriminator
+// inside the markup.
+const installBroken = computed(
+  () => props.application.gha_install_status === "installation_gone",
+);
+const permissionsMissing = computed(
+  () => props.application.gha_install_status === "permissions_missing",
+);
 
 // Compact status snapshot. Drives the inline badge next to the page
 // title AND the right-side CTA. Four states; only "broken" gets a
 // full-width banner above the page (rendered separately).
 type Status = {
-  kind: "ready" | "setting-up" | "incomplete" | "broken";
+  kind: "ready" | "setting-up" | "incomplete" | "broken" | "permissions";
   label: string;
   icon: string;
   iconClass: string;
@@ -115,6 +123,18 @@ const status = computed<Status>(() => {
         "bg-red-500/10 ring-1 ring-inset ring-red-500/40 text-red-700 dark:text-red-300",
       subtitle:
         "Reinstall the Launch GitHub App to restore workflow syncing and builds.",
+    };
+  }
+  if (permissionsMissing.value) {
+    return {
+      kind: "permissions",
+      label: "Missing permissions",
+      icon: "lucide:shield-alert",
+      iconClass: "text-amber-600 dark:text-amber-400",
+      badgeClass:
+        "bg-amber-500/10 ring-1 ring-inset ring-amber-500/40 text-amber-800 dark:text-amber-300",
+      subtitle:
+        "The Launch GitHub App is missing required repo permissions. Grant them in GitHub, then re-sync below.",
     };
   }
   if (!props.application.gha_build_ready) {
@@ -284,25 +304,20 @@ const disableGHA = async () => {
 };
 
 // Refetch the app when the bootstrap job's WS events fire so the
-// status badge + workflow SHA + install-broken state reflect reality
-// without a manual page reload. Synced clears installBroken (a
-// successful sync proves the install is back).
+// status badge + workflow SHA + install-broken / permissions-missing
+// state reflect reality without a manual page reload. The computed
+// refs above pick up the change after emit("updated") triggers the
+// parent to refresh the application object.
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 useDockerApplicationEvents(teamId, (data, event) => {
   if (data.application_id !== props.application.id) return;
-  if (event === "docker.application.gha_install_broken") {
-    installBroken.value = true;
-    emit("updated");
-    return;
-  }
-  if (event === "docker.application.gha_synced") {
-    installBroken.value = false;
-    emit("updated");
-    return;
-  }
-  if (event === "docker.application.gha_disabled") {
-    emit("updated");
+  switch (event) {
+    case "docker.application.gha_installation_broken":
+    case "docker.application.gha_permissions_missing":
+    case "docker.application.gha_synced":
+    case "docker.application.gha_disabled":
+      emit("updated");
   }
 });
 </script>
@@ -350,6 +365,60 @@ useDockerApplicationEvents(teamId, (data, event) => {
           class="border-red-500/40 bg-white/60 text-red-700 hover:bg-red-500/10 hover:text-red-700 dark:bg-black/20 dark:text-red-300 dark:hover:text-red-200"
         >
           Open installations
+          <Icon name="lucide:external-link" class="ml-1.5 h-3 w-3 opacity-70" />
+        </Button>
+      </NuxtLink>
+    </div>
+
+    <!--
+      Permissions-missing banner — the GitHub App is installed but
+      lacks one of the repo permissions bootstrap needs (Contents,
+      Actions, Secrets, Variables). The bootstrap job persists
+      gha_install_status="permissions_missing" so this banner
+      survives reloads; clicking Re-sync after granting permissions
+      lets the bootstrap retry and clear the flag (or the webhook
+      auto-retry path does it automatically when GitHub fires
+      new_permissions_accepted).
+    -->
+    <div
+      v-if="permissionsMissing && !installBroken"
+      class="flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 sm:flex-row sm:items-start sm:justify-between"
+    >
+      <div class="flex items-start gap-3">
+        <Icon
+          name="lucide:shield-alert"
+          class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+        />
+        <div class="min-w-0 space-y-2">
+          <h3 class="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            GitHub App is missing required permissions
+          </h3>
+          <p class="text-xs text-amber-800/80 dark:text-amber-300/80">
+            GitHub blocked the workflow sync with
+            <span class="font-mono">403 "Resource not accessible by integration"</span>.
+            Grant these repository permissions to the Launch GitHub App,
+            accept the new permission set on the installation, then
+            click <span class="font-medium">Re-sync workflow file</span>
+            below (or wait — the webhook auto-retries on accept):
+          </p>
+          <ul
+            class="ml-4 list-disc text-xs text-amber-800/80 dark:text-amber-300/80"
+          >
+            <li>Contents — Read and write</li>
+            <li>Actions — Write</li>
+            <li>Secrets — Read and write</li>
+            <li>Variables — Read and write</li>
+            <li>Metadata — Read (default)</li>
+          </ul>
+        </div>
+      </div>
+      <NuxtLink to="https://github.com/settings/installations" target="_blank">
+        <Button
+          size="sm"
+          variant="outline"
+          class="border-amber-500/40 bg-white/60 text-amber-800 hover:bg-amber-500/10 hover:text-amber-800 dark:bg-black/20 dark:text-amber-300 dark:hover:text-amber-200"
+        >
+          Open App settings
           <Icon name="lucide:external-link" class="ml-1.5 h-3 w-3 opacity-70" />
         </Button>
       </NuxtLink>
