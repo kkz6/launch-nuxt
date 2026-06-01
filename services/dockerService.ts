@@ -45,7 +45,14 @@ export type DockerApplicationStatus =
   | "building"
   | "running"
   | "stopped"
-  | "failed";
+  | "failed"
+  // In-flight delete: the row stays visible with status="deleting"
+  // while the RemoveApplicationJob is running docker stop + rm. On
+  // success the row is soft-deleted and the docker.application.deleted
+  // event removes it from the listing. On failure the status reverts
+  // to whatever it was before. Mirrors the Go enum in
+  // internal/modules/docker/types/types.go.
+  | "deleting";
 
 /**
  * A docker application as returned by the API. source_config is opaque to
