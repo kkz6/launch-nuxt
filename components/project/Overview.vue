@@ -378,11 +378,16 @@ onMounted(fetchAll);
               <SharedDateTooltip v-if="lastDeploy" :date="lastDeploy.toISOString()" />
               <span v-else>—</span>
             </p>
-            <p class="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-              <span>Created</span>
-              <SharedDateTooltip v-if="project.created_at" :date="project.created_at" />
-              <span v-else>—</span>
-            </p>
+            <!--
+              No "Created" subtext here anymore — the project's
+              creation date doesn't belong as a footnote on the
+              "Last deploy" card; the labels said two different
+              things ("Last deploy" / "Created") on the same card,
+              which read like a contradiction at a glance. Project
+              age is now an inline note next to the project name in
+              the header above, where it's clearly about the
+              project itself.
+            -->
           </div>
         </div>
       </div>
