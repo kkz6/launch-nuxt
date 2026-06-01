@@ -16,17 +16,17 @@ const accordionOpen = ref(props.active)
   <div class="overflow-hidden rounded-lg border bg-card transition-colors hover:border-foreground/20">
     <h2>
       <button
-        class="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-foreground"
+        class="flex w-full items-center justify-between px-4 py-3 text-left font-mono text-sm font-medium text-foreground"
         :aria-expanded="accordionOpen"
         :aria-controls="`accordion-text-${id}`"
         @click.prevent="accordionOpen = !accordionOpen"
       >
-        <span>{{ title }}</span>
+        <span><span class="text-emerald-600 dark:text-emerald-400">?</span> {{ title }}</span>
         <span
           :class="[
             'ml-3 flex h-6 w-6 shrink-0 items-center justify-center rounded transition-all duration-300',
             accordionOpen
-              ? 'bg-primary/10 text-primary'
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
               : 'bg-muted text-muted-foreground',
           ]"
         >
