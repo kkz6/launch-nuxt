@@ -232,7 +232,7 @@ const getUserInitials = (name: string): string => {
             <NuxtLink
               v-for="server in displayedServers"
               :key="server.id"
-              :to="server.status === 'running' ? `/servers/${server.id}` : '/servers'"
+              :to="`/servers/${server.id}`"
               class="group"
             >
               <div class="rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50">
