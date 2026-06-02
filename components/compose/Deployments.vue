@@ -73,17 +73,19 @@ const triggerDeploy = async () => {
 
 // Reload re-ups the stack WITHOUT a rebuild — reuses the on-host images
 // and applies the current .env, so saved env changes take effect fast.
-// Build-time changes still need Deploy.
+// Build-time changes still need Deploy. Reload is a lightweight,
+// toast-only action: the backend records NO deployment row and streams
+// NO build logs, so there's nothing to prepend to the history list —
+// we just show a toast and let the WS status events drive the badge.
 const isReloading = ref(false);
 const triggerReload = async () => {
   isReloading.value = true;
   try {
-    const res = await dockerService.composes.reload(
+    await dockerService.composes.reload(
       props.compose.server_id,
       props.compose.project_id,
       props.compose.id,
     );
-    deployments.value = [res.data, ...deployments.value];
     toast.success("Reload started — applying current env");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
