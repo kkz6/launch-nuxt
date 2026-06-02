@@ -29,6 +29,9 @@ type SourceConfig = {
   gha_workflow_sha?: string;
   gha_image_repository?: string;
   source_control_id?: string;
+  // auto_deploy: when true the committed workflow triggers on push to
+  // `branch` (in addition to manual). Toggled from the switch below.
+  auto_deploy?: boolean;
 };
 
 const sc = computed<SourceConfig>(
@@ -223,6 +226,42 @@ const resyncWorkflow = async () => {
     toast.error(e.data?.message || "Failed to queue workflow re-sync");
   } finally {
     isResyncing.value = false;
+  }
+};
+
+// Auto-deploy: optimistic toggle, reverts on failure. Saving re-syncs the
+// committed workflow so its `on:` trigger matches.
+const autoDeploy = ref<boolean>(!!sc.value.auto_deploy);
+watch(
+  () => sc.value.auto_deploy,
+  (v) => {
+    autoDeploy.value = !!v;
+  },
+);
+const isTogglingAutoDeploy = ref(false);
+const setAutoDeploy = async (enabled: boolean) => {
+  const prev = autoDeploy.value;
+  autoDeploy.value = enabled;
+  isTogglingAutoDeploy.value = true;
+  try {
+    await dockerService.composes.setGhaAutoDeploy(
+      props.compose.server_id,
+      props.compose.project_id,
+      props.compose.id,
+      enabled,
+    );
+    toast.success(
+      enabled
+        ? "Auto-deploy on — pushes to the branch will deploy"
+        : "Auto-deploy off — deploys are manual",
+    );
+    emit("updated");
+  } catch (err: unknown) {
+    autoDeploy.value = prev;
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to update auto-deploy");
+  } finally {
+    isTogglingAutoDeploy.value = false;
   }
 };
 
@@ -445,6 +484,25 @@ useDockerComposeEvents(teamId, (data, event) => {
         </h3>
       </div>
       <ul class="divide-y">
+        <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0 flex-1 space-y-0.5">
+            <div class="flex items-center gap-2 text-sm font-medium">
+              <Icon name="lucide:git-branch" class="h-3.5 w-3.5 text-muted-foreground" />
+              Deploy automatically on push
+            </div>
+            <p class="text-xs text-muted-foreground">
+              When on, a push to <span class="font-mono">{{ branch }}</span>
+              triggers a build &amp; deploy via GitHub Actions. When off,
+              deploys are manual (the Deploy button only).
+            </p>
+          </div>
+          <Switch
+            :checked="autoDeploy"
+            :disabled="isTogglingAutoDeploy || !compose.gha_build_ready"
+            class="shrink-0"
+            @update:checked="setAutoDeploy"
+          />
+        </li>
         <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0 flex-1 space-y-0.5">
             <div class="flex items-center gap-2 text-sm font-medium">
