@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useSlots } from "vue";
 import { cn } from "~/utils";
 import { useTable } from "~/composables/useTable";
 import { useActions } from "~/composables/useActions";
@@ -25,6 +25,10 @@ const props = withDefaults(
     syncUrl?: boolean;
     tableClass?: string;
     headers?: Record<string, string> | (() => Record<string, string>);
+    // Optional per-row filter for the server-declared actions. Lets a page
+    // hide actions the current user isn't allowed to invoke (the backend is
+    // the real gate via 403, this is purely UX). Returns the actions to show.
+    rowActionsFilter?: (actions: any[], row: any) => any[];
   }>(),
   {
     defaultPerPage: 15,
@@ -32,6 +36,7 @@ const props = withDefaults(
     syncUrl: true,
     tableClass: "",
     headers: () => ({}),
+    rowActionsFilter: undefined,
   },
 );
 
@@ -80,15 +85,27 @@ const {
 
 const { isExporting, exportProgress, triggerExport } = useExport();
 const { tableRef, headerStuck } = useStickyTable();
+const slots = useSlots();
 
 // Skip the action column entirely when no row on the current page has a
 // visible action (e.g. a Roles table where Delete is hidden for every
 // system role) — leaves no orphan "Actions" header above empty cells.
-const anyRowHasActions = computed(() =>
-  data.value.some((item: any) =>
-    (item._actions ?? []).some((a: any) => !a.hidden),
-  ),
-);
+// A client-injected `#row-actions` slot (e.g. Spectate) also keeps the
+// column alive, since those actions exist on every row regardless of the
+// server-declared `_actions`.
+function rowActions(row: any): any[] {
+  const actions = row._actions ?? [];
+  return props.rowActionsFilter
+    ? props.rowActionsFilter(actions, row)
+    : actions;
+}
+
+const anyRowHasActions = computed(() => {
+  if (slots["row-actions"]) return true;
+  return data.value.some((item: any) =>
+    rowActions(item).some((a: any) => !a.hidden),
+  );
+});
 
 const visibleColumnDefs = computed(() => {
   if (!meta.value) return [];
@@ -337,16 +354,31 @@ defineExpose({ refresh });
                 "
               >
                 <div
-                  v-if="col.type === 'action' && (row as any)._actions"
+                  v-if="col.type === 'action'"
+                  class="flex items-center justify-end gap-0.5"
                   @click.stop
                 >
                   <RowActions
-                    :actions="(row as any)._actions"
+                    v-if="(row as any)._actions"
+                    :actions="rowActions(row)"
                     :row="row as any"
                     :as-dropdown="col.asDropdown"
                     @action="handleRowAction"
                   />
+                  <!-- Client-only row actions (e.g. Spectate) injected by the
+                       parent page, rendered alongside the server actions. -->
+                  <slot name="row-actions" :row="row" />
                 </div>
+                <!-- Per-column custom cell override: a parent can supply
+                     `#cell-<key>` to render a column the generic CellRenderer
+                     can't (e.g. the nested teams[] array). -->
+                <slot
+                  v-else-if="$slots[`cell-${col.key}`]"
+                  :name="`cell-${col.key}`"
+                  :value="(row as any)[col.key]"
+                  :row="row"
+                  :column="col"
+                />
                 <CellRenderer
                   v-else
                   :value="(row as any)[col.key]"

@@ -15,6 +15,12 @@ const tabs = [
     match: (p: string) => p === "/admin",
   },
   {
+    label: "Invitations",
+    to: "/admin/invitations",
+    icon: "lucide:mail",
+    match: (p: string) => p.startsWith("/admin/invitations"),
+  },
+  {
     label: "Servers",
     to: "/admin/servers",
     icon: "lucide:server",

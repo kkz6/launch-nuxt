@@ -7,3 +7,4 @@ export { default as BooleanCell } from "./BooleanCell.vue";
 export { default as BadgeCell } from "./BadgeCell.vue";
 export { default as ImageCell } from "./ImageCell.vue";
 export { default as ActionCell } from "./ActionCell.vue";
+export { default as TeamsCell } from "./TeamsCell.vue";
