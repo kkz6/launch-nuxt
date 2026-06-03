@@ -1,4 +1,10 @@
-import type { User, Team, Server } from "~/types";
+import type {
+  AdminUserRow,
+  AdminOverview,
+  AdminFailuresResponse,
+  PlatformInvitation,
+  Server,
+} from "~/types";
 import type { ApiResponse } from "~/composables/useApi";
 
 export interface AdminMeta {
@@ -39,6 +45,10 @@ interface PaginationParams {
   offset?: number;
 }
 
+interface FailuresParams extends PaginationParams {
+  kind?: string;
+}
+
 const toQuery = (params: PaginationParams = {}) => {
   const query: Record<string, number> = {};
   if (params.limit !== undefined) query.limit = params.limit;
@@ -46,22 +56,70 @@ const toQuery = (params: PaginationParams = {}) => {
   return query;
 };
 
+interface FailuresResponse extends ApiResponse<AdminFailuresResponse> {
+  meta: AdminMeta;
+}
+
 /**
  * Admin (staff back-office) service. All endpoints require a staff JWT.
  */
 export const adminService = {
   users: (params: PaginationParams = {}) => {
     const { get } = useApi();
-    return get<PaginatedAdminResponse<User>>("/admin/users", {
+    return get<PaginatedAdminResponse<AdminUserRow>>("/admin/users", {
       query: toQuery(params),
     });
   },
 
-  teams: (params: PaginationParams = {}) => {
+  overview: () => {
     const { get } = useApi();
-    return get<PaginatedAdminResponse<Team>>("/admin/teams", {
-      query: toQuery(params),
-    });
+    return get<ApiResponse<AdminOverview>>("/admin/overview");
+  },
+
+  failures: (params: FailuresParams = {}) => {
+    const { get } = useApi();
+    const query: Record<string, string | number> = toQuery(params);
+    if (params.kind !== undefined) query.kind = params.kind;
+    return get<FailuresResponse>("/admin/failures", { query });
+  },
+
+  suspendUser: (id: string | number) => {
+    const { post } = useApi();
+    return post<ApiResponse<{ id: string; status: string }>>(
+      `/admin/users/${id}/suspend`,
+    );
+  },
+
+  unsuspendUser: (id: string | number) => {
+    const { post } = useApi();
+    return post<ApiResponse<{ id: string; status: string }>>(
+      `/admin/users/${id}/unsuspend`,
+    );
+  },
+
+  deleteUser: (id: string | number) => {
+    const { delete: del } = useApi();
+    return del<ApiResponse<{ id: string }>>(`/admin/users/${id}`);
+  },
+
+  invitations: (params: PaginationParams = {}) => {
+    const { get } = useApi();
+    return get<PaginatedAdminResponse<PlatformInvitation>>(
+      "/admin/invitations",
+      {
+        query: toQuery(params),
+      },
+    );
+  },
+
+  createInvitation: (body: { email: string; trial_ends_at: string }) => {
+    const { post } = useApi();
+    return post<ApiResponse<PlatformInvitation>>("/admin/invitations", body);
+  },
+
+  revokeInvitation: (id: string | number) => {
+    const { delete: del } = useApi();
+    return del<ApiResponse<null>>(`/admin/invitations/${id}`);
   },
 
   servers: (params: PaginationParams = {}) => {

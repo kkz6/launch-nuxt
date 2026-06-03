@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
-import type { User } from "~/types";
+import type { AdminUserRow } from "~/types";
 import { adminService } from "~/services/adminService";
 import { useImpersonation } from "~/composables/useImpersonation";
 import { Button } from "~/components/ui/button";
@@ -26,7 +26,7 @@ useHead({
 
 const PER_PAGE = 20;
 
-const users = ref<User[]>([]);
+const users = ref<AdminUserRow[]>([]);
 const isLoading = ref(true);
 const total = ref(0);
 const currentPage = ref(1);
@@ -59,7 +59,7 @@ const goToPage = (page: number) => {
   fetchUsers(page);
 };
 
-const spectate = async (target: User) => {
+const spectate = async (target: AdminUserRow) => {
   spectatingId.value = target.id;
   try {
     await start(target.id, "Staff support session");
@@ -76,7 +76,8 @@ const staffBadgeVariant = (role?: string | null) => {
   return "secondary";
 };
 
-const formatDate = (date: string): string => {
+const formatDate = (date?: string | null): string => {
+  if (!date) return "";
   try {
     return formatDistanceToNow(new Date(date), { addSuffix: true });
   } catch {

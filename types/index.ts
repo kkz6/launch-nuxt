@@ -77,6 +77,7 @@ export interface User {
   timezone: string;
   onboarded: boolean;
   staff_role?: "support" | "super_admin" | null;
+  status?: string;
   all_teams?: Team[] | null;
   current_team?: Team;
   two_factor_enabled?: boolean;
@@ -286,7 +287,7 @@ export interface Task {
 export interface ProvisionStatusStep {
   name: string;
   description: string;
-  status: 'completed' | 'current' | 'pending';
+  status: "completed" | "current" | "pending";
 }
 
 export interface ProvisionStatus {
@@ -663,4 +664,80 @@ export interface ServerUpdateStatus {
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
+}
+
+// Admin panel (staff back-office) types
+export interface AdminTeamSubscription {
+  status: string;
+  trial_ends_at?: string | null;
+}
+
+export interface AdminTeam {
+  id: string;
+  name: string;
+  personal_team: boolean;
+  subscription?: AdminTeamSubscription | null;
+}
+
+export interface AdminUserRow {
+  id: string;
+  name: string;
+  email: string;
+  staff_role?: string | null;
+  status: string;
+  created_at?: string | null;
+  teams: AdminTeam[];
+}
+
+export interface RecentPayment {
+  team_id: string;
+  team_name: string;
+  total: number;
+  currency: string;
+  ordered_at?: string | null;
+}
+
+export interface RevenueMonth {
+  month: string;
+  total: number;
+}
+
+export interface AdminOverview {
+  currency: string;
+  mrr_cents: number;
+  total_revenue_cents: number;
+  active_subscriptions: number;
+  trial_subscriptions: number;
+  new_subscriptions_mtd: number;
+  cancelled_mtd: number;
+  revenue_this_month_cents: number;
+  revenue_last_month_cents: number;
+  recent_payments: RecentPayment[];
+  revenue_trend: RevenueMonth[];
+}
+
+export interface AdminFailure {
+  kind: string;
+  id: string;
+  title: string;
+  team_id?: string;
+  server_id?: string;
+  when?: string | null;
+  error: string;
+  detail?: string;
+}
+
+export interface AdminFailuresResponse {
+  failures: AdminFailure[];
+  caveat: string;
+}
+
+export interface PlatformInvitation {
+  id: string;
+  email: string;
+  trial_ends_at: string;
+  invited_by: string;
+  accepted_at?: string | null;
+  expires_at: string;
+  created_at?: string | null;
 }

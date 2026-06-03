@@ -3,22 +3,28 @@ const route = useRoute();
 
 const tabs = [
   {
+    label: "Overview",
+    to: "/admin/overview",
+    icon: "lucide:bar-chart-3",
+    match: (p: string) => p.startsWith("/admin/overview"),
+  },
+  {
     label: "Users",
     to: "/admin",
     icon: "lucide:users",
     match: (p: string) => p === "/admin",
   },
   {
-    label: "Teams",
-    to: "/admin/teams",
-    icon: "lucide:users-round",
-    match: (p: string) => p.startsWith("/admin/teams"),
-  },
-  {
     label: "Servers",
     to: "/admin/servers",
     icon: "lucide:server",
     match: (p: string) => p.startsWith("/admin/servers"),
+  },
+  {
+    label: "Failures",
+    to: "/admin/failures",
+    icon: "lucide:triangle-alert",
+    match: (p: string) => p.startsWith("/admin/failures"),
   },
 ];
 
