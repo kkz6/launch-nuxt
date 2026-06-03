@@ -52,20 +52,24 @@ export const useImpersonation = () => {
       sameSite: "lax",
     });
 
-  // Reactive impersonation flag. Initialized from the active token so it
-  // survives a page reload, then toggled explicitly by start/stop. We can't
-  // derive it from getAccessToken() alone: that reads a fresh useCookie ref
-  // each call, which isn't invalidated when setTokens writes through a
-  // different ref instance — so the banner would only update on a hard reload.
-  const impersonating = useState<boolean>(
-    "auth_is_impersonating",
-    () => !!decodeJwt(getAccessToken())?.impersonator_id,
-  );
+  // Bumped on every token swap (start/stop). It carries no state itself — it's
+  // a reactive trigger so the computed below re-evaluates live without a
+  // reload. The actual impersonation state is always read fresh from the active
+  // token, so it ALSO survives a hard reload (the computed re-runs client-side
+  // and reads the token cookie directly; a useState flag would not, because its
+  // initializer only runs on the server and the client reuses that value).
+  const tokenVersion = useState<number>("auth_token_version", () => 0);
 
   /**
-   * True while a "spectate as user" session is active.
+   * True while a "spectate as user" session is active. Derived from the active
+   * token's impersonator_id claim (survives reload) and re-evaluated on every
+   * token swap via tokenVersion (updates live, no reload needed).
    */
-  const isImpersonating = computed(() => impersonating.value);
+  const isImpersonating = computed(
+    () =>
+      tokenVersion.value >= 0 &&
+      Boolean(decodeJwt(getAccessToken())?.impersonator_id),
+  );
 
   // Name shown in the banner — the target (currently-loaded) user.
   const impersonatedName = computed(() => user.value?.name ?? "user");
@@ -87,9 +91,12 @@ export const useImpersonation = () => {
       const response = await adminService.impersonate(targetUserId, reason);
       const token = response.data.token;
 
-      // 3. Make the impersonation token the active token.
+      // 3. Make the impersonation token the active token. Wait a tick for the
+      //    cookie write to flush before anything reads it back — otherwise the
+      //    fetchUser below races and reads the old (staff) token.
       setTokens(token);
-      impersonating.value = true;
+      await nextTick();
+      tokenVersion.value++; // surface the impersonation banner immediately
 
       // 4. Re-fetch the user so the app shows the target's identity.
       const target = await fetchUser();
@@ -119,7 +126,8 @@ export const useImpersonation = () => {
     if (staffToken) {
       setTokens(staffToken);
     }
-    impersonating.value = false;
+    await nextTick(); // let the staff-token cookie write flush before reads
+    tokenVersion.value++; // hide the impersonation banner immediately
     impersonatorTokenCookie().value = null;
 
     // 2. End the session on the backend with the staff token.
