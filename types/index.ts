@@ -76,6 +76,7 @@ export interface User {
   profile_photo_url: string;
   timezone: string;
   onboarded: boolean;
+  staff_role?: "support" | "super_admin" | null;
   all_teams?: Team[] | null;
   current_team?: Team;
   two_factor_enabled?: boolean;
