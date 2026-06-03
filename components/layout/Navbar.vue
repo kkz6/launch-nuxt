@@ -4,6 +4,7 @@ import {
   ChevronDown,
   LogOut,
   Settings,
+  Shield,
   Plus,
   Check,
   Sun,
@@ -43,14 +44,38 @@ const colorMode = useColorMode();
 const route = useRoute();
 
 // Check if current team is subscribed
-const isSubscribed = computed(() => user.value?.current_team?.is_subscribed ?? true);
+const isSubscribed = computed(
+  () => user.value?.current_team?.is_subscribed ?? true,
+);
+
+// Staff (support/super_admin) see an Admin Panel entry in the user menu.
+const isStaff = computed(
+  () =>
+    user.value?.staff_role === "support" ||
+    user.value?.staff_role === "super_admin",
+);
 
 // Global navigation tabs
 const globalTabsBase = [
-  { value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" },
-  { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
+  {
+    value: "dashboard",
+    label: "Dashboard",
+    route: "/dashboard",
+    icon: "lucide:layout-dashboard",
+  },
+  {
+    value: "servers",
+    label: "Servers",
+    route: "/servers",
+    icon: "lucide:server",
+  },
   { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
-  { value: "scripts", label: "Scripts", route: "/scripts", icon: "lucide:scroll-text" },
+  {
+    value: "scripts",
+    label: "Scripts",
+    route: "/scripts",
+    icon: "lucide:scroll-text",
+  },
 ];
 
 // Track if component is mounted (client-side)
@@ -67,12 +92,24 @@ const globalTabs = computed(() => {
 
   // If not subscribed, only show dashboard
   if (!isSubscribed.value) {
-    return [{ value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" }];
+    return [
+      {
+        value: "dashboard",
+        label: "Dashboard",
+        route: "/dashboard",
+        icon: "lucide:layout-dashboard",
+      },
+    ];
   }
 
   if (!user.value?.onboarded) {
     return [
-      { value: "onboarding", label: "Onboarding", route: "/onboarding", icon: "lucide:rocket" },
+      {
+        value: "onboarding",
+        label: "Onboarding",
+        route: "/onboarding",
+        icon: "lucide:rocket",
+      },
       ...globalTabsBase,
     ];
   }
@@ -87,7 +124,10 @@ const indicatorWidth = ref(0);
 
 const setTabRef = (key: string, el: unknown) => {
   if (el) {
-    tabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    tabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -96,7 +136,7 @@ const updateIndicator = () => {
     indicatorWidth.value = 0;
     return;
   }
-  const currentPath = route.path.replace(/\/$/, '');
+  const currentPath = route.path.replace(/\/$/, "");
   const activeTab = globalTabs.value.find((tab) => {
     return currentPath === tab.route || currentPath.startsWith(`${tab.route}/`);
   });
@@ -114,9 +154,13 @@ const updateIndicator = () => {
   }
 };
 
-watch(() => route.path, () => {
-  nextTick(updateIndicator);
-}, { immediate: true });
+watch(
+  () => route.path,
+  () => {
+    nextTick(updateIndicator);
+  },
+  { immediate: true },
+);
 
 onMounted(() => {
   nextTick(updateIndicator);
@@ -130,7 +174,10 @@ const serverIndicatorWidth = ref(0);
 
 const setServerTabRef = (key: string, el: unknown) => {
   if (el) {
-    serverTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    serverTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -139,7 +186,7 @@ const updateServerIndicator = () => {
     serverIndicatorWidth.value = 0;
     return;
   }
-  const currentTab = (route.query.tab as string) || 'sites';
+  const currentTab = (route.query.tab as string) || "sites";
   if (serverTabRefs.value.has(currentTab)) {
     const tabEl = serverTabRefs.value.get(currentTab);
     if (tabEl && serverNavRef.value) {
@@ -161,7 +208,10 @@ const siteIndicatorWidth = ref(0);
 
 const setSiteTabRef = (key: string, el: unknown) => {
   if (el) {
-    siteTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    siteTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -170,7 +220,7 @@ const updateSiteIndicator = () => {
     siteIndicatorWidth.value = 0;
     return;
   }
-  const currentTab = (route.query.tab as string) || 'general';
+  const currentTab = (route.query.tab as string) || "general";
   if (siteTabRefs.value.has(currentTab)) {
     const tabEl = siteTabRefs.value.get(currentTab);
     if (tabEl && siteNavRef.value) {
@@ -192,7 +242,10 @@ const advancedIndicatorWidth = ref(0);
 
 const setAdvancedTabRef = (key: string, el: unknown) => {
   if (el) {
-    advancedTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    advancedTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -201,7 +254,7 @@ const updateAdvancedIndicator = () => {
     advancedIndicatorWidth.value = 0;
     return;
   }
-  const currentSubTab = (route.query.subtab as string) || 'general';
+  const currentSubTab = (route.query.subtab as string) || "general";
   if (advancedTabRefs.value.has(currentSubTab)) {
     const tabEl = advancedTabRefs.value.get(currentSubTab);
     if (tabEl && advancedNavRef.value) {
@@ -216,46 +269,88 @@ const updateAdvancedIndicator = () => {
 };
 
 // Watch for route changes to update all indicators
-watch([() => route.path, () => route.query.tab, () => route.query.subtab], () => {
-  nextTick(() => {
-    updateServerIndicator();
-    updateSiteIndicator();
-    updateAdvancedIndicator();
-  });
-}, { immediate: true });
-
+watch(
+  [() => route.path, () => route.query.tab, () => route.query.subtab],
+  () => {
+    nextTick(() => {
+      updateServerIndicator();
+      updateSiteIndicator();
+      updateAdvancedIndicator();
+    });
+  },
+  { immediate: true },
+);
 
 // Server detail tabs (conditionally show upstreams for load balancer servers)
-const isLoadBalancerServer = computed(() => serverType.value === 'loadbalancer');
+const isLoadBalancerServer = computed(
+  () => serverType.value === "loadbalancer",
+);
 
 const serverDetailTabs = computed(() => {
-  const baseTabs: { value: string; label: string; query: string; icon: string }[] = [];
+  const baseTabs: {
+    value: string;
+    label: string;
+    query: string;
+    icon: string;
+  }[] = [];
 
   if (isLoadBalancerServer.value) {
-    baseTabs.push(
-      { value: "upstreams", label: "Upstreams", query: "upstreams", icon: "lucide:git-fork" },
-    );
+    baseTabs.push({
+      value: "upstreams",
+      label: "Upstreams",
+      query: "upstreams",
+      icon: "lucide:git-fork",
+    });
   } else {
-    baseTabs.push(
-      { value: "sites", label: "Sites", query: "sites", icon: "lucide:layout" },
-    );
+    baseTabs.push({
+      value: "sites",
+      label: "Sites",
+      query: "sites",
+      icon: "lucide:layout",
+    });
   }
 
-  baseTabs.push(
-    { value: "metrics", label: "Metrics", query: "metrics", icon: "lucide:activity" },
-  );
+  baseTabs.push({
+    value: "metrics",
+    label: "Metrics",
+    query: "metrics",
+    icon: "lucide:activity",
+  });
 
   if (!isLoadBalancerServer.value) {
-    baseTabs.push(
-      { value: "databases", label: "Databases", query: "databases", icon: "lucide:database" },
-    );
+    baseTabs.push({
+      value: "databases",
+      label: "Databases",
+      query: "databases",
+      icon: "lucide:database",
+    });
   }
 
   baseTabs.push(
-    { value: "networks", label: "Networks", query: "networks", icon: "lucide:network" },
-    { value: "daemons", label: "Daemons", query: "daemons", icon: "lucide:bot" },
-    { value: "schedulers", label: "Schedulers", query: "schedulers", icon: "lucide:clock" },
-    { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+    {
+      value: "networks",
+      label: "Networks",
+      query: "networks",
+      icon: "lucide:network",
+    },
+    {
+      value: "daemons",
+      label: "Daemons",
+      query: "daemons",
+      icon: "lucide:bot",
+    },
+    {
+      value: "schedulers",
+      label: "Schedulers",
+      query: "schedulers",
+      icon: "lucide:clock",
+    },
+    {
+      value: "advanced",
+      label: "Advanced",
+      query: "advanced",
+      icon: "lucide:sliders-horizontal",
+    },
   );
 
   return baseTabs;
@@ -264,41 +359,93 @@ const serverDetailTabs = computed(() => {
 // Advanced sub-tabs (second level) - filtered by server type
 const advancedSubTabs = computed(() => {
   const tabs = [
-    { value: "general", label: "General", query: "general", icon: "lucide:info" },
+    {
+      value: "general",
+      label: "General",
+      query: "general",
+      icon: "lucide:info",
+    },
   ];
 
   if (!isLoadBalancerServer.value) {
-    tabs.push(
-      { value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" },
-    );
+    tabs.push({
+      value: "backups",
+      label: "Backups",
+      query: "backups",
+      icon: "lucide:hard-drive",
+    });
   }
 
-  tabs.push(
-    { value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: "lucide:key" },
-  );
+  tabs.push({
+    value: "ssh-keys",
+    label: "SSH Keys",
+    query: "ssh-keys",
+    icon: "lucide:key",
+  });
 
   if (!isLoadBalancerServer.value) {
-    tabs.push(
-      { value: "packages", label: "Packages", query: "packages", icon: "lucide:package" },
-    );
+    tabs.push({
+      value: "packages",
+      label: "Packages",
+      query: "packages",
+      icon: "lucide:package",
+    });
   }
 
-  tabs.push(
-    { value: "services", label: "Services", query: "services", icon: "lucide:cog" },
-  );
+  tabs.push({
+    value: "services",
+    label: "Services",
+    query: "services",
+    icon: "lucide:cog",
+  });
 
   return tabs;
 });
 
 // Site detail tabs (base - filtered based on site type)
 const allSiteDetailTabs = [
-  { value: "general", label: "Overview", query: "general", icon: "lucide:layout-dashboard" },
-  { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
-  { value: "files", label: "Files", query: "files", icon: "lucide:folder-open" },
-  { value: "queues", label: "Queues", query: "queues", icon: "lucide:list-todo" },
-  { value: "redirects", label: "Redirects", query: "redirects", icon: "lucide:corner-up-right" },
-  { value: "commands", label: "Commands", query: "commands", icon: "lucide:terminal-square" },
-  { value: "settings", label: "Settings", query: "settings", icon: "lucide:settings" },
+  {
+    value: "general",
+    label: "Overview",
+    query: "general",
+    icon: "lucide:layout-dashboard",
+  },
+  {
+    value: "deployments",
+    label: "Deployments",
+    query: "deployments",
+    icon: "lucide:git-branch",
+  },
+  {
+    value: "files",
+    label: "Files",
+    query: "files",
+    icon: "lucide:folder-open",
+  },
+  {
+    value: "queues",
+    label: "Queues",
+    query: "queues",
+    icon: "lucide:list-todo",
+  },
+  {
+    value: "redirects",
+    label: "Redirects",
+    query: "redirects",
+    icon: "lucide:corner-up-right",
+  },
+  {
+    value: "commands",
+    label: "Commands",
+    query: "commands",
+    icon: "lucide:terminal-square",
+  },
+  {
+    value: "settings",
+    label: "Settings",
+    query: "settings",
+    icon: "lucide:settings",
+  },
 ];
 
 // DNS domain detail tabs
@@ -310,7 +457,7 @@ const dnsDetailTabs = [
 // Check if we're on a server detail page
 const isServerDetailPage = computed(() => {
   const match = route.path.match(/^\/servers\/([^/]+)$/);
-  return match && match[1] !== 'create';
+  return match && match[1] !== "create";
 });
 
 // Check if we're on a site detail page
@@ -322,7 +469,7 @@ const isSiteDetailPage = computed(() => {
 // Check if we're on a DNS domain detail page
 const isDnsDetailPage = computed(() => {
   const match = route.path.match(/^\/dns\/([^/]+)(?:\/|$)/);
-  return match && match[1] !== 'create';
+  return match && match[1] !== "create";
 });
 
 // Check if we're on DNS settings page
@@ -365,7 +512,10 @@ const isDeploying = ref(false);
 // Shared bus consumed by the site detail page so that triggering a deploy
 // from the navbar updates the on-page overview card immediately, without
 // waiting for the WebSocket roundtrip + debounced refetch.
-const lastTriggeredDeployment = useState<Deployment | null>('lastTriggeredDeployment', () => null);
+const lastTriggeredDeployment = useState<Deployment | null>(
+  "lastTriggeredDeployment",
+  () => null,
+);
 
 const onDeployTriggered = (deployment: Deployment) => {
   isDeploying.value = true;
@@ -373,15 +523,19 @@ const onDeployTriggered = (deployment: Deployment) => {
 };
 
 // Get current team for WebSocket channel
-const teamId = computed(() => user.value?.current_team_id?.toString() || '');
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
 // Subscribe to real-time deployment events
 useDeploymentEvents(teamId, (data) => {
   // Update deployment status for current site
   if (data.site_id === siteId.value) {
-    if (data.status === 'pending' || data.status === 'installing') {
+    if (data.status === "pending" || data.status === "installing") {
       isDeploying.value = true;
-    } else if (data.status === 'finished' || data.status === 'failed' || data.status === 'timeout') {
+    } else if (
+      data.status === "finished" ||
+      data.status === "failed" ||
+      data.status === "timeout"
+    ) {
       isDeploying.value = false;
     }
   }
@@ -411,21 +565,34 @@ const siteTypeLabels: Record<string, string> = {
 // Computed site tabs based on site type
 const siteDetailTabs = computed(() => {
   if (!siteType.value) return allSiteDetailTabs;
-  if (siteType.value === 'wordpress') {
-    return allSiteDetailTabs.filter((t) => !['deployments', 'queues'].includes(t.value));
+  if (siteType.value === "wordpress") {
+    return allSiteDetailTabs.filter(
+      (t) => !["deployments", "queues"].includes(t.value),
+    );
   }
-  if (siteType.value === 'phpmyadmin') {
-    return allSiteDetailTabs.filter((t) => !['deployments', 'queues', 'redirects', 'commands'].includes(t.value));
+  if (siteType.value === "phpmyadmin") {
+    return allSiteDetailTabs.filter(
+      (t) =>
+        !["deployments", "queues", "redirects", "commands"].includes(t.value),
+    );
   }
-  if (siteType.value === 'generic') {
-    return allSiteDetailTabs.filter((t) => !['queues'].includes(t.value));
+  if (siteType.value === "generic") {
+    return allSiteDetailTabs.filter((t) => !["queues"].includes(t.value));
   }
   return allSiteDetailTabs;
 });
 
 const { getCachedServer, getCachedSite } = useNavbarCache();
 
-const applyServerData = (data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string }) => {
+const applyServerData = (data: {
+  name: string;
+  public_ipv4: string;
+  connected: boolean;
+  provider: string;
+  status: string;
+  type: string;
+  provision_command?: string;
+}) => {
   serverName.value = data.name;
   serverIp.value = data.public_ipv4;
   serverConnected.value = data.connected;
@@ -436,113 +603,144 @@ const applyServerData = (data: { name: string; public_ipv4: string; connected: b
 };
 
 // Fetch server info when on server or site detail page
-watch([serverId, siteId], async ([sId, stId]) => {
-  if (sId && !stId) {
-    // Server detail page - use cache if available, otherwise fetch
-    const cached = getCachedServer(sId);
-    if (cached) {
-      applyServerData(cached);
-    } else {
+watch(
+  [serverId, siteId],
+  async ([sId, stId]) => {
+    if (sId && !stId) {
+      // Server detail page - use cache if available, otherwise fetch
+      const cached = getCachedServer(sId);
+      if (cached) {
+        applyServerData(cached);
+      } else {
+        try {
+          const response = await $api<{
+            data: {
+              name: string;
+              public_ipv4: string;
+              connected: boolean;
+              provider: string;
+              status: string;
+              type: string;
+              provision_command?: string;
+            };
+          }>(`/servers/${sId}`);
+          applyServerData(response.data);
+        } catch {
+          serverName.value = null;
+        }
+      }
+      // Clear site data
+      siteAddress.value = null;
+      siteType.value = null;
+    } else if (sId && stId) {
+      // Apply site cache immediately for instant tab filtering
+      const cachedSite = getCachedSite(stId);
+      if (cachedSite) {
+        siteAddress.value = cachedSite.address;
+        siteType.value = cachedSite.type;
+      }
+
+      // Fetch full data from API
       try {
-        const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`);
-        applyServerData(response.data);
+        const [serverRes, siteRes] = await Promise.all([
+          $api<{
+            data: {
+              name: string;
+              public_ipv4: string;
+              connected: boolean;
+              provider: string;
+              status: string;
+              type: string;
+              provision_command?: string;
+            };
+          }>(`/servers/${sId}`),
+          $api<{ data: { address: string; type: string; url: string } }>(
+            `/servers/${sId}/sites/${stId}`,
+          ),
+        ]);
+        applyServerData(serverRes.data);
+        siteAddress.value = siteRes.data.address;
+        siteType.value = siteRes.data.type;
+        siteUrl.value = siteRes.data.url;
       } catch {
         serverName.value = null;
+        siteAddress.value = null;
       }
-    }
-    // Clear site data
-    siteAddress.value = null;
-    siteType.value = null;
-  } else if (sId && stId) {
-    // Apply site cache immediately for instant tab filtering
-    const cachedSite = getCachedSite(stId);
-    if (cachedSite) {
-      siteAddress.value = cachedSite.address;
-      siteType.value = cachedSite.type;
-    }
-
-    // Fetch full data from API
-    try {
-      const [serverRes, siteRes] = await Promise.all([
-        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`),
-        $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`),
-      ]);
-      applyServerData(serverRes.data);
-      siteAddress.value = siteRes.data.address;
-      siteType.value = siteRes.data.type;
-      siteUrl.value = siteRes.data.url;
-    } catch {
+    } else {
       serverName.value = null;
+      serverProvider.value = null;
+      serverStatus.value = null;
+      serverType.value = null;
+      serverProvisionCommand.value = null;
       siteAddress.value = null;
+      siteType.value = null;
     }
-  } else {
-    serverName.value = null;
-    serverProvider.value = null;
-    serverStatus.value = null;
-    serverType.value = null;
-    serverProvisionCommand.value = null;
-    siteAddress.value = null;
-    siteType.value = null;
-  }
-}, { immediate: true });
+  },
+  { immediate: true },
+);
 
 // Fetch domain info when on DNS detail page
-watch(domainId, async (dId) => {
-  if (dId && dId !== 'create') {
-    try {
-      const response = await $api<{
-        data: {
-          domain: {
-            address: string;
-            provider?: { provider: string; profile: string };
+watch(
+  domainId,
+  async (dId) => {
+    if (dId && dId !== "create") {
+      try {
+        const response = await $api<{
+          data: {
+            domain: {
+              address: string;
+              provider?: { provider: string; profile: string };
+            };
           };
-        };
-      }>(`/dns/domains/${dId}`);
-      domainAddress.value = response.data.domain.address;
-      domainProvider.value = response.data.domain.provider?.provider || null;
-      domainProviderLabel.value = response.data.domain.provider?.profile || null;
-    } catch {
+        }>(`/dns/domains/${dId}`);
+        domainAddress.value = response.data.domain.address;
+        domainProvider.value = response.data.domain.provider?.provider || null;
+        domainProviderLabel.value =
+          response.data.domain.provider?.profile || null;
+      } catch {
+        domainAddress.value = null;
+        domainProvider.value = null;
+        domainProviderLabel.value = null;
+      }
+    } else {
       domainAddress.value = null;
       domainProvider.value = null;
       domainProviderLabel.value = null;
     }
-  } else {
-    domainAddress.value = null;
-    domainProvider.value = null;
-    domainProviderLabel.value = null;
-  }
-}, { immediate: true });
+  },
+  { immediate: true },
+);
 
 const isGlobalTabActive = (tabRoute: string) => {
-  const currentPath = route.path.replace(/\/$/, ''); // Remove trailing slash
+  const currentPath = route.path.replace(/\/$/, ""); // Remove trailing slash
   return currentPath === tabRoute || currentPath.startsWith(`${tabRoute}/`);
 };
 
 const isServerTabActive = (query: string) => {
-  const currentTab = route.query.tab as string || 'sites';
+  const currentTab = (route.query.tab as string) || "sites";
   return currentTab === query;
 };
 
 const isAdvancedTabActive = computed(() => {
-  return (route.query.tab as string) === 'advanced';
+  return (route.query.tab as string) === "advanced";
 });
 
 const isAdvancedSubTabActive = (query: string) => {
-  const currentSubTab = route.query.subtab as string || 'general';
+  const currentSubTab = (route.query.subtab as string) || "general";
   return currentSubTab === query;
 };
 
 const isSiteTabActive = (query: string) => {
-  const currentTab = route.query.tab as string || 'general';
+  const currentTab = (route.query.tab as string) || "general";
   return currentTab === query;
 };
 
 const isDnsTabActive = (tabPath: string) => {
-  if (tabPath === '') {
+  if (tabPath === "") {
     // Records tab is active when not on settings page
     return !isDnsSettingsPage.value;
   }
-  if (tabPath === '/settings') {
+  if (tabPath === "/settings") {
     return isDnsSettingsPage.value;
   }
   return false;
@@ -550,17 +748,25 @@ const isDnsTabActive = (tabPath: string) => {
 
 // Show provision button for custom servers that need provisioning
 const showProvisionButton = computed(() => {
-  return serverProvider.value === 'custom_server' && serverStatus.value === 'new';
+  return (
+    serverProvider.value === "custom_server" && serverStatus.value === "new"
+  );
 });
 
 const showGlobalTabs = computed(() => {
-  const currentPath = route.path.replace(/\/$/, ''); // Remove trailing slash
+  const currentPath = route.path.replace(/\/$/, ""); // Remove trailing slash
   // If not subscribed, only show on dashboard
   if (!isSubscribed.value) {
-    return currentPath === '/dashboard';
+    return currentPath === "/dashboard";
   }
   // Show global tabs only on list pages, not detail pages
-  return currentPath === '/dashboard' || currentPath === '/servers' || currentPath === '/dns' || currentPath === '/scripts' || currentPath === '/onboarding';
+  return (
+    currentPath === "/dashboard" ||
+    currentPath === "/servers" ||
+    currentPath === "/dns" ||
+    currentPath === "/scripts" ||
+    currentPath === "/onboarding"
+  );
 });
 
 const showDnsTabs = computed(() => {
@@ -581,43 +787,47 @@ const showSiteTabs = computed(() => {
 });
 
 // Watch for section visibility changes to update indicators when they become visible
-watch([showGlobalTabs, showServerTabs, showSiteTabs, isAdvancedTabActive], ([globalVisible, serverVisible, siteVisible, advancedVisible]) => {
-  // Clear stale refs when sections become hidden
-  if (!serverVisible) serverTabRefs.value.clear();
-  if (!siteVisible) siteTabRefs.value.clear();
-  if (!advancedVisible) advancedTabRefs.value.clear();
+watch(
+  [showGlobalTabs, showServerTabs, showSiteTabs, isAdvancedTabActive],
+  ([globalVisible, serverVisible, siteVisible, advancedVisible]) => {
+    // Clear stale refs when sections become hidden
+    if (!serverVisible) serverTabRefs.value.clear();
+    if (!siteVisible) siteTabRefs.value.clear();
+    if (!advancedVisible) advancedTabRefs.value.clear();
 
-  // Wait for refs to be populated after render
-  setTimeout(() => {
-    nextTick(() => {
-      if (globalVisible) updateIndicator();
-      if (serverVisible) updateServerIndicator();
-      if (siteVisible) updateSiteIndicator();
-      if (advancedVisible) updateAdvancedIndicator();
-    });
-  }, 50);
-}, { immediate: true });
+    // Wait for refs to be populated after render
+    setTimeout(() => {
+      nextTick(() => {
+        if (globalVisible) updateIndicator();
+        if (serverVisible) updateServerIndicator();
+        if (siteVisible) updateSiteIndicator();
+        if (advancedVisible) updateAdvancedIndicator();
+      });
+    }, 50);
+  },
+  { immediate: true },
+);
 
 // DNS refresh trigger
-const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
+const dnsRefreshKey = useState("dnsRefreshKey", () => 0);
 const onDnsCreated = () => {
   dnsRefreshKey.value++;
 };
 
 // Scripts refresh trigger
-const scriptsRefreshKey = useState('scriptsRefreshKey', () => 0);
+const scriptsRefreshKey = useState("scriptsRefreshKey", () => 0);
 const onScriptCreated = () => {
   scriptsRefreshKey.value++;
 };
 
 // Sites refresh trigger (when a site is created from navbar)
-const sitesRefreshKey = useState('sitesRefreshKey', () => 0);
+const sitesRefreshKey = useState("sitesRefreshKey", () => 0);
 const onSiteCreated = () => {
   sitesRefreshKey.value++;
 };
 
 // Terminal state (shared with server detail page)
-const isTerminalOpen = useState('serverTerminalOpen', () => false);
+const isTerminalOpen = useState("serverTerminalOpen", () => false);
 const openTerminal = () => {
   isTerminalOpen.value = true;
 };
@@ -641,10 +851,12 @@ const isOpen = ref(false);
 const isCreateTeamOpen = ref(false);
 const teams = ref<Team[]>([]);
 const isTeamsLoading = ref(true);
-const confirmationDialog = ref<InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null>(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const currentTeam = computed(() =>
-  teams.value.find((t) => t.id === String(user.value?.current_team_id))
+  teams.value.find((t) => t.id === String(user.value?.current_team_id)),
 );
 
 const fetchTeams = async () => {
@@ -659,8 +871,8 @@ const fetchTeams = async () => {
 };
 
 // Refresh triggers for team switch
-const serversRefreshKey = useState('serversRefreshKey', () => 0);
-const dashboardRefreshKey = useState('dashboardRefreshKey', () => 0);
+const serversRefreshKey = useState("serversRefreshKey", () => 0);
+const dashboardRefreshKey = useState("dashboardRefreshKey", () => 0);
 
 const switchTeam = async (teamId: string) => {
   if (teamId === String(user.value?.current_team_id)) return;
@@ -684,7 +896,7 @@ const switchTeam = async (teamId: string) => {
     scriptsRefreshKey.value++;
     dnsRefreshKey.value++;
     // Show success toast
-    toast.success(`Switched to ${targetTeam?.name || 'team'}`);
+    toast.success(`Switched to ${targetTeam?.name || "team"}`);
   } catch {
     toast.error("Failed to switch team");
   }
@@ -770,9 +982,7 @@ onMounted(fetchTeams);
   >
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div
-      class="flex h-16 items-center justify-between px-4 lg:px-8"
-    >
+    <div class="flex h-16 items-center justify-between px-4 lg:px-8">
       <NuxtLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
       </NuxtLink>
@@ -783,10 +993,14 @@ onMounted(fetchTeams);
         class="group relative h-5 cursor-pointer overflow-hidden text-sm"
         @click="openSettingsSheet('billing')"
       >
-        <span class="block text-muted-foreground transition-transform duration-300 ease-out group-hover:-translate-y-full">
+        <span
+          class="block text-muted-foreground transition-transform duration-300 ease-out group-hover:-translate-y-full"
+        >
           Your subscription is inactive
         </span>
-        <span class="absolute inset-x-0 top-full flex items-center gap-1 font-medium text-primary transition-transform duration-300 ease-out group-hover:-translate-y-full">
+        <span
+          class="absolute inset-x-0 top-full flex items-center gap-1 font-medium text-primary transition-transform duration-300 ease-out group-hover:-translate-y-full"
+        >
           Subscribe now
           <Icon name="lucide:arrow-right" class="h-3.5 w-3.5" />
         </span>
@@ -807,7 +1021,9 @@ onMounted(fetchTeams);
                   </AvatarFallback>
                 </Avatar>
 
-                <ChevronDown class="ml-1 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5" />
+                <ChevronDown
+                  class="ml-1 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5"
+                />
               </div>
             </DropdownMenuTrigger>
 
@@ -820,8 +1036,14 @@ onMounted(fetchTeams);
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Teams Section -->
-              <div v-if="isTeamsLoading" class="flex items-center justify-center py-2">
-                <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin text-muted-foreground" />
+              <div
+                v-if="isTeamsLoading"
+                class="flex items-center justify-center py-2"
+              >
+                <Icon
+                  name="lucide:loader-2"
+                  class="h-3 w-3 animate-spin text-muted-foreground"
+                />
               </div>
               <template v-else>
                 <DropdownMenuGroup>
@@ -832,7 +1054,10 @@ onMounted(fetchTeams);
                     @click="switchTeam(team.id)"
                   >
                     <span class="truncate">{{ team.name }}</span>
-                    <Check v-if="team.id === String(user?.current_team_id)" class="h-3.5 w-3.5 text-primary" />
+                    <Check
+                      v-if="team.id === String(user?.current_team_id)"
+                      class="h-3.5 w-3.5 text-primary"
+                    />
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
@@ -853,16 +1078,30 @@ onMounted(fetchTeams);
                 <Settings class="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Settings</span>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                v-if="isStaff"
+                class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
+                @click="navigateTo('/admin')"
+              >
+                <Shield class="h-3.5 w-3.5 text-muted-foreground" />
+                <span>Admin Panel</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Theme Switcher -->
               <div class="flex items-center justify-between px-2 py-1.5">
                 <span class="text-sm text-muted-foreground">Theme</span>
-                <div class="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5">
+                <div
+                  class="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5"
+                >
                   <button
                     type="button"
                     class="rounded p-1 transition-colors"
-                    :class="colorMode.preference === 'light' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :class="
+                      colorMode.preference === 'light'
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    "
                     @click.stop="setColorMode('light')"
                   >
                     <Sun class="h-3.5 w-3.5" />
@@ -870,7 +1109,11 @@ onMounted(fetchTeams);
                   <button
                     type="button"
                     class="rounded p-1 transition-colors"
-                    :class="colorMode.preference === 'dark' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :class="
+                      colorMode.preference === 'dark'
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    "
                     @click.stop="setColorMode('dark')"
                   >
                     <Moon class="h-3.5 w-3.5" />
@@ -878,7 +1121,11 @@ onMounted(fetchTeams);
                   <button
                     type="button"
                     class="rounded p-1 transition-colors"
-                    :class="colorMode.preference === 'system' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :class="
+                      colorMode.preference === 'system'
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    "
                     @click.stop="setColorMode('system')"
                   >
                     <Monitor class="h-3.5 w-3.5" />
@@ -922,7 +1169,7 @@ onMounted(fetchTeams);
             :class="[
               isGlobalTabActive(tab.route)
                 ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
             ]"
           >
             <Icon :name="tab.icon" class="h-4 w-4" />
@@ -931,12 +1178,22 @@ onMounted(fetchTeams);
           <!-- Sliding indicator -->
           <span
             class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-            :style="{ left: `${indicatorLeft}px`, width: `${indicatorWidth}px` }"
+            :style="{
+              left: `${indicatorLeft}px`,
+              width: `${indicatorWidth}px`,
+            }"
           />
         </nav>
         <ServerCreateServerDialog v-if="route.path === '/servers'" />
-        <DnsAddDomain v-if="route.path === '/dns'" :providers="[]" @created="onDnsCreated" />
-        <ScriptsCreateScript v-if="route.path === '/scripts'" @created="onScriptCreated" />
+        <DnsAddDomain
+          v-if="route.path === '/dns'"
+          :providers="[]"
+          @created="onDnsCreated"
+        />
+        <ScriptsCreateScript
+          v-if="route.path === '/scripts'"
+          @created="onScriptCreated"
+        />
       </div>
     </div>
 
@@ -955,17 +1212,25 @@ onMounted(fetchTeams);
           <span class="text-muted-foreground">/</span>
           <template v-if="isServerDataLoaded">
             <div class="flex items-center gap-2">
-              <span class="relative flex items-center gap-1.5 text-sm font-medium">
+              <span
+                class="relative flex items-center gap-1.5 text-sm font-medium"
+              >
                 <span
                   class="h-2 w-2 rounded-full"
                   :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
                 />
                 {{ serverName }}
               </span>
-              <span v-if="isLoadBalancerServer" class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
+              <span
+                v-if="isLoadBalancerServer"
+                class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
+              >
                 Load Balancer
               </span>
-              <span v-if="serverProvider" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+              <span
+                v-if="serverProvider"
+                class="rounded bg-muted px-2 py-0.5 text-xs font-medium"
+              >
                 {{ providerLabels[serverProvider] || serverProvider }}
               </span>
             </div>
@@ -997,25 +1262,40 @@ onMounted(fetchTeams);
             <Terminal class="mr-2 h-4 w-4" />
             Terminal
           </Button>
-          <ServerAddSite v-if="serverId && !isLoadBalancerServer && isServerTabActive('sites')" :server-id="serverId" @created="onSiteCreated" />
+          <ServerAddSite
+            v-if="
+              serverId && !isLoadBalancerServer && isServerTabActive('sites')
+            "
+            :server-id="serverId"
+            @created="onSiteCreated"
+          />
         </div>
       </div>
       <nav
         v-if="isServerDataLoaded"
         ref="serverNavRef"
         class="relative -mb-px flex gap-1 overflow-x-auto"
-        :class="{ '-mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-border mb-0': isAdvancedTabActive }"
+        :class="{
+          '-mx-4 lg:-mx-8 px-4 lg:px-8 border-b border-border mb-0':
+            isAdvancedTabActive,
+        }"
       >
         <NuxtLink
           v-for="tab in serverDetailTabs"
           :key="tab.value"
           :ref="(el) => setServerTabRef(tab.query, el)"
-          :to="{ path: `/servers/${serverId}`, query: tab.query === 'advanced' ? { tab: tab.query, subtab: 'general' } : { tab: tab.query } }"
+          :to="{
+            path: `/servers/${serverId}`,
+            query:
+              tab.query === 'advanced'
+                ? { tab: tab.query, subtab: 'general' }
+                : { tab: tab.query },
+          }"
           class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isServerTabActive(tab.query)
               ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
           ]"
         >
           <Icon :name="tab.icon" class="h-4 w-4" />
@@ -1024,24 +1304,38 @@ onMounted(fetchTeams);
         <!-- Sliding indicator -->
         <span
           class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-          :style="{ left: `${serverIndicatorLeft}px`, width: `${serverIndicatorWidth}px` }"
+          :style="{
+            left: `${serverIndicatorLeft}px`,
+            width: `${serverIndicatorWidth}px`,
+          }"
         />
       </nav>
       <nav v-else class="relative -mb-px flex gap-1 overflow-x-auto">
-        <div v-for="i in 6" :key="i" class="h-9 w-20 animate-pulse rounded bg-muted px-3 py-2" />
+        <div
+          v-for="i in 6"
+          :key="i"
+          class="h-9 w-20 animate-pulse rounded bg-muted px-3 py-2"
+        />
       </nav>
       <!-- Advanced Sub-tabs -->
-      <nav v-if="isAdvancedTabActive" ref="advancedNavRef" class="relative -mb-px flex gap-1 overflow-x-auto">
+      <nav
+        v-if="isAdvancedTabActive"
+        ref="advancedNavRef"
+        class="relative -mb-px flex gap-1 overflow-x-auto"
+      >
         <NuxtLink
           v-for="subtab in advancedSubTabs"
           :key="subtab.value"
           :ref="(el) => setAdvancedTabRef(subtab.query, el)"
-          :to="{ path: `/servers/${serverId}`, query: { tab: 'advanced', subtab: subtab.query } }"
+          :to="{
+            path: `/servers/${serverId}`,
+            query: { tab: 'advanced', subtab: subtab.query },
+          }"
           class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isAdvancedSubTabActive(subtab.query)
               ? 'text-rose-500 dark:text-rose-300'
-              : 'text-muted-foreground hover:text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
           ]"
         >
           <Icon :name="subtab.icon" class="h-4 w-4" />
@@ -1050,7 +1344,10 @@ onMounted(fetchTeams);
         <!-- Sliding indicator -->
         <span
           class="absolute bottom-0 h-0.5 bg-rose-400 transition-all duration-300 ease-out"
-          :style="{ left: `${advancedIndicatorLeft}px`, width: `${advancedIndicatorWidth}px` }"
+          :style="{
+            left: `${advancedIndicatorLeft}px`,
+            width: `${advancedIndicatorWidth}px`,
+          }"
         />
       </nav>
     </div>
@@ -1076,22 +1373,38 @@ onMounted(fetchTeams);
               class="h-2 w-2 rounded-full"
               :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
             />
-            {{ serverName || 'Loading...' }}
+            {{ serverName || "Loading..." }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
             <Globe class="h-4 w-4 text-muted-foreground" />
-            <span class="text-sm font-medium">{{ siteAddress || 'Loading...' }}</span>
-            <span v-if="siteType" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+            <span class="text-sm font-medium">{{
+              siteAddress || "Loading..."
+            }}</span>
+            <span
+              v-if="siteType"
+              class="rounded bg-muted px-2 py-0.5 text-xs font-medium"
+            >
               {{ siteTypeLabels[siteType] || siteType }}
             </span>
-            <a v-if="siteUrl" :href="siteUrl" target="_blank" rel="noreferrer" class="text-muted-foreground hover:text-foreground">
+            <a
+              v-if="siteUrl"
+              :href="siteUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="text-muted-foreground hover:text-foreground"
+            >
               <Icon name="lucide:external-link" class="h-4 w-4" />
             </a>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <SharedLogsSheet v-if="serverId && siteId" :server-id="serverId" type="site" :site-id="siteId" />
+          <SharedLogsSheet
+            v-if="serverId && siteId"
+            :server-id="serverId"
+            type="site"
+            :site-id="siteId"
+          />
           <Button
             v-if="serverConnected"
             variant="outline"
@@ -1102,7 +1415,12 @@ onMounted(fetchTeams);
             Terminal
           </Button>
           <SiteDeployApplication
-            v-if="serverId && siteId && siteType && !['wordpress', 'phpmyadmin'].includes(siteType)"
+            v-if="
+              serverId &&
+              siteId &&
+              siteType &&
+              !['wordpress', 'phpmyadmin'].includes(siteType)
+            "
             :server-id="serverId"
             :site-id="siteId"
             :is-deploying="isDeploying"
@@ -1115,12 +1433,15 @@ onMounted(fetchTeams);
           v-for="tab in siteDetailTabs"
           :key="tab.value"
           :ref="(el) => setSiteTabRef(tab.query, el)"
-          :to="{ path: `/servers/${serverId}/sites/${siteId}`, query: { tab: tab.query } }"
+          :to="{
+            path: `/servers/${serverId}/sites/${siteId}`,
+            query: { tab: tab.query },
+          }"
           class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isSiteTabActive(tab.query)
               ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
           ]"
         >
           <Icon :name="tab.icon" class="h-4 w-4" />
@@ -1129,7 +1450,10 @@ onMounted(fetchTeams);
         <!-- Sliding indicator -->
         <span
           class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-          :style="{ left: `${siteIndicatorLeft}px`, width: `${siteIndicatorWidth}px` }"
+          :style="{
+            left: `${siteIndicatorLeft}px`,
+            width: `${siteIndicatorWidth}px`,
+          }"
         />
       </nav>
     </div>
@@ -1148,8 +1472,13 @@ onMounted(fetchTeams);
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium">{{ domainAddress || 'Loading...' }}</span>
-            <span v-if="domainProviderLabel" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+            <span class="text-sm font-medium">{{
+              domainAddress || "Loading..."
+            }}</span>
+            <span
+              v-if="domainProviderLabel"
+              class="rounded bg-muted px-2 py-0.5 text-xs font-medium"
+            >
               {{ domainProviderLabel }}
             </span>
           </div>
@@ -1164,7 +1493,7 @@ onMounted(fetchTeams);
           :class="[
             isDnsTabActive(tab.path)
               ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground',
           ]"
         >
           {{ tab.label }}
@@ -1173,7 +1502,10 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Create Team Dialog -->
-    <SettingsCreateTeam v-model:open="isCreateTeamOpen" @created="onTeamCreated" />
+    <SettingsCreateTeam
+      v-model:open="isCreateTeamOpen"
+      @created="onTeamCreated"
+    />
 
     <SettingsSheet />
 
