@@ -52,14 +52,20 @@ export const useImpersonation = () => {
       sameSite: "lax",
     });
 
+  // Reactive impersonation flag. Initialized from the active token so it
+  // survives a page reload, then toggled explicitly by start/stop. We can't
+  // derive it from getAccessToken() alone: that reads a fresh useCookie ref
+  // each call, which isn't invalidated when setTokens writes through a
+  // different ref instance — so the banner would only update on a hard reload.
+  const impersonating = useState<boolean>(
+    "auth_is_impersonating",
+    () => !!decodeJwt(getAccessToken())?.impersonator_id,
+  );
+
   /**
-   * True when the active access token carries an impersonator_id claim.
-   * Derived from the token itself so it survives a page reload.
+   * True while a "spectate as user" session is active.
    */
-  const isImpersonating = computed(() => {
-    const payload = decodeJwt(getAccessToken());
-    return !!payload?.impersonator_id;
-  });
+  const isImpersonating = computed(() => impersonating.value);
 
   // Name shown in the banner — the target (currently-loaded) user.
   const impersonatedName = computed(() => user.value?.name ?? "user");
@@ -83,6 +89,7 @@ export const useImpersonation = () => {
 
       // 3. Make the impersonation token the active token.
       setTokens(token);
+      impersonating.value = true;
 
       // 4. Re-fetch the user so the app shows the target's identity.
       const target = await fetchUser();
@@ -112,6 +119,7 @@ export const useImpersonation = () => {
     if (staffToken) {
       setTokens(staffToken);
     }
+    impersonating.value = false;
     impersonatorTokenCookie().value = null;
 
     // 2. End the session on the backend with the staff token.
