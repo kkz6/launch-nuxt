@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
-import type { Server } from "~/types";
+import type { Team } from "~/types";
 import { adminService } from "~/services/adminService";
 import { Button } from "~/components/ui/button";
+import { Badge } from "~/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -19,31 +20,31 @@ definePageMeta({
 });
 
 useHead({
-  title: "Admin — Servers",
+  title: "Admin — Teams",
 });
 
 const PER_PAGE = 20;
 
-const servers = ref<Server[]>([]);
+const teams = ref<Team[]>([]);
 const isLoading = ref(true);
 const total = ref(0);
 const currentPage = ref(1);
 const lastPage = ref(1);
 
-const fetchServers = async (page = 1) => {
+const fetchTeams = async (page = 1) => {
   isLoading.value = true;
   try {
-    const response = await adminService.servers({
+    const response = await adminService.teams({
       limit: PER_PAGE,
       offset: (page - 1) * PER_PAGE,
     });
-    servers.value = response.data;
+    teams.value = response.data;
     total.value = response.meta?.total ?? response.data.length;
     lastPage.value = response.meta?.last_page ?? 1;
     currentPage.value = response.meta?.current_page ?? page;
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || "Failed to load servers");
+    toast.error(err.data?.message || "Failed to load teams");
   } finally {
     isLoading.value = false;
   }
@@ -51,7 +52,7 @@ const fetchServers = async (page = 1) => {
 
 const goToPage = (page: number) => {
   if (page < 1 || page > lastPage.value) return;
-  fetchServers(page);
+  fetchTeams(page);
 };
 
 const formatDate = (date?: string): string => {
@@ -63,14 +64,14 @@ const formatDate = (date?: string): string => {
   }
 };
 
-onMounted(() => fetchServers());
+onMounted(() => fetchTeams());
 </script>
 
 <template>
   <div class="space-y-6 pb-10">
     <AdminTabs />
 
-    <p class="text-sm text-muted-foreground">All servers across teams.</p>
+    <p class="text-sm text-muted-foreground">All teams across the platform.</p>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
@@ -85,38 +86,35 @@ onMounted(() => fetchServers());
           <TableRow>
             <TableHead>ID</TableHead>
             <TableHead>Name</TableHead>
-            <TableHead>Provider</TableHead>
-            <TableHead>IP</TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead>Owner</TableHead>
+            <TableHead>Type</TableHead>
             <TableHead>Created</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          <TableRow v-for="s in servers" :key="s.id">
+          <TableRow v-for="t in teams" :key="t.id">
             <TableCell class="font-mono text-xs text-muted-foreground">
-              {{ s.id }}
+              {{ t.id }}
             </TableCell>
-            <TableCell class="font-medium">{{ s.name }}</TableCell>
-            <TableCell class="text-muted-foreground">
-              {{ s.provider_label || s.provider }}
+            <TableCell class="font-medium">{{ t.name }}</TableCell>
+            <TableCell class="font-mono text-xs text-muted-foreground">
+              {{ t.owner?.name || t.user_id }}
             </TableCell>
-            <TableCell class="text-muted-foreground">
-              {{ s.public_ipv4 || "—" }}
-            </TableCell>
-            <TableCell class="text-muted-foreground">
-              {{ s.status_label || s.status }}
+            <TableCell>
+              <Badge v-if="t.personal_team" variant="secondary">Personal</Badge>
+              <Badge v-else variant="outline">Team</Badge>
             </TableCell>
             <TableCell class="text-muted-foreground">
-              {{ formatDate(s.created_at) }}
+              {{ formatDate(t.created_at) }}
             </TableCell>
           </TableRow>
 
-          <TableRow v-if="servers.length === 0">
+          <TableRow v-if="teams.length === 0">
             <TableCell
-              colspan="6"
+              colspan="5"
               class="py-10 text-center text-muted-foreground"
             >
-              No servers found.
+              No teams found.
             </TableCell>
           </TableRow>
         </TableBody>
@@ -126,7 +124,7 @@ onMounted(() => fetchServers());
         v-if="lastPage > 1"
         class="flex items-center justify-between text-sm text-muted-foreground"
       >
-        <span>{{ total }} servers</span>
+        <span>{{ total }} teams</span>
         <div class="flex items-center gap-2">
           <Button
             variant="outline"

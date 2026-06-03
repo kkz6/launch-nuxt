@@ -89,20 +89,11 @@ onMounted(() => fetchUsers());
 
 <template>
   <div class="space-y-6 pb-10">
-    <div class="flex items-center justify-between">
-      <div>
-        <h1 class="text-2xl font-semibold">Admin — Users</h1>
-        <p class="text-sm text-muted-foreground">
-          Browse users and spectate (read-only) as any user for support.
-        </p>
-      </div>
-      <NuxtLink to="/admin/servers">
-        <Button variant="outline" size="sm">
-          <Icon name="lucide:server" class="h-4 w-4" />
-          Servers
-        </Button>
-      </NuxtLink>
-    </div>
+    <AdminTabs />
+
+    <p class="text-sm text-muted-foreground">
+      Browse users and spectate (read-only) as any user for support.
+    </p>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
