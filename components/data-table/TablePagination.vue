@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import type { PaginationData } from "~/types/data-table/table";
+import type { PaginationData } from "~/types/data-table";
 
 const props = defineProps<{
   pagination: PaginationData;

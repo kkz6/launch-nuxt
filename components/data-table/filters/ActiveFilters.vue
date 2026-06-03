@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FilterDef } from "~/types/data-table/table";
+import type { FilterDef } from "~/types/data-table";
 import FilterChip from "./FilterChip.vue";
 
 defineProps<{

@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
-import type { ExportDef } from "~/types/data-table/table";
+import type { ExportDef } from "~/types/data-table";
 
 defineProps<{
   exports: ExportDef[];

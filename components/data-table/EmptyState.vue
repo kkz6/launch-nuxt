@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Button } from "~/components/ui/button";
-import type { EmptyStateDef } from "~/types/data-table/table";
+import type { EmptyStateDef } from "~/types/data-table";
 
 defineProps<{
   config?: EmptyStateDef | null;

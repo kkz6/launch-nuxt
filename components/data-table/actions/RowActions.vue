@@ -32,7 +32,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import type { ActionDef } from "~/types/data-table/table";
+import type { ActionDef } from "~/types/data-table";
 
 // Map backend icon hints to Lucide components. Falls back to a label-only
 // pill when unknown — better than a blank icon box.

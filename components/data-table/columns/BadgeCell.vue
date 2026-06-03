@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Badge } from "~/components/ui/badge";
-import type { ColumnDef } from "~/types/data-table/table";
+import type { ColumnDef } from "~/types/data-table";
 
 defineProps<{ value: any; column: ColumnDef }>();
 </script>

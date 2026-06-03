@@ -8,7 +8,7 @@ import {
   DropdownMenuLabel,
 } from "~/components/ui/dropdown-menu";
 import { Button } from "~/components/ui/button";
-import type { ActionDef, ExportDef } from "~/types/data-table/table";
+import type { ActionDef, ExportDef } from "~/types/data-table";
 
 defineProps<{
   actions: ActionDef[];

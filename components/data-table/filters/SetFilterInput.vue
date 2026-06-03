@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Checkbox } from "~/components/ui/checkbox";
-import type { FilterOption } from "~/types/data-table/table";
+import type { FilterOption } from "~/types/data-table";
 
 const props = defineProps<{
   value: string;

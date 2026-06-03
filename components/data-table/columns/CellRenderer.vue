@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnDef } from "~/types/data-table/table";
+import type { ColumnDef } from "~/types/data-table";
 import TextCell from "./TextCell.vue";
 import NumericCell from "./NumericCell.vue";
 import DateCell from "./DateCell.vue";

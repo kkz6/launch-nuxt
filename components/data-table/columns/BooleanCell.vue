@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnDef } from "~/types/data-table/table";
+import type { ColumnDef } from "~/types/data-table";
 
 defineProps<{ value: any; column: ColumnDef }>();
 </script>

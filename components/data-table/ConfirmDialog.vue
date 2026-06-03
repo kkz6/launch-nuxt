@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "~/components/ui/dialog";
 import { Button } from "~/components/ui/button";
-import type { ActionDef } from "~/types/data-table/table";
+import type { ActionDef } from "~/types/data-table";
 
 defineProps<{
   action: ActionDef;
