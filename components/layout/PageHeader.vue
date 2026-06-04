@@ -10,7 +10,15 @@ import {
 } from "~/components/ui/breadcrumb";
 
 const route = useRoute();
-const crumbs = usePageBreadcrumbs();
+const breadcrumbState = usePageBreadcrumbState();
+
+// Only render the trail for the route it was declared on. Navigating elsewhere
+// reactively drops it (no manual reset → no flicker).
+const crumbs = computed<PageCrumb[]>(() =>
+  breadcrumbState.value?.path === route.path
+    ? breadcrumbState.value.crumbs
+    : [],
+);
 
 // Admin gets a sub-tab row beneath the breadcrumb (moved out of the page so it
 // no longer re-animates on every tab change).
