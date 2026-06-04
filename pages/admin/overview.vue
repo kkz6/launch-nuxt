@@ -67,16 +67,6 @@ const revenueDelta = computed(() => {
   return { pct: Math.abs(Math.round(pct)), up: pct >= 0 };
 });
 
-const trendMax = computed(() => {
-  const trend = overview.value?.revenue_trend ?? [];
-  return Math.max(1, ...trend.map((m) => m.total));
-});
-
-const barHeight = (total: number): string => {
-  const pct = (total / trendMax.value) * 100;
-  return `${Math.max(2, Math.round(pct))}%`;
-};
-
 onMounted(() => fetchOverview());
 </script>
 
@@ -217,27 +207,11 @@ onMounted(() => fetchOverview());
           <CardTitle class="text-base">Revenue trend</CardTitle>
         </CardHeader>
         <CardContent>
-          <div
+          <AdminRevenueTrendChart
             v-if="overview.revenue_trend.length"
-            class="flex items-end gap-3 sm:gap-6"
-            style="height: 200px"
-          >
-            <div
-              v-for="m in overview.revenue_trend"
-              :key="m.month"
-              class="flex flex-1 flex-col items-center justify-end gap-2"
-            >
-              <span class="text-xs font-medium text-muted-foreground">
-                {{ formatMoney(m.total) }}
-              </span>
-              <div
-                class="w-full rounded-t bg-primary/80 transition-all hover:bg-primary"
-                :style="{ height: barHeight(m.total) }"
-                :title="`${m.month}: ${formatMoney(m.total)}`"
-              />
-              <span class="text-xs text-muted-foreground">{{ m.month }}</span>
-            </div>
-          </div>
+            :trend="overview.revenue_trend"
+            :currency="currency"
+          />
           <p v-else class="py-6 text-center text-sm text-muted-foreground">
             No revenue data yet.
           </p>
