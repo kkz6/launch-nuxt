@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import stripAnsi from "strip-ansi";
 import { toast } from "vue-sonner";
+import { adminService } from "~/services/adminService";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -13,6 +14,7 @@ import {
 } from "~/components/ui/sheet";
 
 interface FailureRow {
+  id?: string;
   kind?: string;
   title?: string;
   when?: string;
@@ -34,17 +36,35 @@ const isOpen = computed({
   set: (value: boolean) => emit("update:open", value),
 });
 
-// The captured task output carries ANSI colour codes; strip them so the log
-// reads cleanly in the viewer.
-const cleanDetail = computed(() =>
-  stripAnsi(props.failure?.detail ?? "").trim(),
-);
+// The table only carries a truncated detail; fetch the full output lazily when
+// the sheet opens (falling back to the truncated detail while it loads / if the
+// fetch fails).
+const fullLog = ref<string | null>(null);
+const loading = ref(false);
+
+const rawLog = computed(() => fullLog.value ?? props.failure?.detail ?? "");
+// Captured task output carries ANSI colour codes; strip them for readability.
+const cleanLog = computed(() => stripAnsi(rawLog.value).trim());
+
+async function loadFullLog(): Promise<void> {
+  const f = props.failure;
+  if (!f?.id || !f.kind) return;
+  loading.value = true;
+  try {
+    const res = await adminService.failureLog(f.id, f.kind);
+    fullLog.value = res.data.log;
+  } catch {
+    // Keep the truncated detail as a fallback; no toast — it's non-critical.
+  } finally {
+    loading.value = false;
+  }
+}
 
 const copied = ref(false);
 
 async function copyLog(): Promise<void> {
   try {
-    await navigator.clipboard.writeText(cleanDetail.value);
+    await navigator.clipboard.writeText(cleanLog.value);
     copied.value = true;
     toast.success("Log copied to clipboard");
   } catch {
@@ -55,8 +75,10 @@ async function copyLog(): Promise<void> {
 watch(
   () => props.open,
   (open) => {
-    if (!open) {
+    if (open) {
+      fullLog.value = null;
       copied.value = false;
+      loadFullLog();
     }
   },
 );
@@ -65,47 +87,60 @@ watch(
 <template>
   <Sheet v-model:open="isOpen">
     <SheetContent
-      class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col"
+      class="!inset-y-auto !right-3 !top-16 !bottom-4 flex !h-auto w-full flex-col rounded-lg border sm:max-w-5xl"
     >
-      <SheetHeader>
-        <SheetTitle class="flex items-center gap-2">
-          <Badge v-if="failure?.kind" variant="secondary">{{
-            failure.kind
-          }}</Badge>
-          <span class="truncate">{{ failure?.title || "Failure log" }}</span>
-        </SheetTitle>
-        <SheetDescription>
-          <span v-if="failure?.error" class="font-medium text-destructive">{{
-            failure.error
-          }}</span>
-          <span v-if="failure?.when" class="text-muted-foreground">
-            · {{ failure.when }}</span
+      <SheetHeader class="flex-row items-start justify-between gap-4 space-y-0">
+        <div class="min-w-0 space-y-1">
+          <SheetTitle class="flex items-center gap-2">
+            <Badge v-if="failure?.kind" variant="secondary">
+              {{ failure.kind }}
+            </Badge>
+            <span class="truncate">{{ failure?.title || "Failure log" }}</span>
+          </SheetTitle>
+          <SheetDescription
+            class="flex flex-wrap items-center gap-x-2 gap-y-0.5"
           >
-        </SheetDescription>
-      </SheetHeader>
+            <span v-if="failure?.error" class="font-medium text-destructive">
+              {{ failure.error }}
+            </span>
+            <span v-if="failure?.error && failure?.when">·</span>
+            <SharedDateTooltip
+              v-if="failure?.when"
+              :date="failure.when"
+              class-name="text-muted-foreground"
+            />
+          </SheetDescription>
+        </div>
 
-      <div class="mt-4 flex items-center justify-end">
         <Button
           variant="outline"
           size="sm"
-          :disabled="!cleanDetail"
+          class="shrink-0"
+          :disabled="!cleanLog"
           @click="copyLog"
         >
           <Icon
             :name="copied ? 'lucide:check' : 'lucide:copy'"
-            class="mr-2 h-4 w-4"
+            class="mr-1.5 h-4 w-4"
           />
           {{ copied ? "Copied" : "Copy log" }}
         </Button>
-      </div>
+      </SheetHeader>
 
       <div
-        class="mt-3 flex-1 min-h-0 overflow-auto rounded-md border bg-muted/30"
+        class="relative mt-3 min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30"
       >
+        <div
+          v-if="loading"
+          class="absolute right-2 top-2 flex items-center gap-1.5 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground"
+        >
+          <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
+          Loading full log…
+        </div>
         <pre
-          v-if="cleanDetail"
+          v-if="cleanLog"
           class="whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed"
-          >{{ cleanDetail }}</pre
+          >{{ cleanLog }}</pre
         >
         <p v-else class="p-4 text-sm text-muted-foreground">
           No log output was captured for this failure.

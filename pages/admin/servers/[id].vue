@@ -67,17 +67,6 @@ const detectedOS = computed(() => {
     .join(" · ");
 });
 
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 async function load(): Promise<void> {
   isLoading.value = true;
   try {
@@ -260,18 +249,32 @@ onMounted(load);
             <div class="flex justify-between gap-4 py-2.5">
               <dt class="text-muted-foreground">Provisioned</dt>
               <dd class="font-medium">
-                {{ formatDate(server.provisioned_at) }}
+                <SharedDateTooltip
+                  v-if="server.provisioned_at"
+                  :date="server.provisioned_at"
+                />
+                <span v-else>—</span>
               </dd>
             </div>
             <div class="flex justify-between gap-4 py-2.5">
               <dt class="text-muted-foreground">Last connectivity</dt>
               <dd class="font-medium">
-                {{ formatDate(server.last_connectivity_check) }}
+                <SharedDateTooltip
+                  v-if="server.last_connectivity_check"
+                  :date="server.last_connectivity_check"
+                />
+                <span v-else>—</span>
               </dd>
             </div>
             <div class="flex justify-between gap-4 py-2.5">
               <dt class="text-muted-foreground">Created</dt>
-              <dd class="font-medium">{{ formatDate(server.created_at) }}</dd>
+              <dd class="font-medium">
+                <SharedDateTooltip
+                  v-if="server.created_at"
+                  :date="server.created_at"
+                />
+                <span v-else>—</span>
+              </dd>
             </div>
           </dl>
         </section>

@@ -24,6 +24,7 @@ const caveat =
   "Showing the most recent failures across the platform. Older records may have been pruned.";
 
 interface FailureRow {
+  id?: string;
   kind?: string;
   title?: string;
   when?: string;

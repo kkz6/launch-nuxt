@@ -90,6 +90,13 @@ export const adminService = {
     return get<ApiResponse<AdminSiteSummary[]>>(`/admin/users/${id}/sites`);
   },
 
+  failureLog: (id: string | number, kind: string) => {
+    const { get } = useApi();
+    return get<ApiResponse<{ log: string }>>(`/admin/failures/${id}/log`, {
+      query: { kind },
+    });
+  },
+
   userSubscriptions: (id: string | number) => {
     const { get } = useApi();
     return get<ApiResponse<AdminSubscriptionSummary[]>>(

@@ -74,16 +74,6 @@ const initials = computed(() =>
     .slice(0, 2),
 );
 
-const joined = computed(() =>
-  user.value?.created_at
-    ? new Date(user.value.created_at).toLocaleDateString(undefined, {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
-    : "—",
-);
-
 const activeSubs = computed(
   () =>
     user.value?.teams.filter((t) => t.subscription?.status === "active")
@@ -127,15 +117,6 @@ function statusBadge(
     default:
       return { variant: "secondary", label: status };
   }
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
 
 // Provider/status badge for a server row.
@@ -339,7 +320,13 @@ onMounted(load);
           </div>
           <div class="flex items-center justify-between gap-3">
             <dt class="text-muted-foreground">Joined</dt>
-            <dd class="font-medium">{{ joined }}</dd>
+            <dd class="font-medium">
+              <SharedDateTooltip
+                v-if="user.created_at"
+                :date="user.created_at"
+              />
+              <span v-else>—</span>
+            </dd>
           </div>
         </dl>
 
@@ -545,14 +532,17 @@ onMounted(load);
                   <div>
                     <p class="text-sm font-medium">{{ sub.team_name }}</p>
                     <p class="text-xs text-muted-foreground">
-                      <template v-if="sub.status === 'on_trial'">
-                        trial ends {{ formatDate(sub.trial_ends_at) }}
+                      <template
+                        v-if="sub.status === 'on_trial' && sub.trial_ends_at"
+                      >
+                        trial ends
+                        <SharedDateTooltip :date="sub.trial_ends_at" />
                       </template>
                       <template v-else-if="sub.ends_at">
-                        ends {{ formatDate(sub.ends_at) }}
+                        ends <SharedDateTooltip :date="sub.ends_at" />
                       </template>
-                      <template v-else>
-                        renews {{ formatDate(sub.renews_at) }}
+                      <template v-else-if="sub.renews_at">
+                        renews <SharedDateTooltip :date="sub.renews_at" />
                       </template>
                       <template v-if="sub.card_last_four">
                         · •••• {{ sub.card_last_four }}
