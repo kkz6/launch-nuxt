@@ -119,128 +119,109 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="server">
-      <!-- Identity header -->
-      <div class="flex flex-wrap items-center gap-4 border-b pb-6">
-        <div
-          class="flex h-14 w-14 items-center justify-center rounded-xl bg-muted"
-        >
-          <Icon :name="providerIcon" class="h-7 w-7 text-foreground" />
-        </div>
-        <div class="space-y-1.5">
-          <div class="flex flex-wrap items-center gap-2.5">
+    <div v-else-if="server" class="flex flex-col gap-8 lg:flex-row">
+      <!-- Left rail: identity + specs -->
+      <aside
+        class="shrink-0 space-y-5 lg:sticky lg:top-4 lg:w-72 lg:self-start lg:border-r lg:pr-8"
+      >
+        <div class="space-y-3">
+          <div
+            class="flex h-14 w-14 items-center justify-center rounded-xl bg-muted"
+          >
+            <Icon :name="providerIcon" class="h-7 w-7 text-foreground" />
+          </div>
+          <div class="space-y-1.5">
             <h1 class="text-xl font-semibold tracking-tight">
               {{ server.name }}
             </h1>
-            <Badge :variant="statusVariant" class="capitalize">
-              {{ server.status }}
-            </Badge>
-            <span
-              class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-            >
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge :variant="statusVariant" class="capitalize">
+                {{ server.status }}
+              </Badge>
               <span
-                class="h-1.5 w-1.5 rounded-full"
-                :class="server.connected ? 'bg-emerald-500' : 'bg-red-500'"
-              />
-              {{ server.connected ? "Connected" : "Disconnected" }}
-            </span>
-          </div>
-          <p class="text-sm capitalize text-muted-foreground">
-            {{ server.provider.replace("_", " ") }}
-            <template v-if="server.type"> · {{ server.type }}</template>
-          </p>
-        </div>
-      </div>
-
-      <!-- Metrics strip -->
-      <div class="flex flex-wrap gap-x-12 gap-y-6 border-b py-6">
-        <div>
-          <p class="text-lg font-semibold">{{ server.cpu_cores ?? "—" }}</p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            vCPU
-          </p>
-        </div>
-        <div>
-          <p class="text-lg font-semibold">{{ memory }}</p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            Memory
-          </p>
-        </div>
-        <div>
-          <p class="text-lg font-semibold">
-            {{ server.storage_in_gb ? `${server.storage_in_gb} GB` : "—" }}
-          </p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            Storage
-          </p>
-        </div>
-        <div>
-          <p class="font-mono text-lg font-semibold">
-            {{ server.public_ipv4 || "—" }}
-          </p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            Public IPv4
-          </p>
-        </div>
-      </div>
-
-      <!-- Owner (the key ask: who owns this) -->
-      <div class="border-b py-6">
-        <h2
-          class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-        >
-          Owner
-        </h2>
-        <NuxtLink
-          v-if="server.owner.user_id"
-          :to="`/admin/users/${server.owner.user_id}`"
-          class="group -mx-2 flex items-center justify-between gap-4 rounded-lg px-2 py-2 transition-colors hover:bg-muted/50"
-        >
-          <div class="flex items-center gap-3">
-            <Avatar class="h-10 w-10">
-              <AvatarFallback class="text-sm font-semibold">
-                {{ teamInitials }}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div class="flex items-center gap-2">
-                <p class="text-sm font-medium">{{ server.owner.team_name }}</p>
+                class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+              >
                 <span
-                  v-if="server.owner.personal_team"
-                  class="text-xs text-muted-foreground"
-                >
-                  · personal
-                </span>
-              </div>
-              <p class="text-xs text-muted-foreground">
-                {{ server.owner.user_name }} · {{ server.owner.user_email }}
-              </p>
+                  class="h-1.5 w-1.5 rounded-full"
+                  :class="server.connected ? 'bg-emerald-500' : 'bg-red-500'"
+                />
+                {{ server.connected ? "Connected" : "Disconnected" }}
+              </span>
             </div>
+            <p class="text-sm capitalize text-muted-foreground">
+              {{ server.provider.replace("_", " ") }}
+              <template v-if="server.type"> · {{ server.type }}</template>
+            </p>
           </div>
-          <Icon
-            name="lucide:arrow-right"
-            class="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground"
-          />
-        </NuxtLink>
-      </div>
+        </div>
 
-      <!-- Detail columns -->
-      <div class="grid grid-cols-1 gap-x-12 gap-y-6 py-6 sm:grid-cols-2">
-        <div>
-          <h2
-            class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+        <dl class="space-y-2.5 border-t pt-4 text-sm">
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-muted-foreground">vCPU</dt>
+            <dd class="font-medium">{{ server.cpu_cores ?? "—" }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-muted-foreground">Memory</dt>
+            <dd class="font-medium">{{ memory }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-muted-foreground">Storage</dt>
+            <dd class="font-medium">
+              {{ server.storage_in_gb ? `${server.storage_in_gb} GB` : "—" }}
+            </dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-muted-foreground">Public IPv4</dt>
+            <dd class="font-mono font-medium">
+              {{ server.public_ipv4 || "—" }}
+            </dd>
+          </div>
+        </dl>
+      </aside>
+
+      <!-- Right content -->
+      <div class="min-w-0 flex-1 space-y-8">
+        <!-- Owner (the key ask: who owns this) -->
+        <section>
+          <h2 class="mb-2 text-sm font-semibold">Owner</h2>
+          <NuxtLink
+            v-if="server.owner.user_id"
+            :to="`/admin/users/${server.owner.user_id}`"
+            class="group flex items-center justify-between gap-4 rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50"
           >
-            Operating system
-          </h2>
-          <dl class="divide-y text-sm">
+            <div class="flex items-center gap-3">
+              <Avatar class="h-10 w-10">
+                <AvatarFallback class="text-sm font-semibold">
+                  {{ teamInitials }}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div class="flex items-center gap-2">
+                  <p class="text-sm font-medium">
+                    {{ server.owner.team_name }}
+                  </p>
+                  <span
+                    v-if="server.owner.personal_team"
+                    class="text-xs text-muted-foreground"
+                  >
+                    · personal
+                  </span>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                  {{ server.owner.user_name }} · {{ server.owner.user_email }}
+                </p>
+              </div>
+            </div>
+            <Icon
+              name="lucide:arrow-right"
+              class="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground"
+            />
+          </NuxtLink>
+        </section>
+
+        <section>
+          <h2 class="mb-2 text-sm font-semibold">Operating system</h2>
+          <dl class="divide-y border-t text-sm">
             <div class="flex justify-between gap-4 py-2.5">
               <dt class="text-muted-foreground">Selected</dt>
               <dd class="font-medium">{{ server.operating_system || "—" }}</dd>
@@ -259,15 +240,11 @@ onMounted(load);
               </dd>
             </div>
           </dl>
-        </div>
+        </section>
 
-        <div>
-          <h2
-            class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-          >
-            Status &amp; lifecycle
-          </h2>
-          <dl class="divide-y text-sm">
+        <section>
+          <h2 class="mb-2 text-sm font-semibold">Status &amp; lifecycle</h2>
+          <dl class="divide-y border-t text-sm">
             <div class="flex items-center justify-between gap-4 py-2.5">
               <dt class="text-muted-foreground">Monitoring</dt>
               <dd class="font-medium">
@@ -297,7 +274,7 @@ onMounted(load);
               <dd class="font-medium">{{ formatDate(server.created_at) }}</dd>
             </div>
           </dl>
-        </div>
+        </section>
       </div>
     </div>
   </div>

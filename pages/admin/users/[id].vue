@@ -204,22 +204,22 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="user">
-      <!-- Identity header -->
-      <div
-        class="flex flex-wrap items-start justify-between gap-4 border-b pb-6"
+    <div v-else-if="user" class="flex flex-col gap-8 lg:flex-row">
+      <!-- Left rail: identity, key facts, actions -->
+      <aside
+        class="shrink-0 space-y-5 lg:sticky lg:top-4 lg:w-72 lg:self-start lg:border-r lg:pr-8"
       >
-        <div class="flex items-center gap-4">
-          <Avatar class="h-14 w-14">
-            <AvatarFallback class="text-base font-semibold">
+        <div class="space-y-3">
+          <Avatar class="h-16 w-16">
+            <AvatarFallback class="text-lg font-semibold">
               {{ initials }}
             </AvatarFallback>
           </Avatar>
           <div class="space-y-1.5">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <h1 class="text-xl font-semibold tracking-tight">
-                {{ user.name }}
-              </h1>
+            <h1 class="text-xl font-semibold tracking-tight">
+              {{ user.name }}
+            </h1>
+            <div class="flex flex-wrap items-center gap-2">
               <Badge :variant="statusVariant" class="capitalize">
                 {{ user.status }}
               </Badge>
@@ -231,14 +231,32 @@ onMounted(load);
                 {{ user.staff_role }}
               </span>
             </div>
-            <p class="text-sm text-muted-foreground">{{ user.email }}</p>
+            <p class="break-all text-sm text-muted-foreground">
+              {{ user.email }}
+            </p>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <dl class="space-y-2.5 border-t pt-4 text-sm">
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-muted-foreground">Teams</dt>
+            <dd class="font-medium">{{ user.teams.length }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-muted-foreground">Active subs</dt>
+            <dd class="font-medium">{{ activeSubs }}</dd>
+          </div>
+          <div class="flex items-center justify-between gap-3">
+            <dt class="text-muted-foreground">Joined</dt>
+            <dd class="font-medium">{{ joined }}</dd>
+          </div>
+        </dl>
+
+        <div class="flex flex-col gap-1.5 border-t pt-4">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
+            class="justify-start"
             :disabled="busy === 'spectate'"
             @click="spectate"
           >
@@ -253,8 +271,9 @@ onMounted(load);
           <template v-if="isSuperAdmin && !isSelf">
             <Button
               v-if="!isSuspended"
-              variant="ghost"
+              variant="outline"
               size="sm"
+              class="justify-start"
               :disabled="busy === 'suspend'"
               @click="suspend"
             >
@@ -267,8 +286,9 @@ onMounted(load);
             </Button>
             <Button
               v-else
-              variant="ghost"
+              variant="outline"
               size="sm"
+              class="justify-start"
               :disabled="busy === 'unsuspend'"
               @click="unsuspend"
             >
@@ -289,7 +309,7 @@ onMounted(load);
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  class="justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
                   :disabled="busy === 'delete'"
                 >
                   <Icon name="lucide:trash-2" class="h-4 w-4" />
@@ -317,64 +337,35 @@ onMounted(load);
             </AlertDialog>
           </template>
         </div>
-      </div>
+      </aside>
 
-      <!-- Metrics strip -->
-      <div class="flex flex-wrap gap-x-12 gap-y-6 border-b py-6">
-        <div>
-          <p class="text-lg font-semibold capitalize">{{ user.status }}</p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            Status
-          </p>
+      <!-- Right content -->
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-semibold">Teams &amp; subscriptions</h2>
+          <span class="text-xs text-muted-foreground">
+            {{ user.teams.length }}
+            {{ user.teams.length === 1 ? "team" : "teams" }}
+          </span>
         </div>
-        <div>
-          <p class="text-lg font-semibold">{{ user.teams.length }}</p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            Teams
-          </p>
-        </div>
-        <div>
-          <p class="text-lg font-semibold">{{ activeSubs }}</p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            Active subs
-          </p>
-        </div>
-        <div>
-          <p class="text-lg font-semibold">{{ joined }}</p>
-          <p
-            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
-          >
-            Joined
-          </p>
-        </div>
-      </div>
 
-      <!-- Teams -->
-      <div class="py-6">
-        <h2
-          class="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground"
-        >
-          Teams &amp; subscriptions
-        </h2>
-        <div v-if="user.teams.length" class="divide-y">
+        <div v-if="user.teams.length" class="mt-2 divide-y border-t">
           <div
             v-for="team in user.teams"
             :key="team.id"
-            class="flex items-center justify-between gap-4 py-3"
+            class="flex items-center justify-between gap-4 py-3.5"
           >
             <div class="flex items-center gap-3">
-              <Icon
-                :name="
-                  team.personal_team ? 'lucide:user' : 'lucide:users-round'
-                "
-                class="h-4 w-4 text-muted-foreground"
-              />
+              <div
+                class="flex h-9 w-9 items-center justify-center rounded-full bg-muted"
+              >
+                <Icon
+                  :name="
+                    team.personal_team ? 'lucide:user' : 'lucide:users-round'
+                  "
+                  class="h-4 w-4 text-muted-foreground"
+                />
+              </div>
               <div>
                 <p class="text-sm font-medium">{{ team.name }}</p>
                 <p class="text-xs text-muted-foreground">
@@ -387,9 +378,15 @@ onMounted(load);
             </Badge>
           </div>
         </div>
-        <p v-else class="py-6 text-sm text-muted-foreground">
-          This user does not own any teams.
-        </p>
+        <div
+          v-else
+          class="mt-2 flex flex-col items-center justify-center gap-2 border-t py-16 text-center"
+        >
+          <Icon name="lucide:users" class="h-8 w-8 text-muted-foreground/50" />
+          <p class="text-sm text-muted-foreground">
+            This user does not own any teams.
+          </p>
+        </div>
       </div>
     </div>
   </div>
