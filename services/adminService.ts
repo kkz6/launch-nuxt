@@ -1,5 +1,8 @@
 import type {
   AdminUserRow,
+  AdminServerSummary,
+  AdminSiteSummary,
+  AdminSubscriptionSummary,
   AdminServerDetail,
   AdminOverview,
   AdminFailuresResponse,
@@ -75,6 +78,23 @@ export const adminService = {
   showUser: (id: string | number) => {
     const { get } = useApi();
     return get<ApiResponse<AdminUserRow>>(`/admin/users/${id}`);
+  },
+
+  userServers: (id: string | number) => {
+    const { get } = useApi();
+    return get<ApiResponse<AdminServerSummary[]>>(`/admin/users/${id}/servers`);
+  },
+
+  userSites: (id: string | number) => {
+    const { get } = useApi();
+    return get<ApiResponse<AdminSiteSummary[]>>(`/admin/users/${id}/sites`);
+  },
+
+  userSubscriptions: (id: string | number) => {
+    const { get } = useApi();
+    return get<ApiResponse<AdminSubscriptionSummary[]>>(
+      `/admin/users/${id}/subscriptions`,
+    );
   },
 
   overview: () => {

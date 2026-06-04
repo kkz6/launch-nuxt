@@ -689,6 +689,53 @@ export interface AdminUserRow {
   teams: AdminTeam[];
 }
 
+// Resource tabs on the admin user-detail page. Each mirrors the secret-safe
+// allow-list DTO returned by the matching /admin/users/:id/* endpoint.
+export interface AdminServerSummary {
+  id: string;
+  team_id: string;
+  user_id: string;
+  name: string;
+  description?: string | null;
+  provider: string;
+  type?: string | null;
+  status: string;
+  public_ipv4?: string | null;
+  connected: boolean;
+  operating_system?: string | null;
+  cpu_cores?: number | null;
+  memory_in_mb?: number | null;
+  storage_in_gb?: number | null;
+  provisioned_at?: string | null;
+  archived_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface AdminSiteSummary {
+  id: string;
+  server_id: string;
+  server_name: string;
+  address: string;
+  type: string;
+  tls_setting: string;
+  repository_branch?: string | null;
+  created_at?: string | null;
+}
+
+export interface AdminSubscriptionSummary {
+  team_id: string;
+  team_name: string;
+  status: string;
+  type: string;
+  trial_ends_at?: string | null;
+  renews_at?: string | null;
+  ends_at?: string | null;
+  card_brand?: string | null;
+  card_last_four?: string | null;
+  created_at: string;
+}
+
 export interface AdminServerOwner {
   team_id: string;
   team_name: string;
