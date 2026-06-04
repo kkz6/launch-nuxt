@@ -4,6 +4,7 @@ import {
   ChevronDown,
   LogOut,
   Settings,
+  Shield,
   Plus,
   Check,
   Sun,
@@ -43,15 +44,61 @@ const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
 
+// Staff (support/super_admin) get the Admin Panel entry + the back-office
+// context row. The menu item flips to "Back to App" once inside /admin.
+const isStaff = computed(
+  () =>
+    user.value?.staff_role === "support" ||
+    user.value?.staff_role === "super_admin",
+);
+const showAdminContext = computed(() => route.path.startsWith("/admin"));
+const adminBreadcrumbState = usePageBreadcrumbState();
+const adminCrumbs = computed(() =>
+  adminBreadcrumbState.value?.path === route.path
+    ? adminBreadcrumbState.value.crumbs
+    : [],
+);
+const adminTabs = [
+  { label: "Overview", to: "/admin/overview", icon: "lucide:bar-chart-3" },
+  {
+    label: "Users",
+    to: "/admin",
+    icon: "lucide:users",
+    match: (p: string) => p === "/admin" || p.startsWith("/admin/users"),
+  },
+  { label: "Invitations", to: "/admin/invitations", icon: "lucide:mail" },
+  { label: "Servers", to: "/admin/servers", icon: "lucide:server" },
+  { label: "Failures", to: "/admin/failures", icon: "lucide:triangle-alert" },
+];
+const isAdminTabActive = (tab: (typeof adminTabs)[number]): boolean =>
+  tab.match ? tab.match(route.path) : route.path.startsWith(tab.to);
+
 // Check if current team is subscribed
-const isSubscribed = computed(() => user.value?.current_team?.is_subscribed ?? true);
+const isSubscribed = computed(
+  () => user.value?.current_team?.is_subscribed ?? true,
+);
 
 // Global navigation tabs
 const globalTabsBase = [
-  { value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" },
-  { value: "servers", label: "Servers", route: "/servers", icon: "lucide:server" },
+  {
+    value: "dashboard",
+    label: "Dashboard",
+    route: "/dashboard",
+    icon: "lucide:layout-dashboard",
+  },
+  {
+    value: "servers",
+    label: "Servers",
+    route: "/servers",
+    icon: "lucide:server",
+  },
   { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
-  { value: "scripts", label: "Scripts", route: "/scripts", icon: "lucide:scroll-text" },
+  {
+    value: "scripts",
+    label: "Scripts",
+    route: "/scripts",
+    icon: "lucide:scroll-text",
+  },
 ];
 
 // Track if component is mounted (client-side)
@@ -68,12 +115,24 @@ const globalTabs = computed(() => {
 
   // If not subscribed, only show dashboard
   if (!isSubscribed.value) {
-    return [{ value: "dashboard", label: "Dashboard", route: "/dashboard", icon: "lucide:layout-dashboard" }];
+    return [
+      {
+        value: "dashboard",
+        label: "Dashboard",
+        route: "/dashboard",
+        icon: "lucide:layout-dashboard",
+      },
+    ];
   }
 
   if (!user.value?.onboarded) {
     return [
-      { value: "onboarding", label: "Onboarding", route: "/onboarding", icon: "lucide:rocket" },
+      {
+        value: "onboarding",
+        label: "Onboarding",
+        route: "/onboarding",
+        icon: "lucide:rocket",
+      },
       ...globalTabsBase,
     ];
   }
@@ -88,7 +147,10 @@ const indicatorWidth = ref(0);
 
 const setTabRef = (key: string, el: unknown) => {
   if (el) {
-    tabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    tabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -97,7 +159,7 @@ const updateIndicator = () => {
     indicatorWidth.value = 0;
     return;
   }
-  const currentPath = route.path.replace(/\/$/, '');
+  const currentPath = route.path.replace(/\/$/, "");
   const activeTab = globalTabs.value.find((tab) => {
     return currentPath === tab.route || currentPath.startsWith(`${tab.route}/`);
   });
@@ -115,9 +177,13 @@ const updateIndicator = () => {
   }
 };
 
-watch(() => route.path, () => {
-  nextTick(updateIndicator);
-}, { immediate: true });
+watch(
+  () => route.path,
+  () => {
+    nextTick(updateIndicator);
+  },
+  { immediate: true },
+);
 
 onMounted(() => {
   nextTick(updateIndicator);
@@ -131,7 +197,10 @@ const serverIndicatorWidth = ref(0);
 
 const setServerTabRef = (key: string, el: unknown) => {
   if (el) {
-    serverTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    serverTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -143,7 +212,7 @@ const updateServerIndicator = () => {
   // Default to whichever tab the active server type lists first. Docker
   // servers default to "projects", load-balancers to "upstreams", PHP to
   // "sites" — driven entirely by useServerTypeRules.
-  const defaultTab = serverDetailTabs.value[0]?.value ?? 'sites';
+  const defaultTab = serverDetailTabs.value[0]?.value ?? "sites";
   const currentTab = (route.query.tab as string) || defaultTab;
   if (serverTabRefs.value.has(currentTab)) {
     const tabEl = serverTabRefs.value.get(currentTab);
@@ -166,7 +235,10 @@ const siteIndicatorWidth = ref(0);
 
 const setSiteTabRef = (key: string, el: unknown) => {
   if (el) {
-    siteTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    siteTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -175,7 +247,7 @@ const updateSiteIndicator = () => {
     siteIndicatorWidth.value = 0;
     return;
   }
-  const currentTab = (route.query.tab as string) || 'general';
+  const currentTab = (route.query.tab as string) || "general";
   if (siteTabRefs.value.has(currentTab)) {
     const tabEl = siteTabRefs.value.get(currentTab);
     if (tabEl && siteNavRef.value) {
@@ -209,7 +281,7 @@ const updateProjectIndicator = () => {
     projectIndicatorWidth.value = 0;
     return;
   }
-  const currentTab = (route.query.tab as string) || 'overview';
+  const currentTab = (route.query.tab as string) || "overview";
   if (projectTabRefs.value.has(currentTab)) {
     const tabEl = projectTabRefs.value.get(currentTab);
     if (tabEl && projectNavRef.value) {
@@ -244,7 +316,7 @@ const updateWorkloadIndicator = () => {
     workloadIndicatorWidth.value = 0;
     return;
   }
-  const currentSubtab = (route.query.subtab as string) || 'general';
+  const currentSubtab = (route.query.subtab as string) || "general";
   if (workloadTabRefs.value.has(currentSubtab)) {
     const tabEl = workloadTabRefs.value.get(currentSubtab);
     if (tabEl && workloadNavRef.value) {
@@ -266,7 +338,10 @@ const advancedIndicatorWidth = ref(0);
 
 const setAdvancedTabRef = (key: string, el: unknown) => {
   if (el) {
-    advancedTabRefs.value.set(key, (el as { $el: HTMLElement }).$el || el as HTMLElement);
+    advancedTabRefs.value.set(
+      key,
+      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
+    );
   }
 };
 
@@ -275,7 +350,7 @@ const updateAdvancedIndicator = () => {
     advancedIndicatorWidth.value = 0;
     return;
   }
-  const currentSubTab = (route.query.subtab as string) || 'general';
+  const currentSubTab = (route.query.subtab as string) || "general";
   if (advancedTabRefs.value.has(currentSubTab)) {
     const tabEl = advancedTabRefs.value.get(currentSubTab);
     if (tabEl && advancedNavRef.value) {
@@ -290,26 +365,33 @@ const updateAdvancedIndicator = () => {
 };
 
 // Watch for route changes to update all indicators
-watch([() => route.path, () => route.query.tab, () => route.query.subtab], () => {
-  nextTick(() => {
-    updateServerIndicator();
-    updateSiteIndicator();
-    updateProjectIndicator();
-    updateWorkloadIndicator();
-    updateAdvancedIndicator();
-  });
-}, { immediate: true });
-
+watch(
+  [() => route.path, () => route.query.tab, () => route.query.subtab],
+  () => {
+    nextTick(() => {
+      updateServerIndicator();
+      updateSiteIndicator();
+      updateProjectIndicator();
+      updateWorkloadIndicator();
+      updateAdvancedIndicator();
+    });
+  },
+  { immediate: true },
+);
 
 // Server detail tabs — driven by useServerTypeRules so adding a new server
 // type doesn't require touching this file. Keeps the loadbalancer/docker
 // branches out of the navbar render path. The "isLoadBalancerServer"
 // derived ref is kept for the advanced sub-tabs block below, which still
 // filters by type until that block is similarly composable-driven.
-const isLoadBalancerServer = computed(() => serverType.value === 'loadbalancer');
-const isDockerServer = computed(() => serverType.value === 'docker');
+const isLoadBalancerServer = computed(
+  () => serverType.value === "loadbalancer",
+);
+const isDockerServer = computed(() => serverType.value === "docker");
 
-const serverDetailTabs = computed(() => getServerTypeRules(serverType.value).tabs);
+const serverDetailTabs = computed(
+  () => getServerTypeRules(serverType.value).tabs,
+);
 
 // Advanced sub-tabs (second level) - filtered by server type.
 // - Load balancers: no backups (no app data) and no packages tab (the host
@@ -319,39 +401,109 @@ const serverDetailTabs = computed(() => getServerTypeRules(serverType.value).tab
 const advancedSubTabs = computed(() => {
   const isHostManaged = !isLoadBalancerServer.value && !isDockerServer.value;
   const tabs = [
-    { value: "general", label: "General", query: "general", icon: "lucide:info" },
+    {
+      value: "general",
+      label: "General",
+      query: "general",
+      icon: "lucide:info",
+    },
   ];
   if (isHostManaged) {
-    tabs.push({ value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" });
+    tabs.push({
+      value: "backups",
+      label: "Backups",
+      query: "backups",
+      icon: "lucide:hard-drive",
+    });
   }
-  tabs.push({ value: "ssh-keys", label: "SSH Keys", query: "ssh-keys", icon: "lucide:key" });
+  tabs.push({
+    value: "ssh-keys",
+    label: "SSH Keys",
+    query: "ssh-keys",
+    icon: "lucide:key",
+  });
   if (isHostManaged) {
-    tabs.push({ value: "packages", label: "Packages", query: "packages", icon: "lucide:package" });
+    tabs.push({
+      value: "packages",
+      label: "Packages",
+      query: "packages",
+      icon: "lucide:package",
+    });
   }
-  tabs.push({ value: "services", label: "Services", query: "services", icon: "lucide:cog" });
+  tabs.push({
+    value: "services",
+    label: "Services",
+    query: "services",
+    icon: "lucide:cog",
+  });
   // Docker-only: Traefik config editing sits under Advanced rather than
   // as a top-level tab — admins occasionally inspect it, but it's not a
   // day-to-day workflow.
   if (isDockerServer.value) {
-    tabs.push({ value: "traefik", label: "Traefik", query: "traefik", icon: "simple-icons:traefikproxy" });
+    tabs.push({
+      value: "traefik",
+      label: "Traefik",
+      query: "traefik",
+      icon: "simple-icons:traefikproxy",
+    });
     // Maintenance — orphaned-resource cleanup + future host-level
     // maintenance actions. Buried under Advanced (not a top-level tab)
     // because most users will never need it: the label-based teardown
     // means new compose deletes don't strand containers anymore.
-    tabs.push({ value: "maintenance", label: "Maintenance", query: "maintenance", icon: "lucide:wrench" });
+    tabs.push({
+      value: "maintenance",
+      label: "Maintenance",
+      query: "maintenance",
+      icon: "lucide:wrench",
+    });
   }
   return tabs;
 });
 
 // Site detail tabs (base - filtered based on site type)
 const allSiteDetailTabs = [
-  { value: "general", label: "Overview", query: "general", icon: "lucide:layout-dashboard" },
-  { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
-  { value: "files", label: "Files", query: "files", icon: "lucide:folder-open" },
-  { value: "queues", label: "Queues", query: "queues", icon: "lucide:list-todo" },
-  { value: "redirects", label: "Redirects", query: "redirects", icon: "lucide:corner-up-right" },
-  { value: "commands", label: "Commands", query: "commands", icon: "lucide:terminal-square" },
-  { value: "settings", label: "Settings", query: "settings", icon: "lucide:settings" },
+  {
+    value: "general",
+    label: "Overview",
+    query: "general",
+    icon: "lucide:layout-dashboard",
+  },
+  {
+    value: "deployments",
+    label: "Deployments",
+    query: "deployments",
+    icon: "lucide:git-branch",
+  },
+  {
+    value: "files",
+    label: "Files",
+    query: "files",
+    icon: "lucide:folder-open",
+  },
+  {
+    value: "queues",
+    label: "Queues",
+    query: "queues",
+    icon: "lucide:list-todo",
+  },
+  {
+    value: "redirects",
+    label: "Redirects",
+    query: "redirects",
+    icon: "lucide:corner-up-right",
+  },
+  {
+    value: "commands",
+    label: "Commands",
+    query: "commands",
+    icon: "lucide:terminal-square",
+  },
+  {
+    value: "settings",
+    label: "Settings",
+    query: "settings",
+    icon: "lucide:settings",
+  },
 ];
 
 // DNS domain detail tabs
@@ -363,7 +515,7 @@ const dnsDetailTabs = [
 // Check if we're on a server detail page
 const isServerDetailPage = computed(() => {
   const match = route.path.match(/^\/servers\/([^/]+)$/);
-  return match && match[1] !== 'create';
+  return match && match[1] !== "create";
 });
 
 // Check if we're on a site detail page
@@ -377,11 +529,7 @@ const isSiteDetailPage = computed(() => {
 // further down (applications/composes/databases) and have their own
 // breadcrumb block below.
 const isProjectDetailPage = computed(() => {
-  return (
-    route.path.match(
-      /^\/servers\/([^/]+)\/projects\/([^/]+)$/,
-    ) !== null
-  );
+  return route.path.match(/^\/servers\/([^/]+)\/projects\/([^/]+)$/) !== null;
 });
 
 // Workload detail pages — /servers/:id/projects/:p/(databases|applications|composes)/:w
@@ -394,13 +542,15 @@ const workloadDetailMatch = computed(() => {
   );
 });
 const isWorkloadDetailPage = computed(() => workloadDetailMatch.value !== null);
-const workloadKind = computed<"database" | "application" | "compose" | null>(() => {
-  const m = workloadDetailMatch.value;
-  if (!m) return null;
-  if (m[3] === "databases") return "database";
-  if (m[3] === "applications") return "application";
-  return "compose";
-});
+const workloadKind = computed<"database" | "application" | "compose" | null>(
+  () => {
+    const m = workloadDetailMatch.value;
+    if (!m) return null;
+    if (m[3] === "databases") return "database";
+    if (m[3] === "applications") return "application";
+    return "compose";
+  },
+);
 const workloadId = computed(() => {
   const m = workloadDetailMatch.value;
   return m ? m[4] : null;
@@ -543,10 +693,25 @@ const workloadParentTab = computed(() => {
 
 const databaseSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
-  { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
-  { value: "backups", label: "Backups", query: "backups", icon: "lucide:hard-drive" },
+  {
+    value: "environment",
+    label: "Environment",
+    query: "environment",
+    icon: "lucide:key",
+  },
+  {
+    value: "backups",
+    label: "Backups",
+    query: "backups",
+    icon: "lucide:hard-drive",
+  },
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
-  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+  {
+    value: "advanced",
+    label: "Advanced",
+    query: "advanced",
+    icon: "lucide:sliders-horizontal",
+  },
 ];
 // `gha` only renders when this specific workload is build_location=
 // github_actions. See workloadSubTabs below for the conditional —
@@ -554,15 +719,55 @@ const databaseSubTabs = [
 // reorder when it adds the tab in.
 const applicationSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
-  { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
-  { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
-  { value: "domains", label: "Domains", query: "domains", icon: "lucide:globe" },
-  { value: "redirects", label: "Redirects", query: "redirects", icon: "lucide:corner-up-right" },
-  { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
-  { value: "schedules", label: "Schedulers", query: "schedules", icon: "lucide:clock" },
-  { value: "gha", label: "GitHub Actions", query: "gha", icon: "simple-icons:github" },
+  {
+    value: "deployments",
+    label: "Deployments",
+    query: "deployments",
+    icon: "lucide:git-branch",
+  },
+  {
+    value: "environment",
+    label: "Environment",
+    query: "environment",
+    icon: "lucide:key",
+  },
+  {
+    value: "domains",
+    label: "Domains",
+    query: "domains",
+    icon: "lucide:globe",
+  },
+  {
+    value: "redirects",
+    label: "Redirects",
+    query: "redirects",
+    icon: "lucide:corner-up-right",
+  },
+  {
+    value: "volumes",
+    label: "Volumes",
+    query: "volumes",
+    icon: "lucide:hard-drive",
+  },
+  {
+    value: "schedules",
+    label: "Schedulers",
+    query: "schedules",
+    icon: "lucide:clock",
+  },
+  {
+    value: "gha",
+    label: "GitHub Actions",
+    query: "gha",
+    icon: "simple-icons:github",
+  },
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
-  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+  {
+    value: "advanced",
+    label: "Advanced",
+    query: "advanced",
+    icon: "lucide:sliders-horizontal",
+  },
 ];
 // Compose subtabs mirror the application tabs where they make sense
 // at the stack level. Skipped:
@@ -581,13 +786,43 @@ const applicationSubTabs = [
 // container, needs a service selector) and Backups (database only).
 const composeSubTabs = [
   { value: "general", label: "General", query: "general", icon: "lucide:info" },
-  { value: "deployments", label: "Deployments", query: "deployments", icon: "lucide:git-branch" },
-  { value: "environment", label: "Environment", query: "environment", icon: "lucide:key" },
-  { value: "domains", label: "Domains", query: "domains", icon: "lucide:globe" },
-  { value: "volumes", label: "Volumes", query: "volumes", icon: "lucide:hard-drive" },
-  { value: "gha", label: "GitHub Actions", query: "gha", icon: "simple-icons:github" },
+  {
+    value: "deployments",
+    label: "Deployments",
+    query: "deployments",
+    icon: "lucide:git-branch",
+  },
+  {
+    value: "environment",
+    label: "Environment",
+    query: "environment",
+    icon: "lucide:key",
+  },
+  {
+    value: "domains",
+    label: "Domains",
+    query: "domains",
+    icon: "lucide:globe",
+  },
+  {
+    value: "volumes",
+    label: "Volumes",
+    query: "volumes",
+    icon: "lucide:hard-drive",
+  },
+  {
+    value: "gha",
+    label: "GitHub Actions",
+    query: "gha",
+    icon: "simple-icons:github",
+  },
   { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
-  { value: "advanced", label: "Advanced", query: "advanced", icon: "lucide:sliders-horizontal" },
+  {
+    value: "advanced",
+    label: "Advanced",
+    query: "advanced",
+    icon: "lucide:sliders-horizontal",
+  },
 ];
 const workloadSubTabs = computed(() => {
   switch (workloadKind.value) {
@@ -618,7 +853,7 @@ const workloadSubTabs = computed(() => {
 });
 
 const isWorkloadSubTabActive = (query: string) => {
-  const current = (route.query.subtab as string) || 'general';
+  const current = (route.query.subtab as string) || "general";
   return current === query;
 };
 
@@ -627,12 +862,12 @@ const isWorkloadSubTabActive = (query: string) => {
 // lifecycle action — same shape dockerProjectsRefreshKey uses for
 // the New-Project flow.
 const workloadActionRefreshKey = useState<number>(
-  'workloadActionRefreshKey',
+  "workloadActionRefreshKey",
   () => 0,
 );
 const workloadActionInFlight = useState<
-  'start' | 'stop' | 'restart' | 'deploy' | null
->('workloadActionInFlight', () => null);
+  "start" | "stop" | "restart" | "deploy" | null
+>("workloadActionInFlight", () => null);
 
 // Application Actions dropdown handler. The verbs in the dropdown
 // (Deploy / Reload / Rebuild / Stop / Start) map to:
@@ -645,7 +880,7 @@ const workloadActionInFlight = useState<
 //   - Stop    → POST /:id/stop    (docker stop)
 //   - Start   → POST /:id/start   (docker start)
 const runApplicationAction = async (
-  action: 'deploy' | 'reload' | 'rebuild' | 'stop' | 'start',
+  action: "deploy" | "reload" | "rebuild" | "stop" | "start",
 ) => {
   if (
     !serverId.value ||
@@ -657,24 +892,24 @@ const runApplicationAction = async (
   }
   // Map the dropdown verb back onto the slot the in-flight ref expects.
   // Deploy + Rebuild share the slot so the spinner shows on either.
-  const inflightSlot: 'start' | 'stop' | 'restart' | 'deploy' = {
-    deploy: 'deploy',
-    rebuild: 'deploy',
-    reload: 'restart',
-    stop: 'stop',
-    start: 'start',
-  }[action] as 'start' | 'stop' | 'restart' | 'deploy';
+  const inflightSlot: "start" | "stop" | "restart" | "deploy" = {
+    deploy: "deploy",
+    rebuild: "deploy",
+    reload: "restart",
+    stop: "stop",
+    start: "start",
+  }[action] as "start" | "stop" | "restart" | "deploy";
   workloadActionInFlight.value = inflightSlot;
   try {
-    const { dockerService } = await import('~/services/dockerService');
-    if (action === 'deploy' || action === 'rebuild') {
+    const { dockerService } = await import("~/services/dockerService");
+    if (action === "deploy" || action === "rebuild") {
       await dockerService.applications.deploy(
         serverId.value,
         projectId.value,
         workloadId.value,
       );
       toast.success(
-        action === 'rebuild' ? 'Rebuild queued' : 'Deployment queued',
+        action === "rebuild" ? "Rebuild queued" : "Deployment queued",
       );
     } else {
       await dockerService.applications.lifecycle(
@@ -683,7 +918,7 @@ const runApplicationAction = async (
         workloadId.value,
         action,
       );
-      const label = { reload: 'Reload', stop: 'Stop', start: 'Start' }[action];
+      const label = { reload: "Reload", stop: "Stop", start: "Start" }[action];
       toast.success(`${label} queued`);
     }
     workloadActionRefreshKey.value++;
@@ -695,7 +930,7 @@ const runApplicationAction = async (
   }
 };
 
-const runDatabaseLifecycle = async (action: 'start' | 'stop' | 'restart') => {
+const runDatabaseLifecycle = async (action: "start" | "stop" | "restart") => {
   if (
     !serverId.value ||
     !projectId.value ||
@@ -706,7 +941,7 @@ const runDatabaseLifecycle = async (action: 'start' | 'stop' | 'restart') => {
   }
   workloadActionInFlight.value = action;
   try {
-    const { dockerService } = await import('~/services/dockerService');
+    const { dockerService } = await import("~/services/dockerService");
     await dockerService.databases.lifecycle(
       serverId.value,
       projectId.value,
@@ -726,7 +961,7 @@ const runDatabaseLifecycle = async (action: 'start' | 'stop' | 'restart') => {
 // Check if we're on a DNS domain detail page
 const isDnsDetailPage = computed(() => {
   const match = route.path.match(/^\/dns\/([^/]+)(?:\/|$)/);
-  return match && match[1] !== 'create';
+  return match && match[1] !== "create";
 });
 
 // Check if we're on DNS settings page
@@ -751,9 +986,7 @@ const siteId = computed(() => {
 // — those pages won't use the project tab strip but might reuse the
 // crumb in a future iteration.
 const projectId = computed(() => {
-  const match = route.path.match(
-    /^\/servers\/([^/]+)\/projects\/([^/]+)/,
-  );
+  const match = route.path.match(/^\/servers\/([^/]+)\/projects\/([^/]+)/);
   return match ? match[2] : null;
 });
 
@@ -802,11 +1035,36 @@ const workloadExternalPort = ref<number | null>(null);
 const workloadBuildLocation = ref<string | null>(null);
 
 const projectDetailTabs = [
-  { value: 'overview', label: 'Overview', query: 'overview', icon: 'lucide:layout-dashboard' },
-  { value: 'applications', label: 'Applications', query: 'applications', icon: 'lucide:box' },
-  { value: 'compose', label: 'Compose', query: 'compose', icon: 'lucide:layers' },
-  { value: 'databases', label: 'Databases', query: 'databases', icon: 'lucide:database' },
-  { value: 'settings', label: 'Settings', query: 'settings', icon: 'lucide:settings' },
+  {
+    value: "overview",
+    label: "Overview",
+    query: "overview",
+    icon: "lucide:layout-dashboard",
+  },
+  {
+    value: "applications",
+    label: "Applications",
+    query: "applications",
+    icon: "lucide:box",
+  },
+  {
+    value: "compose",
+    label: "Compose",
+    query: "compose",
+    icon: "lucide:layers",
+  },
+  {
+    value: "databases",
+    label: "Databases",
+    query: "databases",
+    icon: "lucide:database",
+  },
+  {
+    value: "settings",
+    label: "Settings",
+    query: "settings",
+    icon: "lucide:settings",
+  },
   // Project-level env vars don't live as a tab — they're a sibling
   // concept used by every workload, so they're reached via a
   // dedicated Environment button in the project breadcrumb action
@@ -821,14 +1079,17 @@ const showProjectTabs = computed(() => {
 });
 
 const isProjectTabActive = (query: string) => {
-  const currentTab = (route.query.tab as string) || 'overview';
+  const currentTab = (route.query.tab as string) || "overview";
   return currentTab === query;
 };
 
 // Shared bus consumed by the site detail page so that triggering a deploy
 // from the navbar updates the on-page overview card immediately, without
 // waiting for the WebSocket roundtrip + debounced refetch.
-const lastTriggeredDeployment = useState<Deployment | null>('lastTriggeredDeployment', () => null);
+const lastTriggeredDeployment = useState<Deployment | null>(
+  "lastTriggeredDeployment",
+  () => null,
+);
 
 const onDeployTriggered = (deployment: Deployment) => {
   isDeploying.value = true;
@@ -836,15 +1097,19 @@ const onDeployTriggered = (deployment: Deployment) => {
 };
 
 // Get current team for WebSocket channel
-const teamId = computed(() => user.value?.current_team_id?.toString() || '');
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
 // Subscribe to real-time deployment events
 useDeploymentEvents(teamId, (data) => {
   // Update deployment status for current site
   if (data.site_id === siteId.value) {
-    if (data.status === 'pending' || data.status === 'installing') {
+    if (data.status === "pending" || data.status === "installing") {
       isDeploying.value = true;
-    } else if (data.status === 'finished' || data.status === 'failed' || data.status === 'timeout') {
+    } else if (
+      data.status === "finished" ||
+      data.status === "failed" ||
+      data.status === "timeout"
+    ) {
       isDeploying.value = false;
     }
   }
@@ -874,14 +1139,19 @@ const siteTypeLabels: Record<string, string> = {
 // Computed site tabs based on site type
 const siteDetailTabs = computed(() => {
   if (!siteType.value) return allSiteDetailTabs;
-  if (siteType.value === 'wordpress') {
-    return allSiteDetailTabs.filter((t) => !['deployments', 'queues'].includes(t.value));
+  if (siteType.value === "wordpress") {
+    return allSiteDetailTabs.filter(
+      (t) => !["deployments", "queues"].includes(t.value),
+    );
   }
-  if (siteType.value === 'phpmyadmin') {
-    return allSiteDetailTabs.filter((t) => !['deployments', 'queues', 'redirects', 'commands'].includes(t.value));
+  if (siteType.value === "phpmyadmin") {
+    return allSiteDetailTabs.filter(
+      (t) =>
+        !["deployments", "queues", "redirects", "commands"].includes(t.value),
+    );
   }
-  if (siteType.value === 'generic') {
-    return allSiteDetailTabs.filter((t) => !['queues'].includes(t.value));
+  if (siteType.value === "generic") {
+    return allSiteDetailTabs.filter((t) => !["queues"].includes(t.value));
   }
   return allSiteDetailTabs;
 });
@@ -893,11 +1163,19 @@ const { getCachedServer, getCachedSite } = useNavbarCache();
 // here lets child pages (e.g. database General → External Connection
 // URL) reuse it without making a duplicate /servers/:id request.
 const currentServerPublicIp = useState<string | null>(
-  'currentServerPublicIp',
+  "currentServerPublicIp",
   () => null,
 );
 
-const applyServerData = (data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string }) => {
+const applyServerData = (data: {
+  name: string;
+  public_ipv4: string;
+  connected: boolean;
+  provider: string;
+  status: string;
+  type: string;
+  provision_command?: string;
+}) => {
   serverName.value = data.name;
   serverIp.value = data.public_ipv4;
   currentServerPublicIp.value = data.public_ipv4 || null;
@@ -913,92 +1191,118 @@ const applyServerData = (data: { name: string; public_ipv4: string; connected: b
 // jumps between projects, but the watch body keeps its existing
 // site-vs-server-only branches and treats project the same as
 // "server with extra resource".
-watch([serverId, siteId, projectId], async ([sId, stId, pId]) => {
-  if (sId && !stId) {
-    // Server detail page - use cache if available, otherwise fetch
-    const cached = getCachedServer(sId);
-    if (cached) {
-      applyServerData(cached);
-    } else {
+watch(
+  [serverId, siteId, projectId],
+  async ([sId, stId, pId]) => {
+    if (sId && !stId) {
+      // Server detail page - use cache if available, otherwise fetch
+      const cached = getCachedServer(sId);
+      if (cached) {
+        applyServerData(cached);
+      } else {
+        try {
+          const response = await $api<{
+            data: {
+              name: string;
+              public_ipv4: string;
+              connected: boolean;
+              provider: string;
+              status: string;
+              type: string;
+              provision_command?: string;
+            };
+          }>(`/servers/${sId}`);
+          applyServerData(response.data);
+        } catch {
+          serverName.value = null;
+        }
+      }
+      // Clear site data
+      siteAddress.value = null;
+      siteType.value = null;
+    } else if (sId && stId) {
+      // Apply site cache immediately for instant tab filtering
+      const cachedSite = getCachedSite(stId);
+      if (cachedSite) {
+        siteAddress.value = cachedSite.address;
+        siteType.value = cachedSite.type;
+      }
+
+      // Fetch full data from API
       try {
-        const response = await $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`);
-        applyServerData(response.data);
+        const [serverRes, siteRes] = await Promise.all([
+          $api<{
+            data: {
+              name: string;
+              public_ipv4: string;
+              connected: boolean;
+              provider: string;
+              status: string;
+              type: string;
+              provision_command?: string;
+            };
+          }>(`/servers/${sId}`),
+          $api<{ data: { address: string; type: string; url: string } }>(
+            `/servers/${sId}/sites/${stId}`,
+          ),
+        ]);
+        applyServerData(serverRes.data);
+        siteAddress.value = siteRes.data.address;
+        siteType.value = siteRes.data.type;
+        siteUrl.value = siteRes.data.url;
       } catch {
         serverName.value = null;
+        siteAddress.value = null;
       }
     }
-    // Clear site data
-    siteAddress.value = null;
-    siteType.value = null;
-  } else if (sId && stId) {
-    // Apply site cache immediately for instant tab filtering
-    const cachedSite = getCachedSite(stId);
-    if (cachedSite) {
-      siteAddress.value = cachedSite.address;
-      siteType.value = cachedSite.type;
-    }
 
-    // Fetch full data from API
-    try {
-      const [serverRes, siteRes] = await Promise.all([
-        $api<{ data: { name: string; public_ipv4: string; connected: boolean; provider: string; status: string; type: string; provision_command?: string } }>(`/servers/${sId}`),
-        $api<{ data: { address: string; type: string; url: string } }>(`/servers/${sId}/sites/${stId}`),
-      ]);
-      applyServerData(serverRes.data);
-      siteAddress.value = siteRes.data.address;
-      siteType.value = siteRes.data.type;
-      siteUrl.value = siteRes.data.url;
-    } catch {
-      serverName.value = null;
-      siteAddress.value = null;
-    }
-  }
-
-  // Project detail page — load the project (and server, if not
-  // already loaded by the branch above). The crumb keeps stale data
-  // around for an instant load on back/forward navigation; the
-  // ${projectId}` URL change forces a refresh.
-  if (sId && pId) {
-    try {
-      const [serverRes, projectRes] = await Promise.all([
-        $api<{
-          data: {
-            name: string;
-            public_ipv4: string;
-            connected: boolean;
-            provider: string;
-            status: string;
-            type: string;
-            provision_command?: string;
-          };
-        }>(`/servers/${sId}`),
-        $api<{ data: { name: string } }>(
-          `/servers/${sId}/docker/projects/${pId}`,
-        ),
-      ]);
-      applyServerData(serverRes.data);
-      projectName.value = projectRes.data.name;
-    } catch {
-      // Page-level guard will redirect on its own — just blank.
+    // Project detail page — load the project (and server, if not
+    // already loaded by the branch above). The crumb keeps stale data
+    // around for an instant load on back/forward navigation; the
+    // ${projectId}` URL change forces a refresh.
+    if (sId && pId) {
+      try {
+        const [serverRes, projectRes] = await Promise.all([
+          $api<{
+            data: {
+              name: string;
+              public_ipv4: string;
+              connected: boolean;
+              provider: string;
+              status: string;
+              type: string;
+              provision_command?: string;
+            };
+          }>(`/servers/${sId}`),
+          $api<{ data: { name: string } }>(
+            `/servers/${sId}/docker/projects/${pId}`,
+          ),
+        ]);
+        applyServerData(serverRes.data);
+        projectName.value = projectRes.data.name;
+      } catch {
+        // Page-level guard will redirect on its own — just blank.
+        projectName.value = null;
+      }
+    } else if (!pId) {
+      // Clear the project name when leaving the project subtree so a
+      // late navigation doesn't paint the previous breadcrumb.
       projectName.value = null;
     }
-  } else if (!pId) {
-    // Clear the project name when leaving the project subtree so a
-    // late navigation doesn't paint the previous breadcrumb.
-    projectName.value = null;
-  }
 
-  if (!sId) {
-    serverName.value = null;
-    serverProvider.value = null;
-    serverStatus.value = null;
-    serverType.value = null;
-    serverProvisionCommand.value = null;
-    siteAddress.value = null;
-    siteType.value = null;
-    currentServerPublicIp.value = null;
-  }
-}, { immediate: true });
+    if (!sId) {
+      serverName.value = null;
+      serverProvider.value = null;
+      serverStatus.value = null;
+      serverType.value = null;
+      serverProvisionCommand.value = null;
+      siteAddress.value = null;
+      siteType.value = null;
+      currentServerPublicIp.value = null;
+    }
+  },
+  { immediate: true },
+);
 
 // Load the workload name when on a workload detail page so the
 // breadcrumb segment renders the real name rather than the opaque
@@ -1057,48 +1361,53 @@ watch(
 );
 
 // Fetch domain info when on DNS detail page
-watch(domainId, async (dId) => {
-  if (dId && dId !== 'create') {
-    try {
-      const response = await $api<{
-        data: {
-          domain: {
-            address: string;
-            provider?: { provider: string; profile: string };
+watch(
+  domainId,
+  async (dId) => {
+    if (dId && dId !== "create") {
+      try {
+        const response = await $api<{
+          data: {
+            domain: {
+              address: string;
+              provider?: { provider: string; profile: string };
+            };
           };
-        };
-      }>(`/dns/domains/${dId}`);
-      domainAddress.value = response.data.domain.address;
-      domainProvider.value = response.data.domain.provider?.provider || null;
-      domainProviderLabel.value = response.data.domain.provider?.profile || null;
-    } catch {
+        }>(`/dns/domains/${dId}`);
+        domainAddress.value = response.data.domain.address;
+        domainProvider.value = response.data.domain.provider?.provider || null;
+        domainProviderLabel.value =
+          response.data.domain.provider?.profile || null;
+      } catch {
+        domainAddress.value = null;
+        domainProvider.value = null;
+        domainProviderLabel.value = null;
+      }
+    } else {
       domainAddress.value = null;
       domainProvider.value = null;
       domainProviderLabel.value = null;
     }
-  } else {
-    domainAddress.value = null;
-    domainProvider.value = null;
-    domainProviderLabel.value = null;
-  }
-}, { immediate: true });
+  },
+  { immediate: true },
+);
 
 const isGlobalTabActive = (tabRoute: string) => {
-  const currentPath = route.path.replace(/\/$/, ''); // Remove trailing slash
+  const currentPath = route.path.replace(/\/$/, ""); // Remove trailing slash
   return currentPath === tabRoute || currentPath.startsWith(`${tabRoute}/`);
 };
 
 const isServerTabActive = (query: string) => {
-  const currentTab = route.query.tab as string || 'sites';
+  const currentTab = (route.query.tab as string) || "sites";
   return currentTab === query;
 };
 
 const isAdvancedTabActive = computed(() => {
-  return (route.query.tab as string) === 'advanced';
+  return (route.query.tab as string) === "advanced";
 });
 
 const isAdvancedSubTabActive = (query: string) => {
-  const currentSubTab = route.query.subtab as string || 'general';
+  const currentSubTab = (route.query.subtab as string) || "general";
   return currentSubTab === query;
 };
 
@@ -1112,7 +1421,7 @@ const serverActiveTabKey = computed(() => {
   if (fromQuery && serverDetailTabs.value.some((t) => t.value === fromQuery)) {
     return fromQuery;
   }
-  return serverDetailTabs.value[0]?.value ?? 'sites';
+  return serverDetailTabs.value[0]?.value ?? "sites";
 });
 
 const advancedActiveTabKey = computed(() => {
@@ -1120,20 +1429,20 @@ const advancedActiveTabKey = computed(() => {
   if (fromQuery && advancedSubTabs.value.some((t) => t.value === fromQuery)) {
     return fromQuery;
   }
-  return 'general';
+  return "general";
 });
 
 const isSiteTabActive = (query: string) => {
-  const currentTab = route.query.tab as string || 'general';
+  const currentTab = (route.query.tab as string) || "general";
   return currentTab === query;
 };
 
 const isDnsTabActive = (tabPath: string) => {
-  if (tabPath === '') {
+  if (tabPath === "") {
     // Records tab is active when not on settings page
     return !isDnsSettingsPage.value;
   }
-  if (tabPath === '/settings') {
+  if (tabPath === "/settings") {
     return isDnsSettingsPage.value;
   }
   return false;
@@ -1141,17 +1450,25 @@ const isDnsTabActive = (tabPath: string) => {
 
 // Show provision button for custom servers that need provisioning
 const showProvisionButton = computed(() => {
-  return serverProvider.value === 'custom_server' && serverStatus.value === 'new';
+  return (
+    serverProvider.value === "custom_server" && serverStatus.value === "new"
+  );
 });
 
 const showGlobalTabs = computed(() => {
-  const currentPath = route.path.replace(/\/$/, ''); // Remove trailing slash
+  const currentPath = route.path.replace(/\/$/, ""); // Remove trailing slash
   // If not subscribed, only show on dashboard
   if (!isSubscribed.value) {
-    return currentPath === '/dashboard';
+    return currentPath === "/dashboard";
   }
   // Show global tabs only on list pages, not detail pages
-  return currentPath === '/dashboard' || currentPath === '/servers' || currentPath === '/dns' || currentPath === '/scripts' || currentPath === '/onboarding';
+  return (
+    currentPath === "/dashboard" ||
+    currentPath === "/servers" ||
+    currentPath === "/dns" ||
+    currentPath === "/scripts" ||
+    currentPath === "/onboarding"
+  );
 });
 
 const showDnsTabs = computed(() => {
@@ -1172,41 +1489,59 @@ const showSiteTabs = computed(() => {
 });
 
 // Watch for section visibility changes to update indicators when they become visible
-watch([showGlobalTabs, showServerTabs, showSiteTabs, showProjectTabs, isWorkloadDetailPage, isAdvancedTabActive], ([globalVisible, serverVisible, siteVisible, projectVisible, workloadVisible, advancedVisible]) => {
-  // Clear stale refs when sections become hidden
-  if (!serverVisible) serverTabRefs.value.clear();
-  if (!siteVisible) siteTabRefs.value.clear();
-  if (!projectVisible) projectTabRefs.value.clear();
-  if (!workloadVisible) workloadTabRefs.value.clear();
-  if (!advancedVisible) advancedTabRefs.value.clear();
+watch(
+  [
+    showGlobalTabs,
+    showServerTabs,
+    showSiteTabs,
+    showProjectTabs,
+    isWorkloadDetailPage,
+    isAdvancedTabActive,
+  ],
+  ([
+    globalVisible,
+    serverVisible,
+    siteVisible,
+    projectVisible,
+    workloadVisible,
+    advancedVisible,
+  ]) => {
+    // Clear stale refs when sections become hidden
+    if (!serverVisible) serverTabRefs.value.clear();
+    if (!siteVisible) siteTabRefs.value.clear();
+    if (!projectVisible) projectTabRefs.value.clear();
+    if (!workloadVisible) workloadTabRefs.value.clear();
+    if (!advancedVisible) advancedTabRefs.value.clear();
 
-  // Wait for refs to be populated after render
-  setTimeout(() => {
-    nextTick(() => {
-      if (globalVisible) updateIndicator();
-      if (serverVisible) updateServerIndicator();
-      if (siteVisible) updateSiteIndicator();
-      if (projectVisible) updateProjectIndicator();
-      if (workloadVisible) updateWorkloadIndicator();
-      if (advancedVisible) updateAdvancedIndicator();
-    });
-  }, 50);
-}, { immediate: true });
+    // Wait for refs to be populated after render
+    setTimeout(() => {
+      nextTick(() => {
+        if (globalVisible) updateIndicator();
+        if (serverVisible) updateServerIndicator();
+        if (siteVisible) updateSiteIndicator();
+        if (projectVisible) updateProjectIndicator();
+        if (workloadVisible) updateWorkloadIndicator();
+        if (advancedVisible) updateAdvancedIndicator();
+      });
+    }, 50);
+  },
+  { immediate: true },
+);
 
 // DNS refresh trigger
-const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
+const dnsRefreshKey = useState("dnsRefreshKey", () => 0);
 const onDnsCreated = () => {
   dnsRefreshKey.value++;
 };
 
 // Scripts refresh trigger
-const scriptsRefreshKey = useState('scriptsRefreshKey', () => 0);
+const scriptsRefreshKey = useState("scriptsRefreshKey", () => 0);
 const onScriptCreated = () => {
   scriptsRefreshKey.value++;
 };
 
 // Sites refresh trigger (when a site is created from navbar)
-const sitesRefreshKey = useState('sitesRefreshKey', () => 0);
+const sitesRefreshKey = useState("sitesRefreshKey", () => 0);
 const onSiteCreated = () => {
   sitesRefreshKey.value++;
 };
@@ -1214,13 +1549,13 @@ const onSiteCreated = () => {
 // Docker projects refresh trigger — bumped by the navbar's New
 // Project button so ServerDockerProjects can prepend the new row
 // without a full refetch. Same pattern as sitesRefreshKey.
-const dockerProjectsRefreshKey = useState('dockerProjectsRefreshKey', () => 0);
+const dockerProjectsRefreshKey = useState("dockerProjectsRefreshKey", () => 0);
 const onDockerProjectCreated = () => {
   dockerProjectsRefreshKey.value++;
 };
 
 // Terminal state (shared with server detail page)
-const isTerminalOpen = useState('serverTerminalOpen', () => false);
+const isTerminalOpen = useState("serverTerminalOpen", () => false);
 const openTerminal = () => {
   isTerminalOpen.value = true;
 };
@@ -1230,7 +1565,7 @@ const openTerminal = () => {
 // loaded `compose.raw_yaml` without a second fetch). The navbar item
 // just flips the flag; the page reacts.
 const composeYamlDialogOpen = useState<boolean>(
-  'composeYamlDialogOpen',
+  "composeYamlDialogOpen",
   () => false,
 );
 const openComposeYamlDialog = () => {
@@ -1242,7 +1577,7 @@ const openComposeYamlDialog = () => {
 // detail page mounts the actual dialog (so it has access to the
 // already-loaded database row without a second fetch).
 const databaseConnectionDialogOpen = useState<boolean>(
-  'databaseConnectionDialogOpen',
+  "databaseConnectionDialogOpen",
   () => false,
 );
 const openDatabaseConnectionDialog = () => {
@@ -1255,15 +1590,15 @@ const openDatabaseConnectionDialog = () => {
 // decoupled from the page's local component state — same convention
 // dockerProjectsRefreshKey + ServerDockerCreateProject established.
 const dockerCreateApplicationOpen = useState<boolean>(
-  'dockerCreateApplicationOpen',
+  "dockerCreateApplicationOpen",
   () => false,
 );
 const dockerCreateComposeOpen = useState<boolean>(
-  'dockerCreateComposeOpen',
+  "dockerCreateComposeOpen",
   () => false,
 );
 const dockerCreateDatabaseOpen = useState<boolean>(
-  'dockerCreateDatabaseOpen',
+  "dockerCreateDatabaseOpen",
   () => false,
 );
 // Project-level env-vars dialog. Doesn't belong on any single project
@@ -1271,7 +1606,7 @@ const dockerCreateDatabaseOpen = useState<boolean>(
 // surface it as a stand-alone action button in the project breadcrumb
 // and open a Dialog on the page from here.
 const dockerProjectEnvOpen = useState<boolean>(
-  'dockerProjectEnvOpen',
+  "dockerProjectEnvOpen",
   () => false,
 );
 const openCreateApplication = () => {
@@ -1306,10 +1641,12 @@ const isOpen = ref(false);
 const isCreateTeamOpen = ref(false);
 const teams = ref<Team[]>([]);
 const isTeamsLoading = ref(true);
-const confirmationDialog = ref<InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null>(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const currentTeam = computed(() =>
-  teams.value.find((t) => t.id === String(user.value?.current_team_id))
+  teams.value.find((t) => t.id === String(user.value?.current_team_id)),
 );
 
 const fetchTeams = async () => {
@@ -1324,8 +1661,8 @@ const fetchTeams = async () => {
 };
 
 // Refresh triggers for team switch
-const serversRefreshKey = useState('serversRefreshKey', () => 0);
-const dashboardRefreshKey = useState('dashboardRefreshKey', () => 0);
+const serversRefreshKey = useState("serversRefreshKey", () => 0);
+const dashboardRefreshKey = useState("dashboardRefreshKey", () => 0);
 
 const switchTeam = async (teamId: string) => {
   if (teamId === String(user.value?.current_team_id)) return;
@@ -1349,7 +1686,7 @@ const switchTeam = async (teamId: string) => {
     scriptsRefreshKey.value++;
     dnsRefreshKey.value++;
     // Show success toast
-    toast.success(`Switched to ${targetTeam?.name || 'team'}`);
+    toast.success(`Switched to ${targetTeam?.name || "team"}`);
   } catch {
     toast.error("Failed to switch team");
   }
@@ -1435,9 +1772,7 @@ onMounted(fetchTeams);
   >
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div
-      class="flex h-16 items-center justify-between px-4 lg:px-8"
-    >
+    <div class="flex h-16 items-center justify-between px-4 lg:px-8">
       <NuxtLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
       </NuxtLink>
@@ -1448,10 +1783,14 @@ onMounted(fetchTeams);
         class="group relative h-5 cursor-pointer overflow-hidden text-sm"
         @click="openSettingsSheet('billing')"
       >
-        <span class="block text-muted-foreground transition-transform duration-300 ease-out group-hover:-translate-y-full">
+        <span
+          class="block text-muted-foreground transition-transform duration-300 ease-out group-hover:-translate-y-full"
+        >
           Your subscription is inactive
         </span>
-        <span class="absolute inset-x-0 top-full flex items-center gap-1 font-medium text-primary transition-transform duration-300 ease-out group-hover:-translate-y-full">
+        <span
+          class="absolute inset-x-0 top-full flex items-center gap-1 font-medium text-primary transition-transform duration-300 ease-out group-hover:-translate-y-full"
+        >
           Subscribe now
           <Icon name="lucide:arrow-right" class="h-3.5 w-3.5" />
         </span>
@@ -1497,7 +1836,9 @@ onMounted(fetchTeams);
                   </AvatarFallback>
                 </Avatar>
 
-                <ChevronDown class="ml-1 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5" />
+                <ChevronDown
+                  class="ml-1 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5"
+                />
               </div>
             </DropdownMenuTrigger>
 
@@ -1510,8 +1851,14 @@ onMounted(fetchTeams);
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Teams Section -->
-              <div v-if="isTeamsLoading" class="flex items-center justify-center py-2">
-                <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin text-muted-foreground" />
+              <div
+                v-if="isTeamsLoading"
+                class="flex items-center justify-center py-2"
+              >
+                <Icon
+                  name="lucide:loader-2"
+                  class="h-3 w-3 animate-spin text-muted-foreground"
+                />
               </div>
               <template v-else>
                 <DropdownMenuGroup>
@@ -1522,7 +1869,10 @@ onMounted(fetchTeams);
                     @click="switchTeam(team.id)"
                   >
                     <span class="truncate">{{ team.name }}</span>
-                    <Check v-if="team.id === String(user?.current_team_id)" class="h-3.5 w-3.5 text-primary" />
+                    <Check
+                      v-if="team.id === String(user?.current_team_id)"
+                      class="h-3.5 w-3.5 text-primary"
+                    />
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
@@ -1543,16 +1893,37 @@ onMounted(fetchTeams);
                 <Settings class="h-3.5 w-3.5 text-muted-foreground" />
                 <span>Settings</span>
               </DropdownMenuItem>
+              <DropdownMenuItem
+                v-if="isStaff"
+                class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
+                @click="navigateTo(showAdminContext ? '/dashboard' : '/admin')"
+              >
+                <Icon
+                  v-if="showAdminContext"
+                  name="lucide:layout-dashboard"
+                  class="h-3.5 w-3.5 text-muted-foreground"
+                />
+                <Shield v-else class="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{{
+                  showAdminContext ? "Back to App" : "Admin Panel"
+                }}</span>
+              </DropdownMenuItem>
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Theme Switcher -->
               <div class="flex items-center justify-between px-2 py-1.5">
                 <span class="text-sm text-muted-foreground">Theme</span>
-                <div class="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5">
+                <div
+                  class="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5"
+                >
                   <button
                     type="button"
                     class="rounded p-1 transition-colors"
-                    :class="colorMode.preference === 'light' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :class="
+                      colorMode.preference === 'light'
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    "
                     @click.stop="setColorMode('light')"
                   >
                     <Sun class="h-3.5 w-3.5" />
@@ -1560,7 +1931,11 @@ onMounted(fetchTeams);
                   <button
                     type="button"
                     class="rounded p-1 transition-colors"
-                    :class="colorMode.preference === 'dark' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :class="
+                      colorMode.preference === 'dark'
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    "
                     @click.stop="setColorMode('dark')"
                   >
                     <Moon class="h-3.5 w-3.5" />
@@ -1568,7 +1943,11 @@ onMounted(fetchTeams);
                   <button
                     type="button"
                     class="rounded p-1 transition-colors"
-                    :class="colorMode.preference === 'system' ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :class="
+                      colorMode.preference === 'system'
+                        ? 'bg-background shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground'
+                    "
                     @click.stop="setColorMode('system')"
                   >
                     <Monitor class="h-3.5 w-3.5" />
@@ -1619,7 +1998,7 @@ onMounted(fetchTeams);
             :class="[
               isGlobalTabActive(tab.route)
                 ? 'text-foreground'
-                : 'text-muted-foreground hover:text-foreground'
+                : 'text-muted-foreground hover:text-foreground',
             ]"
           >
             <Icon :name="tab.icon" class="h-4 w-4" />
@@ -1628,15 +2007,67 @@ onMounted(fetchTeams);
           <!-- Sliding indicator -->
           <span
             class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-            :style="{ left: `${indicatorLeft}px`, width: `${indicatorWidth}px` }"
+            :style="{
+              left: `${indicatorLeft}px`,
+              width: `${indicatorWidth}px`,
+            }"
           />
         </nav>
         <div class="flex shrink-0 items-center">
           <ServerCreateServerDialog v-if="route.path === '/servers'" />
-          <DnsAddDomain v-if="route.path === '/dns'" :providers="[]" @created="onDnsCreated" />
-          <ScriptsCreateScript v-if="route.path === '/scripts'" @created="onScriptCreated" />
+          <DnsAddDomain
+            v-if="route.path === '/dns'"
+            :providers="[]"
+            @created="onDnsCreated"
+          />
+          <ScriptsCreateScript
+            v-if="route.path === '/scripts'"
+            @created="onScriptCreated"
+          />
         </div>
       </div>
+    </div>
+
+    <!-- Admin back-office context (breadcrumb + section tabs) -->
+    <div v-if="showAdminContext" class="px-4 lg:px-8">
+      <div
+        v-if="adminCrumbs.length"
+        class="flex items-center gap-1.5 pb-1.5 pt-1 text-sm"
+      >
+        <template v-for="(crumb, i) in adminCrumbs" :key="i">
+          <NuxtLink
+            v-if="crumb.to && i < adminCrumbs.length - 1"
+            :to="crumb.to"
+            class="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {{ crumb.label }}
+          </NuxtLink>
+          <span v-else class="font-medium text-foreground">{{
+            crumb.label
+          }}</span>
+          <Icon
+            v-if="i < adminCrumbs.length - 1"
+            name="lucide:chevron-right"
+            class="h-3.5 w-3.5 text-muted-foreground/60"
+          />
+        </template>
+      </div>
+      <nav class="-mb-px flex gap-6 overflow-x-auto">
+        <NuxtLink
+          v-for="tab in adminTabs"
+          :key="tab.to"
+          :to="tab.to"
+          class="relative flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors"
+          :class="
+            isAdminTabActive(tab)
+              ? 'border-foreground text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          "
+        >
+          <Icon :name="tab.icon" class="h-4 w-4" />
+          {{ tab.label }}
+        </NuxtLink>
+      </nav>
     </div>
 
     <!-- Server Detail Navigation -->
@@ -1654,17 +2085,25 @@ onMounted(fetchTeams);
           <span class="text-muted-foreground">/</span>
           <template v-if="isServerDataLoaded">
             <div class="flex items-center gap-2">
-              <span class="relative flex items-center gap-1.5 text-sm font-medium">
+              <span
+                class="relative flex items-center gap-1.5 text-sm font-medium"
+              >
                 <span
                   class="h-2 w-2 rounded-full"
                   :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
                 />
                 {{ serverName }}
               </span>
-              <span v-if="isLoadBalancerServer" class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
+              <span
+                v-if="isLoadBalancerServer"
+                class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
+              >
                 Load Balancer
               </span>
-              <span v-if="serverProvider" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+              <span
+                v-if="serverProvider"
+                class="rounded bg-muted px-2 py-0.5 text-xs font-medium"
+              >
                 {{ providerLabels[serverProvider] || serverProvider }}
               </span>
             </div>
@@ -1696,7 +2135,13 @@ onMounted(fetchTeams);
             <Terminal class="mr-2 h-4 w-4" />
             Terminal
           </Button>
-          <ServerAddSite v-if="serverId && !isLoadBalancerServer && isServerTabActive('sites')" :server-id="serverId" @created="onSiteCreated" />
+          <ServerAddSite
+            v-if="
+              serverId && !isLoadBalancerServer && isServerTabActive('sites')
+            "
+            :server-id="serverId"
+            @created="onSiteCreated"
+          />
           <!--
             Docker-only create-project action. Mirrors ServerAddSite's
             convention: tab-gated, self-contained button + dialog,
@@ -1722,25 +2167,34 @@ onMounted(fetchTeams);
         v-if="isServerDataLoaded"
         :tabs="serverDetailTabs"
         :active-key="serverActiveTabKey"
-        :to-link="(tab) => ({
-          path: `/servers/${serverId}`,
-          query: tab.query === 'advanced'
-            ? { tab: tab.query, subtab: 'general' }
-            : { tab: tab.query },
-        })"
+        :to-link="
+          (tab) => ({
+            path: `/servers/${serverId}`,
+            query:
+              tab.query === 'advanced'
+                ? { tab: tab.query, subtab: 'general' }
+                : { tab: tab.query },
+          })
+        "
         :extend-border="isAdvancedTabActive"
       />
       <nav v-else class="relative -mb-px flex gap-1 overflow-x-auto">
-        <div v-for="i in 6" :key="i" class="h-9 w-20 animate-pulse rounded bg-muted px-3 py-2" />
+        <div
+          v-for="i in 6"
+          :key="i"
+          class="h-9 w-20 animate-pulse rounded bg-muted px-3 py-2"
+        />
       </nav>
       <LayoutTabStrip
         v-if="isAdvancedTabActive"
         :tabs="advancedSubTabs"
         :active-key="advancedActiveTabKey"
-        :to-link="(tab) => ({
-          path: `/servers/${serverId}`,
-          query: { tab: 'advanced', subtab: tab.query },
-        })"
+        :to-link="
+          (tab) => ({
+            path: `/servers/${serverId}`,
+            query: { tab: 'advanced', subtab: tab.query },
+          })
+        "
         variant="rose"
       />
     </div>
@@ -1766,22 +2220,38 @@ onMounted(fetchTeams);
               class="h-2 w-2 rounded-full"
               :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
             />
-            {{ serverName || 'Loading...' }}
+            {{ serverName || "Loading..." }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
             <Globe class="h-4 w-4 text-muted-foreground" />
-            <span class="text-sm font-medium">{{ siteAddress || 'Loading...' }}</span>
-            <span v-if="siteType" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+            <span class="text-sm font-medium">{{
+              siteAddress || "Loading..."
+            }}</span>
+            <span
+              v-if="siteType"
+              class="rounded bg-muted px-2 py-0.5 text-xs font-medium"
+            >
               {{ siteTypeLabels[siteType] || siteType }}
             </span>
-            <a v-if="siteUrl" :href="siteUrl" target="_blank" rel="noreferrer" class="text-muted-foreground hover:text-foreground">
+            <a
+              v-if="siteUrl"
+              :href="siteUrl"
+              target="_blank"
+              rel="noreferrer"
+              class="text-muted-foreground hover:text-foreground"
+            >
               <Icon name="lucide:external-link" class="h-4 w-4" />
             </a>
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <SharedLogsSheet v-if="serverId && siteId" :server-id="serverId" type="site" :site-id="siteId" />
+          <SharedLogsSheet
+            v-if="serverId && siteId"
+            :server-id="serverId"
+            type="site"
+            :site-id="siteId"
+          />
           <Button
             v-if="serverConnected"
             variant="outline"
@@ -1792,7 +2262,12 @@ onMounted(fetchTeams);
             Terminal
           </Button>
           <SiteDeployApplication
-            v-if="serverId && siteId && siteType && !['wordpress', 'phpmyadmin'].includes(siteType)"
+            v-if="
+              serverId &&
+              siteId &&
+              siteType &&
+              !['wordpress', 'phpmyadmin'].includes(siteType)
+            "
             :server-id="serverId"
             :site-id="siteId"
             :is-deploying="isDeploying"
@@ -1800,17 +2275,23 @@ onMounted(fetchTeams);
           />
         </div>
       </div>
-      <nav ref="siteNavRef" class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto">
+      <nav
+        ref="siteNavRef"
+        class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
+      >
         <NuxtLink
           v-for="tab in siteDetailTabs"
           :key="tab.value"
           :ref="(el) => setSiteTabRef(tab.query, el)"
-          :to="{ path: `/servers/${serverId}/sites/${siteId}`, query: { tab: tab.query } }"
+          :to="{
+            path: `/servers/${serverId}/sites/${siteId}`,
+            query: { tab: tab.query },
+          }"
           class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
           :class="[
             isSiteTabActive(tab.query)
               ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground'
+              : 'text-muted-foreground hover:text-foreground',
           ]"
         >
           <Icon :name="tab.icon" class="h-4 w-4" />
@@ -1819,7 +2300,10 @@ onMounted(fetchTeams);
         <!-- Sliding indicator -->
         <span
           class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-          :style="{ left: `${siteIndicatorLeft}px`, width: `${siteIndicatorWidth}px` }"
+          :style="{
+            left: `${siteIndicatorLeft}px`,
+            width: `${siteIndicatorWidth}px`,
+          }"
         />
       </nav>
     </div>
@@ -1849,13 +2333,16 @@ onMounted(fetchTeams);
               class="h-2 w-2 rounded-full"
               :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
             />
-            {{ serverName || 'Loading...' }}
+            {{ serverName || "Loading..." }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
-            <Icon name="lucide:folder-tree" class="h-4 w-4 text-muted-foreground" />
+            <Icon
+              name="lucide:folder-tree"
+              class="h-4 w-4 text-muted-foreground"
+            />
             <span class="text-sm font-medium">
-              {{ projectName || 'Loading...' }}
+              {{ projectName || "Loading..." }}
             </span>
           </div>
         </div>
@@ -1931,7 +2418,10 @@ onMounted(fetchTeams);
         tabRect.left - navRect.left so it's relative to the nav and
         survives the offset.
       -->
-      <nav ref="projectNavRef" class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto">
+      <nav
+        ref="projectNavRef"
+        class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
+      >
         <NuxtLink
           v-for="tab in projectDetailTabs"
           :key="tab.value"
@@ -1952,7 +2442,10 @@ onMounted(fetchTeams);
         </NuxtLink>
         <span
           class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-          :style="{ left: `${projectIndicatorLeft}px`, width: `${projectIndicatorWidth}px` }"
+          :style="{
+            left: `${projectIndicatorLeft}px`,
+            width: `${projectIndicatorWidth}px`,
+          }"
         />
       </nav>
     </div>
@@ -1983,7 +2476,7 @@ onMounted(fetchTeams);
               class="h-2 w-2 rounded-full"
               :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
             />
-            {{ serverName || 'Loading...' }}
+            {{ serverName || "Loading..." }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <NuxtLink
@@ -1991,7 +2484,7 @@ onMounted(fetchTeams);
             class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <Icon name="lucide:folder-tree" class="h-4 w-4" />
-            {{ projectName || 'Loading...' }}
+            {{ projectName || "Loading..." }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <!--
@@ -2008,7 +2501,9 @@ onMounted(fetchTeams);
               v-if="workloadStatus"
               class="h-2 w-2 shrink-0 rounded-full"
               :class="workloadStatusDotClass"
-              :title="workloadStatus.charAt(0).toUpperCase() + workloadStatus.slice(1)"
+              :title="
+                workloadStatus.charAt(0).toUpperCase() + workloadStatus.slice(1)
+              "
             />
             <Icon
               v-if="workloadKindIcon"
@@ -2017,7 +2512,7 @@ onMounted(fetchTeams);
               :class="workloadKindIconColor"
             />
             <span class="truncate text-sm font-medium text-foreground">
-              {{ workloadName || 'Loading...' }}
+              {{ workloadName || "Loading..." }}
             </span>
           </div>
         </div>
@@ -2053,8 +2548,15 @@ onMounted(fetchTeams);
                   @select="runDatabaseLifecycle('start')"
                 >
                   <Icon
-                    :name="workloadActionInFlight === 'start' ? 'lucide:loader-2' : 'lucide:play'"
-                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'start' && 'animate-spin']"
+                    :name="
+                      workloadActionInFlight === 'start'
+                        ? 'lucide:loader-2'
+                        : 'lucide:play'
+                    "
+                    :class="[
+                      'mr-2 h-4 w-4',
+                      workloadActionInFlight === 'start' && 'animate-spin',
+                    ]"
                   />
                   Start
                 </DropdownMenuItem>
@@ -2064,8 +2566,15 @@ onMounted(fetchTeams);
                   @select="runDatabaseLifecycle('stop')"
                 >
                   <Icon
-                    :name="workloadActionInFlight === 'stop' ? 'lucide:loader-2' : 'lucide:square'"
-                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'stop' && 'animate-spin']"
+                    :name="
+                      workloadActionInFlight === 'stop'
+                        ? 'lucide:loader-2'
+                        : 'lucide:square'
+                    "
+                    :class="[
+                      'mr-2 h-4 w-4',
+                      workloadActionInFlight === 'stop' && 'animate-spin',
+                    ]"
                   />
                   Stop
                 </DropdownMenuItem>
@@ -2074,8 +2583,15 @@ onMounted(fetchTeams);
                   @select="runDatabaseLifecycle('restart')"
                 >
                   <Icon
-                    :name="workloadActionInFlight === 'restart' ? 'lucide:loader-2' : 'lucide:rotate-cw'"
-                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'restart' && 'animate-spin']"
+                    :name="
+                      workloadActionInFlight === 'restart'
+                        ? 'lucide:loader-2'
+                        : 'lucide:rotate-cw'
+                    "
+                    :class="[
+                      'mr-2 h-4 w-4',
+                      workloadActionInFlight === 'restart' && 'animate-spin',
+                    ]"
                   />
                   Restart
                 </DropdownMenuItem>
@@ -2110,8 +2626,15 @@ onMounted(fetchTeams);
                   @select="runApplicationAction('deploy')"
                 >
                   <Icon
-                    :name="workloadActionInFlight === 'deploy' ? 'lucide:loader-2' : 'lucide:rocket'"
-                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'deploy' && 'animate-spin']"
+                    :name="
+                      workloadActionInFlight === 'deploy'
+                        ? 'lucide:loader-2'
+                        : 'lucide:rocket'
+                    "
+                    :class="[
+                      'mr-2 h-4 w-4',
+                      workloadActionInFlight === 'deploy' && 'animate-spin',
+                    ]"
                   />
                   Deploy
                 </DropdownMenuItem>
@@ -2121,8 +2644,15 @@ onMounted(fetchTeams);
                   @select="runApplicationAction('reload')"
                 >
                   <Icon
-                    :name="workloadActionInFlight === 'restart' ? 'lucide:loader-2' : 'lucide:refresh-cw'"
-                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'restart' && 'animate-spin']"
+                    :name="
+                      workloadActionInFlight === 'restart'
+                        ? 'lucide:loader-2'
+                        : 'lucide:refresh-cw'
+                    "
+                    :class="[
+                      'mr-2 h-4 w-4',
+                      workloadActionInFlight === 'restart' && 'animate-spin',
+                    ]"
                   />
                   Reload
                 </DropdownMenuItem>
@@ -2130,10 +2660,7 @@ onMounted(fetchTeams);
                   :disabled="workloadActionInFlight !== null"
                   @select="runApplicationAction('rebuild')"
                 >
-                  <Icon
-                    name="lucide:hammer"
-                    class="mr-2 h-4 w-4"
-                  />
+                  <Icon name="lucide:hammer" class="mr-2 h-4 w-4" />
                   Rebuild
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -2142,8 +2669,15 @@ onMounted(fetchTeams);
                   @select="runApplicationAction('start')"
                 >
                   <Icon
-                    :name="workloadActionInFlight === 'start' ? 'lucide:loader-2' : 'lucide:play'"
-                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'start' && 'animate-spin']"
+                    :name="
+                      workloadActionInFlight === 'start'
+                        ? 'lucide:loader-2'
+                        : 'lucide:play'
+                    "
+                    :class="[
+                      'mr-2 h-4 w-4',
+                      workloadActionInFlight === 'start' && 'animate-spin',
+                    ]"
                   />
                   Start
                 </DropdownMenuItem>
@@ -2153,8 +2687,15 @@ onMounted(fetchTeams);
                   @select="runApplicationAction('stop')"
                 >
                   <Icon
-                    :name="workloadActionInFlight === 'stop' ? 'lucide:loader-2' : 'lucide:square'"
-                    :class="['mr-2 h-4 w-4', workloadActionInFlight === 'stop' && 'animate-spin']"
+                    :name="
+                      workloadActionInFlight === 'stop'
+                        ? 'lucide:loader-2'
+                        : 'lucide:square'
+                    "
+                    :class="[
+                      'mr-2 h-4 w-4',
+                      workloadActionInFlight === 'stop' && 'animate-spin',
+                    ]"
                   />
                   Stop
                 </DropdownMenuItem>
@@ -2229,8 +2770,13 @@ onMounted(fetchTeams);
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
-            <span class="text-sm font-medium">{{ domainAddress || 'Loading...' }}</span>
-            <span v-if="domainProviderLabel" class="rounded bg-muted px-2 py-0.5 text-xs font-medium">
+            <span class="text-sm font-medium">{{
+              domainAddress || "Loading..."
+            }}</span>
+            <span
+              v-if="domainProviderLabel"
+              class="rounded bg-muted px-2 py-0.5 text-xs font-medium"
+            >
               {{ domainProviderLabel }}
             </span>
           </div>
@@ -2245,7 +2791,7 @@ onMounted(fetchTeams);
           :class="[
             isDnsTabActive(tab.path)
               ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground'
+              : 'border-transparent text-muted-foreground hover:border-muted-foreground/50 hover:text-foreground',
           ]"
         >
           {{ tab.label }}
@@ -2254,7 +2800,10 @@ onMounted(fetchTeams);
     </div>
 
     <!-- Create Team Dialog -->
-    <SettingsCreateTeam v-model:open="isCreateTeamOpen" @created="onTeamCreated" />
+    <SettingsCreateTeam
+      v-model:open="isCreateTeamOpen"
+      @created="onTeamCreated"
+    />
 
     <SettingsSheet />
 
