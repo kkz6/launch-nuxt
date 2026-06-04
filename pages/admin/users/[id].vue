@@ -217,7 +217,7 @@ onMounted(load);
           </Avatar>
           <div class="space-y-1.5">
             <div class="flex flex-wrap items-center gap-2.5">
-              <h1 class="text-2xl font-semibold tracking-tight">
+              <h1 class="text-xl font-semibold tracking-tight">
                 {{ user.name }}
               </h1>
               <Badge :variant="statusVariant" class="capitalize">
@@ -322,7 +322,7 @@ onMounted(load);
       <!-- Metrics strip -->
       <div class="flex flex-wrap gap-x-12 gap-y-6 border-b py-6">
         <div>
-          <p class="text-2xl font-semibold capitalize">{{ user.status }}</p>
+          <p class="text-lg font-semibold capitalize">{{ user.status }}</p>
           <p
             class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
           >
@@ -330,7 +330,7 @@ onMounted(load);
           </p>
         </div>
         <div>
-          <p class="text-2xl font-semibold">{{ user.teams.length }}</p>
+          <p class="text-lg font-semibold">{{ user.teams.length }}</p>
           <p
             class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
           >
@@ -338,7 +338,7 @@ onMounted(load);
           </p>
         </div>
         <div>
-          <p class="text-2xl font-semibold">{{ activeSubs }}</p>
+          <p class="text-lg font-semibold">{{ activeSubs }}</p>
           <p
             class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
           >
@@ -346,7 +346,7 @@ onMounted(load);
           </p>
         </div>
         <div>
-          <p class="text-2xl font-semibold">{{ joined }}</p>
+          <p class="text-lg font-semibold">{{ joined }}</p>
           <p
             class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
           >

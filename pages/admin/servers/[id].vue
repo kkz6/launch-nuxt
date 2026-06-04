@@ -129,7 +129,7 @@ onMounted(load);
         </div>
         <div class="space-y-1.5">
           <div class="flex flex-wrap items-center gap-2.5">
-            <h1 class="text-2xl font-semibold tracking-tight">
+            <h1 class="text-xl font-semibold tracking-tight">
               {{ server.name }}
             </h1>
             <Badge :variant="statusVariant" class="capitalize">
@@ -155,7 +155,7 @@ onMounted(load);
       <!-- Metrics strip -->
       <div class="flex flex-wrap gap-x-12 gap-y-6 border-b py-6">
         <div>
-          <p class="text-2xl font-semibold">{{ server.cpu_cores ?? "—" }}</p>
+          <p class="text-lg font-semibold">{{ server.cpu_cores ?? "—" }}</p>
           <p
             class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
           >
@@ -163,7 +163,7 @@ onMounted(load);
           </p>
         </div>
         <div>
-          <p class="text-2xl font-semibold">{{ memory }}</p>
+          <p class="text-lg font-semibold">{{ memory }}</p>
           <p
             class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
           >
@@ -171,7 +171,7 @@ onMounted(load);
           </p>
         </div>
         <div>
-          <p class="text-2xl font-semibold">
+          <p class="text-lg font-semibold">
             {{ server.storage_in_gb ? `${server.storage_in_gb} GB` : "—" }}
           </p>
           <p
@@ -181,7 +181,7 @@ onMounted(load);
           </p>
         </div>
         <div>
-          <p class="font-mono text-2xl font-semibold">
+          <p class="font-mono text-lg font-semibold">
             {{ server.public_ipv4 || "—" }}
           </p>
           <p
