@@ -1106,10 +1106,17 @@ onMounted(fetchTeams);
               <DropdownMenuItem
                 v-if="isStaff"
                 class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
-                @click="navigateTo('/admin')"
+                @click="navigateTo(showAdminContext ? '/dashboard' : '/admin')"
               >
-                <Shield class="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Admin Panel</span>
+                <Icon
+                  v-if="showAdminContext"
+                  name="lucide:layout-dashboard"
+                  class="h-3.5 w-3.5 text-muted-foreground"
+                />
+                <Shield v-else class="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{{
+                  showAdminContext ? "Back to App" : "Admin Panel"
+                }}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator class="my-1" />
 
