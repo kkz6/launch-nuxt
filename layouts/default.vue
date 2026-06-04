@@ -9,6 +9,11 @@ defineProps<{
 const { isAuthenticated, isInitialized } = useAuth();
 const { isImpersonating, impersonatedName, stop } = useImpersonation();
 const colorMode = useColorMode();
+const route = useRoute();
+
+// The back-office uses Inter (the rest of the app uses Manrope). Scoping the
+// font to a class on the app container keeps it to the admin experience.
+const isAdminArea = computed(() => route.path.startsWith("/admin"));
 
 const isExiting = ref(false);
 
@@ -37,6 +42,7 @@ onMounted(() => {
     v-if="isInitialized && isAuthenticated"
     id="app-container"
     class="relative flex h-screen w-full flex-col overflow-hidden bg-background"
+    :class="{ 'admin-area': isAdminArea }"
   >
     <div
       v-if="isImpersonating"
