@@ -689,6 +689,40 @@ export interface AdminUserRow {
   teams: AdminTeam[];
 }
 
+export interface AdminServerOwner {
+  team_id: string;
+  team_name: string;
+  personal_team: boolean;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+}
+
+export interface AdminServerDetail {
+  id: string;
+  name: string;
+  description?: string | null;
+  provider: string;
+  type?: string | null;
+  status: string;
+  connected: boolean;
+  public_ipv4?: string | null;
+  cpu_cores?: number | null;
+  memory_in_mb?: number | null;
+  storage_in_gb?: number | null;
+  operating_system?: string | null;
+  detected_os_id?: string | null;
+  detected_os_version?: string | null;
+  detected_arch?: string | null;
+  detected_kernel?: string | null;
+  monitoring_enabled: boolean;
+  auto_update: boolean;
+  provisioned_at?: string | null;
+  last_connectivity_check?: string | null;
+  created_at?: string | null;
+  owner: AdminServerOwner;
+}
+
 export interface RecentPayment {
   team_id: string;
   team_name: string;

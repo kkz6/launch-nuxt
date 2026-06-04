@@ -1,5 +1,6 @@
 import type {
   AdminUserRow,
+  AdminServerDetail,
   AdminOverview,
   AdminFailuresResponse,
   PlatformInvitation,
@@ -132,6 +133,11 @@ export const adminService = {
     return get<PaginatedAdminResponse<Server>>("/admin/servers", {
       query: toQuery(params),
     });
+  },
+
+  showServer: (id: string | number) => {
+    const { get } = useApi();
+    return get<ApiResponse<AdminServerDetail>>(`/admin/servers/${id}`);
   },
 
   serverLogs: (serverId: string) => {
