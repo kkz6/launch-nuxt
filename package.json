@@ -10,7 +10,10 @@
     "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "pretest": "test -f .nuxt/tsconfig.server.json || nuxt prepare; test -f .nuxt/tsconfig.json || cp .nuxt/tsconfig.server.json .nuxt/tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",
@@ -66,11 +69,14 @@
     "@tailwindcss/typography": "^0.5.16",
     "@types/aos": "^3.0.7",
     "@types/node": "^22.13.9",
+    "@vue/test-utils": "^2.4.10",
     "eslint": "^9.22.0",
+    "jsdom": "^25.0.1",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.8.2",
+    "vitest": "^2.1.9",
     "vue-tsc": "^3.2.2"
   }
 }

@@ -23,6 +23,17 @@ const reconnectAttempts = ref(0)
 const maxReconnectAttempts = 10
 const baseReconnectDelay = 1000 // 1 second
 
+// Reference count per channel. Many components can call
+// subscribeToChannel('team.X') concurrently (the servers index page,
+// the provision-logs sheet, the navbar banner, etc.) — we must only
+// send the wire-level `subscribe` once, and only send `unsubscribe`
+// when the LAST local listener goes away. Without this refcount, the
+// first component to unmount would remove the client from the channel
+// at the hub, even though other components still wanted events. This
+// caused the "server.deleted event never arrives" symptom: 6 subscribes
+// + 2 unsubscribes within 30ms killed the team-channel subscription.
+const channelRefCounts = new Map<string, number>()
+
 export const useWebSocket = () => {
   const config = useRuntimeConfig()
   const { token, isInitialized, waitForAuth } = useAuth()
@@ -56,6 +67,17 @@ export const useWebSocket = () => {
       console.log('[WebSocket] Connected')
       isConnected.value = true
       reconnectAttempts.value = 0
+
+      // Re-send subscribe for every channel that still has live local
+      // listeners. Otherwise on reconnect (or after the API restarts),
+      // the hub-side subscription is gone and we silently stop getting
+      // events even though our components still expect them.
+      for (const channel of channelRefCounts.keys()) {
+        ws.value?.send(JSON.stringify({
+          action: 'subscribe',
+          channel,
+        }))
+      }
     }
 
     ws.value.onmessage = (e) => {
@@ -149,7 +171,10 @@ export const useWebSocket = () => {
   }
 
   const subscribeToChannel = (channel: string) => {
-    if (ws.value?.readyState === WebSocket.OPEN) {
+    const before = channelRefCounts.get(channel) ?? 0
+    channelRefCounts.set(channel, before + 1)
+    // Only send the wire-level subscribe on the first listener.
+    if (before === 0 && ws.value?.readyState === WebSocket.OPEN) {
       ws.value.send(JSON.stringify({
         action: 'subscribe',
         channel,
@@ -158,11 +183,21 @@ export const useWebSocket = () => {
   }
 
   const unsubscribeFromChannel = (channel: string) => {
-    if (ws.value?.readyState === WebSocket.OPEN) {
-      ws.value.send(JSON.stringify({
-        action: 'unsubscribe',
-        channel,
-      }))
+    const before = channelRefCounts.get(channel) ?? 0
+    if (before <= 0) return
+    const after = before - 1
+    if (after === 0) {
+      channelRefCounts.delete(channel)
+      // Only send the wire-level unsubscribe when the last listener
+      // goes away. See the comment on channelRefCounts above.
+      if (ws.value?.readyState === WebSocket.OPEN) {
+        ws.value.send(JSON.stringify({
+          action: 'unsubscribe',
+          channel,
+        }))
+      }
+    } else {
+      channelRefCounts.set(channel, after)
     }
   }
 
@@ -175,11 +210,60 @@ export const useWebSocket = () => {
     }
   }, { immediate: true })
 
+  // Bring the connection back when conditions change.
+  //
+  // Without this, after `maxReconnectAttempts` consecutive failures the
+  // client gives up forever — and the tab silently stops receiving
+  // events with no UI signal. Real-world trigger that surfaced this:
+  // the API process is restarted (deploy, dev restart, OS sleep),
+  // backoff exhausts during the few minutes it takes to come back up,
+  // and from then on every "deploying / deployed / failed" event lands
+  // on a dead socket. The user sees a frozen page until manual reload.
+  //
+  // We treat three signals as "operator just asked us to retry":
+  //   - the tab regains focus (`visibilitychange` -> visible)
+  //   - the OS regains network (`online`)
+  //   - the user clicks a manual reconnect affordance somewhere (kickReconnect)
+  // On any of them, reset the attempt counter so backoff starts fresh
+  // and immediately call connect(). connect() is idempotent — it's a
+  // no-op while OPEN/CONNECTING, so spamming this is safe.
+  if (import.meta.client) {
+    const wake = () => {
+      if (ws.value?.readyState === WebSocket.OPEN) return
+      reconnectAttempts.value = 0
+      if (reconnectTimeout.value) {
+        clearTimeout(reconnectTimeout.value)
+        reconnectTimeout.value = null
+      }
+      void connect()
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') wake()
+    }
+    // Listeners installed once per composable invocation. We don't
+    // remove them on unmount on purpose — useWebSocket is a singleton
+    // pattern; the connection outlives any one component instance.
+    window.addEventListener('visibilitychange', onVisibility, { passive: true })
+    window.addEventListener('online', wake, { passive: true })
+  }
+
+  // Exposed so a UI banner ("Live updates paused — click to retry")
+  // has something to call without reimplementing the wake logic.
+  const kickReconnect = () => {
+    reconnectAttempts.value = 0
+    if (reconnectTimeout.value) {
+      clearTimeout(reconnectTimeout.value)
+      reconnectTimeout.value = null
+    }
+    void connect()
+  }
+
   return {
     isConnected: readonly(isConnected),
     connect,
     disconnect,
     reconnect,
+    kickReconnect,
     subscribe,
     subscribeToChannel,
     unsubscribeFromChannel,

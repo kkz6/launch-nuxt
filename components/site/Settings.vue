@@ -148,8 +148,13 @@ const onSubmit = handleSubmit(async (values) => {
   isLoading.value = true
 
   try {
-    await $api(`/servers/${props.serverId}/sites/${props.site.id}/settings`, {
-      method: 'PATCH',
+    // Backend exposes site Settings updates via the canonical site
+    // resource (PUT /sites/:id with UpdateSiteRequest), not a
+    // /settings sub-resource — the latter is GET-only. Hitting the
+    // old PATCH /settings path used to return 405 and the toast
+    // said "Failed to update settings".
+    await $api(`/servers/${props.serverId}/sites/${props.site.id}`, {
+      method: 'PUT',
       body: values,
     })
     toast.success('Settings updated')

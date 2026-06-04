@@ -270,8 +270,7 @@
   }
 
   .site-grid-pattern {
-    background-image:
-      linear-gradient(hsl(var(--site-text) / 0.03) 1px, transparent 1px),
+    background-image: linear-gradient(hsl(var(--site-text) / 0.03) 1px, transparent 1px),
       linear-gradient(90deg, hsl(var(--site-text) / 0.03) 1px, transparent 1px);
     background-size: 60px 60px;
   }
@@ -283,12 +282,12 @@
 
   /* Font for landing pages */
   .font-site {
-    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
   }
 
   /* Site heading font */
   .font-site-heading {
-    font-family: "Plus Jakarta Sans", sans-serif;
+    font-family: 'Manrope', sans-serif;
   }
 }
 
@@ -314,9 +313,7 @@
 /* Page transitions */
 .page-enter-active,
 .page-leave-active {
-  transition:
-    opacity 0.15s ease,
-    transform 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .page-enter-from {

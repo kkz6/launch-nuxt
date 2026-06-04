@@ -68,6 +68,80 @@ const loadingAction = ref<{ software: string; action: string } | null>(null)
 const isInstallDialogOpen = ref(false)
 const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
 
+// Launch Agent update banner
+interface AgentVersionInfo {
+  service_id: string
+  installed: string
+  latest: string
+  update_available: boolean
+}
+const agentVersion = ref<AgentVersionInfo | null>(null)
+const isUpdatingAgent = ref(false)
+
+// Persistent "update in progress" timestamp so the banner + agent-row
+// status stay on "Updating" across reloads. The service-operation job
+// has no started-event broadcast yet, so the UI drives this state on
+// its own and polls the version endpoint until installed catches up to
+// latest (or the TTL expires as a safety net).
+const agentUpdateStorageKey = computed(() => `launch:agent-update:${props.serverId}`)
+const agentUpdateStartedAt = ref<number | null>(null)
+const AGENT_UPDATE_TTL_MS = 5 * 60 * 1000
+
+const readUpdateStarted = (): number | null => {
+  if (typeof window === 'undefined') return null
+  const raw = window.localStorage.getItem(agentUpdateStorageKey.value)
+  if (!raw) return null
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return null
+  if (Date.now() - n > AGENT_UPDATE_TTL_MS) {
+    window.localStorage.removeItem(agentUpdateStorageKey.value)
+    return null
+  }
+  return n
+}
+
+const writeUpdateStarted = (ts: number | null) => {
+  agentUpdateStartedAt.value = ts
+  if (typeof window === 'undefined') return
+  if (ts === null) {
+    window.localStorage.removeItem(agentUpdateStorageKey.value)
+  } else {
+    window.localStorage.setItem(agentUpdateStorageKey.value, String(ts))
+  }
+}
+
+// True from the moment the user triggers Update until the version
+// endpoint confirms installed === latest (or until the TTL elapses).
+const agentUpdateInProgress = computed(() => {
+  if (!agentUpdateStartedAt.value) return false
+  if (Date.now() - agentUpdateStartedAt.value > AGENT_UPDATE_TTL_MS) return false
+  const v = agentVersion.value
+  // If we don't know the latest yet, stay in "updating" — better to
+  // keep the spinner than to flash back to "update available".
+  if (!v) return true
+  if (v.update_available === false) return false
+  // update_available true but installed already matches latest → done.
+  if (v.installed && v.latest && v.installed === v.latest) return false
+  return true
+})
+
+let agentPollTimer: ReturnType<typeof setInterval> | null = null
+const stopAgentPoll = () => {
+  if (agentPollTimer) {
+    clearInterval(agentPollTimer)
+    agentPollTimer = null
+  }
+}
+const startAgentPoll = () => {
+  stopAgentPoll()
+  agentPollTimer = setInterval(() => {
+    fetchAgentVersion()
+    if (!agentUpdateInProgress.value) {
+      stopAgentPoll()
+    }
+  }, 5000)
+}
+
 // Status dialog state
 const isStatusDialogOpen = ref(false)
 const selectedServiceForStatus = ref<Service | null>(null)
@@ -239,8 +313,37 @@ const getLiveStatus = (serviceId: string) => {
   return liveStatuses.value.find(s => s.id === serviceId)
 }
 
+// Heuristic for "do we trust the persisted DB status?". The Services
+// API hands back the last cached status alongside last_status_check —
+// when that timestamp is stale (older than 5 min) the cached value is
+// likely a leftover (e.g. one failed daemon-supervisor probe months
+// ago that latched the Launch Agent service as Failed even though the
+// agent itself is running fine). Until the live status WS catches up,
+// show "Checking…" instead of broadcasting a misleading state.
+const STATUS_FRESHNESS_MS = 5 * 60 * 1000
+const isPersistedStatusFresh = (service: Service): boolean => {
+  if (!service.last_status_check) return false
+  const checkedAt = Date.parse(service.last_status_check)
+  if (Number.isNaN(checkedAt)) return false
+  return Date.now() - checkedAt < STATUS_FRESHNESS_MS
+}
+
 // Get display status (prefer live status over API status)
 const getDisplayStatus = (service: Service) => {
+  // While the agent self-upgrade is in flight the row should read
+  // "Updating" — the underlying systemd unit may still report Running
+  // (binary swap doesn't always stop the service), but the meaningful
+  // state for the user is "we're in the middle of swapping it out".
+  if (service.software === 'launch_agent' && agentUpdateInProgress.value) {
+    return {
+      status: 'updating',
+      label: 'Updating',
+      memory: undefined,
+      uptime: undefined,
+      pid: undefined,
+      isLive: false,
+    }
+  }
   const live = getLiveStatus(service.id)
   if (live) {
     return {
@@ -252,6 +355,21 @@ const getDisplayStatus = (service: Service) => {
       isLive: true,
     }
   }
+  // No live status yet AND the persisted check is stale → surface a
+  // neutral "Checking…" rather than the cached (possibly wrong)
+  // status. This is what kills the "Failed → Installed" flash on the
+  // Launch Agent row when the supervised-daemon webhook had latched
+  // a months-old FATAL into the parent service.status.
+  if (!isPersistedStatusFresh(service)) {
+    return {
+      status: 'checking',
+      label: 'Checking…',
+      memory: undefined,
+      uptime: undefined,
+      pid: undefined,
+      isLive: false,
+    }
+  }
   return {
     status: service.status,
     label: service.status_label,
@@ -260,6 +378,13 @@ const getDisplayStatus = (service: Service) => {
     pid: service.status_details?.pid ? Number(service.status_details.pid) : undefined,
     isLive: false,
   }
+}
+
+// Prefer the live-probed version (e.g. the real launch-agent version)
+// over the stored value, which can be an install-time placeholder like
+// "latest".
+const displayVersion = (service: Service) => {
+  return getLiveStatus(service.id)?.version || service.version
 }
 
 // Map service types to image paths
@@ -275,6 +400,10 @@ const getServiceImagePath = (service: Service) => {
     bun: '/images/services/bun.svg',
     node: '/images/services/node.svg',
     launch_agent: '/images/services/launch_agent.svg',
+    // Docker / Traefik are keyed by their ServiceType string (not the
+    // software name): container_runtime = Docker, reverse_proxy = Traefik.
+    container_runtime: '/images/services/docker.svg',
+    reverse_proxy: '/images/services/traefik.svg',
   }
 
   if (imageMap[service.type]) {
@@ -299,10 +428,46 @@ const fetchServices = async () => {
   }
 }
 
-const serviceAction = async (service: Service, action: 'start' | 'stop' | 'restart') => {
+const fetchAgentVersion = async () => {
+  try {
+    const data = await $api<{ data: AgentVersionInfo }>(`/servers/${props.serverId}/agent-version`)
+    agentVersion.value = data.data || null
+  } catch {
+    // Non-fatal: GitHub lookup unavailable or agent not installed —
+    // the banner just doesn't render.
+    agentVersion.value = null
+  }
+}
+
+const updateAgent = async () => {
+  const info = agentVersion.value
+  if (!info?.service_id) return
+
+  isUpdatingAgent.value = true
+  try {
+    await $api(`/servers/${props.serverId}/services/${info.service_id}/update`, {
+      method: 'POST',
+    })
+    toast.success(`Updating Launch Agent to v${info.latest}…`)
+    // Latch the "updating" state immediately so the banner + agent row
+    // status flip to "Updating" rather than continuing to show
+    // "Update available". The poll below clears it once the agent
+    // reports the new version.
+    writeUpdateStarted(Date.now())
+    fetchServices()
+    fetchAgentVersion()
+    startAgentPoll()
+  } catch {
+    toast.error('Failed to start Launch Agent update')
+  } finally {
+    isUpdatingAgent.value = false
+  }
+}
+
+const serviceAction = async (service: Service, action: 'start' | 'stop' | 'restart' | 'update') => {
   if (!confirmationDialog.value) return
 
-  const actionLabels: Record<string, string> = { start: 'Start', stop: 'Stop', restart: 'Restart' }
+  const actionLabels: Record<string, string> = { start: 'Start', stop: 'Stop', restart: 'Restart', update: 'Update' }
   const result = await confirmationDialog.value.show({
     title: `${actionLabels[action]} Service`,
     description: `Are you sure you want to ${action} "${service.name}"?`,
@@ -319,6 +484,14 @@ const serviceAction = async (service: Service, action: 'start' | 'stop' | 'resta
       method: 'POST',
     })
     toast.success(`${service.name} ${action} initiated`)
+    // Launch-Agent "update" path: latch the persistent updating state
+    // so the row badge + banner reflect "Updating" until the agent
+    // reports the new version (or the TTL elapses).
+    if (action === 'update' && service.software === 'launch_agent') {
+      writeUpdateStarted(Date.now())
+      fetchAgentVersion()
+      startAgentPoll()
+    }
     fetchServices()
   } catch {
     toast.error(`Failed to ${action} service`)
@@ -346,7 +519,12 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
     case 'pending':
     case 'installing':
     case 'uninstalling':
+    case 'updating':
       return 'warning'
+    case 'checking':
+      // Neutral secondary while we wait for the live WS probe — not
+      // an alarming colour and not a "stable" one, just transitional.
+      return 'secondary'
     case 'installed':
       return 'default'
     default:
@@ -380,12 +558,87 @@ const sortedServices = computed(() =>
 onMounted(() => {
   fetchServices()
   fetchLogs()
+  fetchAgentVersion()
+  // Rehydrate updating state on remount so a reload doesn't drop us
+  // back to "Update available". If we land mid-update, restart the
+  // poll until the version catches up.
+  const persisted = readUpdateStarted()
+  if (persisted) {
+    agentUpdateStartedAt.value = persisted
+    startAgentPoll()
+  }
+})
+
+// Clear the persistent flag the moment the version endpoint confirms
+// we're back in sync — no point keeping the row badge on "Updating"
+// after the agent has restarted reporting the new version.
+watch(agentUpdateInProgress, (inProgress) => {
+  if (!inProgress && agentUpdateStartedAt.value !== null) {
+    writeUpdateStarted(null)
+    stopAgentPoll()
+    toast.success('Launch Agent updated')
+  }
+})
+
+onBeforeUnmount(() => {
+  stopAgentPoll()
 })
 </script>
 
 <template>
   <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!--
+      Launch Agent update banner.
+
+      Three states drive the banner:
+        1. "Updating…" — agentUpdateInProgress (sticky after Run via
+           the persisted timestamp; cleared once installed === latest
+           or the TTL elapses).
+        2. "Update available" — the version endpoint reports installed
+           !== latest and we haven't triggered the update yet.
+        3. Hidden — installed === latest.
+    -->
+    <div
+      v-if="agentUpdateInProgress"
+      class="flex flex-col gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-blue-800/60 dark:bg-blue-950/30"
+    >
+      <div class="flex items-start gap-2.5">
+        <Icon name="lucide:loader-2" class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
+        <div class="text-sm">
+          <p class="font-medium text-blue-900 dark:text-blue-200">
+            Updating Launch Agent<template v-if="agentVersion?.latest">
+              to <span class="font-semibold">v{{ agentVersion.latest }}</span></template>…
+          </p>
+          <p class="text-blue-700 dark:text-blue-300/90">
+            The install script is running on this server. The status will refresh automatically.
+          </p>
+        </div>
+      </div>
+    </div>
+    <div
+      v-else-if="agentVersion?.update_available"
+      class="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800/60 dark:bg-amber-950/30"
+    >
+      <div class="flex items-start gap-2.5">
+        <Icon name="lucide:arrow-up-circle" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <div class="text-sm">
+          <p class="font-medium text-amber-900 dark:text-amber-200">
+            Launch Agent update available
+          </p>
+          <p class="text-amber-700 dark:text-amber-300/90">
+            Version <span class="font-semibold">v{{ agentVersion.latest }}</span> is available<template v-if="agentVersion.installed">
+              — this server runs <span class="font-semibold">v{{ agentVersion.installed }}</span></template>.
+          </p>
+        </div>
+      </div>
+      <Button size="sm" :disabled="isUpdatingAgent" class="shrink-0" @click="updateAgent">
+        <Icon v-if="isUpdatingAgent" name="lucide:loader-2" class="mr-1.5 h-3.5 w-3.5 animate-spin" />
+        <Icon v-else name="lucide:download" class="mr-1.5 h-3.5 w-3.5" />
+        {{ isUpdatingAgent ? 'Updating…' : `Update to v${agentVersion.latest}` }}
+      </Button>
+    </div>
 
     <!-- Install Service Dialog -->
     <ServerSettingsInstallServiceDialog
@@ -542,7 +795,7 @@ onMounted(() => {
                             </Tooltip>
                           </TooltipProvider>
                         </div>
-                        <div class="font-mono text-xs text-muted-foreground">v{{ service.version }}</div>
+                        <div class="font-mono text-xs text-muted-foreground">v{{ displayVersion(service) }}</div>
                       </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -574,6 +827,23 @@ onMounted(() => {
                           <DropdownMenuItem @click="openStatusDialog(service)">
                             <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
                             View Details
+                          </DropdownMenuItem>
+                          <!--
+                            Manual "Update" / re-install for the Launch Agent. The
+                            agent-version-available banner only fires when the
+                            comparison says installed < latest, but legacy v1.0
+                            binaries report ">v0.8.0" semver-wise so the banner
+                            stays hidden. This action is the always-available
+                            escape hatch — runs the existing service-operation
+                            update action (re-runs the install script, which
+                            self-upgrades to the latest published build).
+                          -->
+                          <DropdownMenuItem
+                            v-if="service.software === 'launch_agent'"
+                            @click="serviceAction(service, 'update')"
+                          >
+                            <Icon name="lucide:download" class="mr-2 h-4 w-4" />
+                            Update Agent
                           </DropdownMenuItem>
                           <DropdownMenuItem v-if="logsByService.has(service.software)" @click="openLogSheet(service)">
                             <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
@@ -636,7 +906,7 @@ onMounted(() => {
                                 <span>{{ getDisplayStatus(service).uptime }}</span>
                               </template>
                               <span class="text-muted-foreground">Version:</span>
-                              <span>{{ service.version }}</span>
+                              <span>{{ displayVersion(service) }}</span>
                             </div>
                             <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                               Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
@@ -671,7 +941,7 @@ onMounted(() => {
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                      <div class="text-xs text-muted-foreground">v{{ service.version }}</div>
+                      <div class="text-xs text-muted-foreground">v{{ displayVersion(service) }}</div>
                     </div>
                   </div>
 
@@ -703,7 +973,7 @@ onMounted(() => {
                                 <span>{{ getDisplayStatus(service).uptime }}</span>
                               </template>
                               <span class="text-muted-foreground">Version:</span>
-                              <span>{{ service.version }}</span>
+                              <span>{{ displayVersion(service) }}</span>
                             </div>
                             <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
                               Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}

@@ -148,9 +148,9 @@ const providerOptions = computed(() =>
   <Dialog v-model:open="isOpen">
     <DialogTrigger as-child>
       <slot>
-        <Button>
-          <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-          Add Domain
+        <Button class="px-2.5 sm:px-4" aria-label="Add domain">
+          <Icon name="lucide:plus" class="h-4 w-4 sm:mr-2" />
+          <span class="hidden sm:inline">Add Domain</span>
         </Button>
       </slot>
     </DialogTrigger>

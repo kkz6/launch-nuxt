@@ -14,6 +14,7 @@ export default defineNuxtConfig({
     "@nuxt/content",
   ],
 
+
   css: ["~/assets/css/main.css"],
 
   colorMode: {
@@ -40,14 +41,17 @@ export default defineNuxtConfig({
   runtimeConfig: {
     backendBase: process.env.NUXT_BACKEND_BASE || "http://localhost:8080",
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080/api",
-      wsBase: process.env.NUXT_PUBLIC_WS_BASE || "ws://localhost:8080/api",
+      // No /api suffix — Go app routes live at the root since we dropped
+      // the /api group. Prod overrides via NUXT_PUBLIC_API_BASE
+      // (https://api.<domain>) and NUXT_PUBLIC_WS_BASE (wss://ws.<domain>).
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || "http://localhost:8080",
+      wsBase: process.env.NUXT_PUBLIC_WS_BASE || "ws://localhost:8080",
     },
   },
 
   app: {
-    pageTransition: { name: "page", mode: "out-in" },
-    layoutTransition: { name: "layout", mode: "out-in" },
+    pageTransition: false,
+    layoutTransition: false,
     head: {
       title: "launchctl",
       titleTemplate: "%s - launchctl",
@@ -65,23 +69,9 @@ export default defineNuxtConfig({
       ],
       link: [
         { rel: "icon", type: "image/x-icon", href: "/favicon.ico" },
-        {
-          rel: "icon",
-          type: "image/png",
-          sizes: "32x32",
-          href: "/favicon-32x32.png",
-        },
-        {
-          rel: "icon",
-          type: "image/png",
-          sizes: "16x16",
-          href: "/favicon-16x16.png",
-        },
-        {
-          rel: "apple-touch-icon",
-          sizes: "180x180",
-          href: "/apple-touch-icon.png",
-        },
+        { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32x32.png" },
+        { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png" },
+        { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
         { rel: "manifest", href: "/site.webmanifest" },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         {
@@ -91,7 +81,7 @@ export default defineNuxtConfig({
         },
         {
           rel: "stylesheet",
-          href: "https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
+          href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",
         },
       ],
     },

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from 'vue-sonner'
 import { Badge } from '~/components/ui/badge'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '~/components/ui/sheet'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '~/components/ui/tooltip'
 import type { Database, StorageProviderRecord } from '~/types'
 
@@ -12,6 +13,10 @@ interface BackupJob {
   size: number
   size_in_mb: number
   error?: string
+  // task_id is set by the worker once the SSH task is created — drives
+  // the View Logs button in the history sheet (ServerLogViewer
+  // entity="task"). Absent on legacy rows pre-task-tracking.
+  task_id?: string | null
   created_at: string
   updated_at: string
 }
@@ -62,6 +67,49 @@ const selectedBackupForHistory = ref<Backup | null>(null)
 const isEditDialogOpen = ref(false)
 const selectedBackupForEdit = ref<Backup | null>(null)
 
+// Live log console — auto-opens on Run Backup so the dump/upload
+// streams live (same UX as docker DB backups). Sheet opens immediately
+// in a "Starting backup…" state; task id arrives a beat later on the
+// backup.run.started WS event (see useChannelEvents subscription).
+const isLogSheetOpen = ref(false)
+const logSheetTaskId = ref('')
+const awaitingRunForBackupId = ref<string>('')
+const logRefreshNonce = ref(0)
+watch(isLogSheetOpen, (open) => {
+  if (!open) {
+    awaitingRunForBackupId.value = ''
+    logSheetTaskId.value = ''
+  }
+})
+
+// Subscribe to backup run events on the team channel. When we're
+// awaiting the run we just kicked off, attach the live stream as soon
+// as the task id arrives; on terminal events, refresh the table and
+// bump the refresh nonce so the log viewer remounts for fast runs.
+const { user } = useAuth()
+const teamId = computed(() => user.value?.current_team_id?.toString() || '')
+useBackupEvents(teamId, (data, event) => {
+  const backupId = String((data as { backup_id?: string }).backup_id ?? '')
+  if (event === 'backup.run.started' && backupId === awaitingRunForBackupId.value) {
+    const tid = String((data as { task_id?: string }).task_id ?? '')
+    if (tid) logSheetTaskId.value = tid
+  }
+  if (event === 'backup.run.succeeded' || event === 'backup.run.failed') {
+    fetchBackups()
+    if (isLogSheetOpen.value && logSheetTaskId.value) {
+      setTimeout(() => logRefreshNonce.value++, 800)
+    }
+    // Explicit terminal-state toast so the user gets unambiguous
+    // success/failure feedback instead of having to read the row
+    // tooltip or scan the log console for an exit message.
+    if (event === 'backup.run.succeeded') {
+      toast.success('Backup completed')
+    } else {
+      toast.error('Backup failed — check the log console for details')
+    }
+  }
+})
+
 const fetchBackups = async () => {
   try {
     const [backupsData, providersData, dbData] = await Promise.all([
@@ -104,9 +152,17 @@ const runBackup = async (backup: Backup) => {
       method: 'POST',
     })
     toast.success('Backup started')
+    // Open the live log console immediately — same UX as docker DB
+    // backups. The task id arrives a beat later on the run.started
+    // event (handled in the WS subscription above), which attaches the
+    // stream. The sheet renders a "Starting backup…" state in between.
+    logSheetTaskId.value = ''
+    awaitingRunForBackupId.value = backup.id
+    isLogSheetOpen.value = true
     fetchBackups()
   } catch {
     toast.error('Failed to start backup')
+    awaitingRunForBackupId.value = ''
   } finally {
     loadingActions.value = { ...loadingActions.value, [backup.id]: '' }
   }
@@ -245,7 +301,47 @@ onMounted(fetchBackups)
       v-if="selectedBackupForHistory"
       v-model:open="isHistorySheetOpen"
       :backup="selectedBackupForHistory"
+      :server-id="serverId"
     />
+
+    <!--
+      Live backup-run logs — auto-opens on Run Backup so the operator
+      sees the tar/upload stream live instead of digging into History.
+      Renders a "Starting backup…" state until the run.started WS event
+      arrives with the task id, then attaches the ServerLogViewer.
+      Matches the docker DB backup pattern for layout + scrolling.
+    -->
+    <Sheet v-model:open="isLogSheetOpen">
+      <SheetContent
+        class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-3xl flex flex-col overflow-hidden outline-none"
+      >
+        <SheetHeader class="shrink-0">
+          <SheetTitle>Backup Logs</SheetTitle>
+          <SheetDescription>
+            Tar &amp; upload output for this backup run.
+          </SheetDescription>
+        </SheetHeader>
+        <div class="mt-4 flex flex-1 flex-col min-h-0">
+          <ServerLogViewer
+            v-if="isLogSheetOpen && logSheetTaskId"
+            :key="`${logSheetTaskId}-${logRefreshNonce}`"
+            :server-id="serverId"
+            entity="task"
+            :entity-id="logSheetTaskId"
+            :no-timestamp="true"
+            hide-options
+            container-class-name="h-full rounded-b-lg"
+          />
+          <div
+            v-else-if="isLogSheetOpen"
+            class="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground"
+          >
+            <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+            Starting backup… waiting for output.
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
 
     <!-- Edit Backup Dialog -->
     <ServerCreateBackup

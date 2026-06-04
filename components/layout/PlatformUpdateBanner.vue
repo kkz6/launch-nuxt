@@ -59,33 +59,41 @@ onMounted(() => {
 
 <template>
   <div v-if="updates.length > 0" class="flex shrink-0 flex-col">
+    <!-- On mobile we stack the message and the action row so the title can
+         wrap freely and nothing gets clipped. On sm+ screens we go back to
+         the single-line centered layout. -->
     <div
       v-for="update in updates"
       :key="update.id"
-      class="flex items-center justify-center gap-4 bg-zinc-950 px-4 py-2 text-sm text-zinc-200"
+      class="flex flex-col gap-1 bg-zinc-950 px-4 py-2 text-sm text-zinc-200 sm:flex-row sm:items-center sm:justify-center sm:gap-4"
     >
-      <div class="flex items-center gap-2.5">
+      <div class="flex items-start gap-2.5 sm:items-center">
         <component
           :is="severityConfig[update.severity].icon"
-          :class="['h-4 w-4 shrink-0', severityConfig[update.severity].accent]"
+          :class="['mt-0.5 h-4 w-4 shrink-0 sm:mt-0', severityConfig[update.severity].accent]"
         />
-        <span class="font-medium text-white">{{ update.title }}</span>
-        <span v-if="pendingCount(update) > 0" class="text-xs text-zinc-400">
-          — {{ pendingCount(update) }} server{{ pendingCount(update) !== 1 ? "s" : "" }} pending
-        </span>
+        <div class="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
+          <span class="block break-words font-medium text-white">{{ update.title }}</span>
+          <span v-if="pendingCount(update) > 0" class="text-xs text-zinc-400">
+            — {{ pendingCount(update) }} server{{ pendingCount(update) !== 1 ? "s" : "" }} pending
+          </span>
+        </div>
       </div>
-      <NuxtLink
-        :to="`/platform/updates/${update.id}`"
-        class="text-xs font-medium text-zinc-300 underline underline-offset-2 hover:text-white"
-      >
-        View Details
-      </NuxtLink>
-      <button
-        class="rounded p-0.5 text-zinc-500 hover:text-zinc-300"
-        @click="dismiss(update)"
-      >
-        <X class="h-3.5 w-3.5" />
-      </button>
+      <div class="flex items-center justify-end gap-3 sm:gap-4">
+        <NuxtLink
+          :to="`/platform/updates/${update.id}`"
+          class="text-xs font-medium text-zinc-300 underline underline-offset-2 hover:text-white"
+        >
+          View Details
+        </NuxtLink>
+        <button
+          class="rounded p-0.5 text-zinc-500 hover:text-zinc-300"
+          aria-label="Dismiss notification"
+          @click="dismiss(update)"
+        >
+          <X class="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   </div>
 </template>

@@ -1,0 +1,474 @@
+<script setup lang="ts">
+import { toast } from "vue-sonner";
+
+/**
+ * Generic build-time secret row. Mirrors DockerBuildSecret but kept
+ * structurally minimal so the editor can render application AND
+ * compose secrets without type branching. The owner-FK field is
+ * opaque to this component.
+ *
+ * Crucially: there's no `value` field on the read path. Build-secret
+ * values are never returned by the API after they're written, so the
+ * editor only ever knows whether a row has a value (`has_value`),
+ * never what it is. Editing is always "replace the value".
+ */
+interface BuildSecretRow {
+  id: string;
+  name: string;
+  has_value: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface CreateData {
+  name: string;
+  value: string;
+}
+
+interface UpdatePatch {
+  value: string;
+}
+
+interface Props {
+  secrets: BuildSecretRow[];
+  loading?: boolean;
+  /** Owner label shown in confirmation copy — "application" or "stack". */
+  ownerLabel?: string;
+  /**
+   * When true, the editor surfaces the GitHub Actions naming contract:
+   * each secret `FOO` is pushed to the repo as a `LAUNCH_BUILD_FOO`
+   * Actions secret (while the Dockerfile `id=` stays the short `FOO`).
+   * Off for the plain server-build path, where there's no repo secret.
+   */
+  githubActions?: boolean;
+  onCreate: (data: CreateData) => Promise<BuildSecretRow>;
+  onUpdate: (id: string, patch: UpdatePatch) => Promise<BuildSecretRow>;
+  onDelete: (id: string) => Promise<void>;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  loading: false,
+  ownerLabel: "application",
+  githubActions: false,
+});
+
+// Must match the backend: gha_bootstrap_workflow.go pushes each build
+// secret as ("LAUNCH_BUILD_" + name) verbatim, and the workflow YAML
+// references it via ${{ secrets.LAUNCH_BUILD_<NAME> }}. Keep in sync.
+const REPO_SECRET_PREFIX = "LAUNCH_BUILD_";
+const repoSecretName = (name: string) => REPO_SECRET_PREFIX + name;
+
+const emit = defineEmits<{
+  /** Fires after every successful create/update/delete so the wrapper
+   *  can sync its list ref. Same convention as SharedEnvVarsEditor. */
+  "update:secrets": [BuildSecretRow[]];
+}>();
+
+const isSaving = ref(false);
+const showAddForm = ref(false);
+const newSecret = reactive({ name: "", value: "" });
+
+watch(showAddForm, async (open) => {
+  if (!open) return;
+  await nextTick();
+  const el = document.getElementById("build-secret-name") as HTMLInputElement | null;
+  el?.focus();
+});
+
+const closeAddForm = () => {
+  showAddForm.value = false;
+  newSecret.name = "";
+  newSecret.value = "";
+};
+
+const confirmationDialog = ref<
+  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
+>(null);
+
+// Per-row replace-value state. Different from env-var editing in that
+// the input is ALWAYS empty when we open it (we don't have the old
+// value to pre-fill). Saving with a blank field is a no-op rather
+// than a destructive "clear value" — to actually clear, the user
+// deletes the row and re-adds it.
+const editing = ref<Record<string, { value: string }>>({});
+
+const startEdit = (s: BuildSecretRow) => {
+  editing.value[s.id] = { value: "" };
+  nextTick(() => {
+    document.getElementById(`build-secret-edit-${s.id}`)?.focus();
+  });
+};
+
+const cancelEdit = (id: string) => {
+  delete editing.value[id];
+  editing.value = { ...editing.value };
+};
+
+const saveEdit = async (s: BuildSecretRow) => {
+  const next = editing.value[s.id];
+  if (!next) return;
+  // Blank → no-op. We don't want a stray Enter to silently overwrite
+  // the secret with the empty string.
+  if (next.value === "") {
+    cancelEdit(s.id);
+    return;
+  }
+  try {
+    const updated = await props.onUpdate(s.id, { value: next.value });
+    syncRow(updated);
+    toast.success(`${s.name} updated`);
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to update build secret");
+    return;
+  }
+  cancelEdit(s.id);
+};
+
+const addSecret = async () => {
+  const name = newSecret.name.trim();
+  if (!name) {
+    toast.error("Name is required");
+    return;
+  }
+  isSaving.value = true;
+  try {
+    const created = await props.onCreate({
+      name,
+      value: newSecret.value,
+    });
+    emit("update:secrets", sortByName([...props.secrets, created]));
+    closeAddForm();
+    toast.success("Build secret added");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to add build secret");
+  } finally {
+    isSaving.value = false;
+  }
+};
+
+const removeSecret = async (s: BuildSecretRow) => {
+  if (!confirmationDialog.value) return;
+  const result = await confirmationDialog.value.show({
+    title: "Remove build secret",
+    description: `Remove ${s.name}? Builds that reference id=${s.name} via --mount=type=secret will fail until you re-add it.`,
+    confirmText: "Remove",
+    cancelText: "Cancel",
+    destructive: true,
+  });
+  if (!result.ok) return;
+  try {
+    await props.onDelete(s.id);
+    emit("update:secrets", props.secrets.filter((x) => x.id !== s.id));
+    toast.success("Build secret removed");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to remove build secret");
+  }
+};
+
+const syncRow = (updated: BuildSecretRow) => {
+  emit(
+    "update:secrets",
+    props.secrets.map((x) => (x.id === updated.id ? updated : x)),
+  );
+};
+
+const sortByName = (rows: BuildSecretRow[]) =>
+  [...rows].sort((a, b) => a.name.localeCompare(b.name));
+</script>
+
+<template>
+  <div class="space-y-3">
+    <SharedConfirmationDialog ref="confirmationDialog" />
+
+    <!--
+      Header row: just the add button. The section header + description
+      live in the parent (the GHA tab) so the placement matches the
+      typographic "Configuration / Maintenance / Danger zone" rhythm.
+    -->
+    <div class="flex items-center justify-end">
+      <Button
+        size="icon-sm"
+        :variant="showAddForm ? 'outline' : 'default'"
+        :title="showAddForm ? 'Close' : 'Add build secret'"
+        :aria-label="showAddForm ? 'Close' : 'Add build secret'"
+        @click="showAddForm ? closeAddForm() : (showAddForm = true)"
+      >
+        <Icon
+          name="lucide:plus"
+          class="h-4 w-4 transition-transform duration-200"
+          :class="showAddForm ? 'rotate-45' : ''"
+        />
+      </Button>
+    </div>
+
+    <!--
+      Add form. Inline (vs modal) so the user can see the existing
+      rows + the form at the same time — useful when porting a
+      Dockerfile that references several secrets.
+
+      Same sky-tinted accent as the env-var editor's add form so the
+      two surfaces feel related.
+    -->
+    <Transition name="build-secret-add">
+      <form
+        v-if="showAddForm"
+        class="space-y-3 overflow-hidden rounded-lg border border-sky-500/30 border-l-[3px] border-l-sky-500/70 bg-muted/30 p-4 shadow-sm"
+        @submit.prevent="addSecret"
+      >
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-[220px_1fr]">
+          <div class="space-y-1">
+            <Label for="build-secret-name" class="text-xs">Name</Label>
+            <Input
+              id="build-secret-name"
+              v-model="newSecret.name"
+              class="h-9 font-mono text-sm"
+              placeholder="NPM_TOKEN"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <div class="space-y-1">
+            <Label for="build-secret-value" class="text-xs">Value</Label>
+            <Input
+              id="build-secret-value"
+              v-model="newSecret.value"
+              type="password"
+              class="h-9 font-mono text-sm"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+        </div>
+        <p class="text-[11px] text-muted-foreground">
+          Reference in your <span class="font-mono">Dockerfile</span> with
+          <code class="rounded bg-muted px-1 py-0.5 text-[10px]">
+            RUN --mount=type=secret,id={{ newSecret.name || "NPM_TOKEN" }} cat /run/secrets/{{ newSecret.name || "NPM_TOKEN" }}
+          </code>.
+        </p>
+        <p
+          v-if="githubActions"
+          class="flex items-start gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground"
+        >
+          <Icon name="lucide:key-round" class="mt-0.5 h-3 w-3 shrink-0" />
+          <span>
+            On GitHub Actions this is stored in your repository as the
+            Actions secret
+            <code class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-foreground">{{ repoSecretName(newSecret.name || "NPM_TOKEN") }}</code>
+            and passed to the build as
+            <code class="rounded bg-muted px-1 py-0.5 text-[10px]">{{ newSecret.name || "NPM_TOKEN" }}</code>
+            — so your Dockerfile <span class="font-mono">id=</span> stays
+            the short name.
+          </span>
+        </p>
+        <div class="flex justify-end gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            :disabled="isSaving"
+            @click="closeAddForm"
+          >
+            Cancel
+          </Button>
+          <Button type="submit" size="sm" :disabled="isSaving">
+            <Icon
+              v-if="isSaving"
+              name="lucide:loader-2"
+              class="mr-2 h-3.5 w-3.5 animate-spin"
+            />
+            Add
+          </Button>
+        </div>
+      </form>
+    </Transition>
+
+    <!--
+      Existing-rows list. Same flat-card pattern as the GHA tab's
+      Configuration section — the bordered card carries either a
+      loader, an empty inline state, or the row list. Build secret
+      values are never displayed; each row shows the name + a
+      green "set" indicator instead.
+    -->
+    <div class="overflow-hidden rounded-lg border">
+      <div v-if="loading" class="flex items-center justify-center py-12">
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
+      </div>
+
+      <div
+        v-else-if="secrets.length === 0"
+        class="flex flex-col items-center justify-center px-6 py-10 text-center"
+      >
+        <div class="flex h-11 w-11 items-center justify-center rounded-lg border border-border/40 bg-muted/30">
+          <Icon name="lucide:shield" class="h-5 w-5 text-muted-foreground/70" />
+        </div>
+        <h3 class="mt-3 text-sm font-medium text-foreground/80">
+          No build secrets yet
+        </h3>
+        <p class="mt-1 max-w-md text-xs text-muted-foreground/80">
+          Add a secret here when your <span class="font-mono">Dockerfile</span>
+          needs a credential at build time — private package registries,
+          private git clones, build-time API keys.
+        </p>
+      </div>
+
+      <template v-else>
+        <div
+          class="grid grid-cols-[220px_1fr_140px] gap-2 border-b bg-muted/50 px-4 py-2 text-[10px] uppercase tracking-wide text-muted-foreground"
+        >
+          <div>Name</div>
+          <div>Value</div>
+          <div class="text-right">Actions</div>
+        </div>
+
+        <div
+          v-for="s in secrets"
+          :key="s.id"
+          class="grid grid-cols-[220px_1fr_140px] items-center gap-2 border-b px-4 py-2 last:border-b-0"
+        >
+          <div class="flex min-w-0 flex-col justify-center">
+            <code class="truncate font-mono text-xs" :title="s.name">
+              {{ s.name }}
+            </code>
+            <code
+              v-if="githubActions"
+              class="truncate font-mono text-[10px] text-muted-foreground/70"
+              :title="`Repository Actions secret: ${repoSecretName(s.name)}`"
+            >
+              {{ repoSecretName(s.name) }}
+            </code>
+          </div>
+
+          <!--
+            Value column. Two modes:
+              - editing[s.id] truthy → replace-value Input (always blank)
+              - otherwise            → "set" pill + helpful caption
+          -->
+          <div class="min-w-0">
+            <div v-if="editing[s.id]" class="space-y-1">
+              <Input
+                :id="`build-secret-edit-${s.id}`"
+                v-model="editing[s.id].value"
+                type="password"
+                class="h-9 w-full font-mono text-xs"
+                placeholder="Enter a new value to replace the current one"
+                autocomplete="off"
+                spellcheck="false"
+                @keyup.enter="saveEdit(s)"
+                @keyup.esc="cancelEdit(s.id)"
+              />
+              <p class="text-[10px] text-muted-foreground">
+                The existing value isn't shown — leave blank to cancel
+                without changes.
+              </p>
+            </div>
+            <div v-else class="flex items-center gap-1.5">
+              <span
+                v-if="s.has_value"
+                class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-400"
+              >
+                <Icon name="lucide:check" class="h-2.5 w-2.5" />
+                Set
+              </span>
+              <span
+                v-else
+                class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-400"
+              >
+                <Icon name="lucide:alert-triangle" class="h-2.5 w-2.5" />
+                Empty
+              </span>
+              <span class="font-mono text-[11px] text-muted-foreground/80">
+                value hidden
+              </span>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-0.5">
+            <template v-if="editing[s.id]">
+              <Button
+                variant="default"
+                size="icon-sm"
+                title="Save"
+                aria-label="Save"
+                @click="saveEdit(s)"
+              >
+                <Icon name="lucide:check" class="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Cancel"
+                aria-label="Cancel"
+                @click="cancelEdit(s.id)"
+              >
+                <Icon name="lucide:x" class="h-3.5 w-3.5" />
+              </Button>
+            </template>
+            <template v-else>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Replace value"
+                aria-label="Replace value"
+                @click="startEdit(s)"
+              >
+                <Icon name="lucide:pencil" class="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                title="Remove"
+                aria-label="Remove"
+                class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                @click="removeSecret(s)"
+              >
+                <Icon name="lucide:trash-2" class="h-3.5 w-3.5" />
+              </Button>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <p class="text-[11px] text-muted-foreground">
+      <Icon name="lucide:info" class="-mt-0.5 mr-1 inline-block h-3 w-3" />
+      Changes apply to the next build.
+      <template v-if="githubActions">
+        On GitHub Actions each secret is pushed to your repository as an
+        Actions secret named
+        <code class="rounded bg-muted px-1 py-0.5 text-[10px]">LAUNCH_BUILD_&lt;NAME&gt;</code>,
+        and saving triggers a workflow re-sync so the YAML and your repo
+        secrets stay in lock-step.
+      </template>
+    </p>
+  </div>
+</template>
+
+<style scoped>
+.build-secret-add-enter-active,
+.build-secret-add-leave-active {
+  transition:
+    max-height 200ms ease-out,
+    opacity 180ms ease-out,
+    transform 200ms ease-out;
+}
+
+.build-secret-add-enter-from,
+.build-secret-add-leave-to {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.build-secret-add-enter-to,
+.build-secret-add-leave-from {
+  max-height: 24rem;
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>

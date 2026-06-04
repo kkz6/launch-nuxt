@@ -3,25 +3,24 @@ import { categorizedFaqs } from '~/constants/faqs'
 </script>
 
 <template>
-  <section class="relative bg-background py-24">
-    <div class="absolute inset-0 bg-gradient-to-t from-muted/30 to-background" />
-
-    <div class="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="mx-auto mb-12 max-w-2xl text-center">
-        <h2 class="mb-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-          Frequently asked <span class="text-primary">questions</span>
+  <section class="border-b bg-background py-24">
+    <div class="mx-auto max-w-3xl px-6 lg:px-8">
+      <div class="mb-12 text-center">
+        <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400"># faq</span>
+        <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          Good questions
         </h2>
-        <p class="text-muted-foreground">
+        <p class="mt-4 text-muted-foreground">
           Everything you need to know about launchctl
         </p>
       </div>
 
-      <div class="mx-auto max-w-2xl space-y-8">
+      <div class="space-y-8">
         <div
           v-for="(category, categoryIndex) in categorizedFaqs"
           :key="categoryIndex"
         >
-          <h3 class="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
+          <h3 class="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-wide text-muted-foreground">
             <span :class="['h-2 w-2 rounded-full', category.color]" />
             {{ category.title }}
           </h3>

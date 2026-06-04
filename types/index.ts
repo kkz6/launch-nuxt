@@ -76,8 +76,6 @@ export interface User {
   profile_photo_url: string;
   timezone: string;
   onboarded: boolean;
-  staff_role?: "support" | "super_admin" | null;
-  status?: string;
   all_teams?: Team[] | null;
   current_team?: Team;
   two_factor_enabled?: boolean;
@@ -141,6 +139,18 @@ export interface Server {
   storage_in_gb?: string;
   operating_system: string;
   operating_system_label?: string;
+  // Detected* mirror what the detect_os provision step pulled from
+  // /etc/os-release + uname on the actual box. Distinct from
+  // operating_system above (the user's dashboard pick). UI surfaces
+  // both so any mismatch is visible — particularly useful for custom
+  // (BYO) servers where customers sometimes select Ubuntu in the
+  // dropdown but bring a Debian VPS.
+  detected_os_id?: string;
+  detected_os_version?: string;
+  detected_os_version_codename?: string;
+  detected_arch?: string;
+  detected_kernel?: string;
+  detected_at?: string;
   status: string;
   status_label?: string;
   public_ipv4: string;
@@ -171,6 +181,17 @@ export interface Server {
   sites_count?: number;
   services_count?: number;
   upstreams_count?: number;
+  // Live count of docker_projects on this server. Always present in
+  // responses (0 for PHP / database / loadbalancer servers). The
+  // delete-server flow on docker servers blocks while this is > 0;
+  // the backend re-validates the same condition.
+  projects_count?: number;
+  // Live count of docker workloads (applications + composes +
+  // managed databases) for the server. 0 on non-docker servers.
+  // Surfaced on the Servers list card in place of `sites_count`
+  // when type === "docker" — that table is Laravel-only and is
+  // always 0 for docker servers.
+  workloads_count?: number;
 }
 
 export interface Site extends InstallationStatus {
@@ -287,13 +308,18 @@ export interface Task {
 export interface ProvisionStatusStep {
   name: string;
   description: string;
-  status: "completed" | "current" | "pending";
+  status: 'completed' | 'current' | 'pending';
 }
 
 export interface ProvisionStatus {
   steps: ProvisionStatusStep[];
   current_step?: ProvisionStatusStep;
   latest_task?: Task;
+  // Set by the backend when server.status is "failed". The UI uses these to
+  // suppress the spinner on a never-resolving "current" step and render an
+  // error banner instead. See BuildProvisionStatus in responses.go.
+  failed?: boolean;
+  error_message?: string;
 }
 
 export interface GitProvider {
@@ -359,10 +385,20 @@ export interface SSHKey {
   updated_at: string;
 }
 
+export interface DatabaseBackupBrief {
+  id: string;
+  path: string;
+  enabled: boolean;
+}
+
 export interface Database extends InstallationStatus {
   id: string;
   name: string;
   created_at: string;
+  // Server-level backup configurations that include this database in
+  // their dump set — populated by the API when listing databases for
+  // the server's Databases tab. Drives the per-row "Run Backup" action.
+  backups?: DatabaseBackupBrief[];
 }
 
 export interface DatabaseUser extends InstallationStatus {
@@ -664,6 +700,40 @@ export interface ServerUpdateStatus {
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
+}
+
+// ---------------------------------------------------------------------------
+// Stored SSL Certificates (team library — managed in Settings → Connections,
+// picked from PHP site SSL + docker domain dialogs).
+//
+// The backend never sends the private_key over the wire (`json:"-"` on the
+// model) — it lives only on the server for deploy-time material. The
+// `certificate` field carries the leaf + chain PEM bundle and is safe to
+// surface in the UI for fingerprint / domain inspection.
+// ---------------------------------------------------------------------------
+export interface StoredCertificate {
+  id: string;
+  team_id: string;
+  user_id?: string;
+  name: string;
+  notes?: string;
+  certificate: string;
+  domains: string[];
+  common_name?: string;
+  issuer?: string;
+  not_before: string;
+  not_after: string;
+  serial_number?: string;
+  fingerprint_sha256?: string;
+  created_at?: string;
+  updated_at?: string;
+  deleted_at?: string;
+}
+
+export interface CertificateUsage {
+  kind: "site" | "docker_domain";
+  id: string;
+  name: string;
 }
 
 // Admin panel (staff back-office) types

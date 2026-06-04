@@ -41,6 +41,15 @@ const config = useRuntimeConfig()
 const { token, isInitialized, waitForAuth } = useAuth()
 const { getCurrentTeamId } = useApi()
 const rawLogs = ref('')
+// `emptyConfirmed` flips true ~2.5s after the WS connects if we still
+// haven't received a single byte — at that point the log file is
+// genuinely empty (daemon hasn't printed anything yet, log got
+// truncated, etc) and we surface a friendly empty state instead of
+// spinning forever. The delay is long enough to cover normal WS
+// handshake + first-frame latency, so users who DO have logs don't
+// see this state flash on the way in.
+const emptyConfirmed = ref(false)
+let emptyConfirmTimer: ReturnType<typeof setTimeout> | null = null
 const filteredLogs = ref<LogLine[]>([])
 const autoScroll = ref(true)
 const lines = ref(100)
@@ -53,7 +62,9 @@ const linesString = computed({
 const search = ref('')
 const typeFilter = ref<string[]>([])
 const scrollRef = ref<HTMLDivElement | null>(null)
-const isLoading = ref(false)
+// Loading state is derived in the template from wsOpen + filteredLogs;
+// no separate isLoading boolean (removed to avoid the empty-state
+// flicker — see the template guard for the three explicit states).
 const wsOpen = ref(false)
 const logType = ref('output')
 const showTimestamp = ref(!props.noTimestamp)
@@ -137,11 +148,101 @@ const getLogType = (message: string): LogLine['type'] => {
   return 'info'
 }
 
+// Patterns that are operational noise customers shouldn't see in the log
+// viewer. Each entry is matched against the trimmed (and ansi-stripped)
+// line; matches are dropped silently.
+//
+// Why each one is here:
+//
+// - `tail: cannot open ... no files remaining` — the log-tail SSH starts
+//   before the script's log file exists. Cosmetic.
+// - `SSH connection failed: ...` — early-provision SSH tail races sshd
+//   coming up. Leaks the IP and looks like a hard failure to non-technical
+//   users; instead we silently retry under the hood.
+// - `overall progress: X out of N tasks` / `verify: Waiting N seconds to
+//   verify that tasks are stable` — `docker service create` streams these
+//   on every poll until convergence (40+ identical lines). Legacy
+//   (pre-v2) docker servers used swarm + `docker service create` for
+//   Traefik; new servers run Traefik as a plain container so this
+//   pattern only appears in old provision logs we replay.
+// - `Canceled hold on cloud-init` / `cloud-init was already not on hold` —
+//   cosmetic chatter from `apt-mark unhold` in the cleanup step.
+// - `debconf: unable to initialize frontend ...` / `debconf: (...)` /
+//   `dpkg-preconfigure: unable to re-open stdin:` — every apt-get install
+//   over SSH lacks a controlling tty, so debconf falls back to teletype
+//   and prints 5+ lines of harmless warnings. Pure noise.
+// - `(Reading database ... NN%)` — apt's progress bar; emits ~20 lines
+//   per package operation. Useless without a terminal width.
+// - `SyntaxWarning: invalid escape sequence ...` — upstream fail2ban
+//   ships Python files with deprecation warnings (not our bug).
+// - `[Pp]rocessing triggers for ...` / `Setting up ...` / `Selecting
+//   previously unselected package ...` / `Preparing to unpack ...` /
+//   `Unpacking ...` — verbose apt step-by-step that buries the actionable
+//   lines. We keep the high-level `echo "Install essential packages"`
+//   line from our script — that's the one the customer needs.
+const NOISE_PATTERNS: RegExp[] = [
+  /^tail: (?:cannot open '.*' for reading: No such file or directory|no files remaining)$/,
+  /^SSH connection failed:/,
+  /^overall progress:\s+\d+\s+out of\s+\d+\s+tasks?\b/,
+  /^verify: Waiting \d+ seconds to verify that tasks are stable/,
+  /^Canceled hold on cloud-init\.?$/,
+  /^cloud-init was already not on hold\.?$/,
+  /^debconf:/,
+  /^dpkg-preconfigure: unable to re-open stdin:/,
+  /^\(Reading database \.\.\./,
+  /SyntaxWarning: invalid escape sequence/,
+  /^Selecting previously unselected package /,
+  /^Preparing to unpack /,
+  /^Unpacking /,
+  /^Setting up /,
+  /^Processing triggers for /,
+  /^Created symlink /,
+  /^Running kernel seems to be up-to-date\.?$/,
+  /^No (?:services|containers|user sessions|VM guests) /,
+  /^Synchronizing state of /,
+  /^Executing: \/usr\/lib\/systemd\/systemd-sysv-install /,
+]
+
+const isNoise = (line: string): boolean => {
+  const t = stripAnsi(line).trim()
+  return NOISE_PATTERNS.some(re => re.test(t))
+}
+
+// Python prints SyntaxWarning headers like
+//   /usr/.../foo.py:224: SyntaxWarning: invalid escape sequence '\s'
+// followed by the *source line* the warning refers to:
+//   "1490349000 test failed.dns.ch", "^\s*test <F-ID>\S+</F-ID>"
+// The header matches NOISE_PATTERNS, but the source line is arbitrary
+// Python and doesn't. So we maintain a one-line look-back: once we drop
+// a SyntaxWarning header, we also drop the next non-empty line that
+// follows it (the snippet). Applies once per warning so we don't
+// accidentally swallow real log lines downstream.
+const SYNTAX_WARNING_RE = /SyntaxWarning: invalid escape sequence/
+
+const stripNoiseLines = (lines: string[]): string[] => {
+  const out: string[] = []
+  let dropNext = false
+  for (const line of lines) {
+    if (dropNext) {
+      dropNext = false
+      continue
+    }
+    if (isNoise(line)) {
+      const t = stripAnsi(line).trim()
+      if (SYNTAX_WARNING_RE.test(t)) dropNext = true
+      continue
+    }
+    out.push(line)
+  }
+  return out
+}
+
 const parseLogs = (raw: string): LogLine[] => {
   if (!raw) return []
-  return raw.split('\n').filter(line => line.trim())
-    .filter(line => !line.includes('::LAUNCH::'))
-    .filter(line => !/^tail: (?:cannot open '.*' for reading: No such file or directory|no files remaining)$/.test(line.trim()))
+  const stripped = stripNoiseLines(
+    raw.split('\n').filter(line => line.trim() && !line.includes('::LAUNCH::')),
+  )
+  return stripped
     .map((line) => {
       const cleanLine = stripAnsi(line)
 
@@ -267,9 +368,16 @@ const connectWebSocket = async () => {
     ws.close()
   }
 
-  isLoading.value = true
   rawLogs.value = ''
   filteredLogs.value = []
+  emptyConfirmed.value = false
+  if (emptyConfirmTimer) {
+    clearTimeout(emptyConfirmTimer)
+    emptyConfirmTimer = null
+  }
+  // wsOpen flips true on ws.onopen — the "Connecting…" state below
+  // renders until then. Don't pre-set isLoading; the template derives
+  // the loading state from wsOpen + filteredLogs (see below).
 
   // Wait for auth to be initialized before connecting
   await waitForAuth()
@@ -301,36 +409,49 @@ const connectWebSocket = async () => {
 
   ws = new WebSocket(wsUrl)
 
-  let noDataTimeout: NodeJS.Timeout | null = null
-
-  const resetTimeout = () => {
-    if (noDataTimeout) clearTimeout(noDataTimeout)
-    noDataTimeout = setTimeout(() => {
-      isLoading.value = false
-    }, 2000)
-  }
+  // Loading state is now derived from wsOpen + filteredLogs in the
+  // template — no more no-data timeout, no more isLoading boolean.
+  // The three states are:
+  //   !wsOpen                         → Connecting
+  //   wsOpen && no parsed lines yet   → Loading logs
+  //   parsed lines present            → render them
+  // We never hard-show "No logs found" because the brief window
+  // between WS-open and the first parsed message was the source of the
+  // flicker users saw.
 
   ws.onopen = () => {
     wsOpen.value = true
-    resetTimeout()
+    // Arm the empty-state timer — if we still haven't received any
+    // data after this window, swap the perpetual spinner for "No
+    // logs available". Cancelled on the first onmessage below.
+    if (emptyConfirmTimer) clearTimeout(emptyConfirmTimer)
+    emptyConfirmTimer = setTimeout(() => {
+      if (rawLogs.value.length === 0) {
+        emptyConfirmed.value = true
+      }
+    }, 2500)
   }
 
   ws.onmessage = (e) => {
     rawLogs.value += e.data
-    isLoading.value = false
-    if (noDataTimeout) clearTimeout(noDataTimeout)
+    // First byte arrived — kill the empty-state timer so we don't
+    // race the "Loading…" → lines transition with an empty banner.
+    if (emptyConfirmTimer) {
+      clearTimeout(emptyConfirmTimer)
+      emptyConfirmTimer = null
+    }
+    emptyConfirmed.value = false
+    // The watch(rawLogs) below parses into filteredLogs on the next
+    // microtask — that's what flips the rendered state from
+    // "Loading…" to the actual lines.
   }
 
   ws.onerror = () => {
     wsOpen.value = false
-    isLoading.value = false
-    if (noDataTimeout) clearTimeout(noDataTimeout)
   }
 
   ws.onclose = () => {
     wsOpen.value = false
-    isLoading.value = false
-    if (noDataTimeout) clearTimeout(noDataTimeout)
   }
 }
 
@@ -345,6 +466,8 @@ watch(rawLogs, () => {
   filteredLogs.value = typeFilter.value.length > 0
     ? logs.filter((log) => typeFilter.value.includes(log.type))
     : logs
+  // The template watches filteredLogs.length to drop the
+  // "Loading logs…" state; nothing else to do here.
 })
 
 watch(filteredLogs, () => {
@@ -356,6 +479,10 @@ onMounted(connectWebSocket)
 onUnmounted(() => {
   if (ws) {
     ws.close()
+  }
+  if (emptyConfirmTimer) {
+    clearTimeout(emptyConfirmTimer)
+    emptyConfirmTimer = null
   }
 })
 </script>
@@ -418,12 +545,29 @@ onUnmounted(() => {
           ]"
           @scroll="handleScroll"
         >
-          <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-zinc-950/80">
-            <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-zinc-400" />
-          </div>
-
-          <div v-else-if="filteredLogs.length === 0" class="flex h-full items-center justify-center text-zinc-500">
-            No logs found
+          <!--
+            Four-state machine for the empty overlay:
+              1. !wsOpen                                          → Connecting…
+              2. wsOpen && !emptyConfirmed && no parsed lines yet → Loading logs…
+              3. wsOpen && emptyConfirmed (no bytes after 2.5s)   → No logs available
+              4. parsed lines present                             → render the list
+            The "emptyConfirmed" timer prevents the spinner from
+            sitting forever on genuinely empty logs (daemon hasn't
+            printed anything, log file fresh), while still being long
+            enough to swallow normal WS-open + first-frame latency.
+          -->
+          <div
+            v-if="filteredLogs.length === 0"
+            class="absolute inset-0 flex items-center justify-center gap-2 bg-zinc-950/80 text-sm text-zinc-400"
+          >
+            <template v-if="wsOpen && emptyConfirmed">
+              <Icon name="lucide:file-x" class="h-4 w-4" />
+              <span>No logs available</span>
+            </template>
+            <template v-else>
+              <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+              <span>{{ wsOpen ? 'Loading logs…' : 'Connecting…' }}</span>
+            </template>
           </div>
 
           <div class="space-y-1 font-mono text-sm">

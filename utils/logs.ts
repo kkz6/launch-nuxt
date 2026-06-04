@@ -165,41 +165,93 @@ export const getLogType = (message: string): LogStyle => {
   return LOG_STYLES.info
 }
 
-// Parse ANSI codes to HTML
+// SGR foreground color code → Tailwind text class. Covers the standard
+// 8 (30-37) + bright 8 (90-97) that zerolog and most CLIs emit.
+const ANSI_FG_CLASS: Record<number, string> = {
+  30: 'text-zinc-500',
+  31: 'text-red-400',
+  32: 'text-green-400',
+  33: 'text-yellow-400',
+  34: 'text-blue-400',
+  35: 'text-purple-400',
+  36: 'text-cyan-400',
+  37: 'text-zinc-200',
+  90: 'text-zinc-500',
+  91: 'text-red-300',
+  92: 'text-green-300',
+  93: 'text-yellow-300',
+  94: 'text-blue-300',
+  95: 'text-purple-300',
+  96: 'text-cyan-300',
+  97: 'text-zinc-50',
+}
+
+// Parse a line of ANSI/SGR-coded text into safe HTML.
+//
+// The text is HTML-escaped first (XSS-safe), then each styled run is
+// wrapped in its OWN balanced <span> based on the active SGR state. This
+// is the important difference from a naive code→tag `.replace()`: a
+// combo like zerolog's fatal level (ESC[1m ESC[31m … ESC[0m) opens two
+// spans but resets once, so a replace-based converter leaks an unclosed
+// <span> and bleeds bold/colour onto the rest of the line. Tracking
+// state and emitting self-contained spans per run keeps the markup
+// balanced regardless of how codes are combined. Unknown codes
+// (backgrounds, underline, etc.) are parsed and dropped, never emitted
+// as raw escape text.
 export function parseAnsiToHtml(text: string): string {
   if (!text) return ''
 
-  let html = text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // Reset
-    .replace(/\x1b\[0m/g, '</span>')
-    // Bold
-    .replace(/\x1b\[1m/g, '<span class="font-bold">')
-    // Colors
-    .replace(/\x1b\[30m/g, '<span class="text-zinc-900 dark:text-zinc-100">')
-    .replace(/\x1b\[31m/g, '<span class="text-red-400">')
-    .replace(/\x1b\[32m/g, '<span class="text-green-400">')
-    .replace(/\x1b\[33m/g, '<span class="text-yellow-400">')
-    .replace(/\x1b\[34m/g, '<span class="text-blue-400">')
-    .replace(/\x1b\[35m/g, '<span class="text-purple-400">')
-    .replace(/\x1b\[36m/g, '<span class="text-cyan-400">')
-    .replace(/\x1b\[37m/g, '<span class="text-white">')
-    // Bright colors
-    .replace(/\x1b\[90m/g, '<span class="text-zinc-500">')
-    .replace(/\x1b\[91m/g, '<span class="text-red-300">')
-    .replace(/\x1b\[92m/g, '<span class="text-green-300">')
-    .replace(/\x1b\[93m/g, '<span class="text-yellow-300">')
-    .replace(/\x1b\[94m/g, '<span class="text-blue-300">')
-    .replace(/\x1b\[95m/g, '<span class="text-purple-300">')
-    .replace(/\x1b\[96m/g, '<span class="text-cyan-300">')
-    .replace(/\x1b\[97m/g, '<span class="text-zinc-50">')
-    // Background colors
-    .replace(/\x1b\[4\dm/g, '<span>')
-    // Remove any remaining ANSI codes
-    .replace(/\x1b\[[0-9;]*m/g, '')
+  const escape = (s: string): string =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+  // eslint-disable-next-line no-control-regex
+  const SGR = /\x1b\[([0-9;]*)m/g
+  let html = ''
+  let lastIndex = 0
+  let color = ''
+  let bold = false
+  let dim = false
+
+  const classesFor = (): string => {
+    const c: string[] = []
+    if (color) c.push(color)
+    if (bold) c.push('font-bold')
+    if (dim) c.push('opacity-70')
+    return c.join(' ')
+  }
+  const emit = (raw: string): void => {
+    if (!raw) return
+    const cls = classesFor()
+    html += cls ? `<span class="${cls}">${escape(raw)}</span>` : escape(raw)
+  }
+
+  let m: RegExpExecArray | null
+  while ((m = SGR.exec(text)) !== null) {
+    emit(text.slice(lastIndex, m.index))
+    const codes = m[1] === '' ? [0] : m[1].split(';').map(Number)
+    for (const code of codes) {
+      if (code === 0) {
+        color = ''
+        bold = false
+        dim = false
+      } else if (code === 1) {
+        bold = true
+      } else if (code === 2) {
+        dim = true
+      } else if (code === 22) {
+        bold = false
+        dim = false
+      } else if (code === 39) {
+        color = ''
+      } else if (ANSI_FG_CLASS[code]) {
+        color = ANSI_FG_CLASS[code]
+      }
+      // Other codes (backgrounds, underline, italics, etc.) are
+      // intentionally consumed without emitting markup.
+    }
+    lastIndex = SGR.lastIndex
+  }
+  emit(text.slice(lastIndex))
   return html
 }
 
