@@ -119,194 +119,184 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="server" class="space-y-5">
-      <!-- Hero -->
-      <div
-        class="relative overflow-hidden rounded-xl border bg-gradient-to-br from-card via-card to-muted/40 p-6"
-      >
+    <div v-else-if="server">
+      <!-- Identity header -->
+      <div class="flex flex-wrap items-center gap-4 border-b pb-6">
         <div
-          class="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-primary/5 blur-2xl"
-        />
-        <div class="relative flex flex-wrap items-center gap-4">
-          <div
-            class="flex h-16 w-16 items-center justify-center rounded-2xl border bg-muted shadow-sm"
-          >
-            <Icon :name="providerIcon" class="h-8 w-8 text-foreground" />
-          </div>
-          <div class="space-y-1">
-            <div class="flex flex-wrap items-center gap-2">
-              <h1 class="text-2xl font-semibold tracking-tight">
-                {{ server.name }}
-              </h1>
-              <Badge :variant="statusVariant" class="capitalize">
-                {{ server.status }}
-              </Badge>
+          class="flex h-14 w-14 items-center justify-center rounded-xl bg-muted"
+        >
+          <Icon :name="providerIcon" class="h-7 w-7 text-foreground" />
+        </div>
+        <div class="space-y-1.5">
+          <div class="flex flex-wrap items-center gap-2.5">
+            <h1 class="text-2xl font-semibold tracking-tight">
+              {{ server.name }}
+            </h1>
+            <Badge :variant="statusVariant" class="capitalize">
+              {{ server.status }}
+            </Badge>
+            <span
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+            >
               <span
-                class="flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium"
-              >
-                <span
-                  class="h-1.5 w-1.5 rounded-full"
-                  :class="server.connected ? 'bg-emerald-500' : 'bg-red-500'"
-                />
-                {{ server.connected ? "Connected" : "Disconnected" }}
-              </span>
-            </div>
-            <p class="text-sm capitalize text-muted-foreground">
-              {{ server.provider.replace("_", " ") }}
-              <template v-if="server.type"> · {{ server.type }}</template>
-            </p>
+                class="h-1.5 w-1.5 rounded-full"
+                :class="server.connected ? 'bg-emerald-500' : 'bg-red-500'"
+              />
+              {{ server.connected ? "Connected" : "Disconnected" }}
+            </span>
           </div>
+          <p class="text-sm capitalize text-muted-foreground">
+            {{ server.provider.replace("_", " ") }}
+            <template v-if="server.type"> · {{ server.type }}</template>
+          </p>
+        </div>
+      </div>
+
+      <!-- Metrics strip -->
+      <div class="flex flex-wrap gap-x-12 gap-y-6 border-b py-6">
+        <div>
+          <p class="text-2xl font-semibold">{{ server.cpu_cores ?? "—" }}</p>
+          <p
+            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            vCPU
+          </p>
+        </div>
+        <div>
+          <p class="text-2xl font-semibold">{{ memory }}</p>
+          <p
+            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Memory
+          </p>
+        </div>
+        <div>
+          <p class="text-2xl font-semibold">
+            {{ server.storage_in_gb ? `${server.storage_in_gb} GB` : "—" }}
+          </p>
+          <p
+            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Storage
+          </p>
+        </div>
+        <div>
+          <p class="font-mono text-2xl font-semibold">
+            {{ server.public_ipv4 || "—" }}
+          </p>
+          <p
+            class="mt-0.5 text-xs uppercase tracking-wide text-muted-foreground"
+          >
+            Public IPv4
+          </p>
         </div>
       </div>
 
       <!-- Owner (the key ask: who owns this) -->
-      <NuxtLink
-        v-if="server.owner.user_id"
-        :to="`/admin/users/${server.owner.user_id}`"
-        class="group flex items-center justify-between gap-4 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/50"
-      >
-        <div class="flex items-center gap-3">
-          <Avatar class="h-11 w-11 border">
-            <AvatarFallback class="text-sm font-semibold">
-              {{ teamInitials }}
-            </AvatarFallback>
-          </Avatar>
-          <div>
-            <div class="flex items-center gap-2">
-              <p class="text-sm font-semibold">{{ server.owner.team_name }}</p>
-              <Badge v-if="server.owner.personal_team" variant="secondary">
-                personal
-              </Badge>
-            </div>
-            <p class="text-xs text-muted-foreground">
-              {{ server.owner.user_name }} · {{ server.owner.user_email }}
-            </p>
-          </div>
-        </div>
-        <span
-          class="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground"
+      <div class="border-b py-6">
+        <h2
+          class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
         >
-          View owner
-          <Icon name="lucide:arrow-right" class="h-3.5 w-3.5" />
-        </span>
-      </NuxtLink>
-
-      <!-- Spec tiles -->
-      <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div class="rounded-xl border bg-card p-4">
-          <div
-            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-          >
-            <Icon name="lucide:cpu" class="h-3.5 w-3.5" />
-            vCPU
+          Owner
+        </h2>
+        <NuxtLink
+          v-if="server.owner.user_id"
+          :to="`/admin/users/${server.owner.user_id}`"
+          class="group -mx-2 flex items-center justify-between gap-4 rounded-lg px-2 py-2 transition-colors hover:bg-muted/50"
+        >
+          <div class="flex items-center gap-3">
+            <Avatar class="h-10 w-10">
+              <AvatarFallback class="text-sm font-semibold">
+                {{ teamInitials }}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <div class="flex items-center gap-2">
+                <p class="text-sm font-medium">{{ server.owner.team_name }}</p>
+                <span
+                  v-if="server.owner.personal_team"
+                  class="text-xs text-muted-foreground"
+                >
+                  · personal
+                </span>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                {{ server.owner.user_name }} · {{ server.owner.user_email }}
+              </p>
+            </div>
           </div>
-          <p class="mt-2 text-lg font-semibold">
-            {{ server.cpu_cores ?? "—" }}
-          </p>
-        </div>
-        <div class="rounded-xl border bg-card p-4">
-          <div
-            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-          >
-            <Icon name="lucide:memory-stick" class="h-3.5 w-3.5" />
-            Memory
-          </div>
-          <p class="mt-2 text-lg font-semibold">{{ memory }}</p>
-        </div>
-        <div class="rounded-xl border bg-card p-4">
-          <div
-            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-          >
-            <Icon name="lucide:hard-drive" class="h-3.5 w-3.5" />
-            Storage
-          </div>
-          <p class="mt-2 text-lg font-semibold">
-            {{ server.storage_in_gb ? `${server.storage_in_gb} GB` : "—" }}
-          </p>
-        </div>
-        <div class="rounded-xl border bg-card p-4">
-          <div
-            class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-          >
-            <Icon name="lucide:globe" class="h-3.5 w-3.5" />
-            Public IPv4
-          </div>
-          <p class="mt-2 truncate font-mono text-sm font-semibold">
-            {{ server.public_ipv4 || "—" }}
-          </p>
-        </div>
+          <Icon
+            name="lucide:arrow-right"
+            class="h-4 w-4 text-muted-foreground transition-colors group-hover:text-foreground"
+          />
+        </NuxtLink>
       </div>
 
-      <div class="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <!-- OS -->
-        <div class="rounded-xl border bg-card">
-          <div class="flex items-center gap-2 border-b px-5 py-3">
-            <Icon name="lucide:disc-3" class="h-4 w-4 text-muted-foreground" />
-            <h2 class="text-sm font-semibold">Operating system</h2>
-          </div>
-          <div class="space-y-3 px-5 py-4 text-sm">
-            <div class="flex justify-between gap-4">
-              <span class="text-muted-foreground">Selected</span>
-              <span class="font-medium">
-                {{ server.operating_system || "—" }}
-              </span>
+      <!-- Detail columns -->
+      <div class="grid grid-cols-1 gap-x-12 gap-y-6 py-6 sm:grid-cols-2">
+        <div>
+          <h2
+            class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            Operating system
+          </h2>
+          <dl class="divide-y text-sm">
+            <div class="flex justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">Selected</dt>
+              <dd class="font-medium">{{ server.operating_system || "—" }}</dd>
             </div>
-            <div v-if="detectedOS" class="flex justify-between gap-4">
-              <span class="text-muted-foreground">Detected</span>
-              <span class="font-medium">{{ detectedOS }}</span>
+            <div v-if="detectedOS" class="flex justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">Detected</dt>
+              <dd class="font-medium">{{ detectedOS }}</dd>
             </div>
             <div
               v-if="server.detected_kernel"
-              class="flex justify-between gap-4"
+              class="flex justify-between gap-4 py-2.5"
             >
-              <span class="text-muted-foreground">Kernel</span>
-              <span class="font-mono text-xs font-medium">
+              <dt class="text-muted-foreground">Kernel</dt>
+              <dd class="font-mono text-xs font-medium">
                 {{ server.detected_kernel }}
-              </span>
+              </dd>
             </div>
-          </div>
+          </dl>
         </div>
 
-        <!-- Status -->
-        <div class="rounded-xl border bg-card">
-          <div class="flex items-center gap-2 border-b px-5 py-3">
-            <Icon name="lucide:gauge" class="h-4 w-4 text-muted-foreground" />
-            <h2 class="text-sm font-semibold">Status &amp; lifecycle</h2>
-          </div>
-          <div class="space-y-3 px-5 py-4 text-sm">
-            <div class="flex items-center justify-between gap-4">
-              <span class="text-muted-foreground">Monitoring</span>
-              <Badge
-                :variant="server.monitoring_enabled ? 'green' : 'secondary'"
-              >
-                {{ server.monitoring_enabled ? "on" : "off" }}
-              </Badge>
+        <div>
+          <h2
+            class="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            Status &amp; lifecycle
+          </h2>
+          <dl class="divide-y text-sm">
+            <div class="flex items-center justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">Monitoring</dt>
+              <dd class="font-medium">
+                {{ server.monitoring_enabled ? "On" : "Off" }}
+              </dd>
             </div>
-            <div class="flex items-center justify-between gap-4">
-              <span class="text-muted-foreground">Auto-update</span>
-              <Badge :variant="server.auto_update ? 'green' : 'secondary'">
-                {{ server.auto_update ? "on" : "off" }}
-              </Badge>
+            <div class="flex items-center justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">Auto-update</dt>
+              <dd class="font-medium">
+                {{ server.auto_update ? "On" : "Off" }}
+              </dd>
             </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-muted-foreground">Provisioned</span>
-              <span class="font-medium">
+            <div class="flex justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">Provisioned</dt>
+              <dd class="font-medium">
                 {{ formatDate(server.provisioned_at) }}
-              </span>
+              </dd>
             </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-muted-foreground">Last connectivity</span>
-              <span class="font-medium">
+            <div class="flex justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">Last connectivity</dt>
+              <dd class="font-medium">
                 {{ formatDate(server.last_connectivity_check) }}
-              </span>
+              </dd>
             </div>
-            <div class="flex justify-between gap-4">
-              <span class="text-muted-foreground">Created</span>
-              <span class="font-medium">{{
-                formatDate(server.created_at)
-              }}</span>
+            <div class="flex justify-between gap-4 py-2.5">
+              <dt class="text-muted-foreground">Created</dt>
+              <dd class="font-medium">{{ formatDate(server.created_at) }}</dd>
             </div>
-          </div>
+          </dl>
         </div>
       </div>
     </div>

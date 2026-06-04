@@ -786,6 +786,31 @@ const showSiteTabs = computed(() => {
   return isSiteDetailPage.value;
 });
 
+// Admin back-office context row: a breadcrumb + section tabs, rendered inside
+// the navbar (like the server/global rows) so it shares the single bottom
+// border instead of adding a second one.
+const adminBreadcrumbState = usePageBreadcrumbState();
+const adminCrumbs = computed(() =>
+  adminBreadcrumbState.value?.path === route.path
+    ? adminBreadcrumbState.value.crumbs
+    : [],
+);
+const showAdminContext = computed(() => route.path.startsWith("/admin"));
+const adminTabs = [
+  { label: "Overview", to: "/admin/overview", icon: "lucide:bar-chart-3" },
+  {
+    label: "Users",
+    to: "/admin",
+    icon: "lucide:users",
+    match: (p: string) => p === "/admin" || p.startsWith("/admin/users"),
+  },
+  { label: "Invitations", to: "/admin/invitations", icon: "lucide:mail" },
+  { label: "Servers", to: "/admin/servers", icon: "lucide:server" },
+  { label: "Failures", to: "/admin/failures", icon: "lucide:triangle-alert" },
+];
+const isAdminTabActive = (tab: (typeof adminTabs)[number]): boolean =>
+  tab.match ? tab.match(route.path) : route.path.startsWith(tab.to);
+
 // Watch for section visibility changes to update indicators when they become visible
 watch(
   [showGlobalTabs, showServerTabs, showSiteTabs, isAdvancedTabActive],
@@ -1195,6 +1220,48 @@ onMounted(fetchTeams);
           @created="onScriptCreated"
         />
       </div>
+    </div>
+
+    <!-- Admin back-office context (breadcrumb + section tabs) -->
+    <div v-if="showAdminContext" class="px-4 lg:px-8">
+      <div
+        v-if="adminCrumbs.length"
+        class="flex items-center gap-1.5 pb-1.5 pt-1 text-sm"
+      >
+        <template v-for="(crumb, i) in adminCrumbs" :key="i">
+          <NuxtLink
+            v-if="crumb.to && i < adminCrumbs.length - 1"
+            :to="crumb.to"
+            class="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {{ crumb.label }}
+          </NuxtLink>
+          <span v-else class="font-medium text-foreground">{{
+            crumb.label
+          }}</span>
+          <Icon
+            v-if="i < adminCrumbs.length - 1"
+            name="lucide:chevron-right"
+            class="h-3.5 w-3.5 text-muted-foreground/60"
+          />
+        </template>
+      </div>
+      <nav class="-mb-px flex gap-6 overflow-x-auto">
+        <NuxtLink
+          v-for="tab in adminTabs"
+          :key="tab.to"
+          :to="tab.to"
+          class="relative flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors"
+          :class="
+            isAdminTabActive(tab)
+              ? 'border-foreground text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          "
+        >
+          <Icon :name="tab.icon" class="h-4 w-4" />
+          {{ tab.label }}
+        </NuxtLink>
+      </nav>
     </div>
 
     <!-- Server Detail Navigation -->
