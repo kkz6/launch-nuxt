@@ -13,6 +13,11 @@ useHead({
   title: "Admin — Failures",
 });
 
+setBreadcrumbs([
+  { label: "Admin", to: "/admin/overview" },
+  { label: "Failures" },
+]);
+
 // The caveat isn't part of the table meta, so keep it as static copy below
 // the table.
 const caveat =
@@ -37,8 +42,6 @@ function openLog(row: FailureRow): void {
 
 <template>
   <div class="space-y-6 pb-10">
-    <AdminTabs />
-
     <p class="text-sm text-muted-foreground">
       Recent provisioning, task, and deployment failures across the platform.
     </p>

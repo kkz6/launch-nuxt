@@ -71,6 +71,11 @@ export const adminService = {
     });
   },
 
+  showUser: (id: string | number) => {
+    const { get } = useApi();
+    return get<ApiResponse<AdminUserRow>>(`/admin/users/${id}`);
+  },
+
   overview: () => {
     const { get } = useApi();
     return get<ApiResponse<AdminOverview>>("/admin/overview");

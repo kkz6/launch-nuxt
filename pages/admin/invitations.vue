@@ -25,6 +25,11 @@ useHead({
   title: "Admin — Invitations",
 });
 
+setBreadcrumbs([
+  { label: "Admin", to: "/admin/overview" },
+  { label: "Invitations" },
+]);
+
 const { user } = useAuth();
 const isSuperAdmin = computed(() => user.value?.staff_role === "super_admin");
 
@@ -75,8 +80,6 @@ const submitInvite = async () => {
 
 <template>
   <div class="space-y-6 pb-10">
-    <AdminTabs />
-
     <div class="flex items-center justify-between gap-4">
       <p class="text-sm text-muted-foreground">Pending platform invitations.</p>
       <Button v-if="isSuperAdmin" size="sm" @click="openInvite">

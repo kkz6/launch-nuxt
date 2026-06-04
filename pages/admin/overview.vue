@@ -18,6 +18,11 @@ definePageMeta({
   middleware: ["auth", "staff"],
 });
 
+setBreadcrumbs([
+  { label: "Admin", to: "/admin/overview" },
+  { label: "Overview" },
+]);
+
 useHead({
   title: "Admin — Overview",
 });
@@ -72,8 +77,6 @@ onMounted(() => fetchOverview());
 
 <template>
   <div class="space-y-6 pb-10">
-    <AdminTabs />
-
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
         name="lucide:loader-2"
