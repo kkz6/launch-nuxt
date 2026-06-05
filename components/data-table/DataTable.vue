@@ -119,6 +119,17 @@ const visibleColumnDefs = computed(() => {
   });
 });
 
+// First-ever load has no rows and no meta yet; render a skeleton table so the
+// card keeps its shape instead of collapsing to a blank box with a spinner.
+const isInitialLoading = computed(
+  () => isLoading.value && data.value.length === 0,
+);
+const skeletonColCount = computed(() => visibleColumnDefs.value.length || 5);
+const skeletonRowCount = computed(() =>
+  Math.min(props.defaultPerPage ?? 10, 10),
+);
+const skeletonWidths = ["70%", "45%", "60%", "35%", "55%", "50%"];
+
 const hasBulkActions = computed(
   () => (meta.value?.actions.bulk.length ?? 0) > 0,
 );
@@ -241,7 +252,16 @@ defineExpose({ refresh });
               )
             "
           >
-            <tr>
+            <tr v-if="isInitialLoading && !visibleColumnDefs.length">
+              <th
+                v-for="i in skeletonColCount"
+                :key="`skh-${i}`"
+                class="px-4 py-2.5 text-left"
+              >
+                <div class="h-3 w-20 animate-pulse rounded bg-muted" />
+              </th>
+            </tr>
+            <tr v-else>
               <th v-if="showCheckboxes" class="w-10 pl-4 pr-2 py-2.5">
                 <Checkbox
                   :model-value="allSelected"
@@ -325,7 +345,29 @@ defineExpose({ refresh });
               </th>
             </tr>
           </thead>
-          <tbody class="[&>tr:not(:last-child)]:border-b">
+          <tbody
+            v-if="isInitialLoading"
+            class="[&>tr:not(:last-child)]:border-b"
+          >
+            <tr v-for="n in skeletonRowCount" :key="`sk-${n}`">
+              <td v-if="showCheckboxes" class="pl-4 pr-2 py-3">
+                <div class="h-4 w-4 animate-pulse rounded bg-muted" />
+              </td>
+              <td
+                v-for="i in skeletonColCount"
+                :key="`sk-${n}-${i}`"
+                class="px-4 py-3"
+              >
+                <div
+                  class="h-4 animate-pulse rounded bg-muted"
+                  :style="{
+                    width: skeletonWidths[(i - 1) % skeletonWidths.length],
+                  }"
+                />
+              </td>
+            </tr>
+          </tbody>
+          <tbody v-else class="[&>tr:not(:last-child)]:border-b">
             <tr
               v-for="row in data"
               :key="(row as any).id"
@@ -392,7 +434,7 @@ defineExpose({ refresh });
         <EmptyState v-if="isEmpty && !isLoading" :config="meta?.emptyState" />
 
         <div
-          v-if="isLoading"
+          v-if="isLoading && data.length > 0"
           class="absolute inset-0 flex items-center justify-center bg-card/60 backdrop-blur-sm"
         >
           <div

@@ -3,5 +3,10 @@ import type { ColumnDef } from "~/types/data-table";
 defineProps<{ value: any; column: ColumnDef }>();
 </script>
 <template>
-  <span :class="column.cellClass">{{ value ?? "" }}</span>
+  <SharedDateTooltip
+    v-if="value"
+    :date="value"
+    :class-name="column.cellClass"
+  />
+  <span v-else :class="column.cellClass">—</span>
 </template>
