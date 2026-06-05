@@ -6,6 +6,7 @@ import type {
   AdminServerDetail,
   AdminOverview,
   AdminFailuresResponse,
+  AdminPlan,
   PlatformInvitation,
   Server,
 } from "~/types";
@@ -145,7 +146,16 @@ export const adminService = {
     );
   },
 
-  createInvitation: (body: { email: string; trial_ends_at: string }) => {
+  plans: () => {
+    const { get } = useApi();
+    return get<ApiResponse<AdminPlan[]>>("/admin/plans");
+  },
+
+  createInvitation: (body: {
+    email: string;
+    plan_id: string;
+    trial_ends_at: string;
+  }) => {
     const { post } = useApi();
     return post<ApiResponse<PlatformInvitation>>("/admin/invitations", body);
   },

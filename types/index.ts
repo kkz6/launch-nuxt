@@ -310,7 +310,7 @@ export interface Task {
 export interface ProvisionStatusStep {
   name: string;
   description: string;
-  status: 'completed' | 'current' | 'pending';
+  status: "completed" | "current" | "pending";
 }
 
 export interface ProvisionStatus {
@@ -888,9 +888,18 @@ export interface AdminFailuresResponse {
 export interface PlatformInvitation {
   id: string;
   email: string;
+  plan_id?: string;
   trial_ends_at: string;
   invited_by: string;
   accepted_at?: string | null;
   expires_at: string;
   created_at?: string | null;
+}
+
+export interface AdminPlan {
+  id: string;
+  name: string;
+  monthly_pricing: number;
+  yearly_pricing: number;
+  recommended: boolean;
 }

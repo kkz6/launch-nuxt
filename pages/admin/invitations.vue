@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import type { ActionDef } from "~/types/data-table";
+import type { AdminPlan } from "~/types";
 import { adminService } from "~/services/adminService";
 import { useAuth } from "~/composables/useAuth";
 import { Button } from "~/components/ui/button";
@@ -14,6 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 import DataTable from "~/components/data-table/DataTable.vue";
 
 definePageMeta({
@@ -43,17 +51,45 @@ const filterServerActions = (actions: ActionDef[]): ActionDef[] =>
 const inviteOpen = ref(false);
 const inviting = ref(false);
 const inviteEmail = ref("");
+const invitePlanId = ref("");
 const inviteTrialEndsAt = ref("");
+
+// Plans drive the plan selector. Loaded once, lazily, the first time the
+// dialog opens.
+const plans = ref<AdminPlan[]>([]);
+const plansLoading = ref(false);
+
+const loadPlans = async () => {
+  if (plans.value.length || plansLoading.value) return;
+  plansLoading.value = true;
+  try {
+    const res = await adminService.plans();
+    plans.value = res.data ?? [];
+  } catch {
+    toast.error("Failed to load plans");
+  } finally {
+    plansLoading.value = false;
+  }
+};
+
+const formatPrice = (cents: number): string =>
+  `$${(cents / 100).toFixed(2)}/mo`;
 
 const openInvite = () => {
   inviteEmail.value = "";
+  invitePlanId.value = "";
   inviteTrialEndsAt.value = "";
   inviteOpen.value = true;
+  loadPlans();
 };
 
 const submitInvite = async () => {
   if (!inviteEmail.value.trim()) {
     toast.error("Email is required");
+    return;
+  }
+  if (!invitePlanId.value) {
+    toast.error("Plan is required");
     return;
   }
   if (!inviteTrialEndsAt.value) {
@@ -64,6 +100,7 @@ const submitInvite = async () => {
   try {
     await adminService.createInvitation({
       email: inviteEmail.value.trim(),
+      plan_id: invitePlanId.value,
       trial_ends_at: new Date(inviteTrialEndsAt.value).toISOString(),
     });
     toast.success(`Invitation sent to ${inviteEmail.value.trim()}`);
@@ -112,6 +149,31 @@ const submitInvite = async () => {
               type="email"
               placeholder="user@example.com"
             />
+          </div>
+          <div class="space-y-2">
+            <Label for="invite-plan">Plan</Label>
+            <Select v-model="invitePlanId">
+              <SelectTrigger id="invite-plan" class="w-full">
+                <SelectValue
+                  :placeholder="
+                    plansLoading ? 'Loading plans…' : 'Select a plan'
+                  "
+                />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="plan in plans"
+                  :key="plan.id"
+                  :value="plan.id"
+                >
+                  {{ plan.name }} · {{ formatPrice(plan.monthly_pricing) }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p class="text-xs text-muted-foreground">
+              The customer provides their name and password when they accept the
+              invite.
+            </p>
           </div>
           <div class="space-y-2">
             <Label for="invite-trial">Trial end date</Label>
