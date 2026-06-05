@@ -25,7 +25,8 @@ const caveat =
 
 interface FailureRow {
   id?: string;
-  kind?: string;
+  kind?: unknown;
+  kind_raw?: string;
   title?: string;
   when?: string;
   error?: string;
@@ -44,7 +45,8 @@ function openLog(row: FailureRow): void {
 <template>
   <div class="space-y-6 pb-10">
     <p class="text-sm text-muted-foreground">
-      Recent provisioning, task, and deployment failures across the platform.
+      Recent provisioning, site installation, and service installation failures
+      across the platform.
     </p>
 
     <DataTable endpoint="/admin/failures/table" @row-click="openLog">

@@ -15,7 +15,11 @@ import {
 
 interface FailureRow {
   id?: string;
-  kind?: string;
+  // kind is the display badge ({value,variant}); kind_raw is the unmapped
+  // string ("provision" | "site_installation" | "service_installation") used
+  // for the log endpoint query.
+  kind?: unknown;
+  kind_raw?: string;
   title?: string;
   when?: string;
   error?: string;
@@ -36,6 +40,17 @@ const isOpen = computed({
   set: (value: boolean) => emit("update:open", value),
 });
 
+// The kind cell arrives as a mapped badge ({value,variant}); fall back to a
+// humanised kind_raw for the header label.
+const kindLabel = computed<string>(() => {
+  const k = props.failure?.kind;
+  if (k && typeof k === "object" && "value" in k) {
+    return String((k as { value?: unknown }).value ?? "");
+  }
+  const raw = props.failure?.kind_raw;
+  return raw ? raw.replace(/_/g, " ") : "";
+});
+
 // The table only carries a truncated detail; fetch the full output lazily when
 // the sheet opens (falling back to the truncated detail while it loads / if the
 // fetch fails).
@@ -48,10 +63,10 @@ const cleanLog = computed(() => stripAnsi(rawLog.value).trim());
 
 async function loadFullLog(): Promise<void> {
   const f = props.failure;
-  if (!f?.id || !f.kind) return;
+  if (!f?.id || !f.kind_raw) return;
   loading.value = true;
   try {
-    const res = await adminService.failureLog(f.id, f.kind);
+    const res = await adminService.failureLog(f.id, f.kind_raw);
     fullLog.value = res.data.log;
   } catch {
     // Keep the truncated detail as a fallback; no toast — it's non-critical.
@@ -92,8 +107,8 @@ watch(
       <SheetHeader class="flex-row items-start justify-between gap-4 space-y-0">
         <div class="min-w-0 space-y-1">
           <SheetTitle class="flex items-center gap-2">
-            <Badge v-if="failure?.kind" variant="secondary">
-              {{ failure.kind }}
+            <Badge v-if="kindLabel" variant="secondary" class="capitalize">
+              {{ kindLabel }}
             </Badge>
             <span class="truncate">{{ failure?.title || "Failure log" }}</span>
           </SheetTitle>
