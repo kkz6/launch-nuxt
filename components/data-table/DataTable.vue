@@ -49,6 +49,7 @@ const {
   meta,
   pagination,
   isLoading,
+  hasLoaded,
   isEmpty,
   sortColumn,
   sortDirection,
@@ -119,11 +120,12 @@ const visibleColumnDefs = computed(() => {
   });
 });
 
-// First-ever load has no rows and no meta yet; render a skeleton table so the
-// card keeps its shape instead of collapsing to a blank box with a spinner.
-const isInitialLoading = computed(
-  () => isLoading.value && data.value.length === 0,
-);
+// Until the first fetch settles there are no rows and no meta yet; render a
+// skeleton table so the card keeps its shape instead of collapsing to a blank
+// box. Keyed on hasLoaded (not isLoading) so the skeleton shows from the very
+// first render — including SSR and the tick before onMounted fires the fetch —
+// rather than briefly flashing an (config-less) empty state.
+const isInitialLoading = computed(() => !hasLoaded.value);
 const skeletonColCount = computed(() => visibleColumnDefs.value.length || 5);
 const skeletonRowCount = computed(() =>
   Math.min(props.defaultPerPage ?? 10, 10),
@@ -431,10 +433,13 @@ defineExpose({ refresh });
           </tbody>
         </table>
 
-        <EmptyState v-if="isEmpty && !isLoading" :config="meta?.emptyState" />
+        <EmptyState
+          v-if="!isInitialLoading && isEmpty"
+          :config="meta?.emptyState"
+        />
 
         <div
-          v-if="isLoading && data.length > 0"
+          v-if="isLoading && !isInitialLoading"
           class="absolute inset-0 flex items-center justify-center bg-card/60 backdrop-blur-sm"
         >
           <div

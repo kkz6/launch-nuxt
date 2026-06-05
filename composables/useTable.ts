@@ -21,6 +21,11 @@ export function useTable<T = any>(
   const meta = ref<TableMeta | null>(null);
   const pagination = ref<PaginationData | null>(null);
   const isLoading = ref(false);
+  // hasLoaded flips true once the first fetch settles (success OR failure), so
+  // the UI can show a loading skeleton from the very first render until then —
+  // instead of briefly rendering an empty state while isLoading is still false
+  // (before onMounted) or during SSR.
+  const hasLoaded = ref(false);
   const isEmpty = computed(() => !isLoading.value && data.value.length === 0);
 
   const currentPage = ref(1);
@@ -119,6 +124,7 @@ export function useTable<T = any>(
       console.error("Failed to fetch table data:", error);
     } finally {
       isLoading.value = false;
+      hasLoaded.value = true;
     }
   }
 
@@ -203,6 +209,7 @@ export function useTable<T = any>(
     meta,
     pagination,
     isLoading,
+    hasLoaded,
     isEmpty,
     currentPage,
     perPage,
