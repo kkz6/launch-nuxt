@@ -821,7 +821,10 @@ export interface CreateDockerDatabaseData {
 export type DockerDatabaseLifecycleAction = "start" | "stop" | "restart";
 
 /** Engine catalogue returned by /api/docker/databases/engines. */
-export type DockerDatabaseEngineCatalogue = Record<DockerDatabaseEngine, string[]>;
+export type DockerDatabaseEngineCatalogue = Record<
+  DockerDatabaseEngine,
+  string[]
+>;
 
 // ---- Database backups -----------------------------------------------------
 
@@ -953,7 +956,9 @@ export const dockerService = {
   projects: {
     list: (serverId: string) => {
       const { get } = useApi();
-      return get<ApiResponse<DockerProject[]>>(`/servers/${serverId}/docker/projects`);
+      return get<ApiResponse<DockerProject[]>>(
+        `/servers/${serverId}/docker/projects`,
+      );
     },
 
     get: (serverId: string, projectId: string) => {
@@ -971,7 +976,11 @@ export const dockerService = {
       );
     },
 
-    update: (serverId: string, projectId: string, data: UpdateDockerProjectData) => {
+    update: (
+      serverId: string,
+      projectId: string,
+      data: UpdateDockerProjectData,
+    ) => {
       const { patch } = useApi();
       return patch<ApiResponse<DockerProject>>(
         `/servers/${serverId}/docker/projects/${projectId}`,
@@ -1115,10 +1124,28 @@ export const dockerService = {
       );
     },
 
-    listDeployments: (serverId: string, projectId: string, applicationId: string) => {
+    listDeployments: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
       const { get } = useApi();
       return get<ApiResponse<DockerDeployment[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deployments`,
+      );
+    },
+
+    deleteDeployment: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      deploymentId: string,
+      deleteFromGitHub = false,
+    ) => {
+      const { delete: del } = useApi();
+      const q = deleteFromGitHub ? "?delete_from_gha=true" : "";
+      return del<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deployments/${deploymentId}${q}`,
       );
     },
 
@@ -1136,7 +1163,11 @@ export const dockerService = {
      * stored hash on the row. Use when a token is suspected leaked or
      * just on a routine cadence.
      */
-    rotateGhaToken: (serverId: string, projectId: string, applicationId: string) => {
+    rotateGhaToken: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
       const { post } = useApi();
       return post<ApiResponse<{ status: string; message: string }>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/gha/rotate-token`,
@@ -1151,7 +1182,11 @@ export const dockerService = {
      * (the underlying PutContents uses an If-Match against the stored
      * SHA so we don't churn commits).
      */
-    resyncGhaWorkflow: (serverId: string, projectId: string, applicationId: string) => {
+    resyncGhaWorkflow: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
       const { post } = useApi();
       return post<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/gha/resync`,
@@ -1166,7 +1201,11 @@ export const dockerService = {
      * if they want; we don't take silent destructive actions on their
      * code).
      */
-    disableGha: (serverId: string, projectId: string, applicationId: string) => {
+    disableGha: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
       const { post } = useApi();
       return post<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/gha/disable`,
@@ -1174,7 +1213,11 @@ export const dockerService = {
       );
     },
 
-    listDomains: (serverId: string, projectId: string, applicationId: string) => {
+    listDomains: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+    ) => {
       const { get } = useApi();
       return get<ApiResponse<DockerDomain[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains`,
@@ -1568,7 +1611,11 @@ export const dockerService = {
       );
     },
 
-    create: (serverId: string, projectId: string, data: CreateDockerComposeData) => {
+    create: (
+      serverId: string,
+      projectId: string,
+      data: CreateDockerComposeData,
+    ) => {
       const { post } = useApi();
       return post<ApiResponse<DockerCompose>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes`,
@@ -1628,17 +1675,39 @@ export const dockerService = {
       );
     },
 
-    listDeployments: (serverId: string, projectId: string, composeId: string) => {
+    listDeployments: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+    ) => {
       const { get } = useApi();
       return get<ApiResponse<DockerDeployment[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments`,
       );
     },
 
+    deleteDeployment: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      deploymentId: string,
+      deleteFromGitHub = false,
+    ) => {
+      const { delete: del } = useApi();
+      const q = deleteFromGitHub ? "?delete_from_gha=true" : "";
+      return del<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments/${deploymentId}${q}`,
+      );
+    },
+
     // ---- GitHub Actions builds management (compose mirror) ----
     // See applications.rotateGhaToken/resyncGhaWorkflow/disableGha for the contract.
 
-    rotateGhaToken: (serverId: string, projectId: string, composeId: string) => {
+    rotateGhaToken: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+    ) => {
       const { post } = useApi();
       return post<ApiResponse<{ status: string; message: string }>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/rotate-token`,
@@ -1646,7 +1715,11 @@ export const dockerService = {
       );
     },
 
-    resyncGhaWorkflow: (serverId: string, projectId: string, composeId: string) => {
+    resyncGhaWorkflow: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+    ) => {
       const { post } = useApi();
       return post<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/resync`,
@@ -1974,10 +2047,7 @@ export const dockerService = {
       },
     ) => {
       const { post } = useApi();
-      return post(
-        `/servers/${serverId}/docker/purge-compose-resources`,
-        data,
-      );
+      return post(`/servers/${serverId}/docker/purge-compose-resources`, data);
     },
   },
 
@@ -2163,7 +2233,11 @@ export const dockerService = {
         `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup`,
       );
     },
-    listBackupRuns: (serverId: string, projectId: string, databaseId: string) => {
+    listBackupRuns: (
+      serverId: string,
+      projectId: string,
+      databaseId: string,
+    ) => {
       const { get } = useApi();
       return get<ApiResponse<DockerDatabaseBackupRun[]>>(
         `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/backup/runs`,
@@ -2262,7 +2336,9 @@ export const dockerService = {
   registryCredentials: {
     list: () => {
       const { get } = useApi();
-      return get<ApiResponse<DockerRegistryCredential[]>>("/registry-credentials");
+      return get<ApiResponse<DockerRegistryCredential[]>>(
+        "/registry-credentials",
+      );
     },
     create: (data: CreateDockerRegistryCredentialData) => {
       const { post } = useApi();

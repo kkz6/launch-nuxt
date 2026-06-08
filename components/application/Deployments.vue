@@ -10,6 +10,15 @@ import {
   SheetTitle,
 } from "~/components/ui/sheet";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Checkbox } from "~/components/ui/checkbox";
+import {
   dockerService,
   type DockerApplication,
   type DockerDeployment,
@@ -223,6 +232,49 @@ const elapsedLabel = (deployment: DockerDeployment): string => {
   if (h > 0) return `${h}h ${m}m ${s}s`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
+};
+
+// Delete-deployment dialog state.
+const deleteTarget = ref<DockerDeployment | null>(null);
+const deleteOpen = ref(false);
+const alsoDeleteGitHub = ref(false);
+const deleting = ref(false);
+
+// The "Also remove from GitHub Actions" option only applies to GHA-originated
+// deployments that have a linked run.
+const canRemoveFromGitHub = computed(
+  () =>
+    deleteTarget.value?.trigger_source === "github_actions" &&
+    !!deleteTarget.value?.gha_run_url,
+);
+
+const openDelete = (d: DockerDeployment) => {
+  deleteTarget.value = d;
+  alsoDeleteGitHub.value = false;
+  deleteOpen.value = true;
+};
+
+const confirmDelete = async () => {
+  const d = deleteTarget.value;
+  if (!d) return;
+  deleting.value = true;
+  try {
+    await dockerService.applications.deleteDeployment(
+      props.application.server_id,
+      props.application.project_id,
+      props.application.id,
+      d.id,
+      canRemoveFromGitHub.value && alsoDeleteGitHub.value,
+    );
+    deployments.value = deployments.value.filter((x) => x.id !== d.id);
+    toast.success("Deployment deleted");
+    deleteOpen.value = false;
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to delete deployment");
+  } finally {
+    deleting.value = false;
+  }
 };
 
 // Single-line summary for the secondary row. Image source apps
@@ -469,11 +521,71 @@ onMounted(fetchDeployments);
                 <Icon name="lucide:scroll-text" class="mr-2 block size-4" />
                 View Logs
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                class="text-muted-foreground hover:text-destructive"
+                :disabled="isInProgress(d.status)"
+                :title="
+                  isInProgress(d.status)
+                    ? 'Cannot delete a running deployment'
+                    : 'Delete deployment'
+                "
+                @click="openDelete(d)"
+              >
+                <Icon name="lucide:trash-2" class="size-4" />
+              </Button>
             </div>
           </div>
         </div>
       </div>
     </template>
+
+    <!-- Delete deployment confirmation -->
+    <Dialog v-model:open="deleteOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete deployment</DialogTitle>
+          <DialogDescription>
+            This removes the deployment record and its logs from Launch. This
+            can't be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <label
+          v-if="canRemoveFromGitHub"
+          class="flex items-start gap-3 rounded-md border p-3 text-sm"
+        >
+          <Checkbox v-model="alsoDeleteGitHub" class="mt-0.5" />
+          <span>
+            <span class="font-medium">Also remove from GitHub Actions</span>
+            <span class="block text-muted-foreground">
+              Deletes the linked workflow run from the repo's Actions tab.
+            </span>
+          </span>
+        </label>
+        <DialogFooter>
+          <Button
+            variant="outline"
+            :disabled="deleting"
+            @click="deleteOpen = false"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            :disabled="deleting"
+            @click="confirmDelete"
+          >
+            <Icon
+              v-if="deleting"
+              name="lucide:loader-2"
+              class="mr-2 size-4 animate-spin"
+            />
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
 
     <!--
       Logs sheet — same slide-in surface site DeploymentLogs uses.
