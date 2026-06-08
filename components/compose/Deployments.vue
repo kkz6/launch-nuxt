@@ -176,6 +176,63 @@ const statusLabel = (status: string): string => {
   }
 };
 
+// In-progress = not yet in a terminal state (pending/building/deploying).
+const isInProgress = (status: string): boolean =>
+  status === "pending" || status === "building" || status === "deploying";
+
+const hasActiveDeployment = computed(() =>
+  deployments.value.some((d) => isInProgress(d.status)),
+);
+
+// A live, per-second "now" to tick the elapsed duration of an in-progress
+// deployment. The shared useNow() ticks every 30s (too coarse for a running
+// timer), so we run a dedicated 1s interval while a deploy is active.
+const liveNow = ref(Date.now());
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+const startElapsedTimer = () => {
+  if (elapsedTimer || typeof window === "undefined") return;
+  liveNow.value = Date.now();
+  elapsedTimer = setInterval(() => {
+    liveNow.value = Date.now();
+  }, 1000);
+};
+
+const stopElapsedTimer = () => {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+};
+
+watch(
+  hasActiveDeployment,
+  (active) => {
+    if (active) startElapsedTimer();
+    else stopElapsedTimer();
+  },
+  { immediate: true },
+);
+
+onUnmounted(stopElapsedTimer);
+
+// elapsedLabel formats how long an in-progress deployment has been running
+// (e.g. "1m 23s"), recomputed every second via liveNow.
+const elapsedLabel = (deployment: DockerDeployment): string => {
+  if (!isInProgress(deployment.status)) return "";
+  const start = new Date(
+    deployment.created_at || deployment.started_at || "",
+  ).getTime();
+  if (Number.isNaN(start)) return "";
+  const secs = Math.max(0, Math.floor((liveNow.value - start) / 1000));
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
+
 // See components/application/Deployments.vue#failureSummary for the
 // full rationale. Same helper, same `::LAUNCH::deploy_step::` marker
 // parsing — keeps the two views consistent (a customer scanning an
@@ -183,7 +240,10 @@ const statusLabel = (status: string): string => {
 type FailureSummary = { step: string; detail: string };
 const failureSummary = (raw?: string | null): FailureSummary | null => {
   if (!raw) return null;
-  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length === 0) return null;
   let step = "";
   for (let i = lines.length - 1; i >= 0; i--) {
@@ -273,8 +333,8 @@ onMounted(fetchDeployments);
         <Icon name="lucide:rocket" class="h-8 w-8 text-muted-foreground" />
         <span class="text-base text-muted-foreground">No deployments yet</span>
         <p class="max-w-md px-4 text-center text-xs text-muted-foreground">
-          Click <span class="font-medium">Deploy now</span> to bring the
-          stack up on the server.
+          Click <span class="font-medium">Deploy now</span> to bring the stack
+          up on the server.
         </p>
       </div>
 
@@ -316,7 +376,14 @@ onMounted(fetchDeployments);
 
           <div class="flex shrink-0 flex-col items-end gap-2">
             <div class="text-sm text-muted-foreground">
+              <span
+                v-if="isInProgress(d.status)"
+                class="font-medium tabular-nums text-blue-600 dark:text-blue-400"
+              >
+                {{ elapsedLabel(d) }}
+              </span>
               <SharedDateTooltip
+                v-else
                 :date="d.created_at || d.started_at || new Date().toISOString()"
               />
             </div>
@@ -327,10 +394,7 @@ onMounted(fetchDeployments);
                 size="sm"
                 @click="openLogs(d)"
               >
-                <Icon
-                  name="lucide:scroll-text"
-                  class="mr-2 block size-4"
-                />
+                <Icon name="lucide:scroll-text" class="mr-2 block size-4" />
                 View Logs
               </Button>
             </div>

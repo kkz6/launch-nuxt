@@ -99,13 +99,19 @@ const scheduleRefetch = () => {
 //      Without this second subscription, GHA-triggered deployments
 //      land silently and the user has to manually refresh to see the
 //      row turn green / red.
-const isMine = (
-  data: { application_id?: string; deployment_id?: string; target_id?: string; target_type?: string },
-): boolean => {
+const isMine = (data: {
+  application_id?: string;
+  deployment_id?: string;
+  target_id?: string;
+  target_type?: string;
+}): boolean => {
   if (data.application_id === props.application.id) return true;
   // deployment events carry target_type + target_id rather than a
   // typed application_id — match either shape.
-  if (data.target_type === "application" && data.target_id === props.application.id) {
+  if (
+    data.target_type === "application" &&
+    data.target_id === props.application.id
+  ) {
     return true;
   }
   return false;
@@ -160,6 +166,65 @@ const statusLabel = (status: string): string => {
   }
 };
 
+// In-progress = not yet in a terminal state (pending/building/deploying).
+const isInProgress = (status: string): boolean =>
+  status === "pending" || status === "building" || status === "deploying";
+
+const hasActiveDeployment = computed(() =>
+  deployments.value.some((d) => isInProgress(d.status)),
+);
+
+// A live, per-second "now" to tick the elapsed duration of an in-progress
+// deployment. The shared useNow() ticks every 30s (right for "X ago" badges,
+// too coarse for a running timer), so we run a dedicated 1s interval — but only
+// while a deployment is actually in progress, and torn down otherwise.
+const liveNow = ref(Date.now());
+let elapsedTimer: ReturnType<typeof setInterval> | null = null;
+
+const startElapsedTimer = () => {
+  if (elapsedTimer || typeof window === "undefined") return;
+  liveNow.value = Date.now();
+  elapsedTimer = setInterval(() => {
+    liveNow.value = Date.now();
+  }, 1000);
+};
+
+const stopElapsedTimer = () => {
+  if (elapsedTimer) {
+    clearInterval(elapsedTimer);
+    elapsedTimer = null;
+  }
+};
+
+watch(
+  hasActiveDeployment,
+  (active) => {
+    if (active) startElapsedTimer();
+    else stopElapsedTimer();
+  },
+  { immediate: true },
+);
+
+onUnmounted(stopElapsedTimer);
+
+// elapsedLabel formats how long an in-progress deployment has been running
+// (e.g. "1m 23s"), recomputed every second via liveNow. Empty for terminal
+// deployments — those show their created-at "X ago" badge instead.
+const elapsedLabel = (deployment: DockerDeployment): string => {
+  if (!isInProgress(deployment.status)) return "";
+  const start = new Date(
+    deployment.created_at || deployment.started_at || "",
+  ).getTime();
+  if (Number.isNaN(start)) return "";
+  const secs = Math.max(0, Math.floor((liveNow.value - start) / 1000));
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m ${s}s`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+};
+
 // Single-line summary for the secondary row. Image source apps
 // show the image ref; git source apps show the commit SHA + first
 // line of the message. Each is optional — the function returns
@@ -193,7 +258,10 @@ const shortSha = (sha?: string | null): string => {
 type FailureSummary = { step: string; detail: string };
 const failureSummary = (raw?: string | null): FailureSummary | null => {
   if (!raw) return null;
-  const lines = raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  const lines = raw
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   if (lines.length === 0) return null;
 
   // Last LAUNCH marker = the step that was in flight when things
@@ -284,8 +352,8 @@ onMounted(fetchDeployments);
         <Icon name="lucide:rocket" class="h-8 w-8 text-muted-foreground" />
         <span class="text-base text-muted-foreground">No deployments yet</span>
         <p class="max-w-md px-4 text-center text-xs text-muted-foreground">
-          Click <span class="font-medium">Deploy now</span> to pull the
-          image and start the container on the server.
+          Click <span class="font-medium">Deploy now</span> to pull the image
+          and start the container on the server.
         </p>
       </div>
 
@@ -380,7 +448,14 @@ onMounted(fetchDeployments);
 
           <div class="flex shrink-0 flex-col items-end gap-2">
             <div class="text-sm text-muted-foreground">
+              <span
+                v-if="isInProgress(d.status)"
+                class="font-medium tabular-nums text-blue-600 dark:text-blue-400"
+              >
+                {{ elapsedLabel(d) }}
+              </span>
               <SharedDateTooltip
+                v-else
                 :date="d.created_at || d.started_at || new Date().toISOString()"
               />
             </div>
@@ -391,10 +466,7 @@ onMounted(fetchDeployments);
                 size="sm"
                 @click="openLogs(d)"
               >
-                <Icon
-                  name="lucide:scroll-text"
-                  class="mr-2 block size-4"
-                />
+                <Icon name="lucide:scroll-text" class="mr-2 block size-4" />
                 View Logs
               </Button>
             </div>
