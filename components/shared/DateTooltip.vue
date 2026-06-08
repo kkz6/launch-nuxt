@@ -69,8 +69,24 @@ const parsed = computed<Date | null>(() => {
   return tolerantParse(props.date);
 });
 
-// Ticking "now" — one shared timer for the whole app, see useNow.
-const now = useNow();
+// Ticking "now". Two shared clocks (see useNow):
+//   - coarse (30s): ambient "X minutes/hours ago" badges.
+//   - fast   (1s):  fresh timestamps, so "X seconds ago" counts up
+//                   smoothly instead of jumping in 30s steps.
+// We pick per timestamp by age: within two minutes (where second- and
+// minute-level granularity actually changes the label) we follow the
+// 1s clock; older than that the 30s clock is plenty. Because the
+// computed only reads `fast.value` while the date is recent, old rows
+// stop depending on the 1s tick and don't re-render every second.
+const coarse = useNow();
+const fast = useNow(1000);
+
+const now = computed<Date>(() => {
+  const d = parsed.value;
+  if (!d) return coarse.value;
+  const ageMs = Math.abs(coarse.value.getTime() - d.getTime());
+  return ageMs < 120_000 ? fast.value : coarse.value;
+});
 
 const relativeDate = computed<string>(() => {
   const d = parsed.value;

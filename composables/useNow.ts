@@ -1,57 +1,66 @@
 /**
- * useNow — a process-wide reactive `now` ref that ticks every
- * `intervalMs` milliseconds. Sharing one timer across every component
- * that wants a live "X minutes ago" badge keeps the cost flat no
- * matter how many date rows are on screen (a Containers list with
- * 50 rows used to either re-fetch the page or accept stale "just
- * now" labels forever).
+ * useNow — process-wide reactive `now` ref(s) that tick on a fixed
+ * cadence. Sharing one timer per cadence across every component that
+ * wants a live "X ago" / elapsed badge keeps the cost flat no matter
+ * how many date rows are on screen (a Containers list with 50 rows
+ * used to either re-fetch the page or accept stale "just now" labels
+ * forever).
  *
  * Usage from a component:
  *
- *     const now = useNow()
+ *     const now = useNow()        // 30s cadence (default)
+ *     const live = useNow(1000)   // 1s cadence, for live timers
  *     const relative = computed(() => formatDistance(props.date, now.value))
  *
- * The first caller starts the global interval. Subsequent callers
- * reuse the same ref. The interval keeps running for the life of
- * the page — there's never a moment we want this to stop.
+ * Each distinct `intervalMs` gets its own shared ref + interval, so a
+ * caller that asks for 1s really gets 1s — earlier versions handed
+ * every caller the first ref that was ever created, silently ignoring
+ * the requested cadence.
  *
- * The default 30s cadence is a balance: granular enough that "X
- * minutes ago" labels feel live, sparse enough that we're not
- * waking the main thread every second.
+ * Timers are created lazily on the client only (Nuxt SSR runs module
+ * code in Node, where we never want a stray setInterval). They live
+ * for the lifetime of the page — there's never a moment we want them
+ * to stop.
+ *
+ * The 30s default is a balance for ambient "X minutes ago" labels:
+ * granular enough to feel live, sparse enough that we're not waking
+ * the main thread every second. Live timers (running deployments,
+ * fresh timestamps) opt into 1s explicitly.
  */
 const DEFAULT_INTERVAL_MS = 30_000
 
-let started = false
-let timer: ReturnType<typeof setInterval> | null = null
-let nowRef: Ref<Date> | null = null
+interface Clock {
+  ref: Ref<Date>
+  timer: ReturnType<typeof setInterval> | null
+}
+
+const clocks = new Map<number, Clock>()
 
 export function useNow(intervalMs: number = DEFAULT_INTERVAL_MS): Ref<Date> {
-  if (nowRef) return nowRef
-  // First caller — bootstrap the shared state. We deliberately
-  // initialise here (not at module top-level) because Nuxt SSR runs
-  // module code on the server and we don't want a stray setInterval
-  // running in Node.
-  nowRef = ref(new Date())
-  if (!started && typeof window !== 'undefined') {
-    started = true
+  const existing = clocks.get(intervalMs)
+  if (existing) return existing.ref
+
+  // First caller for this cadence — bootstrap a dedicated ref + timer.
+  const nowRef = ref(new Date())
+  let timer: ReturnType<typeof setInterval> | null = null
+  if (typeof window !== 'undefined') {
     timer = setInterval(() => {
       // Replace the Date object so Vue's reactivity sees a new
-      // identity. Mutating in place via .setTime() also works but
-      // is more error-prone if a consumer ever holds the same Date
-      // reference and compares with ===.
-      nowRef!.value = new Date()
+      // identity. Mutating in place via .setTime() also works but is
+      // more error-prone if a consumer holds the same Date reference
+      // and compares with ===.
+      nowRef.value = new Date()
     }, intervalMs)
   }
+  clocks.set(intervalMs, { ref: nowRef, timer })
   return nowRef
 }
 
 // Exposed for tests + hot-reload teardown. Real app code never calls
-// this — the interval lives for the lifetime of the tab.
+// this — the intervals live for the lifetime of the tab.
 export function _stopNowForTests() {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
+  for (const clock of clocks.values()) {
+    if (clock.timer) clearInterval(clock.timer)
   }
-  started = false
-  nowRef = null
+  clocks.clear()
 }
