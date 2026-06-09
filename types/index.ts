@@ -82,7 +82,15 @@ export interface User {
   current_team?: Team;
   two_factor_enabled?: boolean;
   membership?: TeamMember;
+  // The caller's role in their current team. Populated by /auth/user
+  // and used to gate UI actions (see useCan()). The backend remains
+  // the authorization source of truth.
+  role?: TeamRole;
 }
+
+// Team roles, highest privilege first. Mirrors the backend hierarchy
+// (owner > admin > editor > member). Drives frontend UI gating only.
+export type TeamRole = "owner" | "admin" | "editor" | "member";
 
 export interface Team {
   id: string;

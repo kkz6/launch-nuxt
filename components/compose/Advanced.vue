@@ -21,6 +21,9 @@ const emit = defineEmits<{
   deleted: [];
 }>();
 
+// Role gating — the Danger Zone (delete stack) is admin/owner only.
+const { canDelete } = useCan();
+
 // Rename form moved here from compose/General.vue so General stays
 // read-only (info-card grid only, matches application + database
 // detail pages). Stack name is the only mutable field today; future
@@ -498,7 +501,10 @@ const deleteCompose = async () => {
       visual weight matches the action. Mirrors the application
       Advanced danger zone shape.
     -->
-    <div class="rounded-lg border border-destructive/30 bg-destructive/[0.03] p-6">
+    <div
+      v-if="canDelete"
+      class="rounded-lg border border-destructive/30 bg-destructive/[0.03] p-6"
+    >
       <h3 class="text-base font-semibold text-destructive">Danger Zone</h3>
       <p class="mt-1 text-sm text-muted-foreground">
         Permanently delete this compose stack. Every container the stack
