@@ -37,6 +37,8 @@ interface Team {
 }
 
 const { user, logout, fetchUser } = useAuth();
+// Role gating — hide create/mutate actions for read-only members.
+const { canEdit } = useCan();
 const { setCurrentTeamId } = useApi();
 const { reconnect: reconnectWebSocket, isConnected: isWsConnected } =
   useWebSocket();
@@ -2386,7 +2388,7 @@ onMounted(fetchTeams);
             optimistic prepend.
           -->
           <Button
-            v-if="isProjectTabActive('applications')"
+            v-if="canEdit && isProjectTabActive('applications')"
             size="sm"
             @click="openCreateApplication"
           >
@@ -2394,7 +2396,7 @@ onMounted(fetchTeams);
             New Application
           </Button>
           <Button
-            v-else-if="isProjectTabActive('compose')"
+            v-else-if="canEdit && isProjectTabActive('compose')"
             size="sm"
             @click="openCreateCompose"
           >
@@ -2402,7 +2404,7 @@ onMounted(fetchTeams);
             New Compose Stack
           </Button>
           <Button
-            v-else-if="isProjectTabActive('databases')"
+            v-else-if="canEdit && isProjectTabActive('databases')"
             size="sm"
             @click="openCreateDatabase"
           >

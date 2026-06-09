@@ -164,6 +164,8 @@ const lastDeployFallback = (app: DockerApplication): string | null => {
 // accurate without a manual reload. Audit 2026-05-23 flagged this
 // as the worst HALF-WIRED gap on the list views.
 const { user } = useAuth();
+// Role gating — members are read-only; editors+ can create, admins+ delete.
+const { canEdit, canDelete } = useCan();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 useDockerApplicationEvents(teamId, (data) => {
   if (data.project_id && data.project_id !== props.projectId) return;
@@ -208,7 +210,7 @@ onMounted(fetchApps);
         Register your first application to start deploying containers in
         this project.
       </p>
-      <Button class="mt-6" @click="createSheetOpen = true">
+      <Button v-if="canEdit" class="mt-6" @click="createSheetOpen = true">
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
         New Application
       </Button>
@@ -262,6 +264,7 @@ onMounted(fetchApps);
               </p>
             </div>
             <Button
+              v-if="canDelete"
               variant="ghost"
               size="icon"
               class="-mr-1 -mt-1 shrink-0 opacity-0 transition group-hover:opacity-100"

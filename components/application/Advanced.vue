@@ -22,6 +22,9 @@ const emit = defineEmits<{
   deleted: [];
 }>();
 
+// Role gating — the Danger Zone (delete) is admin/owner only.
+const { canDelete } = useCan();
+
 type RestartPolicy = "no" | "on-failure" | "always" | "unless-stopped";
 
 // All advanced-form state lives in this single block. Mirrors the
@@ -839,7 +842,7 @@ const deleteApplication = async () => {
       Rebuild row because Rebuild for apps is just "Deploy", which is
       non-destructive and lives in the Actions dropdown.
     -->
-    <Card class="border-destructive/40">
+    <Card v-if="canDelete" class="border-destructive/40">
       <CardHeader class="p-4">
         <CardTitle
           class="flex items-center gap-2 text-sm font-semibold text-destructive"

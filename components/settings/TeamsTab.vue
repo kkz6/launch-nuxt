@@ -69,6 +69,9 @@ const isOwner = computed(() => {
   return currentTeam.value?.user_id === String(user.value?.id)
 })
 
+// Role gating — inviting / cancelling invitations is admin/owner only.
+const { canManageTeam } = useCan()
+
 const fetchTeamMembers = async () => {
   try {
     const teamId = user.value?.current_team_id
@@ -161,7 +164,12 @@ onMounted(fetchTeamMembers)
             <h3 class="text-base font-semibold">Team Members</h3>
             <p class="text-sm text-muted-foreground">Manage who has access to this team.</p>
           </div>
-          <Button variant="outline" size="sm" @click="isInviteOpen = true">
+          <Button
+            v-if="canManageTeam"
+            variant="outline"
+            size="sm"
+            @click="isInviteOpen = true"
+          >
             <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
             Invite
           </Button>

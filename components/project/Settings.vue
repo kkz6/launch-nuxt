@@ -39,6 +39,10 @@ const totalWorkloads = computed(
 );
 const canDelete = computed(() => totalWorkloads.value === 0);
 
+// Role gating — only admins/owners see the Danger Zone at all (aliased
+// to avoid colliding with the workload-based canDelete above).
+const { canDelete: canDeleteByRole } = useCan();
+
 // Per-kind breakdown for the yellow "cannot delete" callout — gives
 // the user a precise list of what still has to go before they can
 // remove the project.
@@ -164,7 +168,7 @@ const deleteProject = async () => {
     <Separator />
 
     <!-- Danger Zone -->
-    <div class="space-y-4">
+    <div v-if="canDeleteByRole" class="space-y-4">
       <div>
         <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
         <p class="text-sm text-muted-foreground">

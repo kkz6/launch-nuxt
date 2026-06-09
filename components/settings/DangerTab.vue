@@ -169,6 +169,9 @@ const deleteServer = async (server: ArchivedServer) => {
   }
 }
 
+// Role gating — archiving / deleting servers is admin/owner only.
+const { canDelete } = useCan()
+
 onMounted(() => {
   fetchActiveServers()
   fetchArchivedServers()
@@ -176,7 +179,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="divide-y">
+  <div
+    v-if="!canDelete"
+    class="flex items-start gap-3 px-6 py-10 text-sm text-muted-foreground"
+  >
+    <Icon name="lucide:lock" class="mt-0.5 h-4 w-4 shrink-0" />
+    <p>
+      Only team admins and owners can archive or delete servers. Ask a
+      team admin if you need a server removed.
+    </p>
+  </div>
+
+  <div v-else class="divide-y">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!-- Archive a Server Section -->
