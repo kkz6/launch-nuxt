@@ -24,7 +24,10 @@ import {
 interface DnsProvider {
   id: string;
   provider: string;
-  label: string;
+  // The API returns the human label as `provider_label`; older callers
+  // pass `label`. Accept either so the dropdown never renders blank.
+  provider_label?: string;
+  label?: string;
 }
 
 interface Props {
@@ -140,7 +143,10 @@ const availableProviders = computed(() =>
 )
 
 const providerOptions = computed(() =>
-  availableProviders.value.map((p) => ({ value: p.id, label: p.label }))
+  availableProviders.value.map((p) => ({
+    value: p.id,
+    label: p.provider_label || p.label || p.provider || "Unknown provider",
+  }))
 );
 </script>
 

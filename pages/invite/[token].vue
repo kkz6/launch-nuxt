@@ -21,6 +21,11 @@ const { setUser } = useAuth();
 const token = computed(() => route.params.token as string);
 
 const email = ref("");
+const teamName = ref("");
+// Whether the invited email already has an account. When true the page
+// asks for the existing password to join the team instead of registering
+// a fresh account (#71).
+const userExists = ref(false);
 const name = ref("");
 const password = ref("");
 const passwordConfirmation = ref("");
@@ -31,10 +36,12 @@ const invitationLoading = ref(true);
 // Fetch invitation details
 onMounted(async () => {
   try {
-    const response = await $api<{ data: { email: string; team_name: string } }>(
-      `/auth/invitations/${token.value}`
-    );
+    const response = await $api<{
+      data: { email: string; team_name: string; user_exists: boolean };
+    }>(`/auth/invitations/${token.value}`);
     email.value = response.data.email;
+    teamName.value = response.data.team_name;
+    userExists.value = response.data.user_exists;
   } catch {
     toast.error("Invalid or expired invitation");
     navigateTo("/login");
@@ -48,6 +55,17 @@ const handleSubmit = async () => {
   errors.value = {};
 
   try {
+    // Existing accounts join with just their password; new invitees
+    // register with name + password + confirmation.
+    const body: Record<string, string> = {
+      invitation_token: token.value,
+      password: password.value,
+    };
+    if (!userExists.value) {
+      body.name = name.value;
+      body.password_confirmation = passwordConfirmation.value;
+    }
+
     const response = await $api<{
       data: {
         access_token: string;
@@ -56,18 +74,17 @@ const handleSubmit = async () => {
       };
     }>("/auth/invitations/accept", {
       method: "POST",
-      body: {
-        invitation_token: token.value,
-        name: name.value,
-        password: password.value,
-        password_confirmation: passwordConfirmation.value,
-      },
+      body,
     });
 
     setTokens(response.data.access_token, response.data.refresh_token);
     setUser(response.data.user);
 
-    toast.success("Account created successfully");
+    toast.success(
+      userExists.value
+        ? `You've joined ${teamName.value || "the team"}`
+        : "Account created successfully",
+    );
     navigateTo("/dashboard");
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
@@ -82,11 +99,11 @@ const handleSubmit = async () => {
         errors.value = errs;
       } else {
         errors.value = {
-          name: fetchError.data?.message || "An error occurred",
+          password: fetchError.data?.message || "An error occurred",
         };
       }
     } else {
-      errors.value = { name: "An error occurred. Please try again." };
+      errors.value = { password: "An error occurred. Please try again." };
     }
   } finally {
     loading.value = false;
@@ -109,10 +126,21 @@ const handleSubmit = async () => {
       </div>
 
       <h3 class="mb-2 text-lg font-semibold text-foreground">
-        Complete Your Invitation
+        {{ userExists ? "Join the team" : "Complete Your Invitation" }}
       </h3>
       <p class="mb-8 text-sm text-muted-foreground">
-        You've been invited to join. Please complete your account setup.
+        <template v-if="userExists">
+          You already have an account. Enter your password to join
+          <span class="font-medium text-foreground">{{
+            teamName || "the team"
+          }}</span>.
+        </template>
+        <template v-else>
+          You've been invited to join
+          <span class="font-medium text-foreground">{{
+            teamName || "the team"
+          }}</span>. Please complete your account setup.
+        </template>
       </p>
 
       <form class="space-y-4" @submit.prevent="handleSubmit">
@@ -121,7 +149,7 @@ const handleSubmit = async () => {
           <Input id="email" v-model="email" type="email" disabled />
         </div>
 
-        <div class="space-y-2">
+        <div v-if="!userExists" class="space-y-2">
           <Label for="name">Full Name</Label>
           <Input
             id="name"
@@ -141,8 +169,10 @@ const handleSubmit = async () => {
             id="password"
             v-model="password"
             type="password"
-            placeholder="Choose a secure password"
-            autocomplete="new-password"
+            :placeholder="
+              userExists ? 'Enter your password' : 'Choose a secure password'
+            "
+            :autocomplete="userExists ? 'current-password' : 'new-password'"
             required
           />
           <p v-if="errors.password" class="text-sm text-destructive">
@@ -150,7 +180,7 @@ const handleSubmit = async () => {
           </p>
         </div>
 
-        <div class="space-y-2">
+        <div v-if="!userExists" class="space-y-2">
           <Label for="password_confirmation">Confirm Password</Label>
           <Input
             id="password_confirmation"
@@ -174,7 +204,12 @@ const handleSubmit = async () => {
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          {{ loading ? "Creating Account..." : "Complete Registration" }}
+          <template v-if="loading">
+            {{ userExists ? "Joining..." : "Creating Account..." }}
+          </template>
+          <template v-else>
+            {{ userExists ? "Join Team" : "Complete Registration" }}
+          </template>
         </Button>
       </form>
     </div>
