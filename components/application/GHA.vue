@@ -34,6 +34,9 @@ type SourceConfig = {
   gha_workflow_sha?: string;
   gha_image_repository?: string;
   source_control_id?: string;
+  // auto_deploy: when true the committed workflow triggers on push to
+  // `branch` (in addition to manual). Toggled from the switch below.
+  auto_deploy?: boolean;
 };
 
 const sc = computed<SourceConfig>(
@@ -252,6 +255,43 @@ const resyncWorkflow = async () => {
     toast.error(e.data?.message || "Failed to queue workflow re-sync");
   } finally {
     isResyncing.value = false;
+  }
+};
+
+// Auto-deploy: mirror the saved state, with an optimistic toggle that
+// reverts on failure. The save re-syncs the committed workflow so its
+// `on:` trigger matches (push + dispatch when on, dispatch-only when off).
+const autoDeploy = ref<boolean>(!!sc.value.auto_deploy);
+watch(
+  () => sc.value.auto_deploy,
+  (v) => {
+    autoDeploy.value = !!v;
+  },
+);
+const isTogglingAutoDeploy = ref(false);
+const setAutoDeploy = async (enabled: boolean) => {
+  const prev = autoDeploy.value;
+  autoDeploy.value = enabled;
+  isTogglingAutoDeploy.value = true;
+  try {
+    await dockerService.applications.setGhaAutoDeploy(
+      props.application.server_id,
+      props.application.project_id,
+      props.application.id,
+      enabled,
+    );
+    toast.success(
+      enabled
+        ? "Auto-deploy on — pushes to the branch will deploy"
+        : "Auto-deploy off — deploys are manual",
+    );
+    emit("updated");
+  } catch (err: unknown) {
+    autoDeploy.value = prev;
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to update auto-deploy");
+  } finally {
+    isTogglingAutoDeploy.value = false;
   }
 };
 
@@ -505,6 +545,26 @@ useDockerApplicationEvents(teamId, (data, event) => {
         </h3>
       </div>
       <ul class="divide-y">
+        <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div class="min-w-0 flex-1 space-y-0.5">
+            <div class="flex items-center gap-2 text-sm font-medium">
+              <Icon name="lucide:git-branch" class="h-3.5 w-3.5 text-muted-foreground" />
+              Deploy automatically on push
+            </div>
+            <p class="text-xs text-muted-foreground">
+              When on, a push to
+              <span class="font-mono">{{ sc.branch || "the deploy branch" }}</span>
+              triggers a build &amp; deploy via GitHub Actions. When off,
+              deploys are manual (the Deploy button only).
+            </p>
+          </div>
+          <Switch
+            :checked="autoDeploy"
+            :disabled="isTogglingAutoDeploy || !application.gha_build_ready"
+            class="shrink-0"
+            @update:checked="setAutoDeploy"
+          />
+        </li>
         <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="min-w-0 flex-1 space-y-0.5">
             <div class="flex items-center gap-2 text-sm font-medium">

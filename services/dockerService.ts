@@ -1244,6 +1244,24 @@ export const dockerService = {
     },
 
     /**
+     * Enable/disable auto-deploy. Enabled re-renders the committed
+     * workflow with an `on: push: [branch]` trigger (push auto-deploys);
+     * disabled reverts to manual (workflow_dispatch). Re-syncs on save.
+     */
+    setGhaAutoDeploy: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      enabled: boolean,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/gha/auto-deploy`,
+        { enabled },
+      );
+    },
+
+    /**
      * Flip build_location back to "server", clear the token hash and
      * GHA fields in source_config. Doesn't touch the workflow file on
      * the customer's repo (intentional — they can delete it manually
@@ -1786,6 +1804,19 @@ export const dockerService = {
       return post<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/resync`,
         {},
+      );
+    },
+
+    setGhaAutoDeploy: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      enabled: boolean,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/gha/auto-deploy`,
+        { enabled },
       );
     },
 
