@@ -173,13 +173,29 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
       </button>
     </div>
 
-    <!-- Waiting for the run to start -->
+    <!-- No steps yet. Two cases: a run link exists (terminal / older
+         deploy whose live steps aren't retrievable) vs a fresh deploy
+         whose run hasn't appeared yet. Always show something actionable. -->
     <div
       v-else-if="isWaiting"
-      class="flex items-center gap-2 py-6 text-sm text-muted-foreground"
+      class="flex flex-col gap-3 py-6 text-sm text-muted-foreground"
     >
-      <Icon name="lucide:loader-circle" class="size-4 animate-spin" />
-      Waiting for the GitHub Actions run to start…
+      <template v-if="runUrl">
+        <p>Step details aren't available for this deployment.</p>
+        <a
+          :href="runUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 text-foreground underline"
+        >
+          View the run on GitHub
+          <Icon name="lucide:external-link" class="size-3" />
+        </a>
+      </template>
+      <div v-else class="flex items-center gap-2">
+        <Icon name="lucide:loader-circle" class="size-4 animate-spin" />
+        Waiting for the GitHub Actions run to start…
+      </div>
     </div>
 
     <!-- Jobs + steps -->
