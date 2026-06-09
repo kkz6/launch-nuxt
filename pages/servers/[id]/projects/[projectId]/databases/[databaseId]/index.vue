@@ -26,6 +26,7 @@ const isLoading = ref(true);
 // it via the action buttons + Logs tab instead of a dedicated tab.
 const SUBTABS = [
   { value: "general", label: "General", icon: "lucide:info" },
+  { value: "databases", label: "Databases", icon: "lucide:database" },
   { value: "environment", label: "Environment", icon: "lucide:key" },
   { value: "backups", label: "Backups", icon: "lucide:hard-drive" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
@@ -35,6 +36,7 @@ type SubTabId = (typeof SUBTABS)[number]["value"];
 
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
+  databases: true,
   environment: true,
   backups: true,
   logs: true,
@@ -188,6 +190,11 @@ const statusBadge = computed(() => {
 
     <template v-else>
       <DatabaseGeneral v-if="subTab === 'general'" :database="db" />
+
+      <DatabaseDatabases
+        v-else-if="subTab === 'databases'"
+        :database="db"
+      />
 
       <DatabaseEnvironment
         v-else-if="subTab === 'environment'"
