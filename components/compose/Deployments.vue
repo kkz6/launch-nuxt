@@ -44,6 +44,14 @@ const logSheetTaskId = ref<string>("");
 const logSheetTitle = ref<string>("");
 const logSheetSubtitle = ref<string>("");
 
+// GitHub Actions live step timeline sheet (#87).
+const stepsSheetOpen = ref(false);
+const stepsDeploymentId = ref<string>("");
+const openSteps = (d: DockerDeployment) => {
+  stepsDeploymentId.value = d.id;
+  stepsSheetOpen.value = true;
+};
+
 const fetchDeployments = async (silent = false) => {
   if (!silent) isLoading.value = true;
   try {
@@ -439,6 +447,15 @@ onMounted(fetchDeployments);
             </div>
             <div class="flex flex-row items-center gap-2">
               <Button
+                v-if="d.trigger_source === 'github_actions'"
+                variant="outline"
+                size="sm"
+                @click="openSteps(d)"
+              >
+                <Icon name="simple-icons:githubactions" class="mr-2 block size-4" />
+                Steps
+              </Button>
+              <Button
                 v-if="d.task_id"
                 variant="outline"
                 size="sm"
@@ -538,6 +555,31 @@ onMounted(fetchDeployments);
             :no-timestamp="true"
             hide-options
             container-class-name="h-full rounded-b-lg"
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
+
+    <!-- GitHub Actions live step timeline (#87). -->
+    <Sheet v-model:open="stepsSheetOpen">
+      <SheetContent
+        class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-xl flex flex-col overflow-hidden outline-none"
+      >
+        <SheetHeader class="shrink-0">
+          <SheetTitle>Deployment steps</SheetTitle>
+          <SheetDescription>
+            Live GitHub Actions workflow progress for this deployment.
+          </SheetDescription>
+        </SheetHeader>
+        <div class="mt-4 flex flex-1 flex-col min-h-0 overflow-y-auto pr-1">
+          <GhaStepsTimeline
+            v-if="stepsSheetOpen && stepsDeploymentId"
+            kind="compose"
+            :server-id="compose.server_id"
+            :project-id="compose.project_id"
+            :workload-id="compose.id"
+            :deployment-id="stepsDeploymentId"
+            :team-id="teamId"
           />
         </div>
       </SheetContent>
