@@ -523,6 +523,8 @@ export interface DockerRegistryCredentialSummary {
 }
 
 export interface UpdateDockerAdvancedData {
+  /** The container's internal port. Applied on the next deploy. */
+  internal_port?: number;
   cpu_limit?: string;
   memory_limit?: string;
   cpu_reservation?: string;
