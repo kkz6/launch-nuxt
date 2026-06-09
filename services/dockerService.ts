@@ -947,6 +947,40 @@ export interface DockerDeployment {
   gha_run_url?: string | null;
 }
 
+/** One step of a GitHub Actions job (live deployment step timeline, #87). */
+export interface DockerDeploymentGhaStep {
+  name: string;
+  status: "queued" | "in_progress" | "completed" | string;
+  conclusion?:
+    | "success"
+    | "failure"
+    | "skipped"
+    | "cancelled"
+    | string
+    | null;
+  number: number;
+  started_at?: string | null;
+  completed_at?: string | null;
+}
+
+/** One job of a workflow run (application: 1 job; compose: 1 per service). */
+export interface DockerDeploymentGhaJob {
+  name: string;
+  status: string;
+  conclusion?: string | null;
+  html_url?: string | null;
+  steps: DockerDeploymentGhaStep[];
+}
+
+/** Live GitHub Actions step timeline for a deployment (#87). */
+export interface DockerDeploymentGhaSteps {
+  deployment_id: string;
+  run_id?: string | null;
+  run_url?: string | null;
+  run_status: "queued" | "in_progress" | "completed" | "pending" | string;
+  jobs: DockerDeploymentGhaJob[];
+}
+
 /**
  * dockerService groups every API call under /api/servers/:serverId/docker/.
  * Mirrors serverService.ts for consistency — every method takes the
@@ -1146,6 +1180,21 @@ export const dockerService = {
       const q = deleteFromGitHub ? "?delete_from_gha=true" : "";
       return del<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deployments/${deploymentId}${q}`,
+      );
+    },
+
+    // Live GitHub Actions step timeline for a deployment (#87). Returns
+    // a "pending" payload with no jobs until the run id is known; live
+    // updates arrive via the deployment.gha_steps WS event.
+    getDeploymentGhaSteps: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      deploymentId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDeploymentGhaSteps>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/deployments/${deploymentId}/gha-steps`,
       );
     },
 
@@ -1697,6 +1746,19 @@ export const dockerService = {
       const q = deleteFromGitHub ? "?delete_from_gha=true" : "";
       return del<ApiResponse<null>>(
         `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments/${deploymentId}${q}`,
+      );
+    },
+
+    // Live GitHub Actions step timeline for a compose deployment (#87).
+    getDeploymentGhaSteps: (
+      serverId: string,
+      projectId: string,
+      composeId: string,
+      deploymentId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<DockerDeploymentGhaSteps>>(
+        `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/deployments/${deploymentId}/gha-steps`,
       );
     },
 

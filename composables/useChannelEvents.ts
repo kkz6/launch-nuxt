@@ -185,6 +185,26 @@ export const useDeploymentEvents = (
 }
 
 /**
+ * Subscribe to the live GitHub Actions step timeline for deployments
+ * (#87). The backend poller broadcasts deployment.gha_steps on the team
+ * channel with a deployment_id; consumers filter by that id to render the
+ * matching deployment's step list. Payload carries { deployment_id,
+ * target_type, target_id, run_id, run_status, jobs }.
+ *
+ * @param teamId - The team ID
+ * @param onEvent - Callback to run when a step-timeline event is received
+ */
+export const useDeploymentGhaStepsEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  const teamIdValue = computed(() => unref(teamId))
+  const channel = computed(() => `team.${teamIdValue.value}`)
+
+  return useChannelEvents(channel, ['deployment.gha_steps'], onEvent)
+}
+
+/**
  * Composable to subscribe to site queue events
  *
  * @param teamId - The team ID
