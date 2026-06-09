@@ -19,6 +19,11 @@ interface Props {
 }
 const props = defineProps<Props>();
 
+// Role gating — members are read-only; editors+ can create databases,
+// admins+ can drop them. The backend enforces the same via
+// docker.database.lifecycle.
+const { canEdit, canDelete } = useCan();
+
 // Per-engine "named databases" management (#75). These are the real
 // CREATE DATABASE objects living inside the running engine container —
 // listed / created / dropped live over `docker exec` by the backend.
@@ -175,6 +180,7 @@ const dropDatabase = async (name: string) => {
         <template v-else>
           <!-- Create row -->
           <form
+            v-if="canEdit"
             class="flex items-center gap-2"
             @submit.prevent="createDatabase"
           >
@@ -200,7 +206,7 @@ const dropDatabase = async (name: string) => {
               Create
             </Button>
           </form>
-          <p class="mt-1.5 text-[11px] text-muted-foreground">
+          <p v-if="canEdit" class="mt-1.5 text-[11px] text-muted-foreground">
             1–64 characters: letters, digits, or underscores.
           </p>
 
@@ -242,6 +248,7 @@ const dropDatabase = async (name: string) => {
                 </span>
               </div>
               <Button
+                v-if="canDelete"
                 size="sm"
                 variant="ghost"
                 class="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"

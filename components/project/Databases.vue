@@ -113,6 +113,8 @@ const statusColor = (status: string): string => {
 // Reflect lifecycle/status updates from the worker so the list is
 // always fresh without a manual refresh.
 const { user } = useAuth();
+// Role gating — members are read-only; editors+ create, admins+ delete.
+const { canEdit, canDelete } = useCan();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 const channel = computed(() => `team.${teamId.value}`);
 useChannelEvents(
@@ -163,7 +165,7 @@ onMounted(fetchDatabases);
         generated on create and reachable from sibling containers by
         the database's name on <code>launch-network</code>.
       </p>
-      <Button class="mt-6" @click="createOpen = true">
+      <Button v-if="canEdit" class="mt-6" @click="createOpen = true">
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
         New Database
       </Button>
@@ -213,6 +215,7 @@ onMounted(fetchDatabases);
               </p>
             </div>
             <Button
+              v-if="canDelete"
               variant="ghost"
               size="icon"
               class="-mr-1 -mt-1 shrink-0 opacity-0 transition group-hover:opacity-100"

@@ -21,6 +21,9 @@ const emit = defineEmits<{
   deleted: [];
 }>();
 
+// Role gating — the Danger Zone (rebuild / delete) is admin/owner only.
+const { canDelete } = useCan();
+
 type RestartPolicy = "no" | "on-failure" | "always" | "unless-stopped";
 
 // All advanced-form state lives in this single block. Each Card binds
@@ -381,7 +384,7 @@ const deleteDatabase = async () => {
       Each row has a tight label + description + button, divided by a
       hairline so the two destructive actions never visually merge.
     -->
-    <Card class="border-destructive/40">
+    <Card v-if="canDelete" class="border-destructive/40">
       <CardHeader class="p-4">
         <CardTitle class="flex items-center gap-2 text-sm font-semibold text-destructive">
           <Icon name="lucide:alert-triangle" class="h-4 w-4" />

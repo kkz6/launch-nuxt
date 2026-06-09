@@ -36,6 +36,9 @@ const emit = defineEmits<{
   deleted: []
 }>()
 
+// Role gating — the Delete Site danger zone is admin/owner only.
+const { canDelete } = useCan()
+
 const isLoading = ref(false)
 const phpVersions = ref<Record<string, string>>({})
 const tlsOptions = ref<Record<string, string>>({})
@@ -343,19 +346,21 @@ onMounted(fetchSettings)
       </template>
 
       <!-- Delete Site -->
-      <Separator />
-      <div class="space-y-4 pt-2">
-        <div>
-          <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
-          <p class="text-sm text-muted-foreground">
-            Permanently delete this site and all its associated resources
-          </p>
+      <template v-if="canDelete">
+        <Separator />
+        <div class="space-y-4 pt-2">
+          <div>
+            <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+            <p class="text-sm text-muted-foreground">
+              Permanently delete this site and all its associated resources
+            </p>
+          </div>
+          <Button variant="destructive" @click="deleteSite">
+            <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+            Delete Site
+          </Button>
         </div>
-        <Button variant="destructive" @click="deleteSite">
-          <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
-          Delete Site
-        </Button>
-      </div>
+      </template>
     </div>
   </div>
 </template>
