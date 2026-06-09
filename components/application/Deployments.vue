@@ -647,7 +647,7 @@ onMounted(fetchDeployments);
           </SheetDescription>
         </SheetHeader>
         <div class="mt-4 flex flex-1 flex-col min-h-0 overflow-y-auto pr-1">
-          <GhaStepsTimeline
+          <SharedGhaStepsTimeline
             v-if="stepsSheetOpen && stepsDeploymentId"
             kind="application"
             :server-id="application.server_id"
