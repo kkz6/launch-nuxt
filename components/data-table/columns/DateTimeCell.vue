@@ -6,7 +6,7 @@ defineProps<{ value: any; column: ColumnDef }>();
   <SharedDateTooltip
     v-if="value"
     :date="value"
-    :class-name="column.cellClass"
+    :class-name="column.cellClass ?? undefined"
   />
   <span v-else :class="column.cellClass">—</span>
 </template>
