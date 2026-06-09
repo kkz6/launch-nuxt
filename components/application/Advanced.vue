@@ -73,6 +73,11 @@ const extraPortsRaw = ref<string>(
 );
 const portsSaving = ref(false);
 
+// The container's internal port (top-level field, not a build_config knob).
+const internalPort = ref<number | undefined>(
+  props.application.internal_port || undefined,
+);
+
 // Security — single basic-auth row. The empty form (username and
 // password both blank) clears the middleware on save; otherwise it
 // writes both into build_config.security.
@@ -184,13 +189,25 @@ const savePorts = async () => {
       return;
     }
   }
+  if (
+    internalPort.value !== undefined &&
+    (internalPort.value < 1 || internalPort.value > 65535)
+  ) {
+    toast.error("Port must be between 1 and 65535");
+    return;
+  }
   portsSaving.value = true;
   try {
     await dockerService.applications.updateAdvanced(
       props.application.server_id,
       props.application.project_id,
       props.application.id,
-      { extra_ports: ports },
+      {
+        extra_ports: ports,
+        ...(internalPort.value && internalPort.value > 0
+          ? { internal_port: internalPort.value }
+          : {}),
+      },
     );
     toast.success("Ports saved — applies on next deploy");
     emit("updated");
@@ -661,9 +678,26 @@ const deleteApplication = async () => {
         </CardDescription>
       </CardHeader>
 
-      <CardContent class="p-4 pt-0">
+      <CardContent class="space-y-4 p-4 pt-0">
         <div class="space-y-1">
-          <Label for="app-extra-ports" class="sr-only">Extra ports</Label>
+          <Label for="app-internal-port">Container port</Label>
+          <Input
+            id="app-internal-port"
+            v-model.number="internalPort"
+            type="number"
+            min="1"
+            max="65535"
+            class="max-w-[160px]"
+            placeholder="80"
+          />
+          <p class="text-[11px] text-muted-foreground">
+            The port your app listens on inside the container. Domains and
+            health checks route to this. Applies on the next deploy.
+          </p>
+        </div>
+
+        <div class="space-y-1">
+          <Label for="app-extra-ports">Extra ports</Label>
           <Textarea
             id="app-extra-ports"
             v-model="extraPortsRaw"
