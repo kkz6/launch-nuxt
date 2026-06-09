@@ -2419,6 +2419,44 @@ export const dockerService = {
         );
       },
     },
+
+    // Logical databases that live INSIDE a managed engine instance
+    // (#75). These are the real `CREATE DATABASE` objects on the
+    // running container — listed/created/dropped live over `docker
+    // exec` by the backend, nothing is mirrored into our DB. Only
+    // MySQL / MariaDB / PostgreSQL expose the "named databases"
+    // model; Redis / Mongo return a 400.
+    instanceDatabases: {
+      list: (serverId: string, projectId: string, databaseId: string) => {
+        const { get } = useApi();
+        return get<ApiResponse<string[]>>(
+          `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/databases`,
+        );
+      },
+      create: (
+        serverId: string,
+        projectId: string,
+        databaseId: string,
+        name: string,
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<string[]>>(
+          `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/databases`,
+          { name },
+        );
+      },
+      drop: (
+        serverId: string,
+        projectId: string,
+        databaseId: string,
+        name: string,
+      ) => {
+        const { delete: del } = useApi();
+        return del(
+          `/servers/${serverId}/docker/projects/${projectId}/databases/${databaseId}/databases/${encodeURIComponent(name)}`,
+        );
+      },
+    },
   },
 
   // --- Docker registry credentials --------------------------------
