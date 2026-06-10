@@ -12,7 +12,6 @@ interface Plan {
   name: string
   description: string
   monthlyPricing: number // cents
-  yearlyPricing: number // cents
   features: string[]
   recommended: boolean
 }
@@ -23,7 +22,6 @@ const plans: Plan[] = [
     name: 'Hobby',
     description: 'For side projects and learning',
     monthlyPricing: 199,
-    yearlyPricing: 2380,
     features: [
       '1 server',
       '1 site per server',
@@ -37,7 +35,6 @@ const plans: Plan[] = [
     name: 'Compact',
     description: 'For growing apps and small teams',
     monthlyPricing: 699,
-    yearlyPricing: 8388,
     features: [
       '3 servers',
       '10 sites per server',
@@ -53,7 +50,6 @@ const plans: Plan[] = [
     name: 'Turbo',
     description: 'For heavier production workloads',
     monthlyPricing: 2000,
-    yearlyPricing: 24000,
     features: [
       '10 servers',
       '20 sites per server',
@@ -66,31 +62,13 @@ const plans: Plan[] = [
   },
 ]
 
-const annual = ref(false)
-
 // cents → "1.99" / "20"
 const formatPrice = (cents: number) => {
   const dollars = cents / 100
   return dollars % 1 === 0 ? dollars.toString() : dollars.toFixed(2)
 }
 
-// Real yearly savings vs paying monthly for 12 months. Same formula as
-// the in-app modal. With today's plans this is ~0, so we simply don't
-// advertise a discount that doesn't exist.
-const savingsPercent = (plan: Plan) => {
-  const monthlyTotal = plan.monthlyPricing * 12
-  if (monthlyTotal <= 0) return 0
-  return Math.round(((monthlyTotal - plan.yearlyPricing) / monthlyTotal) * 100)
-}
-
-// Only show the toggle's "save %" hint if at least one plan genuinely
-// offers a yearly discount.
-const maxSavings = computed(() => Math.max(0, ...plans.map(savingsPercent)))
-
-// Per-month figure shown on the card (yearly billed plans show the
-// effective monthly so the comparison is apples-to-apples).
-const perMonth = (plan: Plan) =>
-  formatPrice(annual.value ? Math.round(plan.yearlyPricing / 12) : plan.monthlyPricing)
+const perMonth = (plan: Plan) => formatPrice(plan.monthlyPricing)
 </script>
 
 <template>
@@ -106,39 +84,6 @@ const perMonth = (plan: Plan) =>
         <p class="mt-4 text-lg text-muted-foreground">
           Start free, upgrade when you're ready. No hidden fees, no sales calls.
         </p>
-      </div>
-
-      <!-- Billing toggle -->
-      <div class="mb-12 flex justify-center">
-        <div class="inline-flex rounded-lg border bg-card p-1 font-mono text-sm">
-          <button
-            :class="[
-              'rounded-md px-5 py-2 font-medium transition-all',
-              !annual ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            ]"
-            @click="annual = false"
-          >
-            monthly
-          </button>
-          <button
-            :class="[
-              'rounded-md px-5 py-2 font-medium transition-all',
-              annual ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
-            ]"
-            @click="annual = true"
-          >
-            yearly
-            <span
-              v-if="maxSavings > 0"
-              :class="[
-                'ml-2 rounded px-1.5 py-0.5 text-xs',
-                annual ? 'bg-background/20 text-background' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-              ]"
-            >
-              save {{ maxSavings }}%
-            </span>
-          </button>
-        </div>
       </div>
 
       <div class="mx-auto grid max-w-5xl gap-5 lg:grid-cols-3">
@@ -167,17 +112,6 @@ const perMonth = (plan: Plan) =>
               <span class="text-xl text-muted-foreground">$</span>
               <span class="text-4xl font-bold tabular-nums">{{ perMonth(plan) }}</span>
               <span class="ml-1 text-sm text-muted-foreground">/mo</span>
-            </div>
-            <div class="mt-1.5 h-5 font-mono text-xs text-muted-foreground">
-              <span v-if="annual">
-                ${{ formatPrice(plan.yearlyPricing) }} billed yearly
-                <span
-                  v-if="savingsPercent(plan) > 0"
-                  class="ml-1 font-medium text-emerald-600 dark:text-emerald-400"
-                >
-                  · save {{ savingsPercent(plan) }}%
-                </span>
-              </span>
             </div>
           </div>
 
