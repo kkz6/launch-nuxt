@@ -41,7 +41,6 @@
     "cobe": "^0.6.5",
     "codemirror": "^6.0.2",
     "date-fns": "^4.1.0",
-    "dodopayments-checkout": "^1.8.0",
     "embla-carousel-vue": "^8.6.0",
     "lucide-vue-next": "^0.562.0",
     "motion-v": "^1.8.0",
