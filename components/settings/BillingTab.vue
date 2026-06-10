@@ -17,9 +17,7 @@ interface SubscriptionPlan {
   name: string
   description: string
   monthly_id: string
-  yearly_id: string
   monthly_pricing: number
-  yearly_pricing: number
   features: string[]
   recommended?: boolean
   options?: SubscriptionPlanOptions
@@ -28,7 +26,6 @@ interface SubscriptionPlan {
 interface Subscription {
   id: string
   plan?: SubscriptionPlan
-  yearly: boolean
   ends_at?: string
   status?: string
   card_brand?: string
@@ -97,23 +94,17 @@ const fetchBillingData = async () => {
   }
 }
 
-const nuxtApp = useNuxtApp()
-const dodoCheckout = nuxtApp.$dodoCheckout as {
-  open: (url: string) => void
-} | undefined
-
-const handleCheckout = async (planId: string, isAnnual: boolean) => {
+const handleCheckout = async (planId: string) => {
   try {
     const response = await $api<{ data: { url: string } }>('/billing/generate-checkout-url', {
       method: 'POST',
-      body: { annual: isAnnual, plan: planId },
+      body: { plan: planId },
     })
-    const url = response.data?.url || (response as any).url
+    const url = response.data?.url || (response as { url?: string }).url
     isModalOpen.value = false
 
-    if (dodoCheckout) {
-      dodoCheckout.open(url)
-    } else {
+    // Redirect to Polar's hosted checkout; it returns to /settings/billing.
+    if (url) {
       window.location.href = url
     }
   } catch (error: unknown) {
@@ -207,17 +198,17 @@ onMounted(() => {
                   {{ currentSubscription.plan.options.max_servers === 999999 ? 'Unlimited' : currentSubscription.plan.options.max_servers }} servers
                 </span>
                 <span v-if="currentSubscription?.plan?.options?.max_servers"> · </span>
-                {{ currentSubscription?.yearly ? 'Annual' : 'Monthly' }} billing
+                Monthly billing
               </p>
             </div>
             <div class="text-right">
               <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Price</p>
               <p class="mt-1 text-lg font-semibold">
-                ${{ formatPrice(currentSubscription?.yearly ? currentSubscription?.plan?.yearly_pricing || 0 : currentSubscription?.plan?.monthly_pricing || 0) }}
+                ${{ formatPrice(currentSubscription?.plan?.monthly_pricing || 0) }}
                 <span class="text-sm font-normal text-muted-foreground">USD</span>
               </p>
               <p class="text-xs text-muted-foreground">
-                per {{ currentSubscription?.yearly ? 'year' : 'month' }}
+                per month
               </p>
             </div>
           </div>
@@ -270,7 +261,7 @@ onMounted(() => {
                 Ends on {{ currentSubscription?.ends_at }}
               </span>
               <span v-else class="text-sm text-muted-foreground">
-                Renews {{ currentSubscription?.yearly ? 'annually' : 'monthly' }}
+                Renews monthly
               </span>
             </div>
             <div class="flex items-center gap-2">

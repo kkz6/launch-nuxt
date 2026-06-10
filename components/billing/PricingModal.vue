@@ -13,7 +13,6 @@ interface PlanOption {
   name: string
   description?: string
   monthly_pricing: number
-  yearly_pricing: number
   features: string[]
   recommended?: boolean
 }
@@ -26,11 +25,10 @@ interface Props {
 const props = defineProps<Props>()
 
 const emit = defineEmits<{
-  selectPlan: [planId: string, isAnnual: boolean]
+  selectPlan: [planId: string]
 }>()
 
 const isOpen = defineModel<boolean>('isOpen', { required: true })
-const isAnnual = ref(false)
 const isLoading = ref<string | null>(null)
 
 // Format price from cents to dollars
@@ -39,16 +37,9 @@ const formatPrice = (cents: number) => {
   return dollars % 1 === 0 ? dollars.toString() : dollars.toFixed(2)
 }
 
-// Calculate yearly savings percentage
-const getSavingsPercent = (plan: PlanOption) => {
-  const monthlyTotal = plan.monthly_pricing * 12
-  const yearlyTotal = plan.yearly_pricing
-  return Math.round(((monthlyTotal - yearlyTotal) / monthlyTotal) * 100)
-}
-
 const handleSelectPlan = (planId: string) => {
   isLoading.value = planId
-  emit('selectPlan', planId, isAnnual.value)
+  emit('selectPlan', planId)
 }
 
 const resetLoading = () => {
@@ -73,35 +64,6 @@ const currentPlan = computed(() => props.plans.find(p => p.id === props.currentP
             Select the plan that best fits your needs
           </p>
         </DialogHeader>
-
-        <!-- Billing Toggle -->
-        <div class="mt-5 inline-flex items-center rounded-full border bg-muted/50 p-1">
-          <button
-            :class="[
-              'relative rounded-full px-5 py-2 text-sm font-medium transition-all duration-200',
-              !isAnnual
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            ]"
-            @click="isAnnual = false"
-          >
-            Monthly
-          </button>
-          <button
-            :class="[
-              'relative rounded-full px-5 py-2 text-sm font-medium transition-all duration-200',
-              isAnnual
-                ? 'bg-background text-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground',
-            ]"
-            @click="isAnnual = true"
-          >
-            Yearly
-            <span v-if="!isAnnual" class="ml-1.5 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-              -20%
-            </span>
-          </button>
-        </div>
       </div>
 
       <!-- Plans Grid -->
@@ -146,17 +108,9 @@ const currentPlan = computed(() => props.plans.find(p => p.id === props.currentP
             <div class="flex items-baseline justify-center">
               <span class="text-sm font-medium text-muted-foreground">$</span>
               <span class="text-4xl font-bold tracking-tight">
-                {{ formatPrice(isAnnual ? plan.yearly_pricing / 12 : plan.monthly_pricing) }}
+                {{ formatPrice(plan.monthly_pricing) }}
               </span>
               <span class="ml-1 text-sm text-muted-foreground">/mo</span>
-            </div>
-            <div class="mt-1.5 h-5">
-              <p v-if="isAnnual" class="text-xs text-muted-foreground">
-                ${{ formatPrice(plan.yearly_pricing) }}/year
-                <span v-if="getSavingsPercent(plan) > 0" class="ml-1 font-medium text-emerald-600 dark:text-emerald-400">
-                  (save {{ getSavingsPercent(plan) }}%)
-                </span>
-              </p>
             </div>
           </div>
 
