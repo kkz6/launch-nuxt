@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Fired by the docs repo (NUXT_CONTENT_DOCS_REPO) on push, so a docs
+  # change rebuilds the image with the fresh markdown and redeploys.
+  repository_dispatch:
+    types: [docs-updated]
 
 env:
   REGISTRY: ghcr.io
@@ -47,6 +51,12 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+          # Docs content source (optional). Repo URL is a non-secret repo
+          # Variable; the token (private repos only) is a BuildKit secret.
+          build-args: |
+            NUXT_CONTENT_DOCS_REPO=${{ vars.NUXT_CONTENT_DOCS_REPO }}
+          secrets: |
+            nuxt_content_token=${{ secrets.NUXT_CONTENT_GITHUB_TOKEN }}
           labels: |
             ${{ steps.meta.outputs.labels }}
             service=launch-nuxt
@@ -54,7 +64,7 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
       - name: Dispatch deploy to launch-deploy
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || github.event_name == 'repository_dispatch'
         uses: peter-evans/repository-dispatch@v3
         with:
           # Fine-grained PAT with `Actions: Read & write` on kkz6/launch-deploy.

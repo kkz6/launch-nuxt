@@ -39,3 +39,6 @@ coverage
 
 # Misc
 *.local
+
+# Local Claude Code tooling (launch.json, etc.)
+.claude/
