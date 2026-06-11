@@ -2,12 +2,11 @@
 const footerLinks = {
   product: [
     { label: 'Features', href: '/#features' },
-    { label: 'Integrations', href: '/integrations' },
     { label: 'Pricing', href: '/pricing' },
     { label: 'Changelog', href: '#' },
   ],
   support: [
-    { label: 'Documentation', href: '/support' },
+    { label: 'Documentation', href: '/docs' },
     { label: 'Support Center', href: '/support' },
     { label: 'Status', href: '#' },
     { label: 'Report Vulnerability', href: 'https://forum.gigcodes.com/', external: true },

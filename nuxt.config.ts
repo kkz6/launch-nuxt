@@ -110,10 +110,17 @@ export default defineNuxtConfig({
       pathPrefix: false,
       ignore: ["**/index.ts"],
     },
+    // MDC components used inside docs markdown (::callout, ::card, …) must be
+    // global and unprefixed so @nuxt/content can resolve them by name.
+    {
+      path: "~/components/content",
+      pathPrefix: false,
+      global: true,
+    },
     {
       path: "~/components",
       pathPrefix: true,
-      ignore: ["ui/**"],
+      ignore: ["ui/**", "content/**"],
     },
   ],
 
