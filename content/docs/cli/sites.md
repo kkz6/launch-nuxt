@@ -11,7 +11,7 @@ CLI commands are currently in development. Syntax may change.
 
 ## List Sites
 ```bash
-launch sites
+lctl sites
 ```
 
 ### Options
@@ -32,13 +32,13 @@ ID    DOMAIN           SERVER        PHP    STATUS
 
 ## Get Site Details
 ```bash
-launch sites:show <site>
+lctl sites:show <site>
 ```
 
 ### Example
 
 ```bash
-launch sites:show example.com
+lctl sites:show example.com
 ```
 
 ### Output
@@ -57,7 +57,7 @@ Status: active
 
 ## Create Site
 ```bash
-launch sites:create <server>
+lctl sites:create <server>
 ```
 
 Interactive prompts guide you through site creation.
@@ -74,7 +74,7 @@ Interactive prompts guide you through site creation.
 ### Example
 
 ```bash
-launch sites:create production \
+lctl sites:create production \
   --domain example.com \
   --type laravel \
   --php 8.3 \
@@ -83,7 +83,7 @@ launch sites:create production \
 
 ## Delete Site
 ```bash
-launch sites:delete <site>
+lctl sites:delete <site>
 ```
 
 ### Options
@@ -96,13 +96,13 @@ launch sites:delete <site>
 ### View Environment
 
 ```bash
-launch env <site>
+lctl env <site>
 ```
 
 ### Edit Environment
 
 ```bash
-launch env:edit <site>
+lctl env:edit <site>
 ```
 
 Opens your default editor to modify the `.env` file.
@@ -110,30 +110,30 @@ Opens your default editor to modify the `.env` file.
 ### Set Variable
 
 ```bash
-launch env:set <site> KEY=value
+lctl env:set <site> KEY=value
 ```
 
 ### Example
 
 ```bash
-launch env:set example.com APP_DEBUG=false
+lctl env:set example.com APP_DEBUG=false
 ```
 
 ## SSL Certificates
 ### Enable SSL
 
 ```bash
-launch ssl:enable <site>
+lctl ssl:enable <site>
 ```
 
 ### Disable SSL
 
 ```bash
-launch ssl:disable <site>
+lctl ssl:disable <site>
 ```
 
 ### Renew Certificate
 
 ```bash
-launch ssl:renew <site>
+lctl ssl:renew <site>
 ```

@@ -11,7 +11,7 @@ CLI commands are currently in development. Syntax may change.
 
 ## List Servers
 ```bash
-launch servers
+lctl servers
 ```
 
 ### Options
@@ -33,13 +33,13 @@ ID    NAME           IP              PROVIDER       STATUS
 
 ## Get Server Details
 ```bash
-launch servers:show <server>
+lctl servers:show <server>
 ```
 
 ### Example
 
 ```bash
-launch servers:show production
+lctl servers:show production
 ```
 
 ### Output
@@ -58,7 +58,7 @@ Created: 2024-01-15
 
 ## Create Server
 ```bash
-launch servers:create
+lctl servers:create
 ```
 
 Interactive prompts guide you through server creation.
@@ -76,7 +76,7 @@ Interactive prompts guide you through server creation.
 ### Example
 
 ```bash
-launch servers:create \
+lctl servers:create \
   --name my-server \
   --provider digitalocean \
   --region nyc1 \
@@ -86,7 +86,7 @@ launch servers:create \
 
 ## Delete Server
 ```bash
-launch servers:delete <server>
+lctl servers:delete <server>
 ```
 
 ### Options
@@ -97,43 +97,43 @@ launch servers:delete <server>
 
 ## Reboot Server
 ```bash
-launch servers:reboot <server>
+lctl servers:reboot <server>
 ```
 
 ## Server Services
 ### List Services
 
 ```bash
-launch services <server>
+lctl services <server>
 ```
 
 ### Restart Service
 
 ```bash
-launch services:restart <server> <service>
+lctl services:restart <server> <service>
 ```
 
 ### Example
 
 ```bash
-launch services:restart production nginx
+lctl services:restart production nginx
 ```
 
 ## SSH Keys
 ### List Keys
 
 ```bash
-launch ssh-keys <server>
+lctl ssh-keys <server>
 ```
 
 ### Add Key
 
 ```bash
-launch ssh-keys:add <server> --name "My Key" --key "ssh-ed25519 AAAA..."
+lctl ssh-keys:add <server> --name "My Key" --key "ssh-ed25519 AAAA..."
 ```
 
 ### Remove Key
 
 ```bash
-launch ssh-keys:remove <server> <key-id>
+lctl ssh-keys:remove <server> <key-id>
 ```

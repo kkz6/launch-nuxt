@@ -8,7 +8,6 @@ const mobileMenuOpen = ref(false)
 const navLinks = [
   { href: '/pricing', label: 'Pricing' },
   { href: '/docs', label: 'Docs' },
-  { href: '/integrations', label: 'Integrations' },
 ]
 
 const toggleTheme = () => {

@@ -13,34 +13,34 @@ The launchctl CLI is currently in development. This documentation will be update
 ### macOS
 
 ```bash
-brew tap launch/tap
-brew install launch-cli
+brew tap launchctl/tap
+brew install lctl
 ```
 
 ### Linux
 
 ```bash
-curl -fsSL https://cli.launch.dev/install.sh | bash
+curl -fsSL https://cli.launchctl.dev/install.sh | bash
 ```
 
 ### Windows
 
 ```powershell
-scoop bucket add launch https://github.com/launch/scoop-bucket
-scoop install launch-cli
+scoop bucket add launchctl https://github.com/launchctl/scoop-bucket
+scoop install lctl
 ```
 
 ### NPM
 
 ```bash
-npm install -g @launch/cli
+npm install -g @launchctl/cli
 ```
 
 ## Authentication
 ### Login
 
 ```bash
-launch login
+lctl login
 ```
 
 This opens your browser to authenticate with launchctl.
@@ -48,31 +48,31 @@ This opens your browser to authenticate with launchctl.
 ### Using API Token
 
 ```bash
-launch login --token YOUR_API_TOKEN
+lctl login --token YOUR_API_TOKEN
 ```
 
 ### Check Authentication
 
 ```bash
-launch whoami
+lctl whoami
 ```
 
 ## Quick Start
 ```bash
 # Login to launchctl
-launch login
+lctl login
 
 # List your servers
-launch servers
+lctl servers
 
 # List sites on a server
-launch sites --server production
+lctl sites --server production
 
 # Deploy a site
-launch deploy --site example.com
+lctl deploy --site example.com
 
 # View deployment logs
-launch logs --site example.com
+lctl logs --site example.com
 ```
 
 ## Available Commands
@@ -103,7 +103,7 @@ Connect to servers via SSH
 ## Configuration
 ### Config File
 
-The CLI stores configuration in `~/.launch/config.json`:
+The CLI stores configuration in `~/.lctl/config.json`:
 
 ```json
 {
@@ -127,19 +127,19 @@ The CLI stores configuration in `~/.launch/config.json`:
 ### Bash
 
 ```bash
-launch completion bash > /etc/bash_completion.d/launch
+lctl completion bash > /etc/bash_completion.d/lctl
 ```
 
 ### Zsh
 
 ```bash
-launch completion zsh > ~/.zsh/completions/_launch
+lctl completion zsh > ~/.zsh/completions/_lctl
 ```
 
 ### Fish
 
 ```bash
-launch completion fish > ~/.config/fish/completions/launch.fish
+lctl completion fish > ~/.config/fish/completions/lctl.fish
 ```
 
 ## Examples
@@ -151,7 +151,7 @@ Add to your CI/CD pipeline:
 # GitHub Actions
 - name: Deploy to launchctl
   run: |
-    launch deploy --site ${{ secrets.SITE_ID }}
+    lctl deploy --site ${{ secrets.SITE_ID }}
   env:
     LAUNCH_TOKEN: ${{ secrets.LAUNCH_TOKEN }}
 ```
@@ -160,20 +160,20 @@ Add to your CI/CD pipeline:
 
 ```bash
 # Connect to server
-launch ssh production
+lctl ssh production
 
 # Run a command
-launch ssh production -- php artisan migrate
+lctl ssh production -- php artisan migrate
 ```
 
 ### Tail Logs
 
 ```bash
 # View live logs
-launch logs --site example.com --follow
+lctl logs --site example.com --follow
 
 # View deployment output
-launch logs --deployment 123
+lctl logs --deployment 123
 ```
 
 ## Troubleshooting
@@ -182,7 +182,7 @@ launch logs --deployment 123
 Ensure the CLI is in your PATH:
 
 ```bash
-which launch
+which lctl
 ```
 
 ### Authentication Failed
@@ -190,8 +190,8 @@ which launch
 Re-authenticate:
 
 ```bash
-launch logout
-launch login
+lctl logout
+lctl login
 ```
 
 ### Connection Issues
@@ -199,5 +199,5 @@ launch login
 Check your network and API status:
 
 ```bash
-launch status
+lctl status
 ```

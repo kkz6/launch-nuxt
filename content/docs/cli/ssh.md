@@ -11,7 +11,7 @@ CLI commands are currently in development. Syntax may change.
 
 ## SSH into Server
 ```bash
-launch ssh <server>
+lctl ssh <server>
 ```
 
 Opens an interactive SSH session to the server.
@@ -26,80 +26,80 @@ Opens an interactive SSH session to the server.
 
 ```bash
 # Connect as launch user
-launch ssh production
+lctl ssh production
 
 # Connect as root
-launch ssh production --user root
+lctl ssh production --user root
 ```
 
 ## Run Command
 Execute a command on the server without interactive session:
 
 ```bash
-launch ssh <server> -- <command>
+lctl ssh <server> -- <command>
 ```
 
 ### Examples
 
 ```bash
 # Check disk space
-launch ssh production -- df -h
+lctl ssh production -- df -h
 
 # Run artisan command
-launch ssh production -- "cd /home/launch/example.com && php artisan migrate"
+lctl ssh production -- "cd /home/launch/example.com && php artisan migrate"
 
 # View logs
-launch ssh production -- tail -f /var/log/syslog
+lctl ssh production -- tail -f /var/log/syslog
 ```
 
 ## Site Commands
 Run commands in a site's directory:
 
 ```bash
-launch run <site> <command>
+lctl run <site> <command>
 ```
 
 ### Examples
 
 ```bash
 # Run artisan command
-launch run example.com "php artisan cache:clear"
+lctl run example.com "php artisan cache:clear"
 
 # Run composer
-launch run example.com "composer install"
+lctl run example.com "composer install"
 
 # Run npm
-launch run example.com "npm run build"
+lctl run example.com "npm run build"
 ```
 
 ## Copy Files
 ### Upload
 
 ```bash
-launch scp:up <server> <local-path> <remote-path>
+lctl scp:up <server> <local-path> <remote-path>
 ```
 
 ### Download
 
 ```bash
-launch scp:down <server> <remote-path> <local-path>
+lctl scp:down <server> <remote-path> <local-path>
 ```
 
 ### Examples
 
 ```bash
 # Upload file
-launch scp:up production ./config.json /home/launch/config.json
+lctl scp:up production ./config.json /home/launch/config.json
 
 # Download logs
-launch scp:down production /var/log/app.log ./app.log
+lctl scp:down production /var/log/app.log ./app.log
 ```
 
 ## SSH Config
 Generate SSH config for direct access:
 
 ```bash
-launch ssh:config
+lctl ssh:config
 ```
 
 ### Output
@@ -126,7 +126,7 @@ ssh launch-production
 ## Troubleshooting
 ### Connection Refused
 
-1. Verify server is running: `launch servers:show <server>`
+1. Verify server is running: `lctl servers:show <server>`
 2. Check firewall rules allow SSH
 3. Verify your SSH key is added
 

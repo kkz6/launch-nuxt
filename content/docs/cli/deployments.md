@@ -11,7 +11,7 @@ CLI commands are currently in development. Syntax may change.
 
 ## Deploy Site
 ```bash
-launch deploy <site>
+lctl deploy <site>
 ```
 
 ### Options
@@ -27,18 +27,18 @@ launch deploy <site>
 
 ```bash
 # Deploy default branch
-launch deploy example.com
+lctl deploy example.com
 
 # Deploy specific branch
-launch deploy example.com --branch staging
+lctl deploy example.com --branch staging
 
 # Deploy and follow logs
-launch deploy example.com --follow
+lctl deploy example.com --follow
 ```
 
 ## List Deployments
 ```bash
-launch deployments <site>
+lctl deployments <site>
 ```
 
 ### Options
@@ -59,7 +59,7 @@ ID    COMMIT   BRANCH   STATUS     STARTED              DURATION
 
 ## View Deployment
 ```bash
-launch deployments:show <deployment-id>
+lctl deployments:show <deployment-id>
 ```
 
 ### Output
@@ -77,7 +77,7 @@ Duration: 2m 15s
 
 ## Deployment Logs
 ```bash
-launch logs <site>
+lctl logs <site>
 ```
 
 ### Options
@@ -92,18 +92,18 @@ launch logs <site>
 
 ```bash
 # Latest deployment logs
-launch logs example.com
+lctl logs example.com
 
 # Specific deployment
-launch logs example.com --deployment 5
+lctl logs example.com --deployment 5
 
 # Follow live
-launch logs example.com --follow
+lctl logs example.com --follow
 ```
 
 ## Rollback
 ```bash
-launch rollback <site>
+lctl rollback <site>
 ```
 
 Rolls back to the previous successful deployment.
@@ -119,10 +119,10 @@ Rolls back to the previous successful deployment.
 
 ```bash
 # Rollback to previous
-launch rollback example.com
+lctl rollback example.com
 
 # Rollback to specific deployment
-launch rollback example.com --deployment 3
+lctl rollback example.com --deployment 3
 ```
 
 ## CI/CD Integration
@@ -141,8 +141,8 @@ jobs:
     steps:
       - name: Deploy to launchctl
         run: |
-          npm install -g @launch/cli
-          launch deploy example.com --wait
+          npm install -g @launchctl/cli
+          lctl deploy example.com --wait
         env:
           LAUNCH_TOKEN: ${{ secrets.LAUNCH_TOKEN }}
 ```
@@ -153,8 +153,8 @@ jobs:
 deploy:
   stage: deploy
   script:
-    - npm install -g @launch/cli
-    - launch deploy example.com --wait
+    - npm install -g @launchctl/cli
+    - lctl deploy example.com --wait
   only:
     - main
   variables:
