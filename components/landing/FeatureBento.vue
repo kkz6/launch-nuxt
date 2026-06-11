@@ -6,39 +6,39 @@
 
 const features = [
   {
-    icon: 'lucide:git-branch',
-    title: 'GitHub Actions CI/CD',
-    desc: 'Build in Actions, push to GHCR and deploy to your box. Build load stays off production, and a fresh pull token is minted per deploy.',
+    icon: 'lucide:server',
+    title: 'Laravel & PHP app servers',
+    desc: 'Provision a server and deploy Laravel or any PHP app from Git — deploy scripts, environment, the scheduler and queue workers wired up. Node and static sites too.',
   },
   {
     icon: 'lucide:box',
-    title: 'Apps, compose & databases',
+    title: 'Docker apps, compose & databases',
     desc: 'Single containers, multi-service compose stacks, and one-click managed Postgres, MySQL, MariaDB, Mongo and Redis.',
   },
   {
-    icon: 'lucide:rocket',
-    title: 'Zero-downtime & rollback',
-    desc: 'Health-checked rollouts behind Traefik. Every deploy is a release, so you can roll back to any previous one in a click.',
+    icon: 'lucide:activity',
+    title: 'Live queue monitoring',
+    desc: 'Watch queue workers, jobs, throughput and failures in real time — restart, pause or scale workers straight from the dashboard.',
   },
   {
     icon: 'lucide:square-terminal',
     title: 'Live logs & web terminal',
-    desc: 'Stream colour-coded build, deploy and runtime logs in real time, and open a real shell into any container from the browser.',
+    desc: 'Stream colour-coded build, deploy and runtime logs in real time, and open a real shell into any server or container from the browser.',
   },
   {
-    icon: 'lucide:hard-drive-download',
-    title: 'Scheduled backups',
-    desc: 'Cron or run-now database backups straight to S3-compatible storage, with retention rules and one-click restore.',
+    icon: 'lucide:rocket',
+    title: 'CI/CD & zero-downtime',
+    desc: 'Build in GitHub Actions, push to GHCR and roll out health-checked behind Traefik. Every deploy is a release you can roll back in a click.',
   },
   {
     icon: 'lucide:shield-check',
-    title: 'SSL, domains & multi-cloud',
-    desc: "Automatic Let's Encrypt certificates, domains and DNS — on servers you provision across DigitalOcean, Hetzner, AWS, Linode or Vultr.",
+    title: 'SSL, DNS, backups & multi-cloud',
+    desc: "Automatic Let's Encrypt, domains and DNS, plus scheduled S3 backups with one-click restore — across DigitalOcean, Hetzner, AWS, Linode or Vultr.",
   },
 ]
 
 const alsoIncluded =
-  'queues · cron · daemons · metrics · firewall · SSH keys · env & secrets · volumes · notifications · teams & roles · file manager'
+  'cron · daemons · server metrics · firewall · SSH keys · env & secrets · volumes · notifications · teams & roles · file manager'
 </script>
 
 <template>
@@ -48,7 +48,7 @@ const alsoIncluded =
       <div class="mx-auto max-w-2xl text-center" data-aos="fade-up">
         <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400">$ lctl --help</span>
         <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
-          Everything you need to ship
+          <RevealText text="Everything you need to ship" />
         </h2>
         <p class="mt-4 text-pretty text-lg text-muted-foreground">
           A full operations console for the servers you already own — build,

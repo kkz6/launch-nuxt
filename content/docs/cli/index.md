@@ -20,7 +20,7 @@ brew install lctl
 ### Linux
 
 ```bash
-curl -fsSL https://cli.launchctl.dev/install.sh | bash
+curl -fsSL https://cli.launchctl.io/install.sh | bash
 ```
 
 ### Windows

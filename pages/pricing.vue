@@ -12,7 +12,7 @@ useSeoMeta({
   ogDescription:
     'Simple, transparent pricing for server management. Choose the plan that fits your team and scale as you grow.',
   ogImage: '/images/og-image.png',
-  ogUrl: 'https://launchctl.dev/pricing',
+  ogUrl: 'https://launchctl.io/pricing',
   ogType: 'website',
   twitterTitle: 'Pricing - launchctl',
   twitterDescription:
