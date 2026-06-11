@@ -7,7 +7,7 @@ const mobileMenuOpen = ref(false)
 
 const navLinks = [
   { href: '/pricing', label: 'Pricing' },
-  { href: '/support', label: 'Docs' },
+  { href: '/docs', label: 'Docs' },
   { href: '/integrations', label: 'Integrations' },
 ]
 
