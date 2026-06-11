@@ -62,99 +62,7 @@ const ciRun = [
   { mark: '▸', mcls: 'text-zinc-500', k: 'pull', v: 'short-lived token', tail: 'ok', tcls: 'text-emerald-400' },
 ]
 
-// Capabilities, framed as console commands. Covers the breadth of the
-// platform — build/deploy, data, and day-2 operations — not just deploys.
-const commands = [
-  {
-    cmd: 'lctl ci:enable',
-    icon: 'lucide:git-branch',
-    title: 'GitHub Actions CI/CD',
-    desc: 'Build in CI, push to GHCR, deploy to your box automatically. A fresh pull token is minted per deploy — no long-lived PAT to manage.',
-  },
-  {
-    cmd: 'lctl up <app|compose|db>',
-    icon: 'lucide:box',
-    title: 'Apps, compose & databases',
-    desc: 'Single containers, multi-service compose stacks, and one-click managed Postgres, MySQL, MariaDB, MongoDB & Redis.',
-  },
-  {
-    cmd: 'lctl deploy --zero-downtime',
-    icon: 'lucide:rocket',
-    title: 'Zero-downtime deploys',
-    desc: 'Health-checked rollouts behind Traefik, so traffic only moves to a container once it reports healthy.',
-  },
-  {
-    cmd: 'lctl rollback <release>',
-    icon: 'lucide:rotate-ccw',
-    title: 'Instant rollback',
-    desc: 'Every deploy is a release. Roll back to any previous one in a click when something looks wrong.',
-  },
-  {
-    cmd: 'lctl logs --follow',
-    icon: 'lucide:scroll-text',
-    title: 'Live, colour-coded logs',
-    desc: 'Stream build, deploy and runtime logs in real time — ANSI-coloured, searchable, with pause and download.',
-  },
-  {
-    cmd: 'lctl ssh',
-    icon: 'lucide:square-terminal',
-    title: 'Web terminal access',
-    desc: 'A real shell into your server, app, compose or database container — straight from the browser, no local SSH setup.',
-  },
-  {
-    cmd: 'lctl queue:work',
-    icon: 'lucide:list-checks',
-    title: 'Queue workers & logs',
-    desc: 'Run and supervise background queue workers — with auto-restart, Horizon support and live worker logs.',
-  },
-  {
-    cmd: 'lctl backup --schedule',
-    icon: 'lucide:hard-drive-download',
-    title: 'Scheduled backups',
-    desc: 'Cron or run-now database backups straight to S3-compatible storage, with live progress and one-click restore.',
-  },
-  {
-    cmd: 'lctl metrics',
-    icon: 'lucide:gauge',
-    title: 'Metrics & monitoring',
-    desc: 'CPU, memory and storage at a glance, with health status across every server, app and database.',
-  },
-  {
-    cmd: 'lctl ssl:auto',
-    icon: 'lucide:shield-check',
-    title: 'Automatic SSL',
-    desc: "Let's Encrypt certificates issued and renewed for you — or bring your own from the stored-certificate library.",
-  },
-  {
-    cmd: 'lctl domains add',
-    icon: 'lucide:globe',
-    title: 'Domains & redirects',
-    desc: 'Bind multiple domains per workload and set up HTTP redirects — TLS wired up automatically.',
-  },
-  {
-    cmd: 'lctl server:provision',
-    icon: 'lucide:cloud',
-    title: 'Multi-cloud provisioning',
-    desc: 'Spin up servers on DigitalOcean, Hetzner, AWS, Linode or Vultr — firewall, cron, SSH keys and monitoring handled.',
-  },
-]
-
-// The long tail — everything else that ships in the box.
-const moreFeatures = [
-  'firewall rules',
-  'cron & schedulers',
-  'daemons / supervisor',
-  'SSH keys',
-  'volumes & mounts',
-  'env vars & build secrets',
-  'DNS records',
-  'notifications · slack · discord · telegram',
-  'teams & roles',
-  'file manager',
-  'run commands',
-  'stored TLS certs',
-]
-
+// Feature breadth now lives in components/landing/FeatureBento.vue.
 const ciPoints = [
   'No long-lived tokens — a fresh pull token is minted per deploy',
   'Builds never touch your production server',
@@ -367,56 +275,8 @@ const faqs = [
       </div>
     </section>
 
-    <!-- ───────────────── Features as commands ───────────────── -->
-    <section class="relative border-b bg-muted/20">
-      <div class="bp-grid pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_80%_70%_at_50%_50%,black,transparent)]" />
-      <div class="relative mx-auto max-w-6xl px-6 py-24 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center" data-aos="fade-up">
-          <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400">$ lctl --help</span>
-          <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
-            One platform, every command
-          </h2>
-          <p class="mt-4 text-lg text-muted-foreground">
-            From provision to production — build, deploy, data, TLS and
-            day-2 operations — in a single, calm workflow.
-          </p>
-        </div>
-
-        <div class="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div
-            v-for="(c, i) in commands"
-            :key="c.cmd"
-            class="group overflow-hidden rounded-lg border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-500/40 hover:shadow-md"
-            data-aos="fade-up"
-            :data-aos-delay="(i % 3) * 70"
-          >
-            <div class="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 font-mono text-xs">
-              <Icon :name="c.icon" class="h-3.5 w-3.5 text-muted-foreground" />
-              <span class="text-emerald-600 dark:text-emerald-400">$</span>
-              <span class="truncate text-foreground">{{ c.cmd }}</span>
-            </div>
-            <div class="p-5">
-              <h3 class="font-mono text-sm font-semibold">{{ c.title }}</h3>
-              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ c.desc }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- The long tail of features -->
-        <div class="mt-10" data-aos="fade-up">
-          <p class="text-center font-mono text-xs text-muted-foreground"># also included</p>
-          <div class="mt-5 flex flex-wrap justify-center gap-2">
-            <span
-              v-for="f in moreFeatures"
-              :key="f"
-              class="rounded-md border bg-card px-3 py-1.5 font-mono text-xs text-muted-foreground"
-            >
-              {{ f }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- ───────────── Features bento (full platform breadth) ───────────── -->
+    <LandingFeatureBento />
 
     <!-- ──────────────────────── How it works ──────────────────────── -->
     <section class="border-b">
