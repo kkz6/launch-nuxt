@@ -160,7 +160,7 @@ const getUserInitials = (name: string): string => {
               Add Payment Method
             </button>
             <a
-              href="mailto:support@launchctl.dev"
+              href="mailto:support@launchctl.io"
               class="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted"
             >
               <Icon name="lucide:mail" class="h-4 w-4" />

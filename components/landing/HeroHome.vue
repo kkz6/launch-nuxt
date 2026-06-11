@@ -94,7 +94,7 @@ const providers = [
               <div class="ml-4 flex-1">
                 <div class="mx-auto flex max-w-md items-center gap-2 rounded-md bg-background px-3 py-1.5 text-xs text-muted-foreground">
                   <Icon name="lucide:lock" class="h-3 w-3" />
-                  app.launchctl.dev/dashboard
+                  app.launchctl.io/dashboard
                 </div>
               </div>
             </div>

@@ -12,19 +12,19 @@ definePageMeta({ layout: 'site' })
 
 // Note: nuxt.config sets titleTemplate "%s - launchctl", so the title
 // here must NOT repeat the brand or it doubles up.
-useHead({ title: 'Ship to your own servers' })
+useHead({ title: 'Run every app on your own servers' })
 useSeoMeta({
   description:
-    'Provision servers on any cloud, build in GitHub Actions or on-server, and deploy Docker apps, compose stacks and managed databases — with live logs, queue workers, scheduled backups, web terminal access, automatic SSL and zero-downtime rollouts.',
-  ogTitle: 'launchctl — your servers, deployed properly',
+    'Provision servers on any cloud and run Laravel and PHP apps, Docker stacks and managed databases — with CI/CD, live logs, live queue monitoring, scheduled backups, web terminal access, automatic SSL and zero-downtime rollouts.',
+  ogTitle: 'launchctl — run every app on your own servers',
   ogDescription:
-    'Provision, build, deploy and operate Docker apps, compose stacks and managed databases on your own servers. CI/CD, live logs, queues, backups, terminal access, SSL — without the platform tax.',
+    'One platform to provision servers and run Laravel/PHP apps, Docker stacks and managed databases on your own cloud. CI/CD, live logs, queue monitoring, backups, terminal access, SSL — without the platform tax.',
   ogImage: '/images/og-image.png',
-  ogUrl: 'https://launchctl.dev',
+  ogUrl: 'https://launchctl.io',
   ogType: 'website',
-  twitterTitle: 'launchctl — your servers, deployed properly',
+  twitterTitle: 'launchctl — run every app on your own servers',
   twitterDescription:
-    'Provision, build, deploy and operate Docker apps, compose stacks and managed databases on your own servers. CI/CD, live logs, queues, backups, terminal access, SSL — without the platform tax.',
+    'One platform to provision servers and run Laravel/PHP apps, Docker stacks and managed databases on your own cloud. CI/CD, live logs, queue monitoring, backups, terminal access, SSL — without the platform tax.',
   twitterImage: '/images/og-image.png',
   twitterCard: 'summary_large_image',
 })
@@ -33,6 +33,19 @@ const { isAuthenticated } = useAuth()
 const ctaTo = computed(() => (isAuthenticated.value ? '/servers' : '/register'))
 
 const clouds = ['DigitalOcean', 'Hetzner', 'AWS', 'Linode', 'Vultr']
+
+// Hero product mockup — a real "Deployments" panel, not a terminal.
+const heroDeploys = [
+  { status: 'Live', tone: 'emerald', sha: '9f2c1ab', branch: 'main', who: 'GitHub Actions', when: 'just now', dur: '1m 12s' },
+  { status: 'Live', tone: 'emerald', sha: 'a7e44d0', branch: 'main', who: 'Priya Nair', when: '2h ago', dur: '58s' },
+  { status: 'Building', tone: 'amber', sha: 'c01f9b2', branch: 'feat/checkout', who: 'GitHub Actions', when: 'running', dur: '34s' },
+  { status: 'Live', tone: 'emerald', sha: '4db8e1f', branch: 'main', who: 'Marco Bianchi', when: 'yesterday', dur: '1m 04s' },
+]
+const heroMetrics = [
+  { label: 'CPU', value: '18%' },
+  { label: 'Memory', value: '512 MB' },
+  { label: 'Uptime', value: '99.98%' },
+]
 
 const stack = [
   { src: '/images/services/docker.svg', label: 'docker' },
@@ -62,99 +75,7 @@ const ciRun = [
   { mark: '▸', mcls: 'text-zinc-500', k: 'pull', v: 'short-lived token', tail: 'ok', tcls: 'text-emerald-400' },
 ]
 
-// Capabilities, framed as console commands. Covers the breadth of the
-// platform — build/deploy, data, and day-2 operations — not just deploys.
-const commands = [
-  {
-    cmd: 'lctl ci:enable',
-    icon: 'lucide:git-branch',
-    title: 'GitHub Actions CI/CD',
-    desc: 'Build in CI, push to GHCR, deploy to your box automatically. A fresh pull token is minted per deploy — no long-lived PAT to manage.',
-  },
-  {
-    cmd: 'lctl up <app|compose|db>',
-    icon: 'lucide:box',
-    title: 'Apps, compose & databases',
-    desc: 'Single containers, multi-service compose stacks, and one-click managed Postgres, MySQL, MariaDB, MongoDB & Redis.',
-  },
-  {
-    cmd: 'lctl deploy --zero-downtime',
-    icon: 'lucide:rocket',
-    title: 'Zero-downtime deploys',
-    desc: 'Health-checked rollouts behind Traefik, so traffic only moves to a container once it reports healthy.',
-  },
-  {
-    cmd: 'lctl rollback <release>',
-    icon: 'lucide:rotate-ccw',
-    title: 'Instant rollback',
-    desc: 'Every deploy is a release. Roll back to any previous one in a click when something looks wrong.',
-  },
-  {
-    cmd: 'lctl logs --follow',
-    icon: 'lucide:scroll-text',
-    title: 'Live, colour-coded logs',
-    desc: 'Stream build, deploy and runtime logs in real time — ANSI-coloured, searchable, with pause and download.',
-  },
-  {
-    cmd: 'lctl ssh',
-    icon: 'lucide:square-terminal',
-    title: 'Web terminal access',
-    desc: 'A real shell into your server, app, compose or database container — straight from the browser, no local SSH setup.',
-  },
-  {
-    cmd: 'lctl queue:work',
-    icon: 'lucide:list-checks',
-    title: 'Queue workers & logs',
-    desc: 'Run and supervise background queue workers — with auto-restart, Horizon support and live worker logs.',
-  },
-  {
-    cmd: 'lctl backup --schedule',
-    icon: 'lucide:hard-drive-download',
-    title: 'Scheduled backups',
-    desc: 'Cron or run-now database backups straight to S3-compatible storage, with live progress and one-click restore.',
-  },
-  {
-    cmd: 'lctl metrics',
-    icon: 'lucide:gauge',
-    title: 'Metrics & monitoring',
-    desc: 'CPU, memory and storage at a glance, with health status across every server, app and database.',
-  },
-  {
-    cmd: 'lctl ssl:auto',
-    icon: 'lucide:shield-check',
-    title: 'Automatic SSL',
-    desc: "Let's Encrypt certificates issued and renewed for you — or bring your own from the stored-certificate library.",
-  },
-  {
-    cmd: 'lctl domains add',
-    icon: 'lucide:globe',
-    title: 'Domains & redirects',
-    desc: 'Bind multiple domains per workload and set up HTTP redirects — TLS wired up automatically.',
-  },
-  {
-    cmd: 'lctl server:provision',
-    icon: 'lucide:cloud',
-    title: 'Multi-cloud provisioning',
-    desc: 'Spin up servers on DigitalOcean, Hetzner, AWS, Linode or Vultr — firewall, cron, SSH keys and monitoring handled.',
-  },
-]
-
-// The long tail — everything else that ships in the box.
-const moreFeatures = [
-  'firewall rules',
-  'cron & schedulers',
-  'daemons / supervisor',
-  'SSH keys',
-  'volumes & mounts',
-  'env vars & build secrets',
-  'DNS records',
-  'notifications · slack · discord · telegram',
-  'teams & roles',
-  'file manager',
-  'run commands',
-  'stored TLS certs',
-]
-
+// Feature breadth now lives in components/landing/FeatureBento.vue.
 const ciPoints = [
   'No long-lived tokens — a fresh pull token is minted per deploy',
   'Builds never touch your production server',
@@ -172,7 +93,7 @@ const steps = [
     no: '02',
     cmd: 'app:configure',
     title: 'Configure your app',
-    desc: 'Point at a repo or image, set env vars and domains, and pick a build method — Dockerfile, Nixpacks or GitHub Actions.',
+    desc: 'Deploy a Laravel or PHP site from Git, or point at a Dockerfile, compose stack or image — set env, domains, queue workers and the build method.',
   },
   {
     no: '03',
@@ -198,6 +119,14 @@ const faqs = [
     a: 'On servers you own, in your own cloud account. launchctl provisions and operates them for you, but the infrastructure and data stay yours.',
   },
   {
+    q: 'Can I run Laravel and PHP apps, not just Docker?',
+    a: 'Yes. Provision a server and deploy Laravel or any PHP app straight from Git — deploy scripts, environment, the scheduler and queue workers are set up for you. Docker apps, compose stacks and managed databases run alongside on the same platform.',
+  },
+  {
+    q: 'Can I monitor my queues?',
+    a: 'Yes — watch queue workers, job throughput and failures live, and restart, pause or scale workers from the dashboard, with worker logs streamed in real time.',
+  },
+  {
     q: 'Do I need to manage GitHub tokens for CI/CD?',
     a: 'No. We commit a managed GitHub Actions workflow that builds and pushes to GHCR, and mints a short-lived pull token per deploy — no long-lived PAT to set up or rotate.',
   },
@@ -216,80 +145,111 @@ const faqs = [
   <div class="bg-background text-foreground">
     <!-- ───────────────────────── Hero ───────────────────────── -->
     <section class="relative overflow-hidden border-b">
-      <div class="bp-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_75%_60%_at_50%_0%,black,transparent)]" />
-      <div class="pointer-events-none absolute inset-0 bg-gradient-to-b from-emerald-500/[0.04] to-transparent" />
+      <!-- soft ambient wash + faint grid, lighter than the dark rebuild -->
+      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_55%_at_78%_-5%,theme(colors.emerald.500/9%),transparent)]" />
+      <div class="bp-grid pointer-events-none absolute inset-0 opacity-[0.55] [mask-image:radial-gradient(ellipse_70%_55%_at_50%_-10%,black,transparent)]" />
 
-      <div class="relative mx-auto max-w-6xl px-6 pb-24 pt-24 lg:px-8 lg:pt-28">
-        <div class="mx-auto max-w-3xl text-center" data-aos="fade-up">
-          <div class="inline-flex items-center gap-2 rounded-md border bg-card px-3 py-1.5 font-mono text-xs shadow-sm">
-            <span class="text-emerald-600 dark:text-emerald-400">$</span>
-            <span class="text-foreground">lctl</span>
-            <span class="text-muted-foreground">deploy --to your-own-servers</span>
+      <div class="relative mx-auto grid max-w-6xl items-center gap-y-14 px-6 pb-24 pt-20 lg:grid-cols-12 lg:gap-x-10 lg:px-8 lg:pb-28 lg:pt-28">
+        <!-- copy -->
+        <div class="lg:col-span-5" data-aos="fade-up">
+          <div class="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium text-muted-foreground shadow-sm">
+            <span class="relative flex h-1.5 w-1.5">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+              <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            Bring your own cloud
           </div>
 
-          <h1 class="mt-7 font-mono text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            Your servers,<br >deployed properly.<span class="caret text-emerald-500">_</span>
+          <h1 class="mt-6 text-balance text-5xl font-semibold leading-[1.04] tracking-tight sm:text-6xl">
+            <RevealText text="One platform to run everything." :delay="0.1" :stagger="0.07" />
           </h1>
-          <p class="mx-auto mt-6 max-w-2xl text-pretty text-lg leading-relaxed text-muted-foreground">
-            Provision on any cloud, build in CI or on-server, and ship Docker
-            apps, compose stacks and managed databases — with live logs, queue
-            workers, backups, web terminal access and automatic SSL. Without
-            the platform tax.
+          <p class="mt-6 max-w-md text-pretty text-lg leading-relaxed text-muted-foreground">
+            Provision a server and run Laravel and PHP apps, Docker stacks and
+            managed databases — with CI/CD, live logs, queue monitoring, backups
+            and zero-downtime rollouts. On the cloud you control.
           </p>
 
-          <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+          <div class="mt-9 flex flex-wrap items-center gap-x-4 gap-y-3">
             <NuxtLink
               :to="ctaTo"
-              class="inline-flex items-center gap-2 rounded-lg bg-primary px-5 py-3 font-mono text-sm font-semibold text-primary-foreground shadow-sm transition-transform hover:-translate-y-0.5"
+              class="group inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:-translate-y-0.5 active:translate-y-0"
             >
-              <span class="text-primary-foreground/60">$</span> get-started
-              <Icon name="lucide:arrow-right" class="h-4 w-4" />
+              Start deploying
+              <Icon name="lucide:arrow-right" class="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </NuxtLink>
             <NuxtLink
-              to="/support"
-              class="inline-flex items-center gap-2 rounded-lg border bg-card px-5 py-3 font-mono text-sm font-semibold transition-colors hover:bg-muted"
+              to="/docs"
+              class="inline-flex items-center gap-1.5 px-2 py-3 text-sm font-semibold text-foreground transition-colors hover:text-emerald-600 dark:hover:text-emerald-400"
             >
-              <Icon name="lucide:book-open" class="h-4 w-4" />
-              read the docs
+              Read the docs
+              <Icon name="lucide:arrow-up-right" class="h-4 w-4" />
             </NuxtLink>
           </div>
-          <p class="mt-4 font-mono text-xs text-muted-foreground">
-            # no credit card required · bring your own cloud
-          </p>
+
+          <div class="mt-10 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
+            <span class="uppercase tracking-wide text-muted-foreground/60">Runs on</span>
+            <span v-for="c in clouds" :key="c" class="font-medium text-foreground/65">{{ c }}</span>
+          </div>
         </div>
 
-        <!-- Hero terminal: a deploy streaming live -->
-        <div class="mx-auto mt-16 max-w-3xl" data-aos="fade-up" data-aos-delay="120">
-          <div class="overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl shadow-black/30">
-            <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-2.5">
-              <span class="h-3 w-3 rounded-full bg-rose-400/80" />
-              <span class="h-3 w-3 rounded-full bg-amber-400/80" />
-              <span class="h-3 w-3 rounded-full bg-emerald-400/80" />
-              <span class="ml-3 font-mono text-xs text-zinc-500">lctl — deploy gj-hrms-api</span>
-              <span class="ml-auto inline-flex items-center gap-1.5 font-mono text-xs text-emerald-400">
-                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" /> live
-              </span>
-            </div>
-            <div class="space-y-2 p-5 font-mono text-sm sm:p-6">
-              <div class="term-line text-zinc-100" :style="{ animationDelay: '0ms' }">
-                <span class="text-emerald-400">$</span> lctl deploy gj-hrms-api <span class="text-zinc-500">--prod</span>
+        <!-- product mockup: a real Deployments panel -->
+        <div class="lg:col-span-7 lg:pl-6" data-aos="fade-up" data-aos-delay="120">
+          <div class="relative">
+            <!-- depth: a faint card peeking behind -->
+            <div class="absolute -right-3 -top-3 hidden h-full w-full rounded-2xl border bg-card/60 sm:block" aria-hidden="true" />
+
+            <div class="relative overflow-hidden rounded-2xl border bg-card shadow-xl shadow-emerald-950/[0.06] ring-1 ring-black/[0.02]">
+              <!-- panel header -->
+              <div class="flex items-center gap-3 border-b px-5 py-3.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/20">
+                  <Icon name="lucide:box" class="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div class="min-w-0">
+                  <div class="truncate text-sm font-semibold">gj-hrms-api</div>
+                  <div class="font-mono text-xs text-muted-foreground">hrms.example.com</div>
+                </div>
+                <span class="ml-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:text-emerald-400">
+                  <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" /> production
+                </span>
               </div>
-              <div
-                v-for="(s, i) in deployRun"
-                :key="s.k"
-                class="term-line flex items-center gap-3"
-                :style="{ animationDelay: (i + 1) * 260 + 'ms' }"
-              >
-                <span :class="s.mcls">{{ s.mark }}</span>
-                <span class="w-16 shrink-0 text-zinc-400">{{ s.k }}</span>
-                <span class="flex-1 truncate text-zinc-300">{{ s.v }}</span>
-                <span v-if="s.tail" :class="s.tcls">{{ s.tail }}</span>
+
+              <!-- deployments list -->
+              <div class="divide-y">
+                <div
+                  v-for="d in heroDeploys"
+                  :key="d.sha"
+                  class="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-muted/40"
+                >
+                  <span
+                    class="inline-flex w-[68px] shrink-0 items-center gap-1.5 text-xs font-medium"
+                    :class="d.tone === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'"
+                  >
+                    <span
+                      class="h-1.5 w-1.5 rounded-full"
+                      :class="[d.tone === 'emerald' ? 'bg-emerald-500' : 'bg-amber-500', d.tone === 'amber' ? 'animate-pulse' : '']"
+                    />
+                    {{ d.status }}
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 font-mono text-xs">
+                      <span class="font-medium text-foreground">{{ d.sha }}</span>
+                      <span class="truncate text-muted-foreground">{{ d.branch }}</span>
+                    </div>
+                    <div class="mt-0.5 truncate text-xs text-muted-foreground">{{ d.who }}</div>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <div class="text-xs tabular-nums text-muted-foreground">{{ d.when }}</div>
+                    <div class="font-mono text-[11px] tabular-nums text-muted-foreground/70">{{ d.dur }}</div>
+                  </div>
+                </div>
               </div>
-              <div class="term-line flex items-center gap-3 pt-1" :style="{ animationDelay: (deployRun.length + 1) * 260 + 'ms' }">
-                <span class="text-emerald-400">✓</span>
-                <span class="w-16 shrink-0 text-emerald-400">live</span>
-                <span class="flex-1 truncate text-cyan-400">https://hrms.example.com</span>
-                <span class="text-zinc-500">health ok</span>
+
+              <!-- metrics footer -->
+              <div class="grid grid-cols-3 divide-x border-t bg-muted/30">
+                <div v-for="m in heroMetrics" :key="m.label" class="px-5 py-3">
+                  <div class="text-[11px] uppercase tracking-wide text-muted-foreground/70">{{ m.label }}</div>
+                  <div class="mt-0.5 text-sm font-semibold tabular-nums">{{ m.value }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -322,7 +282,7 @@ const faqs = [
         <div data-aos="fade-up">
           <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400"># ci/cd</span>
           <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
-            Build in Actions.<br >Deploy to your box.
+            <RevealText :text="'Build in Actions.\nDeploy to your box.'" />
           </h2>
           <p class="mt-5 text-lg leading-relaxed text-muted-foreground">
             Pick <span class="font-mono text-sm font-medium text-foreground">github_actions</span> as your
@@ -367,63 +327,17 @@ const faqs = [
       </div>
     </section>
 
-    <!-- ───────────────── Features as commands ───────────────── -->
-    <section class="relative border-b bg-muted/20">
-      <div class="bp-grid pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_80%_70%_at_50%_50%,black,transparent)]" />
-      <div class="relative mx-auto max-w-6xl px-6 py-24 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center" data-aos="fade-up">
-          <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400">$ lctl --help</span>
-          <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
-            One platform, every command
-          </h2>
-          <p class="mt-4 text-lg text-muted-foreground">
-            From provision to production — build, deploy, data, TLS and
-            day-2 operations — in a single, calm workflow.
-          </p>
-        </div>
-
-        <div class="mt-16 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <div
-            v-for="(c, i) in commands"
-            :key="c.cmd"
-            class="group overflow-hidden rounded-lg border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-500/40 hover:shadow-md"
-            data-aos="fade-up"
-            :data-aos-delay="(i % 3) * 70"
-          >
-            <div class="flex items-center gap-2 border-b bg-muted/40 px-4 py-2.5 font-mono text-xs">
-              <Icon :name="c.icon" class="h-3.5 w-3.5 text-muted-foreground" />
-              <span class="text-emerald-600 dark:text-emerald-400">$</span>
-              <span class="truncate text-foreground">{{ c.cmd }}</span>
-            </div>
-            <div class="p-5">
-              <h3 class="font-mono text-sm font-semibold">{{ c.title }}</h3>
-              <p class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ c.desc }}</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- The long tail of features -->
-        <div class="mt-10" data-aos="fade-up">
-          <p class="text-center font-mono text-xs text-muted-foreground"># also included</p>
-          <div class="mt-5 flex flex-wrap justify-center gap-2">
-            <span
-              v-for="f in moreFeatures"
-              :key="f"
-              class="rounded-md border bg-card px-3 py-1.5 font-mono text-xs text-muted-foreground"
-            >
-              {{ f }}
-            </span>
-          </div>
-        </div>
-      </div>
-    </section>
+    <!-- ───────────────── Features bento (full breadth) ───────────────── -->
+    <LandingFeatureBento />
 
     <!-- ──────────────────────── How it works ──────────────────────── -->
     <section class="border-b">
       <div class="mx-auto max-w-6xl px-6 py-24 lg:px-8">
         <div class="mx-auto max-w-2xl text-center" data-aos="fade-up">
           <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400"># how-it-works</span>
-          <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">Live in three steps</h2>
+          <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
+            <RevealText text="Live in three steps" />
+          </h2>
         </div>
         <div class="mt-16 grid gap-5 md:grid-cols-3">
           <div
@@ -456,10 +370,10 @@ const faqs = [
               <span class="ml-3 font-mono text-xs text-zinc-500">lctl logs — gj-hrms-api -f</span>
             </div>
             <div class="space-y-1.5 p-5 font-mono text-xs leading-relaxed sm:text-sm">
-              <div v-for="l in logLines" :key="l.t + l.msg">
-                <span class="text-zinc-600">{{ l.t }}</span>
-                <span :class="l.cls"> {{ l.lvl }}</span>
-                <span class="text-zinc-300"> {{ l.msg }}</span>
+              <div v-for="l in logLines" :key="l.t + l.msg" class="flex gap-3">
+                <span class="shrink-0 tabular-nums text-zinc-600">{{ l.t }}</span>
+                <span class="w-8 shrink-0 font-semibold" :class="l.cls">{{ l.lvl }}</span>
+                <span class="text-zinc-300">{{ l.msg }}</span>
               </div>
               <div class="text-zinc-100"><span class="text-emerald-400">$</span> <span class="caret">▋</span></div>
             </div>
@@ -469,7 +383,7 @@ const faqs = [
         <div class="order-1 lg:order-2" data-aos="fade-up" data-aos-delay="120">
           <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400"># observe &amp; control</span>
           <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
-            See everything.<br >Change it in a click.
+            <RevealText :text="'See everything.\nChange it in a click.'" />
           </h2>
           <p class="mt-5 text-lg leading-relaxed text-muted-foreground">
             Tail build, deploy, runtime and queue-worker logs live — colour-coded
@@ -486,20 +400,36 @@ const faqs = [
 
     <!-- ───────────────────────────── FAQ ───────────────────────────── -->
     <section class="border-b">
-      <div class="mx-auto max-w-3xl px-6 py-24 lg:px-8">
-        <div class="text-center" data-aos="fade-up">
+      <div class="mx-auto grid max-w-6xl gap-x-16 gap-y-12 px-6 py-24 lg:grid-cols-[0.85fr_1.15fr] lg:px-8">
+        <!-- intro -->
+        <div data-aos="fade-up">
           <span class="font-mono text-xs text-emerald-600 dark:text-emerald-400"># faq</span>
-          <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">Good questions</h2>
+          <h2 class="mt-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
+            <RevealText :text="'Questions,\nanswered.'" />
+          </h2>
+          <p class="mt-5 max-w-sm text-lg leading-relaxed text-muted-foreground">
+            The things people ask before spinning up their first server. Need
+            more detail?
+          </p>
+          <NuxtLink
+            to="/docs"
+            class="mt-4 inline-flex items-center gap-1.5 font-mono text-sm font-semibold text-emerald-600 transition-colors hover:text-emerald-500 dark:text-emerald-400"
+          >
+            Read the docs
+            <Icon name="lucide:arrow-up-right" class="h-4 w-4" />
+          </NuxtLink>
         </div>
-        <div class="mt-12 divide-y rounded-lg border bg-card" data-aos="fade-up">
-          <details v-for="f in faqs" :key="f.q" class="group p-6">
-            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 font-mono text-sm font-medium">
-              <span><span class="text-emerald-600 dark:text-emerald-400">?</span> {{ f.q }}</span>
-              <Icon name="lucide:plus" class="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-open:rotate-45" />
-            </summary>
-            <p class="mt-3 text-sm leading-relaxed text-muted-foreground">{{ f.a }}</p>
-          </details>
-        </div>
+
+        <!-- open Q&A grid -->
+        <dl class="grid gap-x-10 gap-y-9 sm:grid-cols-2" data-aos="fade-up" data-aos-delay="100">
+          <div v-for="f in faqs" :key="f.q">
+            <dt class="flex gap-2 font-mono text-sm font-semibold">
+              <span class="text-emerald-600 dark:text-emerald-400">?</span>
+              <span>{{ f.q }}</span>
+            </dt>
+            <dd class="mt-2 text-sm leading-relaxed text-muted-foreground">{{ f.a }}</dd>
+          </div>
+        </dl>
       </div>
     </section>
 
@@ -513,7 +443,7 @@ const faqs = [
               <span class="text-zinc-500">$</span> lctl get-started<span class="caret">▋</span>
             </div>
             <h2 class="mt-5 font-mono text-3xl font-bold tracking-tight text-zinc-50 sm:text-4xl">
-              Deploy your first app today
+              <RevealText text="Deploy your first app today" />
             </h2>
             <p class="mx-auto mt-4 max-w-xl text-lg text-zinc-400">
               Connect a server, point at a repo, and ship — with CI/CD, live
