@@ -6,14 +6,13 @@ definePageMeta({
 const route = useRoute()
 const slug = computed(() => {
   const parts = route.params.slug
-  if (Array.isArray(parts)) {
-    return parts.join('/')
-  }
-  return parts || 'overview'
+  const joined = Array.isArray(parts) ? parts.join('/') : parts || ''
+  return joined
 })
+const docPath = computed(() => (slug.value ? `/docs/${slug.value}` : '/docs'))
 
-const { data: page } = await useAsyncData(`docs-${slug.value}`, () =>
-  queryCollection('docs').path(`/docs/${slug.value}`).first()
+const { data: page } = await useAsyncData(`docs-${slug.value || 'index'}`, () =>
+  queryCollection('docs').path(docPath.value).first()
 )
 
 if (!page.value) {

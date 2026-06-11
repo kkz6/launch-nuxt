@@ -8,19 +8,67 @@ const mobileSidebarOpen = ref(false)
 
 const navLinks = [
   { href: '/pricing', label: 'Pricing' },
-  { href: '/docs/overview', label: 'Docs' },
+  { href: '/docs', label: 'Docs' },
   { href: '/integrations', label: 'Integrations' },
 ]
 
-const docsNavigation = [
-  {
-    title: 'Getting Started',
-    items: [
-      { title: 'Overview', path: '/docs/overview' },
-      { title: 'Servers', path: '/docs/servers' },
-    ],
-  },
-]
+interface NavNode {
+  title: string
+  path: string
+  children?: NavNode[]
+}
+
+interface DocNavItem {
+  title: string
+  path: string
+  items: DocNavItem[]
+}
+
+interface DocNavSection {
+  title: string
+  path?: string
+  items: DocNavItem[]
+}
+
+// Build the sidebar from the actual @nuxt/content tree so it always reflects
+// the markdown files under content/docs.
+const { data: navTree } = await useAsyncData('docs-nav', () =>
+  queryCollectionNavigation('docs')
+)
+
+// Recursively map a content node into a nav item, dropping the directory's own
+// index child (its path equals the parent's) so section headers aren't repeated.
+const mapItem = (node: NavNode): DocNavItem => ({
+  title: node.title,
+  path: node.path,
+  items: (node.children ?? [])
+    .filter((child) => child.path !== node.path)
+    .map(mapItem),
+})
+
+const docsRoot = computed<NavNode[]>(
+  () => navTree.value?.[0]?.children ?? navTree.value ?? []
+)
+
+// Top-level pages (no children) render as plain links above the grouped
+// sections. Each directory becomes a section whose header links to its index.
+const topLevelItems = computed<DocNavItem[]>(() =>
+  docsRoot.value
+    .filter((node) => !node.children || node.children.length === 0)
+    .map(mapItem)
+)
+
+const docsNavigation = computed<DocNavSection[]>(() =>
+  docsRoot.value
+    .filter((node) => node.children && node.children.length > 0)
+    .map((node) => ({
+      title: node.title,
+      path: node.path,
+      items: node.children!
+        .filter((child) => child.path !== node.path)
+        .map(mapItem),
+    }))
+)
 
 const toggleTheme = () => {
   colorMode.preference = colorMode.preference === 'dark' ? 'light' : 'dark'
@@ -29,6 +77,11 @@ const toggleTheme = () => {
 const isDark = computed(() => colorMode.preference === 'dark')
 
 const isActive = (path: string) => route.path === path
+
+// Close the mobile sidebar whenever navigation lands on a new page.
+watch(() => route.path, () => {
+  mobileSidebarOpen.value = false
+})
 
 // Receive TOC from page
 const docsToc = inject<ComputedRef<Array<{ id: string; text: string }>>>('docsToc', computed(() => []))
@@ -125,26 +178,22 @@ const docsToc = inject<ComputedRef<Array<{ id: string; text: string }>>>('docsTo
         </button>
       </div>
       <nav>
+        <DocsNavItems v-if="topLevelItems.length" :items="topLevelItems" class="mb-6" />
         <div v-for="section in docsNavigation" :key="section.title" class="mb-6">
-          <h4 class="mb-2 text-sm font-semibold text-foreground">
+          <NuxtLink
+            v-if="section.path"
+            :to="section.path"
+            :class="[
+              'mb-2 block text-sm font-semibold transition-colors',
+              isActive(section.path) ? 'text-primary' : 'text-foreground hover:text-primary',
+            ]"
+          >
+            {{ section.title }}
+          </NuxtLink>
+          <h4 v-else class="mb-2 text-sm font-semibold text-foreground">
             {{ section.title }}
           </h4>
-          <ul class="space-y-1">
-            <li v-for="item in section.items" :key="item.path">
-              <NuxtLink
-                :to="item.path"
-                :class="[
-                  'block rounded-md px-3 py-2 text-sm transition-colors',
-                  isActive(item.path)
-                    ? 'bg-muted font-medium text-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
-                ]"
-                @click="mobileSidebarOpen = false"
-              >
-                {{ item.title }}
-              </NuxtLink>
-            </li>
-          </ul>
+          <DocsNavItems :items="section.items" />
         </div>
       </nav>
     </aside>
@@ -156,25 +205,22 @@ const docsToc = inject<ComputedRef<Array<{ id: string; text: string }>>>('docsTo
         <aside class="hidden w-64 shrink-0 border-r lg:block">
           <div class="sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto py-8 pr-4 pl-6">
             <nav>
+              <DocsNavItems v-if="topLevelItems.length" :items="topLevelItems" class="mb-6" />
               <div v-for="section in docsNavigation" :key="section.title" class="mb-6">
-                <h4 class="mb-2 text-sm font-semibold text-foreground">
+                <NuxtLink
+                  v-if="section.path"
+                  :to="section.path"
+                  :class="[
+                    'mb-2 block text-sm font-semibold transition-colors',
+                    isActive(section.path) ? 'text-primary' : 'text-foreground hover:text-primary',
+                  ]"
+                >
+                  {{ section.title }}
+                </NuxtLink>
+                <h4 v-else class="mb-2 text-sm font-semibold text-foreground">
                   {{ section.title }}
                 </h4>
-                <ul class="space-y-1">
-                  <li v-for="item in section.items" :key="item.path">
-                    <NuxtLink
-                      :to="item.path"
-                      :class="[
-                        'block rounded-md px-3 py-1.5 text-sm transition-colors',
-                        isActive(item.path)
-                          ? 'bg-muted font-medium text-foreground'
-                          : 'text-muted-foreground hover:text-foreground',
-                      ]"
-                    >
-                      {{ item.title }}
-                    </NuxtLink>
-                  </li>
-                </ul>
+                <DocsNavItems :items="section.items" />
               </div>
             </nav>
           </div>
