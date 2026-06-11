@@ -12,7 +12,16 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NODE_OPTIONS=--max-old-space-size=4096
-RUN npm run build
+
+# Optional: pull /docs markdown from a dedicated GitHub repo at build time
+# (see content.config.ts). The repo URL is a non-secret build arg; the token
+# for a private repo is a BuildKit secret so it never lands in an image layer.
+# Both default to empty, in which case @nuxt/content uses local content/.
+ARG NUXT_CONTENT_DOCS_REPO=""
+ENV NUXT_CONTENT_DOCS_REPO=$NUXT_CONTENT_DOCS_REPO
+RUN --mount=type=secret,id=nuxt_content_token \
+    NUXT_CONTENT_GITHUB_TOKEN="$(cat /run/secrets/nuxt_content_token 2>/dev/null || true)" \
+    npm run build
 
 # --- Production ---
 FROM base AS runtime
