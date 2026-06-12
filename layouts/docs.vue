@@ -87,7 +87,7 @@ const docsToc = inject<ComputedRef<Array<{ id: string; text: string }>>>('docsTo
 </script>
 
 <template>
-  <div class="relative min-h-screen bg-[hsl(var(--site-bg))] font-site text-[hsl(var(--site-text))]">
+  <div class="relative min-h-screen bg-[hsl(var(--site-bg))] font-inter text-[hsl(var(--site-text))]">
     <!-- Blueprint grid backdrop, matching the landing -->
     <div class="site-grid-pattern pointer-events-none fixed inset-0 -z-10" />
 
