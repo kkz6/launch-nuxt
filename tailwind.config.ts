@@ -31,6 +31,7 @@ const config = {
         mono: ["JetBrains Mono", "monospace"],
         display: ["Plus Jakarta Sans", "sans-serif"],
         site: ["Plus Jakarta Sans", "sans-serif"],
+        inter: ["Inter", "system-ui", "sans-serif"],
       },
       fontSize: {
         xs: ["0.75rem", { lineHeight: "1.5" }],

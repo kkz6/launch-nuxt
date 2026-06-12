@@ -128,15 +128,23 @@ const breadcrumb = computed(() =>
   @apply mt-2 mb-0;
 }
 
-/* Links */
-.docs-content a {
+/* Links — only inline links inside running text get the accent + underline.
+   Block links (doc cards) and heading anchor links are left alone. */
+.docs-content :is(p, li, td, blockquote) a {
   @apply font-medium underline underline-offset-4 transition-colors;
   color: hsl(var(--site-accent));
   text-decoration-color: hsl(var(--site-accent) / 0.4);
 }
 
-.docs-content a:hover {
+.docs-content :is(p, li, td, blockquote) a:hover {
   text-decoration-color: hsl(var(--site-accent));
+}
+
+/* Heading anchor links (added by @nuxt/content) should look like the heading. */
+.docs-content :is(h1, h2, h3, h4) a {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
 }
 
 /* Code - inline */
