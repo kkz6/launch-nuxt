@@ -71,6 +71,15 @@ const onDelete = async (id: string) => {
     id,
   );
 };
+
+const onRestart = async () => {
+  await dockerService.databases.lifecycle(
+    props.database.server_id,
+    props.database.project_id,
+    props.database.id,
+    "restart",
+  );
+};
 </script>
 
 <template>
@@ -84,6 +93,9 @@ const onDelete = async (id: string) => {
     :vars="vars"
     :loading="isLoading"
     :show-project-hint="true"
+    :is-running="database.status === 'running'"
+    :on-restart="onRestart"
+    restart-label="Restart"
     title="Environment"
     description="Extra runtime env vars layered on top of the engine credentials. Save, then Restart to apply (recreates the container, keeps your data). Note: engine credential vars like POSTGRES_PASSWORD only apply on first init — Restart can't change them."
     :on-create="onCreate"
