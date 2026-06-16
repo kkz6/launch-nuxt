@@ -51,6 +51,9 @@ interface Props {
    * branch implies project-scope which is wrong for a single stack.
    */
   emptyDescription?: string;
+  isRunning?: boolean;
+  onRestart?: () => Promise<void>;
+  restartLabel?: string;
   /**
    * Optional replace-all bulk endpoint. When provided, used by the
    * "Replace all" path inside the bulk dialog. When omitted, that
@@ -68,6 +71,9 @@ const props = withDefaults(defineProps<Props>(), {
   title: "Environment",
   description: "Env vars passed to the container. Changes take effect on the next deploy.",
   showProjectHint: false,
+  isRunning: false,
+  onRestart: undefined,
+  restartLabel: "Restart",
   onSetBulk: undefined,
 });
 
@@ -202,6 +208,7 @@ const saveEdit = async (v: EnvVarRow) => {
     return;
   }
   cancelEdit(v.id);
+  await promptRestart();
 };
 
 const copyValue = async (v: EnvVarRow) => {
@@ -238,9 +245,11 @@ const addVar = async () => {
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to add env var");
+    return;
   } finally {
     isSaving.value = false;
   }
+  await promptRestart();
 };
 
 // Persistent is_secret toggle. Fires on chip click (the "secret" /
@@ -288,7 +297,9 @@ const removeVar = async (v: EnvVarRow) => {
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to remove env var");
+    return;
   }
+  await promptRestart();
 };
 
 // Parse + validate the bulk text once. Returns the rows + a count of
@@ -347,9 +358,11 @@ const submitBulk = async () => {
     } catch (err: unknown) {
       const e = err as { data?: { message?: string } };
       toast.error(e.data?.message || "Failed to save env vars");
+      return;
     } finally {
       isSaving.value = false;
     }
+    await promptRestart();
     return;
   }
 
@@ -390,6 +403,9 @@ const submitBulk = async () => {
     bulkText.value = "";
   }
   isSaving.value = false;
+  if (created > 0) {
+    await promptRestart();
+  }
 };
 
 // Smart-paste on the inline single-row Key input. If the user pastes
@@ -424,6 +440,34 @@ const syncRow = (updated: EnvVarRow) => {
 
 const sortVars = (vars: EnvVarRow[]) =>
   [...vars].sort((a, b) => a.key.localeCompare(b.key));
+
+const isRestarting = ref(false);
+
+// After a successful env mutation, offer to restart/reload if the workload is running.
+const promptRestart = async () => {
+  if (!props.isRunning || !props.onRestart || !confirmationDialog.value) return;
+
+  const label = props.restartLabel || "Restart";
+  const result = await confirmationDialog.value.show({
+    title: `${label} to apply changes?`,
+    description: `Environment variables saved. The running container is still using the old values — ${label.toLowerCase()} it to pick up the changes?`,
+    confirmText: label,
+    cancelText: "Not now",
+  });
+
+  if (!result.ok) return;
+
+  isRestarting.value = true;
+  try {
+    await props.onRestart();
+    toast.success(`${label} triggered — new env will be active shortly`);
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || `Failed to ${label.toLowerCase()}`);
+  } finally {
+    isRestarting.value = false;
+  }
+};
 
 // Resolved empty-state description. Computed in script (not inlined in a
 // `{{ }}` mustache) because the default copy contains the literal

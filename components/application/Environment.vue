@@ -81,6 +81,15 @@ const onSetBulk = async (
   );
   return res.data;
 };
+
+const onRestart = async () => {
+  await dockerService.applications.lifecycle(
+    props.application.server_id,
+    props.application.project_id,
+    props.application.id,
+    "reload",
+  );
+};
 </script>
 
 <template>
@@ -88,6 +97,9 @@ const onSetBulk = async (
     :vars="vars"
     :loading="isLoading"
     :show-project-hint="true"
+    :is-running="application.status === 'running'"
+    :on-restart="onRestart"
+    restart-label="Reload"
     title="Environment"
     description="Env vars passed to the container as -e KEY=VALUE. Save, then Reload to apply them — Reload recreates the container with no rebuild. (Build-time secrets need a full Deploy.)"
     :on-create="onCreate"

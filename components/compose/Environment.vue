@@ -158,6 +158,14 @@ const onSetBulk = async (
   vars.value = next;
   return next;
 };
+
+const onRestart = async () => {
+  await dockerService.composes.reload(
+    props.compose.server_id,
+    props.compose.project_id,
+    props.compose.id,
+  );
+};
 </script>
 
 <template>
@@ -171,6 +179,9 @@ const onSetBulk = async (
   <SharedEnvVarsEditor
     :vars="vars"
     :loading="isLoading"
+    :is-running="compose.status === 'running'"
+    :on-restart="onRestart"
+    restart-label="Reload"
     title="Environment"
     description="Written to .env next to the compose file. Save, then Reload to apply — Reload re-ups the stack with no rebuild. Compose uses it for ${VAR} substitution and passes matching keys to services."
     empty-description="Add KEY=VALUE pairs (or paste a .env file) — they're written next to the compose file on every deploy and used by docker compose for ${VAR} substitution."
