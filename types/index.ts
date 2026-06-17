@@ -903,3 +903,62 @@ export interface AdminPlan {
   yearly_pricing: number;
   recommended: boolean;
 }
+
+export interface QueryEntry {
+  sql: string;
+  duration_ns: number;
+  rows: number;
+  caller: string;
+  trace_id?: string;
+  slow: boolean;
+  error?: string;
+  timestamp: string;
+}
+
+export interface N1Pattern {
+  sql: string;
+  count: number;
+  trace_id: string;
+  caller: string;
+  total_ms: number;
+  timestamp: string;
+}
+
+export interface RuntimeStats {
+  goroutines: number;
+  heap_alloc_mb: number;
+  heap_inuse_mb: number;
+  heap_objects_k: number;
+  stack_inuse_mb: number;
+  sys_mem_mb: number;
+  num_gc: number;
+  last_gc_pause_ms: number;
+  gc_cpu_percent: number;
+  num_cpu: number;
+  uptime: string;
+}
+
+export interface DBPoolStats {
+  max_open: number;
+  open: number;
+  in_use: number;
+  idle: number;
+  wait_count: number;
+  wait_duration: string;
+}
+
+export interface ObservabilitySnapshot {
+  runtime: RuntimeStats;
+  db_pool: DBPoolStats;
+  queries: {
+    total: number;
+    slow_count: number;
+    n1_count: number;
+    avg_ms: number;
+    recent: QueryEntry[];
+    slow_queries: QueryEntry[];
+    n1_patterns: N1Pattern[];
+  };
+  uptime: string;
+  timestamp: string;
+}

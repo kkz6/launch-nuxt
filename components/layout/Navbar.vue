@@ -69,6 +69,7 @@ const adminTabs = [
   { label: "Invitations", to: "/admin/invitations", icon: "lucide:mail" },
   { label: "Servers", to: "/admin/servers", icon: "lucide:server" },
   { label: "Failures", to: "/admin/failures", icon: "lucide:triangle-alert" },
+  { label: "Observability", to: "/admin/observability", icon: "lucide:activity" },
 ];
 const isAdminTabActive = (tab: (typeof adminTabs)[number]): boolean =>
   tab.match ? tab.match(route.path) : route.path.startsWith(tab.to);
