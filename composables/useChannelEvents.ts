@@ -399,6 +399,11 @@ export const useDockerApplicationEvents = (
       'docker.application.gha_synced',
       'docker.application.gha_install_broken',
       'docker.application.gha_disabled',
+      // Fired when a build-secret change leaves the committed workflow
+      // YAML / repo secrets stale. Drives the "re-sync workflow" banner
+      // on the Environment tab's Build-time section (carries
+      // pending_changes for the "N pending changes" copy).
+      'docker.application.gha_out_of_sync',
     ],
     onEvent,
   )

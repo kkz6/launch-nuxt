@@ -38,7 +38,7 @@ interface Team {
 
 const { user, logout, fetchUser } = useAuth();
 // Role gating — hide create/mutate actions for read-only members.
-const { canEdit } = useCan();
+const { canEdit, canDelete } = useCan();
 const { setCurrentTeamId } = useApi();
 const { reconnect: reconnectWebSocket, isConnected: isWsConnected } =
   useWebSocket();
@@ -297,40 +297,9 @@ const updateProjectIndicator = () => {
   }
 };
 
-// Workload (database / application / compose) subtab nav. Same shape
-// as the project tab nav — sliding underline indicator + ref map.
-const workloadNavRef = ref<HTMLElement | null>(null);
-const workloadTabRefs = ref<Map<string, HTMLElement>>(new Map());
-const workloadIndicatorLeft = ref(0);
-const workloadIndicatorWidth = ref(0);
-
-const setWorkloadTabRef = (key: string, el: unknown) => {
-  if (el) {
-    workloadTabRefs.value.set(
-      key,
-      (el as { $el: HTMLElement }).$el || (el as HTMLElement),
-    );
-  }
-};
-
-const updateWorkloadIndicator = () => {
-  if (!isWorkloadDetailPage.value) {
-    workloadIndicatorWidth.value = 0;
-    return;
-  }
-  const currentSubtab = (route.query.subtab as string) || "general";
-  if (workloadTabRefs.value.has(currentSubtab)) {
-    const tabEl = workloadTabRefs.value.get(currentSubtab);
-    if (tabEl && workloadNavRef.value) {
-      const navRect = workloadNavRef.value.getBoundingClientRect();
-      const tabRect = tabEl.getBoundingClientRect();
-      workloadIndicatorLeft.value = tabRect.left - navRect.left;
-      workloadIndicatorWidth.value = tabRect.width;
-    }
-  } else {
-    workloadIndicatorWidth.value = 0;
-  }
-};
+// Workload (database / application / compose) subtab nav renders
+// through LayoutTabStrip, which owns the sliding-underline indicator
+// (see workloadActiveSubtab below).
 
 // Advanced sub-tabs indicator
 const advancedNavRef = ref<HTMLElement | null>(null);
@@ -374,7 +343,6 @@ watch(
       updateServerIndicator();
       updateSiteIndicator();
       updateProjectIndicator();
-      updateWorkloadIndicator();
       updateAdvancedIndicator();
     });
   },
@@ -720,7 +688,7 @@ const databaseSubTabs = [
 // keeping the canonical order here means the filter doesn't have to
 // reorder when it adds the tab in.
 const applicationSubTabs = [
-  { value: "general", label: "General", query: "general", icon: "lucide:info" },
+  { value: "general", label: "Overview", query: "general", icon: "lucide:layout-dashboard" },
   {
     value: "deployments",
     label: "Deployments",
@@ -746,24 +714,14 @@ const applicationSubTabs = [
     icon: "lucide:corner-up-right",
   },
   {
-    value: "volumes",
-    label: "Volumes",
-    query: "volumes",
-    icon: "lucide:hard-drive",
-  },
-  {
     value: "schedules",
     label: "Schedulers",
     query: "schedules",
     icon: "lucide:clock",
   },
-  {
-    value: "gha",
-    label: "GitHub Actions",
-    query: "gha",
-    icon: "simple-icons:github",
-  },
-  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
+  // Logs moved into the Actions dropdown (see the application Actions
+  // menu) so the tab strip stays focused on configuration. The
+  // ?subtab=logs route still renders the log viewer.
   {
     value: "advanced",
     label: "Advanced",
@@ -837,12 +795,9 @@ const workloadSubTabs = computed(() => {
       }
       return databaseSubTabs;
     case "application":
-      // Hide the GitHub Actions tab on server-built apps. Same
-      // visibility rule the detail page applies — keep the chrome
-      // honest with the workload's actual build_location.
-      if (workloadBuildLocation.value !== "github_actions") {
-        return applicationSubTabs.filter((t) => t.value !== "gha");
-      }
+      // GitHub Actions settings moved into the Advanced tab (shown
+      // there only for github_actions builds), so there's no longer a
+      // GHA subtab to conditionally hide here.
       return applicationSubTabs;
     case "compose":
       if (workloadBuildLocation.value !== "github_actions") {
@@ -854,10 +809,54 @@ const workloadSubTabs = computed(() => {
   }
 });
 
-const isWorkloadSubTabActive = (query: string) => {
-  const current = (route.query.subtab as string) || "general";
-  return current === query;
-};
+// The active workload subtab is the URL identifier. Each subtab's
+// `value` equals its `query`, so LayoutTabStrip matches activeKey
+// against tab.value directly.
+const workloadActiveSubtab = computed(
+  () => (route.query.subtab as string) || "general",
+);
+
+// Docker application Advanced sub-tabs. Rendered here in the navbar
+// (not the page body) so they sit tight under the workload tabs like
+// the PHP server Advanced tab. URL-driven via ?section=… ; these values
+// must mirror the section v-show keys in
+// components/application/Advanced.vue and its GHA/Danger gating.
+const applicationAdvancedSubTabs = computed(() => {
+  const tabs = [
+    { value: "general", label: "General", icon: "lucide:tag" },
+    { value: "runtime", label: "Runtime", icon: "lucide:sliders-horizontal" },
+    { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
+  ];
+  if (workloadBuildLocation.value === "github_actions") {
+    tabs.push({
+      value: "build",
+      label: "GitHub Actions",
+      icon: "simple-icons:github",
+    });
+  }
+  tabs.push({
+    value: "proxy",
+    label: "Traefik",
+    icon: "simple-icons:traefikproxy",
+  });
+  if (canDelete.value) {
+    tabs.push({
+      value: "danger",
+      label: "Danger zone",
+      icon: "lucide:alert-triangle",
+    });
+  }
+  return tabs;
+});
+const applicationAdvancedActiveKey = computed(
+  () => (route.query.section as string) || "general",
+);
+const showApplicationAdvancedSubTabs = computed(
+  () =>
+    isWorkloadDetailPage.value &&
+    workloadKind.value === "application" &&
+    workloadActiveSubtab.value === "advanced",
+);
 
 // Workload action bus. The detail page subscribes to bumps on this
 // key so it can re-fetch immediately when the navbar fires a
@@ -930,6 +929,13 @@ const runApplicationAction = async (
   } finally {
     workloadActionInFlight.value = null;
   }
+};
+
+// "View logs" lives in the Actions dropdown rather than the tab strip.
+// Keeps the current workload-detail path and just flips the subtab query
+// so the log viewer renders (the ?subtab=logs route is still valid).
+const viewWorkloadLogs = () => {
+  void navigateTo(`${route.path}?subtab=logs`);
 };
 
 const runDatabaseLifecycle = async (action: "start" | "stop" | "restart") => {
@@ -1497,7 +1503,6 @@ watch(
     showServerTabs,
     showSiteTabs,
     showProjectTabs,
-    isWorkloadDetailPage,
     isAdvancedTabActive,
   ],
   ([
@@ -1505,14 +1510,12 @@ watch(
     serverVisible,
     siteVisible,
     projectVisible,
-    workloadVisible,
     advancedVisible,
   ]) => {
     // Clear stale refs when sections become hidden
     if (!serverVisible) serverTabRefs.value.clear();
     if (!siteVisible) siteTabRefs.value.clear();
     if (!projectVisible) projectTabRefs.value.clear();
-    if (!workloadVisible) workloadTabRefs.value.clear();
     if (!advancedVisible) advancedTabRefs.value.clear();
 
     // Wait for refs to be populated after render
@@ -1522,7 +1525,6 @@ watch(
         if (serverVisible) updateServerIndicator();
         if (siteVisible) updateSiteIndicator();
         if (projectVisible) updateProjectIndicator();
-        if (workloadVisible) updateWorkloadIndicator();
         if (advancedVisible) updateAdvancedIndicator();
       });
     }, 50);
@@ -2701,6 +2703,13 @@ onMounted(fetchTeams);
                   />
                   Stop
                 </DropdownMenuItem>
+
+                <!-- Logs moved here from the tab strip. -->
+                <DropdownMenuSeparator />
+                <DropdownMenuItem @select="viewWorkloadLogs">
+                  <Icon name="lucide:scroll" class="mr-2 h-4 w-4" />
+                  View logs
+                </DropdownMenuItem>
               </template>
 
               <!--
@@ -2729,33 +2738,34 @@ onMounted(fetchTeams);
         breadcrumb's Server icon above (same trick the project tab nav
         uses). Indicator math is relative to the nav so it follows.
       -->
-      <nav
-        ref="workloadNavRef"
-        class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
-      >
-        <NuxtLink
-          v-for="tab in workloadSubTabs"
-          :key="tab.value"
-          :ref="(el) => setWorkloadTabRef(tab.query, el)"
-          :to="{ query: { ...route.query, subtab: tab.query } }"
-          class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
-          :class="[
-            isWorkloadSubTabActive(tab.query)
-              ? 'text-foreground'
-              : 'text-muted-foreground hover:text-foreground',
-          ]"
-        >
-          <Icon :name="tab.icon" class="h-4 w-4" />
-          {{ tab.label }}
-        </NuxtLink>
-        <span
-          class="absolute bottom-0 h-0.5 bg-foreground transition-all duration-300 ease-out"
-          :style="{
-            left: `${workloadIndicatorLeft}px`,
-            width: `${workloadIndicatorWidth}px`,
-          }"
-        />
-      </nav>
+      <LayoutTabStrip
+        :tabs="workloadSubTabs"
+        :active-key="workloadActiveSubtab"
+        :to-link="
+          (tab) => ({
+            query: { ...route.query, subtab: tab.query, section: undefined },
+          })
+        "
+        :extend-border="showApplicationAdvancedSubTabs"
+      />
+      <!--
+        Application Advanced sub-tabs (rose). Second-level nav rendered
+        in the navbar so it sits tight under the workload tabs — same
+        pattern as the PHP server Advanced sub-tabs. The page body
+        (components/application/Advanced.vue) reads ?section= to render
+        the matching section.
+      -->
+      <LayoutTabStrip
+        v-if="showApplicationAdvancedSubTabs"
+        :tabs="applicationAdvancedSubTabs"
+        :active-key="applicationAdvancedActiveKey"
+        :to-link="
+          (tab) => ({
+            query: { ...route.query, subtab: 'advanced', section: tab.value },
+          })
+        "
+        variant="rose"
+      />
     </div>
 
     <!-- DNS Domain Detail Navigation -->

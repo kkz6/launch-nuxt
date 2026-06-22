@@ -4,7 +4,6 @@ import { Button } from "~/components/ui/button";
 import {
   dockerService,
   type DockerApplication,
-  type DockerBuildSecret,
 } from "~/services/dockerService";
 
 interface Props {
@@ -154,65 +153,6 @@ const status = computed<Status>(() => {
     subtitle: `Builds run on GitHub Actions. Each push to ${branch.value} builds the image, publishes to GHCR, and triggers a deploy.`,
   };
 });
-
-// Build-secret list lives in the editor's wrapper here so onMounted
-// can hydrate it before the section renders. Failure-tolerant: a
-// fetch error just leaves the list empty + surfaces a toast — the
-// rest of the page still works because build-secrets are optional.
-const buildSecrets = ref<DockerBuildSecret[]>([]);
-const isLoadingBuildSecrets = ref(true);
-
-const fetchBuildSecrets = async () => {
-  isLoadingBuildSecrets.value = true;
-  try {
-    const res = await dockerService.applications.listBuildSecrets(
-      props.application.server_id,
-      props.application.project_id,
-      props.application.id,
-    );
-    buildSecrets.value = res.data;
-  } catch {
-    toast.error("Failed to load build secrets");
-  } finally {
-    isLoadingBuildSecrets.value = false;
-  }
-};
-
-onMounted(fetchBuildSecrets);
-
-// Wrapper callbacks adapt the service signature to the editor's
-// generic create/update/delete contract. The editor pushes the
-// result back via update:secrets so we don't need to refetch after
-// each operation.
-const onCreateBuildSecret = async (data: { name: string; value: string }) => {
-  const res = await dockerService.applications.createBuildSecret(
-    props.application.server_id,
-    props.application.project_id,
-    props.application.id,
-    data,
-  );
-  return res.data;
-};
-
-const onUpdateBuildSecret = async (id: string, patch: { value: string }) => {
-  const res = await dockerService.applications.updateBuildSecret(
-    props.application.server_id,
-    props.application.project_id,
-    props.application.id,
-    id,
-    patch,
-  );
-  return res.data;
-};
-
-const onDeleteBuildSecret = async (id: string) => {
-  await dockerService.applications.deleteBuildSecret(
-    props.application.server_id,
-    props.application.project_id,
-    props.application.id,
-    id,
-  );
-};
 
 const isRotating = ref(false);
 const isResyncing = ref(false);
@@ -494,42 +434,6 @@ useDockerApplicationEvents(teamId, (data, event) => {
           </span>
         </dd>
       </dl>
-    </section>
-
-    <!--
-      SECTION: BUILD-TIME SECRETS
-
-      Editor is delegated to SharedBuildSecretsEditor (mirrors the env-
-      var editor pattern). The values are write-only — backend never
-      echoes them back through the API. Each save on a GHA-backed app
-      also triggers a workflow re-sync so the YAML + the
-      LAUNCH_BUILD_<NAME> repo secrets stay aligned.
-    -->
-    <section class="space-y-3">
-      <div class="border-b pb-2">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Build-time secrets
-        </h3>
-      </div>
-      <p class="text-sm text-muted-foreground">
-        Values mounted into <span class="font-mono">docker build</span>
-        via <span class="font-mono">--mount=type=secret</span>. Use
-        these for things a <span class="font-mono">RUN</span> step
-        needs at build time — private npm / pip / composer registries,
-        private git clones inside multi-stage builds, etc. Different
-        from runtime env vars (those live on the Environment tab and
-        are only visible to <span class="font-mono">docker run</span>).
-      </p>
-      <SharedBuildSecretsEditor
-        :secrets="buildSecrets"
-        :loading="isLoadingBuildSecrets"
-        owner-label="application"
-        github-actions
-        :on-create="onCreateBuildSecret"
-        :on-update="onUpdateBuildSecret"
-        :on-delete="onDeleteBuildSecret"
-        @update:secrets="(v) => (buildSecrets = v as unknown as DockerBuildSecret[])"
-      />
     </section>
 
     <!--

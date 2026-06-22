@@ -489,25 +489,21 @@ const resolvedEmptyDescription = computed(() => {
 
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0 space-y-1">
-        <div class="flex items-center gap-2">
-          <h2 class="text-base font-semibold">{{ title }}</h2>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <h3 class="text-base font-semibold tracking-tight">{{ title }}</h3>
           <!--
-            Encryption reassurance chip. Surfaces what's already true:
-            values are AES-256-GCM encrypted in our DB via
-            internal/pkg/dbtype/encrypted.go. The same chip is shown on
-            every editor (project / application / database) because the
-            same dbtype wraps all three models. Tooltip carries the
-            longer-form explanation so the header stays compact.
+            Encryption reassurance chip — values are AES-256-GCM
+            encrypted at rest (internal/pkg/dbtype/encrypted.go).
           -->
           <span
-            class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400"
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
             title="Values are encrypted at rest with AES-256-GCM in the Launch database. They reach the container at deploy time via a 0600 env file on the host (tmpfs) — never as cleartext command-line args."
           >
             <Icon name="lucide:shield-check" class="h-3 w-3" />
             Encrypted at rest
           </span>
         </div>
-        <p class="text-xs text-muted-foreground">{{ description }}</p>
+        <p class="max-w-prose text-[13px] leading-relaxed text-muted-foreground">{{ description }}</p>
       </div>
       <div class="flex shrink-0 gap-2">
         <!--
@@ -522,6 +518,7 @@ const resolvedEmptyDescription = computed(() => {
         <Button
           size="icon-sm"
           variant="outline"
+          class="press"
           title="Add multiple (paste .env)"
           aria-label="Add multiple env vars from a .env-style paste"
           @click="openBulkDialog"
@@ -537,6 +534,7 @@ const resolvedEmptyDescription = computed(() => {
         <Button
           size="icon-sm"
           :variant="showAddForm ? 'outline' : 'default'"
+          class="press"
           :title="showAddForm ? 'Close' : 'Add var'"
           :aria-label="showAddForm ? 'Close' : 'Add var'"
           @click="showAddForm ? closeAddForm() : (showAddForm = true)"
@@ -564,38 +562,17 @@ const resolvedEmptyDescription = computed(() => {
     -->
     <div
       v-if="showProjectHint"
-      class="flex items-start gap-2 rounded-md border border-sky-500/30 bg-sky-500/5 px-3 py-2 text-xs text-sky-700 dark:text-sky-300"
+      class="flex items-start gap-2.5 rounded-lg border border-border/60 bg-muted/40 px-3.5 py-2.5 text-[13px] leading-relaxed text-muted-foreground"
     >
-      <Icon name="lucide:lightbulb" class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <Icon name="lucide:info" class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70" />
       <p>
-        Reference a project env var with
+        Reference a project-level variable with
         <code
           v-pre
-          class="rounded bg-sky-500/15 px-1 py-0.5 text-[11px]"
+          class="rounded bg-foreground/[0.06] px-1.5 py-0.5 font-mono text-[12px] text-foreground"
         >${{project.KEY}}</code>
-        — resolved at deploy / run time.
-      </p>
-    </div>
-
-    <!--
-      Runtime-vs-build clarification. These env vars are passed to
-      `docker run` via --env-file at deploy time. They are NOT
-      available during `docker build` — a Dockerfile that needs a
-      credential for an install step (private npm/pip/composer registry,
-      private git clone in a multi-stage build, etc.) needs a separate
-      build-time secret. This banner shows on every editor variant so
-      a user landing on Environment doesn't assume runtime values flow
-      backwards into the build.
-    -->
-    <div
-      class="flex items-start gap-2 rounded-md border border-amber-500/25 bg-amber-500/5 px-3 py-2 text-xs text-amber-800 dark:text-amber-300"
-    >
-      <Icon name="lucide:info" class="mt-0.5 h-3.5 w-3.5 shrink-0" />
-      <p>
-        Values here are passed to <span class="font-mono">docker run</span>
-        only — they're <strong>not available during build</strong>.
-        For credentials a <span class="font-mono">RUN</span> step needs
-        at build time, use Build-time secrets on the GitHub Actions tab.
+        — resolved at deploy time. Credentials a build step needs go in
+        <span class="font-medium text-foreground">Build-time secrets</span> below.
       </p>
     </div>
 
@@ -619,7 +596,7 @@ const resolvedEmptyDescription = computed(() => {
     <Transition name="env-add-form">
       <form
         v-if="showAddForm"
-        class="space-y-3 overflow-hidden rounded-lg border border-sky-500/30 border-l-[3px] border-l-sky-500/70 bg-muted/30 p-4 shadow-sm"
+        class="space-y-3 overflow-hidden rounded-lg border border-border/60 bg-muted/40 p-4"
         @submit.prevent="addVar"
       >
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -709,7 +686,7 @@ const resolvedEmptyDescription = computed(() => {
       above a still-rendered "KEY / VALUE / ACTIONS" header strip
       with no rows underneath).
     -->
-    <div class="overflow-hidden rounded-lg border">
+    <div class="overflow-hidden rounded-lg border border-border/50 bg-background/40">
       <!-- Loading: centered spinner, no header strip yet. -->
       <div v-if="loading" class="flex items-center justify-center py-16">
         <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
@@ -731,8 +708,8 @@ const resolvedEmptyDescription = computed(() => {
         <div class="flex h-11 w-11 items-center justify-center rounded-lg border border-border/40 bg-muted/30">
           <Icon name="lucide:key" class="h-5 w-5 text-muted-foreground/70" />
         </div>
-        <h3 class="mt-3 text-sm font-medium text-foreground/80">No env vars yet</h3>
-        <p class="mt-1 max-w-md text-xs text-muted-foreground/80">
+        <h3 class="mt-3.5 text-[15px] font-semibold tracking-tight">No env vars yet</h3>
+        <p class="mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
           {{ resolvedEmptyDescription }}
         </p>
       </div>
@@ -746,7 +723,7 @@ const resolvedEmptyDescription = computed(() => {
         <!-- Header row uses the same grid so column boundaries line up
              with the data rows below regardless of zoom or font scale. -->
         <div
-          class="grid grid-cols-[220px_1fr_168px] gap-2 border-b bg-muted/50 px-4 py-2 text-[10px] uppercase tracking-wide text-muted-foreground"
+          class="grid grid-cols-[220px_1fr_168px] gap-2 border-b border-border/50 bg-muted/30 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
         >
           <div>Key</div>
           <div>Value</div>
@@ -756,7 +733,7 @@ const resolvedEmptyDescription = computed(() => {
         <div
           v-for="v in vars"
           :key="v.id"
-          class="grid grid-cols-[220px_1fr_168px] items-center gap-2 border-b px-4 py-2 last:border-b-0"
+          class="grid grid-cols-[220px_1fr_168px] items-center gap-2 border-b border-border/40 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-muted/40"
         >
         <!-- KEY column. Truncates long keys with overflow-hidden +
              title so the row never widens past 220px. The secret
@@ -764,18 +741,18 @@ const resolvedEmptyDescription = computed(() => {
              is_secret on the server. Mouse hint says so. -->
         <div class="flex min-w-0 items-center gap-1.5">
           <code
-            class="truncate font-mono text-xs"
+            class="truncate font-mono text-[13px]"
             :title="v.key"
           >
             {{ v.key }}
           </code>
           <button
             type="button"
-            class="shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium transition-colors"
+            class="shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide transition-colors"
             :class="
               v.is_secret
-                ? 'bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400'
-                : 'bg-muted text-muted-foreground hover:bg-muted/70'
+                ? 'border-border/70 bg-muted text-foreground/80 hover:bg-muted/70'
+                : 'border-transparent bg-transparent text-muted-foreground/70 hover:bg-muted'
             "
             :title="
               v.is_secret

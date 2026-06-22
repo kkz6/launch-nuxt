@@ -100,6 +100,19 @@ export interface DockerApplication {
    * the "bootstrap is provisioning…" / "broken install" affordances.
    */
   gha_build_ready?: boolean;
+  /**
+   * True when build secrets have changed since the last successful
+   * workflow re-sync, so the committed workflow YAML + repo secrets
+   * are stale. Drives the "re-sync workflow" banner on the
+   * Environment tab's Build-time section. Always false for
+   * build_location=server.
+   */
+  gha_out_of_sync?: boolean;
+  /**
+   * Number of build-secret changes made since the last sync — shown
+   * in the banner as "N pending changes".
+   */
+  gha_pending_changes?: number;
 }
 
 /**

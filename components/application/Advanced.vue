@@ -1,13 +1,6 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "~/components/ui/card";
+import { Separator } from "~/components/ui/separator";
 import {
   dockerService,
   type DockerApplication,
@@ -25,6 +18,17 @@ const emit = defineEmits<{
 // Role gating — the Danger Zone (delete) is admin/owner only.
 const { canDelete } = useCan();
 
+const route = useRoute();
+
+// Advanced is organised into sub-sections. The sub-tab strip itself
+// lives in the navbar (components/layout/Navbar.vue) so it sits tight
+// under the workload tabs like the PHP server Advanced tab; this body
+// just renders the active section, read from ?section=. v-show keeps
+// each section mounted so in-progress form edits survive switching.
+const activeSection = computed(
+  () => (route.query.section as string) || "general",
+);
+
 type RestartPolicy = "no" | "on-failure" | "always" | "unless-stopped";
 
 // All advanced-form state lives in this single block. Mirrors the
@@ -38,9 +42,6 @@ type RestartPolicy = "no" | "on-failure" | "always" | "unless-stopped";
 // database General. Settings live with settings.
 const nameForm = ref(props.application.name);
 const nameSaving = ref(false);
-const nameDirty = computed(
-  () => nameForm.value.trim() !== props.application.name,
-);
 
 // Container Runtime — CPU/memory limits + reservations + restart
 // policy. Merged into a single card with a single Save button, same
@@ -390,145 +391,144 @@ const deleteApplication = async () => {
 
 <template>
   <!--
-    Grouped-cards layout — mirrors components/database/Advanced.vue.
-      1. General           — rename
-      2. Container Runtime — resources + restart + healthcheck (one Save)
-      3. Ports             — extra host:container mappings
-      4. Danger Zone       — Delete, destructive border tint
+    Flat sub-section layout — mirrors the PHP server Advanced tab
+    (components/server/settings/*): plain sections, each a heading +
+    muted description + fields, no elevated cards. Sections within a
+    sub-tab are split with <Separator />. The rose sub-tab strip itself
+    is rendered in the navbar (Navbar.vue, `showApplicationAdvancedSubTabs`)
+    so it sits tight under the workload tabs — the active section is
+    read from ?section= and rendered here.
 
-    Each editable card has Header (title + description), Content (form),
-    Footer (right-aligned Save). Same `Card` primitives, same paddings,
-    same label/help-text sizes the database Advanced uses.
+    No space-y on this root: the sections are mutually exclusive
+    (v-show / v-if on activeSection), so a `space-y` here would add a
+    stray top margin to every section after the first — Tailwind's
+    space utility keys off DOM order, not visibility. Each section
+    owns its internal spacing instead.
   -->
-  <div class="space-y-4">
+  <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!-- ─── General ───────────────────────────────────────────── -->
-    <Card>
-      <CardHeader class="p-4">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:tag" class="h-4 w-4 text-muted-foreground" />
-          General
-        </CardTitle>
-        <CardDescription class="text-xs">
+    <div v-show="activeSection === 'general'" class="space-y-4">
+      <div>
+        <h3 class="text-lg font-medium">General</h3>
+        <p class="text-sm text-muted-foreground">
           Rename the application. Source and build settings are
           immutable until a later release adds a reconfigure flow.
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </div>
 
-      <CardContent class="space-y-3 p-4 pt-0">
-        <div class="space-y-1 sm:max-w-md">
-          <Label for="app-name" class="text-xs">Name</Label>
-          <Input
-            id="app-name"
-            v-model="nameForm"
-            class="h-9 text-sm"
-            placeholder="e.g. api, web, worker"
-            autocomplete="off"
-          />
-          <p class="text-[11px] text-muted-foreground">
-            Used in the container name and the deploy log.
+      <div class="space-y-2">
+        <Label for="app-name">Name</Label>
+        <Input
+          id="app-name"
+          v-model="nameForm"
+          placeholder="e.g. api, web, worker"
+          autocomplete="off"
+        />
+        <p class="text-sm text-muted-foreground">
+          Used in the container name and the deploy log.
+        </p>
+      </div>
+
+      <Button :disabled="nameSaving" @click="saveName">
+        <Icon
+          v-if="nameSaving"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        Save Changes
+      </Button>
+    </div>
+
+    <!-- ─── Volumes (moved here from a top-level tab) ─────────── -->
+    <ApplicationVolumes
+      v-if="activeSection === 'volumes'"
+      :application="application"
+    />
+
+    <!-- ─── GitHub Actions ────────────────────────────────────── -->
+    <!--
+      Only for build_location=github_actions. The full GHA settings
+      panel (status, config, maintenance, disable) lives here now — it
+      used to be its own tab. Build-time secrets moved to the
+      Environment tab's Build-time section. @updated bubbles a refetch
+      up to the application page.
+    -->
+    <div
+      v-if="application.build_location === 'github_actions'"
+      v-show="activeSection === 'build'"
+    >
+      <ApplicationGHA :application="application" @updated="$emit('updated')" />
+    </div>
+
+    <!-- ─── Container Runtime / Security / Ports ──────────────── -->
+    <div v-show="activeSection === 'runtime'" class="space-y-6">
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-medium">Container Runtime</h3>
+          <p class="text-sm text-muted-foreground">
+            Resource caps + reservations, restart policy, and the
+            container HEALTHCHECK. Applied on the next deploy.
           </p>
         </div>
-      </CardContent>
 
-      <CardFooter class="justify-end border-t bg-muted/30 px-4 py-2">
-        <Button
-          size="sm"
-          :disabled="!nameDirty || nameSaving"
-          @click="saveName"
-        >
-          <Icon
-            v-if="nameSaving"
-            name="lucide:loader-2"
-            class="mr-2 h-3.5 w-3.5 animate-spin"
-          />
-          Save
-        </Button>
-      </CardFooter>
-    </Card>
-
-    <!-- ─── Container Runtime ─────────────────────────────────── -->
-    <Card>
-      <CardHeader class="p-4">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon
-            name="lucide:sliders-horizontal"
-            class="h-4 w-4 text-muted-foreground"
-          />
-          Container Runtime
-        </CardTitle>
-        <CardDescription class="text-xs">
-          Resource caps + reservations, restart policy, and the
-          container HEALTHCHECK. Applied on the next deploy.
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent class="space-y-4 p-4 pt-0">
         <!-- Resources block -->
-        <div class="space-y-2">
+        <div class="space-y-3">
           <div
-            class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+            class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
             Resources
           </div>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div class="space-y-1">
-              <Label for="app-memory-limit" class="text-xs">Memory Limit</Label>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div class="space-y-2">
+              <Label for="app-memory-limit">Memory Limit</Label>
               <Input
                 id="app-memory-limit"
                 v-model="memoryLimit"
-                class="h-9 text-sm"
                 placeholder="e.g. 512m, 1g"
                 autocomplete="off"
               />
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-sm text-muted-foreground">
                 Hard ceiling (<code>-m</code>). Empty = unlimited.
               </p>
             </div>
 
-            <div class="space-y-1">
-              <Label for="app-memory-reservation" class="text-xs">
-                Memory Reservation
-              </Label>
+            <div class="space-y-2">
+              <Label for="app-memory-reservation">Memory Reservation</Label>
               <Input
                 id="app-memory-reservation"
                 v-model="memoryReservation"
-                class="h-9 text-sm"
                 placeholder="e.g. 256m"
                 autocomplete="off"
               />
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-sm text-muted-foreground">
                 Soft floor (<code>--memory-reservation</code>).
               </p>
             </div>
 
-            <div class="space-y-1">
-              <Label for="app-cpu-limit" class="text-xs">CPU Limit</Label>
+            <div class="space-y-2">
+              <Label for="app-cpu-limit">CPU Limit</Label>
               <Input
                 id="app-cpu-limit"
                 v-model="cpuLimit"
-                class="h-9 text-sm"
                 placeholder="e.g. 0.5, 2"
                 autocomplete="off"
               />
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-sm text-muted-foreground">
                 CPUs (<code>--cpus</code>). Empty = unlimited.
               </p>
             </div>
 
-            <div class="space-y-1">
-              <Label for="app-cpu-reservation" class="text-xs">
-                CPU Reservation
-              </Label>
+            <div class="space-y-2">
+              <Label for="app-cpu-reservation">CPU Reservation</Label>
               <Input
                 id="app-cpu-reservation"
                 v-model="cpuReservation"
-                class="h-9 text-sm"
                 placeholder="e.g. 1024"
                 autocomplete="off"
               />
-              <p class="text-[11px] text-muted-foreground">
+              <p class="text-sm text-muted-foreground">
                 CPU shares (1024 = baseline).
               </p>
             </div>
@@ -536,15 +536,15 @@ const deleteApplication = async () => {
         </div>
 
         <!-- Restart policy block -->
-        <div class="space-y-2">
+        <div class="space-y-3">
           <div
-            class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+            class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
             Restart Policy
           </div>
-          <div class="space-y-1 sm:max-w-md">
+          <div class="space-y-2">
             <Select v-model="restartPolicy">
-              <SelectTrigger id="app-restart" class="h-9 text-sm">
+              <SelectTrigger id="app-restart">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -556,7 +556,7 @@ const deleteApplication = async () => {
                 <SelectItem value="no">No</SelectItem>
               </SelectContent>
             </Select>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-sm text-muted-foreground">
               Whether the container restarts after the docker daemon
               (or host) reboots.
             </p>
@@ -564,125 +564,112 @@ const deleteApplication = async () => {
         </div>
 
         <!-- Healthcheck block -->
-        <div class="space-y-2">
+        <div class="space-y-3">
           <div
-            class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+            class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
             Healthcheck
           </div>
-          <div class="space-y-1">
+          <div class="space-y-2">
             <Input
               id="app-healthcheck"
               v-model="healthcheckCommand"
-              class="h-9 font-mono text-sm"
+              class="font-mono"
               placeholder="curl -fsS http://localhost/health || exit 1"
               autocomplete="off"
             />
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-sm text-muted-foreground">
               Single command run inside the container by docker's
               HEALTHCHECK. Leave blank to skip.
             </p>
           </div>
         </div>
-      </CardContent>
 
-      <CardFooter class="justify-end border-t bg-muted/30 px-4 py-2">
-        <Button size="sm" :disabled="runtimeSaving" @click="saveRuntime">
+        <Button :disabled="runtimeSaving" @click="saveRuntime">
           <Icon
             v-if="runtimeSaving"
             name="lucide:loader-2"
-            class="mr-2 h-3.5 w-3.5 animate-spin"
+            class="mr-2 h-4 w-4 animate-spin"
           />
-          Save
+          Save Changes
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
 
-    <!-- ─── Security (basic auth) ─────────────────────────────── -->
-    <Card>
-      <CardHeader class="p-4">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:shield-check" class="h-4 w-4 text-muted-foreground" />
-          Security
-        </CardTitle>
-        <CardDescription class="text-xs">
-          HTTP basic-auth in front of the app via a Traefik basicauth
-          middleware. Clear both fields to disable.
-        </CardDescription>
-      </CardHeader>
+      <Separator />
 
-      <CardContent class="space-y-3 p-4 pt-0">
-        <div class="grid gap-3 sm:grid-cols-2">
-          <div class="space-y-1">
-            <Label for="app-security-user" class="text-xs">Username</Label>
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-medium">Security</h3>
+          <p class="text-sm text-muted-foreground">
+            HTTP basic-auth in front of the app via a Traefik basicauth
+            middleware. Clear both fields to disable.
+          </p>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="space-y-2">
+            <Label for="app-security-user">Username</Label>
             <Input
               id="app-security-user"
               v-model="security.username"
-              class="h-9 text-sm"
               placeholder="admin"
               autocomplete="off"
             />
           </div>
-          <div class="space-y-1">
-            <Label for="app-security-pass" class="text-xs">Password</Label>
+          <div class="space-y-2">
+            <Label for="app-security-pass">Password</Label>
             <div class="relative">
               <Input
                 id="app-security-pass"
                 v-model="security.password"
                 :type="securityRevealPassword ? 'text' : 'password'"
-                class="h-9 pr-9 text-sm"
+                class="pr-10"
                 placeholder="••••••••"
                 autocomplete="new-password"
               />
               <button
                 type="button"
-                class="absolute right-0 top-0 grid h-9 w-9 place-items-center text-muted-foreground hover:text-foreground"
+                class="absolute right-0 top-0 grid h-10 w-10 place-items-center text-muted-foreground hover:text-foreground"
                 :title="securityRevealPassword ? 'Hide password' : 'Show password'"
                 @click="securityRevealPassword = !securityRevealPassword"
               >
                 <Icon
                   :name="securityRevealPassword ? 'lucide:eye-off' : 'lucide:eye'"
-                  class="h-3.5 w-3.5"
+                  class="h-4 w-4"
                 />
               </button>
             </div>
           </div>
         </div>
-        <p class="text-[11px] text-muted-foreground">
+        <p class="text-sm text-muted-foreground">
           Password is hashed by Traefik (htpasswd) at deploy time and
           stored in the application's build_config.
         </p>
-      </CardContent>
 
-      <CardFooter class="justify-end border-t bg-muted/30 px-4 py-2">
-        <Button size="sm" :disabled="securitySaving" @click="saveSecurity">
+        <Button :disabled="securitySaving" @click="saveSecurity">
           <Icon
             v-if="securitySaving"
             name="lucide:loader-2"
-            class="mr-2 h-3.5 w-3.5 animate-spin"
+            class="mr-2 h-4 w-4 animate-spin"
           />
-          Save
+          Save Changes
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
 
-    <!-- ─── Ports ─────────────────────────────────────────────── -->
-    <Card>
-      <CardHeader class="p-4">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:plug" class="h-4 w-4 text-muted-foreground" />
-          Ports
-        </CardTitle>
-        <CardDescription class="text-xs">
-          Extra <code>host:container</code> mappings, one per line.
-          For HTTP apps prefer the Domains tab — Traefik handles TLS +
-          routing. These are for non-HTTP services that need a raw
-          host port.
-        </CardDescription>
-      </CardHeader>
+      <Separator />
 
-      <CardContent class="space-y-4 p-4 pt-0">
-        <div class="space-y-1">
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-medium">Ports</h3>
+          <p class="text-sm text-muted-foreground">
+            Extra <code>host:container</code> mappings, one per line.
+            For HTTP apps prefer the Domains tab — Traefik handles TLS +
+            routing. These are for non-HTTP services that need a raw
+            host port.
+          </p>
+        </div>
+
+        <div class="space-y-2">
           <Label for="app-internal-port">Container port</Label>
           <Input
             id="app-internal-port"
@@ -693,13 +680,13 @@ const deleteApplication = async () => {
             class="max-w-[160px]"
             placeholder="80"
           />
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-sm text-muted-foreground">
             The port your app listens on inside the container. Domains and
             health checks route to this. Applies on the next deploy.
           </p>
         </div>
 
-        <div class="space-y-1">
+        <div class="space-y-2">
           <Label for="app-extra-ports">Extra ports</Label>
           <Textarea
             id="app-extra-ports"
@@ -708,23 +695,21 @@ const deleteApplication = async () => {
             class="font-mono text-sm"
             placeholder="8080:80&#10;5432:5432/tcp"
           />
-          <p class="text-[11px] text-muted-foreground">
+          <p class="text-sm text-muted-foreground">
             Each entry is appended to <code>docker run -p</code>.
           </p>
         </div>
-      </CardContent>
 
-      <CardFooter class="justify-end border-t bg-muted/30 px-4 py-2">
-        <Button size="sm" :disabled="portsSaving" @click="savePorts">
+        <Button :disabled="portsSaving" @click="savePorts">
           <Icon
             v-if="portsSaving"
             name="lucide:loader-2"
-            class="mr-2 h-3.5 w-3.5 animate-spin"
+            class="mr-2 h-4 w-4 animate-spin"
           />
-          Save
+          Save Changes
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
 
     <!-- ─── Traefik dynamic-config ────────────────────────────── -->
     <!--
@@ -736,28 +721,25 @@ const deleteApplication = async () => {
       WriteTraefikDynamicFile, which validates filename + size cap;
       Traefik watches the dir and picks up changes with no reload.
     -->
-    <Card>
-      <CardHeader class="p-4">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:route" class="h-4 w-4 text-muted-foreground" />
-          Traefik
-        </CardTitle>
-        <CardDescription class="text-xs">
+    <div v-show="activeSection === 'proxy'" class="space-y-4">
+      <div>
+        <h3 class="text-lg font-medium">Traefik</h3>
+        <p class="text-sm text-muted-foreground">
           Modify the traefik config, in rare cases you may need to add
           specific config, be careful because modifying incorrectly
           can break traefik and your application.
           <span
             v-if="traefikFilename"
-            class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono"
+            class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono text-xs"
             :title="`/etc/launch/traefik/dynamic/${traefikFilename}`"
           >
             <Icon name="lucide:file-text" class="h-3 w-3" />
             {{ traefikFilename }}
           </span>
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </div>
 
-      <CardContent class="space-y-2 p-4 pt-0">
+      <div class="space-y-2">
         <div
           v-if="traefikLoading"
           class="flex h-72 items-center justify-center rounded-md border bg-muted/30"
@@ -806,14 +788,10 @@ const deleteApplication = async () => {
             placeholder="http:&#10;  routers:&#10;    ..."
           />
         </div>
-      </CardContent>
+      </div>
 
-      <CardFooter
-        v-if="traefikEditing"
-        class="justify-end gap-2 border-t bg-muted/30 px-4 py-2"
-      >
+      <div v-if="traefikEditing" class="flex justify-end gap-2">
         <Button
-          size="sm"
           variant="outline"
           :disabled="traefikSaving"
           @click="cancelModifyTraefik"
@@ -821,19 +799,18 @@ const deleteApplication = async () => {
           Cancel
         </Button>
         <Button
-          size="sm"
           :disabled="traefikSaving || !traefikDirty"
           @click="saveTraefikConfig"
         >
           <Icon
             v-if="traefikSaving"
             name="lucide:loader-2"
-            class="mr-2 h-3.5 w-3.5 animate-spin"
+            class="mr-2 h-4 w-4 animate-spin"
           />
           Save
         </Button>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
 
     <!-- ─── Danger Zone ───────────────────────────────────────── -->
     <!--
@@ -842,48 +819,33 @@ const deleteApplication = async () => {
       Rebuild row because Rebuild for apps is just "Deploy", which is
       non-destructive and lives in the Actions dropdown.
     -->
-    <Card v-if="canDelete" class="border-destructive/40">
-      <CardHeader class="p-4">
-        <CardTitle
-          class="flex items-center gap-2 text-sm font-semibold text-destructive"
-        >
-          <Icon name="lucide:alert-triangle" class="h-4 w-4" />
-          Danger Zone
-        </CardTitle>
-        <CardDescription class="text-xs">
-          Destructive actions. Requires typing the application name
-          to confirm.
-        </CardDescription>
-      </CardHeader>
+    <div
+      v-if="canDelete"
+      v-show="activeSection === 'danger'"
+      class="space-y-4"
+    >
+      <div>
+        <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+        <p class="text-sm text-muted-foreground">
+          Permanently delete this application. The container is stopped
+          and removed; volumes (if any) stay on disk. This action
+          cannot be undone.
+        </p>
+      </div>
 
-      <CardContent class="space-y-0 divide-y p-4 pt-0">
-        <div
-          class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
-        >
-          <div class="min-w-0 space-y-0.5">
-            <p class="text-sm font-medium">Delete Application</p>
-            <p class="text-xs text-muted-foreground">
-              Permanently delete this application. The container is
-              stopped and removed; volumes (if any) stay on disk.
-            </p>
-          </div>
-          <Button
-            variant="destructive"
-            size="sm"
-            :disabled="deleteLoading"
-            class="shrink-0"
-            @click="deleteApplication"
-          >
-            <Icon
-              v-if="deleteLoading"
-              name="lucide:loader-2"
-              class="mr-2 h-3.5 w-3.5 animate-spin"
-            />
-            <Icon v-else name="lucide:trash-2" class="mr-2 h-3.5 w-3.5" />
-            Delete
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+      <Button
+        variant="destructive"
+        :disabled="deleteLoading"
+        @click="deleteApplication"
+      >
+        <Icon
+          v-if="deleteLoading"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
+        Delete Application
+      </Button>
+    </div>
   </div>
 </template>

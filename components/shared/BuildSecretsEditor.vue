@@ -180,20 +180,25 @@ const sortByName = (rows: BuildSecretRow[]) =>
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div class="space-y-4">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!--
-      Header row: just the add button. The section header + description
-      live in the parent (the GHA tab) so the placement matches the
-      typographic "Configuration / Maintenance / Danger zone" rhythm.
-    -->
-    <div class="flex items-center justify-end">
+    <div class="flex items-start justify-between gap-3">
+      <div class="min-w-0 space-y-1">
+        <h3 class="text-base font-semibold tracking-tight">Build-time secrets</h3>
+        <p class="max-w-prose text-[13px] leading-relaxed text-muted-foreground">
+          Mounted into <span class="font-mono text-foreground/80">docker&nbsp;build</span>
+          via <span class="font-mono text-foreground/80">--mount=type=secret</span> —
+          available only while the image builds. Separate from the runtime
+          variables above.
+        </p>
+      </div>
       <Button
         size="icon-sm"
         :variant="showAddForm ? 'outline' : 'default'"
         :title="showAddForm ? 'Close' : 'Add build secret'"
         :aria-label="showAddForm ? 'Close' : 'Add build secret'"
+        class="press shrink-0"
         @click="showAddForm ? closeAddForm() : (showAddForm = true)"
       >
         <Icon
@@ -215,7 +220,7 @@ const sortByName = (rows: BuildSecretRow[]) =>
     <Transition name="build-secret-add">
       <form
         v-if="showAddForm"
-        class="space-y-3 overflow-hidden rounded-lg border border-sky-500/30 border-l-[3px] border-l-sky-500/70 bg-muted/30 p-4 shadow-sm"
+        class="space-y-3 overflow-hidden rounded-lg border border-border/60 bg-muted/40 p-4"
         @submit.prevent="addSecret"
       >
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-[220px_1fr]">
@@ -254,8 +259,8 @@ const sortByName = (rows: BuildSecretRow[]) =>
         >
           <Icon name="lucide:key-round" class="mt-0.5 h-3 w-3 shrink-0" />
           <span>
-            On GitHub Actions this is stored in your repository as the
-            Actions secret
+            On your next re-sync this is uploaded to your repository as the
+            GitHub Actions secret
             <code class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-foreground">{{ repoSecretName(newSecret.name || "NPM_TOKEN") }}</code>
             and passed to the build as
             <code class="rounded bg-muted px-1 py-0.5 text-[10px]">{{ newSecret.name || "NPM_TOKEN" }}</code>
@@ -292,7 +297,7 @@ const sortByName = (rows: BuildSecretRow[]) =>
       values are never displayed; each row shows the name + a
       green "set" indicator instead.
     -->
-    <div class="overflow-hidden rounded-lg border">
+    <div class="overflow-hidden rounded-lg border border-border/50 bg-background/40">
       <div v-if="loading" class="flex items-center justify-center py-12">
         <Icon
           name="lucide:loader-2"
@@ -307,10 +312,10 @@ const sortByName = (rows: BuildSecretRow[]) =>
         <div class="flex h-11 w-11 items-center justify-center rounded-lg border border-border/40 bg-muted/30">
           <Icon name="lucide:shield" class="h-5 w-5 text-muted-foreground/70" />
         </div>
-        <h3 class="mt-3 text-sm font-medium text-foreground/80">
+        <h3 class="mt-3.5 text-[15px] font-semibold tracking-tight">
           No build secrets yet
         </h3>
-        <p class="mt-1 max-w-md text-xs text-muted-foreground/80">
+        <p class="mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
           Add a secret here when your <span class="font-mono">Dockerfile</span>
           needs a credential at build time — private package registries,
           private git clones, build-time API keys.
@@ -319,7 +324,7 @@ const sortByName = (rows: BuildSecretRow[]) =>
 
       <template v-else>
         <div
-          class="grid grid-cols-[220px_1fr_140px] gap-2 border-b bg-muted/50 px-4 py-2 text-[10px] uppercase tracking-wide text-muted-foreground"
+          class="grid grid-cols-[220px_1fr_140px] gap-2 border-b border-border/50 bg-muted/30 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
         >
           <div>Name</div>
           <div>Value</div>
@@ -329,10 +334,10 @@ const sortByName = (rows: BuildSecretRow[]) =>
         <div
           v-for="s in secrets"
           :key="s.id"
-          class="grid grid-cols-[220px_1fr_140px] items-center gap-2 border-b px-4 py-2 last:border-b-0"
+          class="grid grid-cols-[220px_1fr_140px] items-center gap-2 border-b border-border/40 px-4 py-2.5 transition-colors last:border-b-0 hover:bg-muted/40"
         >
           <div class="flex min-w-0 flex-col justify-center">
-            <code class="truncate font-mono text-xs" :title="s.name">
+            <code class="truncate font-mono text-[13px]" :title="s.name">
               {{ s.name }}
             </code>
             <code
@@ -370,14 +375,14 @@ const sortByName = (rows: BuildSecretRow[]) =>
             <div v-else class="flex items-center gap-1.5">
               <span
                 v-if="s.has_value"
-                class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-500/30 dark:text-emerald-400"
+                class="inline-flex items-center gap-1 rounded border border-border/70 bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground/80"
               >
                 <Icon name="lucide:check" class="h-2.5 w-2.5" />
                 Set
               </span>
               <span
                 v-else
-                class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-400"
+                class="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/5 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive"
               >
                 <Icon name="lucide:alert-triangle" class="h-2.5 w-2.5" />
                 Empty
@@ -435,15 +440,17 @@ const sortByName = (rows: BuildSecretRow[]) =>
       </template>
     </div>
 
-    <p class="text-[11px] text-muted-foreground">
+    <p class="text-[11px] leading-relaxed text-muted-foreground">
       <Icon name="lucide:info" class="-mt-0.5 mr-1 inline-block h-3 w-3" />
-      Changes apply to the next build.
       <template v-if="githubActions">
-        On GitHub Actions each secret is pushed to your repository as an
-        Actions secret named
-        <code class="rounded bg-muted px-1 py-0.5 text-[10px]">LAUNCH_BUILD_&lt;NAME&gt;</code>,
-        and saving triggers a workflow re-sync so the YAML and your repo
-        secrets stay in lock-step.
+        Saved changes are <span class="font-medium text-foreground/80">staged, not pushed</span>.
+        Re-syncing the workflow uploads each secret to your repository as the
+        Actions secret
+        <code class="rounded bg-muted px-1 py-0.5 text-[10px]">LAUNCH_BUILD_&lt;NAME&gt;</code>
+        and commits the updated YAML — a change isn't in your build until you re-sync.
+      </template>
+      <template v-else>
+        Changes apply to the next build.
       </template>
     </p>
   </div>

@@ -30,12 +30,20 @@ import type { RouteLocationRaw } from 'vue-router'
  * `extendBorder` is for the parent tabs above a sub-tab strip — it
  * renders a wrapping div with a full-width bottom border without
  * disturbing the nav's `-ml-3` alignment.
+ *
+ * `toLink` switches the strip between its two modes:
+ *   - provided → route tabs; each renders a <NuxtLink> and the URL
+ *               drives the active key. Used by the navbar strips.
+ *   - omitted  → local tabs; each renders a <button> and emits
+ *               update:activeKey on click (v-model:active-key). Used
+ *               by self-contained sub-sections like the docker
+ *               application Advanced tab.
  */
 const props = withDefaults(
   defineProps<{
     tabs: T[]
     activeKey: string
-    toLink: (tab: T) => string | RouteLocationRaw
+    toLink?: (tab: T) => string | RouteLocationRaw
     variant?: 'foreground' | 'rose'
     extendBorder?: boolean
   }>(),
@@ -44,6 +52,9 @@ const props = withDefaults(
     extendBorder: false,
   },
 )
+const emit = defineEmits<{ 'update:activeKey': [value: string] }>()
+
+const NuxtLink = resolveComponent('NuxtLink')
 
 const navRef = ref<HTMLElement | null>(null)
 const tabRefs = ref(new Map<string, HTMLElement>())
@@ -122,21 +133,24 @@ export interface TabItem {
       ref="navRef"
       class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
     >
-      <NuxtLink
+      <component
+        :is="toLink ? NuxtLink : 'button'"
         v-for="tab in tabs"
         :key="tab.value"
-        :ref="(el) => setTabRef(tab.value, el)"
-        :to="toLink(tab)"
+        :ref="(el: unknown) => setTabRef(tab.value, el)"
+        :to="toLink ? toLink(tab) : undefined"
+        :type="toLink ? undefined : 'button'"
         class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
         :class="
           activeKey === tab.value
             ? activeTextClass
             : 'text-muted-foreground hover:text-foreground'
         "
+        @click="toLink ? undefined : emit('update:activeKey', tab.value)"
       >
         <Icon :name="tab.icon" class="h-4 w-4" />
         {{ tab.label }}
-      </NuxtLink>
+      </component>
       <!-- Sliding underline indicator — position computed from the
            active tab's bounding box relative to the nav. -->
       <span

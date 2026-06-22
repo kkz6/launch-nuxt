@@ -29,14 +29,12 @@ const isLoading = ref(true);
 // but filtered out of the rendered subtab strip by `visibleSubtabs`
 // below for server-side builds. (Show: SUBTABS, Render: visibleSubtabs.)
 const SUBTABS = [
-  { value: "general", label: "General", icon: "lucide:info" },
+  { value: "general", label: "Overview", icon: "lucide:layout-dashboard" },
   { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
   { value: "environment", label: "Environment", icon: "lucide:key" },
   { value: "domains", label: "Domains", icon: "lucide:globe" },
   { value: "redirects", label: "Redirects", icon: "lucide:corner-up-right" },
-  { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
   { value: "schedules", label: "Schedules", icon: "lucide:clock" },
-  { value: "gha", label: "GitHub Actions", icon: "simple-icons:github" },
   { value: "logs", label: "Logs", icon: "lucide:scroll" },
   { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
 ] as const;
@@ -127,20 +125,15 @@ const READY_SUBTABS: Record<string, boolean> = {
   domains: true,
   logs: true,
   environment: true,
-  volumes: true,
   schedules: true,
-  gha: true,
   advanced: true,
 };
 
-// GHA subtab only renders for github_actions-backed apps. Hiding it
-// for "server" apps keeps the strip uncluttered for the common case
-// (most workloads aren't GHA-backed) and avoids the dead-end where a
-// user clicks an irrelevant tab and sees an empty state.
-const isGHA = computed(() => app.value?.build_location === "github_actions");
-const visibleSubtabs = computed(() =>
-  SUBTABS.filter((t) => t.value !== "gha" || isGHA.value),
-);
+// Every subtab renders for every app now. The GitHub Actions settings
+// panel moved into the Advanced tab (shown there only for
+// github_actions builds) and build-time secrets moved to the
+// Environment tab — so there's no longer a GHA-only subtab to hide.
+const visibleSubtabs = computed(() => SUBTABS);
 // Expose to a child <Navbar> or layout in future; for now the local
 // SUBTABS array drives the strip via the layout's slot.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -151,7 +144,7 @@ const _exposedSubtabs = visibleSubtabs;
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
-useDockerApplicationEvents(teamId, (data) => {
+useDockerApplicationEvents(teamId, (data, event) => {
   if (data.application_id !== applicationId.value) return;
   // Status fields live on the application row; the Deployments tab
   // owns deployment-history refetches.
@@ -160,6 +153,18 @@ useDockerApplicationEvents(teamId, (data) => {
     data.status === "failed" ||
     data.status === "building" ||
     data.status === "stopped"
+  ) {
+    void fetchApp();
+    return;
+  }
+  // GHA sync state (out-of-sync banner, synced/broken/disabled) all
+  // live on the application row's source_config — refetch so the
+  // Environment Build-time banner + Advanced GHA card stay current.
+  if (
+    event === "docker.application.gha_out_of_sync" ||
+    event === "docker.application.gha_synced" ||
+    event === "docker.application.gha_install_broken" ||
+    event === "docker.application.gha_disabled"
   ) {
     void fetchApp();
   }
@@ -220,17 +225,9 @@ useDockerApplicationEvents(teamId, (data) => {
       :application="app"
     />
 
-    <ApplicationVolumes v-else-if="subTab === 'volumes'" :application="app" />
-
     <ApplicationSchedules
       v-else-if="subTab === 'schedules'"
       :application="app"
-    />
-
-    <ApplicationGHA
-      v-else-if="subTab === 'gha'"
-      :application="app"
-      @updated="fetchApp"
     />
 
     <ApplicationAdvanced
