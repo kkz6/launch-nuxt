@@ -1,22 +1,23 @@
 const isOpen = ref(false)
-const initialTab = ref<string | null>(null)
+// Owned here (not in Sheet.vue) so `open('connections')` sets the active
+// tab *before* the sheet — and its Tabs — render. Setting it after open
+// (the old initialTab + watch approach) raced the Tabs' own init and left
+// the requested tab unselected.
+const activeTab = ref('general')
 
 export const useSettingsSheet = () => {
   const open = (tab?: string) => {
-    if (tab) {
-      initialTab.value = tab
-    }
+    activeTab.value = tab || 'general'
     isOpen.value = true
   }
 
   const close = () => {
     isOpen.value = false
-    initialTab.value = null
   }
 
   return {
     isOpen,
-    initialTab,
+    activeTab,
     open,
     close,
   }

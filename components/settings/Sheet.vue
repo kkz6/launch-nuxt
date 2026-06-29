@@ -8,9 +8,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import { ScrollArea } from '~/components/ui/scroll-area'
 
-const { isOpen, initialTab } = useSettingsSheet()
+const { isOpen, activeTab } = useSettingsSheet()
 
-const activeTab = ref('general')
 const tabsContainer = ref<HTMLElement | null>(null)
 const contentContainer = ref<HTMLElement | null>(null)
 const isScrolled = ref(false)
@@ -31,11 +30,10 @@ const tabs = [
   { value: 'danger', label: 'Danger Zone' },
 ]
 
-// Reset to general tab (or initialTab) when sheet opens
+// activeTab is already set by useSettingsSheet().open(); here we just
+// reset scroll position and scroll the active tab into view.
 watch(isOpen, (open) => {
   if (open) {
-    activeTab.value = initialTab.value || 'general'
-    initialTab.value = null
     isScrolled.value = false
     nextTick(() => {
       if (tabsContainer.value) {

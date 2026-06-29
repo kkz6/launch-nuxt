@@ -92,14 +92,17 @@ const fetchDashboard = async () => {
 }
 
 const route = useRoute()
+const router = useRouter()
 
 onMounted(() => {
   fetchDashboard()
   // Landing here from a git-provider install callback (?settings=connections)
-  // opens the matching settings tab so the user sees the new connection.
+  // opens the matching settings tab so the user sees the new connection,
+  // then drops the param so a refresh doesn't reopen the sheet.
   const tab = route.query.settings
   if (typeof tab === 'string' && tab) {
     openSettingsSheet(tab)
+    void router.replace({ query: { ...route.query, settings: undefined } })
   }
 })
 

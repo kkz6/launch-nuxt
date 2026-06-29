@@ -225,16 +225,20 @@ const handleConfigureInstallation = async () => {
 }
 
 const handleInstallApp = async (provider: string) => {
+  // The picker dialog closes on click, so surface progress as a loading
+  // toast until we redirect (or fail).
+  const toastId = toast.loading('Connecting…')
   try {
     const response = await $api<{ data: { url: string } }>(`/settings/git-providers/${provider}/installation-url`)
     const url = response.data?.url
     if (url) {
+      // Navigation unloads the page; the loading toast carries the user over.
       window.location.href = url
     } else {
-      toast.error('No installation URL was returned')
+      toast.error('No installation URL was returned', { id: toastId })
     }
   } catch {
-    toast.error('Could not start the connection. Please try again.')
+    toast.error('Could not start the connection. Please try again.', { id: toastId })
   }
 }
 

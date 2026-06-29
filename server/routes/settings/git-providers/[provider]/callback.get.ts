@@ -23,9 +23,19 @@ export default defineEventHandler(async (event) => {
     qs ? `?${qs}` : ""
   }`;
 
+  // The backend authenticates via the Authorization / X-Team-ID headers
+  // that $api normally builds from these cookies. A plain provider
+  // redirect carries only the cookies (no headers), so rebuild them here
+  // — otherwise the callback 401s and the installation is never recorded.
+  const authToken = getCookie(event, "auth_token");
+  const teamId = getCookie(event, "current_team_id");
+
   try {
     await $fetch(target, {
-      headers: { cookie: getHeader(event, "cookie") || "" },
+      headers: {
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        ...(teamId ? { "X-Team-ID": teamId } : {}),
+      },
       redirect: "manual",
     });
   } catch {
