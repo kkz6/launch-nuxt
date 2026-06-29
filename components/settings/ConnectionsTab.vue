@@ -189,10 +189,10 @@ const handleRefreshRepositories = async (installationId: string) => {
   refreshingInstallations.value[key] = true
 
   try {
-    const response = await $api<{ status: string }>(`/settings/git-providers/github/installations/${installationId}/refresh-repositories`, {
+    const response = await $api<{ data: { status: string } }>(`/settings/git-providers/github/installations/${installationId}/refresh-repositories`, {
       method: 'POST',
     })
-    if (response.status === 'queued') {
+    if (response.data?.status === 'success') {
       toast.success('Repository refresh queued')
       setTimeout(() => window.location.reload(), 2000)
     }
@@ -203,11 +203,21 @@ const handleRefreshRepositories = async (installationId: string) => {
   }
 }
 
+// The API wraps payloads as { success, message, data }, so the URL is
+// at response.data.url — reading response.url gave undefined, the guard
+// never passed, and nothing happened ("dialog closes, nothing else").
+// We also navigate via window.location rather than window.open after an
+// await: a popup opened post-await is outside the click's user-gesture
+// window and gets silently blocked. The provider redirects back to our
+// callback route once the app is installed.
 const handleConfigureInstallation = async () => {
   try {
-    const response = await $api<{ url: string }>('/settings/git-providers/github/installation-url')
-    if (response.url) {
-      window.open(response.url, '_blank')
+    const response = await $api<{ data: { url: string } }>('/settings/git-providers/github/installation-url')
+    const url = response.data?.url
+    if (url) {
+      window.location.href = url
+    } else {
+      toast.error('No installation URL was returned')
     }
   } catch {
     toast.error('Failed to get installation URL')
@@ -216,12 +226,26 @@ const handleConfigureInstallation = async () => {
 
 const handleInstallApp = async (provider: string) => {
   try {
-    const response = await $api<{ url: string }>(`/settings/git-providers/${provider}/installation-url`)
-    if (response.url) {
-      window.open(response.url, '_blank')
+    const response = await $api<{ data: { url: string } }>(`/settings/git-providers/${provider}/installation-url`)
+    const url = response.data?.url
+    if (url) {
+      window.location.href = url
+    } else {
+      toast.error('No installation URL was returned')
     }
   } catch {
-    // Silent fail
+    toast.error('Could not start the connection. Please try again.')
+  }
+}
+
+// The per-installation gear opens that installation's own settings page
+// on GitHub (installation.htmlUrl). Falls back to the app's generic
+// configure page if the URL isn't present on the record.
+const handleManageInstallation = (installation: AppInstallation) => {
+  if (installation.htmlUrl) {
+    window.location.href = installation.htmlUrl
+  } else {
+    void handleConfigureInstallation()
   }
 }
 
@@ -584,7 +608,7 @@ onMounted(() => {
                   :class="{ 'animate-spin': refreshingInstallations[`github-${installation.id}`] }"
                 />
               </Button>
-              <Button variant="ghost" size="sm" @click="handleConfigureInstallation">
+              <Button variant="ghost" size="sm" @click="handleManageInstallation(installation)">
                 <Icon name="lucide:settings" class="h-4 w-4" />
               </Button>
             </div>
