@@ -697,7 +697,7 @@ watch(isOpen, (open) => {
                           <Icon name="lucide:check" class="h-4 w-4" />
                         </ComboboxItemIndicator>
                         <Icon :name="repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'" class="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
-                        <span class="truncate">{{ repo.full_name }}</span>
+                        <span class="truncate">{{ repo.name }}</span>
                       </ComboboxItem>
                     </ComboboxGroup>
                   </ComboboxContent>

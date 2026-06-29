@@ -358,7 +358,7 @@ const submit = async () => {
                   <ComboboxInput
                     class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
                     :placeholder="isLoadingRepositories ? 'Loading...' : 'Search repository...'"
-                    :display-value="(repo: Repository) => repo?.full_name || ''"
+                    :display-value="(repo: Repository) => repo?.name || ''"
                   />
                   <ComboboxTrigger class="flex items-center justify-center">
                     <Icon name="lucide:chevron-down" class="h-4 w-4 opacity-50" />
@@ -388,7 +388,7 @@ const submit = async () => {
                           :name="repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'"
                           class="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
                         />
-                        <span class="truncate">{{ repo.full_name }}</span>
+                        <span class="truncate">{{ repo.name }}</span>
                       </ComboboxItem>
                     </ComboboxGroup>
                   </ComboboxContent>
