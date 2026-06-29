@@ -91,8 +91,16 @@ const fetchDashboard = async () => {
   }
 }
 
+const route = useRoute()
+
 onMounted(() => {
   fetchDashboard()
+  // Landing here from a git-provider install callback (?settings=connections)
+  // opens the matching settings tab so the user sees the new connection.
+  const tab = route.query.settings
+  if (typeof tab === 'string' && tab) {
+    openSettingsSheet(tab)
+  }
 })
 
 // Computed values
