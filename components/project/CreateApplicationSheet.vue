@@ -732,6 +732,15 @@ const submit = async () => {
               <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
               Requires a connected GitHub source control above.
             </p>
+            <p
+              v-if="gitBuildLocation === 'github_actions' && sourceControlId"
+              class="text-xs text-muted-foreground"
+            >
+              <Icon name="lucide:git-commit-horizontal" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
+              On create, Launch commits a workflow file to
+              <span class="font-mono">.github/workflows/</span> in this repo.
+              Changing the build settings later re-syncs that file.
+            </p>
 
             <!--
               GHCR + GitHub App permission disclosure. The GHA workflow

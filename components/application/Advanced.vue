@@ -99,6 +99,26 @@ const security = ref(seedSecurity());
 const securitySaving = ref(false);
 const securityRevealPassword = ref(false);
 
+// Build — builder + Dockerfile location. Only meaningful for git-source
+// apps (image / inline-Dockerfile sources have no repo build step). The
+// builder is modelled as "auto-detect" vs "dockerfile"; auto-detect maps
+// to the nixpacks build type, which the deploy job overrides to Dockerfile
+// when one is present. For a GitHub Actions app a saved change marks the
+// committed workflow out of sync — surfaced inline with a Re-sync button,
+// since the workflow YAML embeds the dockerfile path.
+const isGitSource = computed(() => props.application.source_type === "git");
+const isGhaApp = computed(
+  () => props.application.build_location === "github_actions",
+);
+const builderType = ref<"auto" | "dockerfile">(
+  props.application.build_type === "dockerfile" ? "dockerfile" : "auto",
+);
+const dockerfilePath = ref<string>(
+  (props.application.build_config?.dockerfile_path as string) || "",
+);
+const buildSaving = ref(false);
+const buildResyncing = ref(false);
+
 const deleteLoading = ref(false);
 
 const confirmationDialog = ref<
@@ -126,6 +146,8 @@ watch(
       ? (app.build_config!.extra_ports as string[]).join("\n")
       : "";
     security.value = seedSecurity();
+    builderType.value = app.build_type === "dockerfile" ? "dockerfile" : "auto";
+    dockerfilePath.value = (app.build_config?.dockerfile_path as string) || "";
   },
   { deep: true },
 );
@@ -152,6 +174,55 @@ const saveName = async () => {
     toast.error(e.data?.message || "Failed to rename application");
   } finally {
     nameSaving.value = false;
+  }
+};
+
+const saveBuild = async () => {
+  const useDockerfile = builderType.value === "dockerfile";
+  buildSaving.value = true;
+  try {
+    await dockerService.applications.update(
+      props.application.server_id,
+      props.application.project_id,
+      props.application.id,
+      {
+        build_type: useDockerfile ? "dockerfile" : "nixpacks",
+        dockerfile_path: useDockerfile ? dockerfilePath.value.trim() : "",
+      },
+    );
+    toast.success(
+      isGhaApp.value
+        ? "Build settings saved — re-sync the workflow to apply"
+        : "Build settings saved — applies on next deploy",
+    );
+    emit("updated");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to update build settings");
+  } finally {
+    buildSaving.value = false;
+  }
+};
+
+// Re-commit the GitHub Actions workflow YAML with the current build
+// config. Same endpoint the GitHub Actions subtab's Re-sync uses; exposed
+// here so the user can apply a dockerfile-location change without leaving
+// the Build section.
+const resyncBuildWorkflow = async () => {
+  buildResyncing.value = true;
+  try {
+    await dockerService.applications.resyncGhaWorkflow(
+      props.application.server_id,
+      props.application.project_id,
+      props.application.id,
+    );
+    toast.success("Workflow re-sync queued");
+    emit("updated");
+  } catch (err: unknown) {
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || "Failed to queue workflow re-sync");
+  } finally {
+    buildResyncing.value = false;
   }
 };
 
@@ -409,36 +480,125 @@ const deleteApplication = async () => {
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <!-- ─── General ───────────────────────────────────────────── -->
-    <div v-show="activeSection === 'general'" class="space-y-4">
-      <div>
-        <h3 class="text-lg font-medium">General</h3>
-        <p class="text-sm text-muted-foreground">
-          Rename the application. Source and build settings are
-          immutable until a later release adds a reconfigure flow.
-        </p>
+    <div v-show="activeSection === 'general'" class="space-y-6">
+      <!-- Name -->
+      <div class="space-y-4">
+        <div>
+          <h3 class="text-lg font-medium">General</h3>
+          <p class="text-sm text-muted-foreground">Rename the application.</p>
+        </div>
+
+        <div class="space-y-2">
+          <Label for="app-name">Name</Label>
+          <Input
+            id="app-name"
+            v-model="nameForm"
+            placeholder="e.g. api, web, worker"
+            autocomplete="off"
+          />
+          <p class="text-sm text-muted-foreground">
+            Used in the container name and the deploy log.
+          </p>
+        </div>
+
+        <Button :disabled="nameSaving" @click="saveName">
+          <Icon
+            v-if="nameSaving"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          Save Changes
+        </Button>
       </div>
 
-      <div class="space-y-2">
-        <Label for="app-name">Name</Label>
-        <Input
-          id="app-name"
-          v-model="nameForm"
-          placeholder="e.g. api, web, worker"
-          autocomplete="off"
-        />
-        <p class="text-sm text-muted-foreground">
-          Used in the container name and the deploy log.
-        </p>
-      </div>
+      <!-- Build — git-source apps only (image / inline-Dockerfile have no
+           repo build step to configure). -->
+      <template v-if="isGitSource">
+        <Separator />
+        <div class="space-y-4">
+          <div>
+            <h3 class="text-lg font-medium">Build</h3>
+            <p class="text-sm text-muted-foreground">
+              How Launch builds the image from your repository.
+            </p>
+          </div>
 
-      <Button :disabled="nameSaving" @click="saveName">
-        <Icon
-          v-if="nameSaving"
-          name="lucide:loader-2"
-          class="mr-2 h-4 w-4 animate-spin"
-        />
-        Save Changes
-      </Button>
+          <!-- GitHub Actions: the committed workflow embeds the build
+               config, so a change leaves it out of date until re-synced. -->
+          <div
+            v-if="isGhaApp && application.gha_out_of_sync"
+            class="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-50 p-3 text-sm dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="flex items-start gap-2">
+              <Icon
+                name="lucide:triangle-alert"
+                class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+              />
+              <span class="text-amber-800 dark:text-amber-200">
+                Your GitHub Actions workflow is out of date. Re-sync it to
+                commit the updated build config to your repository.
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              :disabled="buildResyncing"
+              class="shrink-0"
+              @click="resyncBuildWorkflow"
+            >
+              <Icon
+                v-if="buildResyncing"
+                name="lucide:loader-2"
+                class="mr-2 h-4 w-4 animate-spin"
+              />
+              Re-sync workflow
+            </Button>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="app-builder">Builder</Label>
+            <Select v-model="builderType">
+              <SelectTrigger id="app-builder">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">
+                  Auto-detect (Dockerfile, else Nixpacks)
+                </SelectItem>
+                <SelectItem value="dockerfile">Dockerfile</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div v-if="builderType === 'dockerfile'" class="space-y-2">
+            <Label for="app-dockerfile">Dockerfile location</Label>
+            <Input
+              id="app-dockerfile"
+              v-model="dockerfilePath"
+              placeholder="e.g. docker/Dockerfile — blank uses ./Dockerfile"
+              autocomplete="off"
+            />
+            <p class="text-sm text-muted-foreground">
+              Path to the Dockerfile within the repository.
+            </p>
+          </div>
+
+          <p v-if="isGhaApp" class="text-sm text-muted-foreground">
+            This app builds on GitHub Actions. Saving marks the committed
+            workflow out of date — re-sync it to push the change to your repo.
+            Server builds apply on the next deploy.
+          </p>
+
+          <Button :disabled="buildSaving" @click="saveBuild">
+            <Icon
+              v-if="buildSaving"
+              name="lucide:loader-2"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            Save Build Settings
+          </Button>
+        </div>
+      </template>
     </div>
 
     <!-- ─── Volumes (moved here from a top-level tab) ─────────── -->

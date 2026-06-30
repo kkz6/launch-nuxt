@@ -164,6 +164,17 @@ export interface CreateDockerApplicationData {
 
 export interface UpdateDockerApplicationData {
   name?: string;
+  /**
+   * Builder for git-source apps: "nixpacks" (auto-detect a Dockerfile, else
+   * Nixpacks) or "dockerfile". Ignored on image/inline-Dockerfile sources.
+   */
+  build_type?: "nixpacks" | "dockerfile";
+  /**
+   * Path to the Dockerfile within the repo; only meaningful when build_type
+   * is "dockerfile". For a GitHub Actions app, changing this marks the
+   * committed workflow out of sync (the YAML embeds the path).
+   */
+  dockerfile_path?: string;
 }
 
 export interface DockerDomainDnsValidation {
