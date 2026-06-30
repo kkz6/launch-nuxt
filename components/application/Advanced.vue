@@ -110,8 +110,12 @@ const isGitSource = computed(() => props.application.source_type === "git");
 const isGhaApp = computed(
   () => props.application.build_location === "github_actions",
 );
-const builderType = ref<"auto" | "dockerfile">(
-  props.application.build_type === "dockerfile" ? "dockerfile" : "auto",
+const seedBuilder = (
+  bt?: string | null,
+): "auto" | "nixpacks" | "dockerfile" =>
+  bt === "dockerfile" ? "dockerfile" : bt === "nixpacks" ? "nixpacks" : "auto";
+const builderType = ref<"auto" | "nixpacks" | "dockerfile">(
+  seedBuilder(props.application.build_type),
 );
 const dockerfilePath = ref<string>(
   (props.application.build_config?.dockerfile_path as string) || "",
@@ -146,7 +150,7 @@ watch(
       ? (app.build_config!.extra_ports as string[]).join("\n")
       : "";
     security.value = seedSecurity();
-    builderType.value = app.build_type === "dockerfile" ? "dockerfile" : "auto";
+    builderType.value = seedBuilder(app.build_type);
     dockerfilePath.value = (app.build_config?.dockerfile_path as string) || "";
   },
   { deep: true },
@@ -186,7 +190,7 @@ const saveBuild = async () => {
       props.application.project_id,
       props.application.id,
       {
-        build_type: useDockerfile ? "dockerfile" : "nixpacks",
+        build_type: builderType.value,
         dockerfile_path: useDockerfile ? dockerfilePath.value.trim() : "",
       },
     );
@@ -565,6 +569,7 @@ const deleteApplication = async () => {
                 <SelectItem value="auto">
                   Auto-detect (Dockerfile, else Nixpacks)
                 </SelectItem>
+                <SelectItem value="nixpacks">Nixpacks</SelectItem>
                 <SelectItem value="dockerfile">Dockerfile</SelectItem>
               </SelectContent>
             </Select>
