@@ -412,26 +412,43 @@ useDockerApplicationEvents(teamId, (data, event) => {
             <Icon name="lucide:external-link" class="h-3 w-3 opacity-70" />
           </NuxtLink>
           <span v-else class="font-mono text-muted-foreground">—</span>
-          <span
-            v-if="sc.gha_workflow_sha"
-            class="ml-2 inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
-            title="Commit SHA of the workflow file Launch committed to your repository"
-          >
-            <Icon name="lucide:git-commit" class="h-3 w-3" />
-            {{ sc.gha_workflow_sha.slice(0, 7) }}
-          </span>
+          <TooltipProvider v-if="sc.gha_workflow_sha">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span
+                  class="ml-2 inline-flex cursor-help items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
+                >
+                  <Icon name="lucide:git-commit" class="h-3 w-3" />
+                  {{ sc.gha_workflow_sha.slice(0, 7) }}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-xs">
+                Commit SHA of the workflow file Launch committed to your
+                repository
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </dd>
 
         <dt class="text-xs uppercase tracking-wide text-muted-foreground">Container image</dt>
         <dd class="flex items-center gap-1.5 font-mono">
           {{ sc.gha_image_repository || "—" }}
-          <span
-            v-if="sc.gha_image_repository"
-            class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-muted-foreground"
-            title="Launch only accepts deploy notifications whose image tag starts with this prefix — even if your deploy token leaked, an attacker couldn't redirect us to a different image."
-          >
-            <Icon name="lucide:info" class="h-3 w-3" />
-          </span>
+          <TooltipProvider v-if="sc.gha_image_repository">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span
+                  class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-muted-foreground"
+                >
+                  <Icon name="lucide:info" class="h-3 w-3" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-xs">
+                Launch only accepts deploy notifications whose image tag starts
+                with this prefix — even if your deploy token leaked, an attacker
+                couldn't redirect us to a different image.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </dd>
       </dl>
     </section>
