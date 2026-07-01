@@ -497,10 +497,10 @@ useDockerComposeEvents(teamId, (data, event) => {
             </p>
           </div>
           <Switch
-            :checked="autoDeploy"
+            :model-value="autoDeploy"
             :disabled="isTogglingAutoDeploy || !compose.gha_build_ready"
             class="shrink-0"
-            @update:checked="setAutoDeploy"
+            @update:model-value="setAutoDeploy"
           />
         </li>
         <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">

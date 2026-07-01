@@ -443,7 +443,7 @@ watch(open, (isOpen) => {
                 Issue + serve a Let's Encrypt certificate.
               </p>
             </div>
-            <Switch v-model:checked="https" />
+            <Switch v-model="https" />
           </div>
           <div class="flex items-start justify-between gap-3 rounded-md border p-3">
             <div class="space-y-0.5">
@@ -452,7 +452,7 @@ watch(open, (isOpen) => {
                 Strip External Path before forwarding.
               </p>
             </div>
-            <Switch v-model:checked="stripPath" />
+            <Switch v-model="stripPath" />
           </div>
         </div>
 
