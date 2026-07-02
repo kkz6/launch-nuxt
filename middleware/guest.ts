@@ -1,7 +1,17 @@
 export default defineNuxtRouteMiddleware(async () => {
-  // Skip on server - we can't access localStorage there
-  if (import.meta.server) {
+  const { getAccessToken } = useApi();
+
+  // Mirror of the auth middleware: the token is in the `auth_token` cookie
+  // (SSR-readable), so send already-authenticated users to /dashboard on the
+  // server. A client-only redirect here would hydrate the dashboard's
+  // `default` layout against the SSR'd /login `guest` layout — the same
+  // hydration mismatch, in the other direction.
+  if (!getAccessToken()) {
     return;
+  }
+
+  if (import.meta.server) {
+    return navigateTo("/dashboard");
   }
 
   const { waitForAuth, isAuthenticated } = useAuth();
