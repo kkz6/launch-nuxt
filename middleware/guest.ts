@@ -1,12 +1,10 @@
 export default defineNuxtRouteMiddleware(async () => {
-  const { getAccessToken } = useApi();
-
-  // Mirror of the auth middleware: the token is in the `auth_token` cookie
-  // (SSR-readable), so send already-authenticated users to /dashboard on the
-  // server. A client-only redirect here would hydrate the dashboard's
-  // `default` layout against the SSR'd /login `guest` layout — the same
-  // hydration mismatch, in the other direction.
-  if (!getAccessToken()) {
+  // Mirror of the auth middleware: read the token cookie directly (useCookie
+  // works during SSR; useApi().getAccessToken() returns null on the server).
+  // Send already-authenticated users to /dashboard on the server so we don't
+  // hydrate the dashboard's `default` layout against the SSR'd /login `guest`
+  // layout — the same hydration mismatch, in the other direction.
+  if (!useCookie("auth_token").value) {
     return;
   }
 

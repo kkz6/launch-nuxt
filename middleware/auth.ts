@@ -1,16 +1,17 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  const { getAccessToken } = useApi();
-
   // The access token lives in the `auth_token` cookie, which IS readable
-  // during SSR (via useCookie) — so the token check runs on the server too.
+  // during SSR — read it directly via useCookie. (Do NOT use
+  // useApi().getAccessToken() here: it short-circuits to null on the server,
+  // which would redirect every request — even logged-in ones — to /login
+  // during SSR.)
   //
-  // This matters for the layout: if we only checked on the client, the server
-  // would SSR the protected page in its `default` layout, then the client
-  // would redirect to /login and hydrate the `guest` layout against that
-  // server-rendered `default`-layout DOM — a hydration mismatch that leaves
-  // the login page unstyled/uncentered in production. Redirecting on the
-  // server means /login is SSR'd with its own layout from the start.
-  const token = getAccessToken();
+  // Running the check on the server matters for the layout: a client-only
+  // check would SSR the protected page in its `default` layout, then redirect
+  // to /login on the client and hydrate the `guest` layout against that
+  // default-layout DOM — a hydration mismatch that leaves the login page
+  // unstyled/uncentered in production. Redirecting on the server means /login
+  // is SSR'd with its own layout from the start.
+  const token = useCookie("auth_token").value;
   if (!token) {
     return navigateTo("/login");
   }
