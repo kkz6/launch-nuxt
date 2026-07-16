@@ -88,8 +88,9 @@ const runCommandAgain = async (command: Command) => {
 
   if (result.ok) {
     try {
-      await $api(`/servers/${props.serverId}/sites/${props.siteId}/commands/${command.id}/again`, {
+      await $api(`/servers/${props.serverId}/sites/${props.siteId}/commands`, {
         method: 'POST',
+        body: { command: command.command },
       })
       toast.success('Command execution started')
       fetchCommands()
