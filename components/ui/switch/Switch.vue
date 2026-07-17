@@ -23,9 +23,8 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     v-bind="forwarded"
     :class="cn(
       // Track: a clearly-different OFF colour that stays visible in dark
-      // mode and on tinted (success/info) panels — bg-input is too subtle
-      // there, so use a muted-foreground tint with a ring for definition.
-      'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 ring-1 ring-inset ring-black/10 dark:ring-white/15 data-[state=checked]:bg-primary data-[state=checked]:ring-transparent data-[state=unchecked]:bg-muted-foreground/30 dark:data-[state=unchecked]:bg-muted-foreground/40',
+      // mode and on tinted (success/info) panels — bg-input is too subtle.
+      'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30 dark:data-[state=unchecked]:bg-muted-foreground/40',
       props.class,
     )"
   >
