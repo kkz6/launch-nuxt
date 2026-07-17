@@ -38,8 +38,7 @@ interface Team {
 
 const { user, logout, fetchUser } = useAuth();
 const { setCurrentTeamId } = useApi();
-const { reconnect: reconnectWebSocket, isConnected: isWsConnected } =
-  useWebSocket();
+const { reconnect: reconnectWebSocket } = useWebSocket();
 const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
@@ -69,7 +68,11 @@ const adminTabs = [
   { label: "Invitations", to: "/admin/invitations", icon: "lucide:mail" },
   { label: "Servers", to: "/admin/servers", icon: "lucide:server" },
   { label: "Failures", to: "/admin/failures", icon: "lucide:triangle-alert" },
-  { label: "Observability", to: "/admin/observability", icon: "lucide:activity" },
+  {
+    label: "Observability",
+    to: "/admin/observability",
+    icon: "lucide:activity",
+  },
 ];
 const isAdminTabActive = (tab: (typeof adminTabs)[number]): boolean =>
   tab.match ? tab.match(route.path) : route.path.startsWith(tab.to);
@@ -1796,31 +1799,6 @@ onMounted(fetchTeams);
           <Icon name="lucide:arrow-right" class="h-3.5 w-3.5" />
         </span>
       </div>
-
-      <!--
-        WS disconnected banner. The reconnect logic in useWebSocket
-        does its best (exponential backoff up to ~5 min; auto-resumes
-        on `visibilitychange` / `online`), but if all that fails we
-        owe the customer a visible signal + a click-to-retry — without
-        this they'd stare at a stale page assuming nothing's
-        happening. ClientOnly because `isWsConnected` is false during
-        SSR by design and we don't want a flash on hydrate.
-      -->
-      <ClientOnly>
-        <button
-          v-if="!isWsConnected"
-          type="button"
-          class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-500/25 dark:text-amber-400"
-          title="Live updates aren't connected. Click to reconnect."
-          @click="reconnectWebSocket"
-        >
-          <Icon name="lucide:wifi-off" class="h-3.5 w-3.5" />
-          <span class="hidden sm:inline">Live updates paused</span>
-          <span class="text-amber-700/70 underline dark:text-amber-400/70">
-            Reconnect
-          </span>
-        </button>
-      </ClientOnly>
 
       <div class="flex items-center space-x-2">
         <!-- User Menu (with Teams) -->
