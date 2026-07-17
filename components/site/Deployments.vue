@@ -120,55 +120,6 @@ const hasActiveDeployment = computed(() => {
   return deployments.value.some((d) => isInProgress(d.status));
 });
 
-// A live, per-second "now" used to tick the elapsed duration of an in-progress
-// deployment. The shared useNow() ticks every 30s (right for "X ago" badges,
-// too coarse for a running timer), so we run a dedicated 1s interval — but only
-// while a deployment is actually in progress, and torn down otherwise.
-const liveNow = ref(Date.now());
-let elapsedTimer: ReturnType<typeof setInterval> | null = null;
-
-const startElapsedTimer = () => {
-  if (elapsedTimer || typeof window === "undefined") return;
-  liveNow.value = Date.now();
-  elapsedTimer = setInterval(() => {
-    liveNow.value = Date.now();
-  }, 1000);
-};
-
-const stopElapsedTimer = () => {
-  if (elapsedTimer) {
-    clearInterval(elapsedTimer);
-    elapsedTimer = null;
-  }
-};
-
-watch(
-  hasActiveDeployment,
-  (active) => {
-    if (active) startElapsedTimer();
-    else stopElapsedTimer();
-  },
-  { immediate: true },
-);
-
-onUnmounted(stopElapsedTimer);
-
-// elapsedLabel formats how long an in-progress deployment has been running
-// (e.g. "1m 23s"), recomputed every second via liveNow. Empty for terminal
-// deployments — those show their created-at "X ago" badge instead.
-const elapsedLabel = (deployment: Deployment): string => {
-  if (!isInProgress(deployment.status)) return "";
-  const start = new Date(deployment.created_at).getTime();
-  if (Number.isNaN(start)) return "";
-  const secs = Math.max(0, Math.floor((liveNow.value - start) / 1000));
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  const s = secs % 60;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
-};
-
 const secondFinishedIndex = computed(() => {
   let count = 0;
   return deployments.value.findIndex((d) => {
@@ -402,13 +353,6 @@ onMounted(fetchDeployments);
           <div class="flex flex-col items-end gap-2">
             <div class="text-sm capitalize text-muted-foreground">
               <SharedDateTooltip :date="deployment.created_at" />
-            </div>
-            <div
-              v-if="isInProgress(deployment.status)"
-              class="flex items-center gap-1 font-mono text-xs tabular-nums text-blue-600 dark:text-blue-400"
-            >
-              <Icon name="lucide:timer" class="block size-3 animate-pulse" />
-              {{ elapsedLabel(deployment) }}
             </div>
             <div class="flex flex-row items-center gap-2">
               <Button
