@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, toRefs } from "vue";
 import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -29,25 +30,57 @@ interface Props {
 }
 const props = defineProps<Props>();
 
-// Same shape as components/site/Deployments.vue. Card-per-row layout
-// instead of a table — status pill + dot on the left, relative date
-// + View Logs / Deploy actions on the right. Live updates via
-// useDockerApplicationEvents: terminal events trigger a debounced
-// refetch (so commit / task_id / finished_at land), in-flight events
-// patch the row in-place without a network round-trip.
+interface DeploymentState {
+  deployments: DockerDeployment[];
+  isLoading: boolean;
+  isDeploying: boolean;
+  logSheetOpen: boolean;
+  logSheetTaskId: string;
+  logSheetTitle: string;
+  logSheetSubtitle: string;
+  stepsSheetOpen: boolean;
+  stepsDeploymentId: string;
+  liveNow: number;
+  deleteTarget: DockerDeployment | null;
+  deleteOpen: boolean;
+  alsoDeleteGitHub: boolean;
+  deleting: boolean;
+}
 
-const deployments = ref<DockerDeployment[]>([]);
-const isLoading = ref(true);
-const isDeploying = ref(false);
+const state = reactive({
+  deployments: [],
+  isLoading: true,
+  isDeploying: false,
+  logSheetOpen: false,
+  logSheetTaskId: "",
+  logSheetTitle: "",
+  logSheetSubtitle: "",
+  stepsSheetOpen: false,
+  stepsDeploymentId: "",
+  liveNow: Date.now(),
+  deleteTarget: null,
+  deleteOpen: false,
+  alsoDeleteGitHub: false,
+  deleting: false,
+}) as DeploymentState;
 
-const logSheetOpen = ref(false);
-const logSheetTaskId = ref<string>("");
-const logSheetTitle = ref<string>("");
-const logSheetSubtitle = ref<string>("");
+const {
+  deployments,
+  isLoading,
+  isDeploying,
+  logSheetOpen,
+  logSheetTaskId,
+  logSheetTitle,
+  logSheetSubtitle,
+  stepsSheetOpen,
+  stepsDeploymentId,
+  liveNow,
+  deleteTarget,
+  deleteOpen,
+  alsoDeleteGitHub,
+  deleting,
+} = toRefs(state);
 
-// GitHub Actions live step timeline sheet (#87).
-const stepsSheetOpen = ref(false);
-const stepsDeploymentId = ref<string>("");
 const openSteps = (d: DockerDeployment) => {
   stepsDeploymentId.value = d.id;
   stepsSheetOpen.value = true;
@@ -77,8 +110,6 @@ const triggerDeploy = async () => {
       props.application.project_id,
       props.application.id,
     );
-    // Prepend so the user sees the row immediately; the WS terminal
-    // event will overwrite it with the canonical server copy.
     deployments.value = [res.data, ...deployments.value];
     toast.success("Deployment started");
   } catch (err: unknown) {
@@ -89,9 +120,6 @@ const triggerDeploy = async () => {
   }
 };
 
-// WS sync — same debounced terminal-refetch pattern site
-// Deployments uses. Filter on application_id so a sibling app's
-// deploy doesn't refresh ours.
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 let refetchTimer: ReturnType<typeof setTimeout> | null = null;
@@ -100,22 +128,6 @@ const scheduleRefetch = () => {
   refetchTimer = setTimeout(() => fetchDeployments(true), 300);
 };
 
-// Two parallel event streams feed this view:
-//
-//   1) `docker.application.*` on the team channel — fired by the
-//      service layer when the workload's overall lifecycle moves
-//      (created / deploying / deployed / failed / gha_synced …).
-//      These are the "an application thing happened" events.
-//
-//   2) `deployment.*` on the same team channel — fired by the
-//      deploy_application job for the *row-level* deployment
-//      lifecycle (started / progress / finished / failed / timeout).
-//      Critically, the GHA-initiated webhook path enqueues a
-//      deploy_application job whose terminal `.finished` / `.failed`
-//      events ride this stream, NOT the docker.application stream.
-//      Without this second subscription, GHA-triggered deployments
-//      land silently and the user has to manually refresh to see the
-//      row turn green / red.
 const isMine = (data: {
   application_id?: string;
   deployment_id?: string;
@@ -123,8 +135,6 @@ const isMine = (data: {
   target_type?: string;
 }): boolean => {
   if (data.application_id === props.application.id) return true;
-  // deployment events carry target_type + target_id rather than a
-  // typed application_id — match either shape.
   if (
     data.target_type === "application" &&
     data.target_id === props.application.id
@@ -143,9 +153,6 @@ useDeploymentEvents(teamId, (data) => {
   scheduleRefetch();
 });
 
-// Status palette — mirrors site Deployments.vue. The dot is what
-// users actually scan for, so we pick saturated colors and reserve
-// the animate-pulse for in-flight states.
 const statusDotClass = (status: string): string => {
   switch (status) {
     case "pending":
@@ -183,7 +190,6 @@ const statusLabel = (status: string): string => {
   }
 };
 
-// In-progress = not yet in a terminal state (pending/building/deploying).
 const isInProgress = (status: string): boolean =>
   status === "pending" || status === "building" || status === "deploying";
 
@@ -191,11 +197,6 @@ const hasActiveDeployment = computed(() =>
   deployments.value.some((d) => isInProgress(d.status)),
 );
 
-// A live, per-second "now" to tick the elapsed duration of an in-progress
-// deployment. The shared useNow() ticks every 30s (right for "X ago" badges,
-// too coarse for a running timer), so we run a dedicated 1s interval — but only
-// while a deployment is actually in progress, and torn down otherwise.
-const liveNow = ref(Date.now());
 let elapsedTimer: ReturnType<typeof setInterval> | null = null;
 
 const startElapsedTimer = () => {
@@ -224,9 +225,6 @@ watch(
 
 onUnmounted(stopElapsedTimer);
 
-// elapsedLabel formats how long an in-progress deployment has been running
-// (e.g. "1m 23s"), recomputed every second via liveNow. Empty for terminal
-// deployments — those show their created-at "X ago" badge instead.
 const elapsedLabel = (deployment: DockerDeployment): string => {
   if (!isInProgress(deployment.status)) return "";
   const start = new Date(
@@ -242,14 +240,6 @@ const elapsedLabel = (deployment: DockerDeployment): string => {
   return `${s}s`;
 };
 
-// Delete-deployment dialog state.
-const deleteTarget = ref<DockerDeployment | null>(null);
-const deleteOpen = ref(false);
-const alsoDeleteGitHub = ref(false);
-const deleting = ref(false);
-
-// The "Also remove from GitHub Actions" option only applies to GHA-originated
-// deployments that have a linked run.
 const canRemoveFromGitHub = computed(
   () =>
     deleteTarget.value?.trigger_source === "github_actions" &&
@@ -285,10 +275,6 @@ const confirmDelete = async () => {
   }
 };
 
-// Single-line summary for the secondary row. Image source apps
-// show the image ref; git source apps show the commit SHA + first
-// line of the message. Each is optional — the function returns
-// what's available.
 const commitHeading = (msg?: string | null): string => {
   if (!msg) return "";
   return msg.split("\n")[0];
@@ -299,22 +285,6 @@ const shortSha = (sha?: string | null): string => {
   return sha.substring(0, 7);
 };
 
-// Pull a clean one-line failure summary out of the deploy script's
-// raw output blob. The backend stores stderr+stdout verbatim on
-// docker_deployments.error (think: every `set -x` echo, every
-// warning, ANSI sequences, the docker-daemon error response, the
-// trailing newline soup). Dumping that into the list row inline
-// — even with line-clamp — looks like a spilled stack trace. We
-// keep two affordances instead:
-//
-//   1) Surface the actionable bit on the row: which step failed
-//      (parsed out of `::LAUNCH::deploy_step::<name>` markers the
-//      deploy script emits) and the last non-empty error line.
-//   2) Park the full transcript behind "View Logs" — which already
-//      opens a modal with proper monospace + scroll.
-//
-// Returns "" when there's nothing useful to show. Callers should
-// check explicitly so the row doesn't render an empty stripe.
 type FailureSummary = { step: string; detail: string };
 const failureSummary = (raw?: string | null): FailureSummary | null => {
   if (!raw) return null;
@@ -324,9 +294,6 @@ const failureSummary = (raw?: string | null): FailureSummary | null => {
     .filter(Boolean);
   if (lines.length === 0) return null;
 
-  // Last LAUNCH marker = the step that was in flight when things
-  // went sideways. Strip the `::LAUNCH::deploy_step::` prefix and
-  // hyphenate so it reads as English on the chip.
   let step = "";
   for (let i = lines.length - 1; i >= 0; i--) {
     const m = lines[i].match(/^::LAUNCH::deploy_step::([a-z0-9_]+)/);
@@ -336,10 +303,6 @@ const failureSummary = (raw?: string | null): FailureSummary | null => {
     }
   }
 
-  // The actionable detail is usually the LAST non-noise line —
-  // skip generic warnings, "Login Succeeded", `+ shell echoes`,
-  // and the marker lines themselves. We're after the actual
-  // failure ("Error response from daemon: ...", a 4xx body, etc).
   const noise =
     /^(WARNING!|Configure a credential|See https?:\/\/|Login Succeeded|\+ |::LAUNCH::|\s*$)/i;
   let detail = "";
@@ -349,9 +312,6 @@ const failureSummary = (raw?: string | null): FailureSummary | null => {
       break;
     }
   }
-  // Don't repeat the step name. If detail is empty (every line was
-  // noise), fall back to the literal last line so we say something
-  // rather than nothing.
   if (!detail) detail = lines[lines.length - 1];
 
   if (!step && !detail) return null;
@@ -361,9 +321,6 @@ const failureSummary = (raw?: string | null): FailureSummary | null => {
 const openLogs = (d: DockerDeployment) => {
   if (!d.task_id) return;
   logSheetTaskId.value = d.task_id;
-  // Build a useful subtitle from whatever metadata the row has.
-  // Image-source apps get the image ref; git-source apps get
-  // <sha> · <commit subject>.
   const parts: string[] = [];
   if (d.commit_sha) parts.push(shortSha(d.commit_sha));
   const subject = commitHeading(d.commit_msg);
@@ -417,12 +374,6 @@ onMounted(fetchDeployments);
         </p>
       </div>
 
-      <!--
-        Card-per-row list. Same shape as site Deployments.vue — left
-        side is status + secondary info, right side is timestamp +
-        actions. divide-y inside a bordered card so adjacent rows
-        share a hairline divider.
-      -->
       <div v-else class="rounded-lg border bg-card">
         <div
           v-for="d in deployments"
@@ -448,8 +399,6 @@ onMounted(fetchDeployments);
             </span>
 
             <div class="mt-0.5 flex flex-wrap items-center gap-2">
-              <!-- Image source: just the image ref. Git source: the
-                   commit SHA. Either / both may be present. -->
               <span
                 v-if="d.image_ref"
                 class="font-mono text-sm text-muted-foreground"
@@ -462,13 +411,6 @@ onMounted(fetchDeployments);
               >
                 {{ shortSha(d.commit_sha) }}
               </span>
-              <!--
-                Slice G of the GHA-builds feature. Show a small badge
-                when this deployment was initiated by a GitHub Actions
-                workflow notify, linking to the run page on github.com.
-                Manual + webhook auto-deploys carry no badge — they
-                already telegraph their origin via task_id presence.
-              -->
               <a
                 v-if="d.trigger_source === 'github_actions' && d.gha_run_url"
                 :href="d.gha_run_url"
@@ -489,14 +431,6 @@ onMounted(fetchDeployments);
             >
               {{ commitHeading(d.commit_msg) }}
             </span>
-            <!--
-              Failed deploys get a small "which step blew up" pill
-              and nothing else. The full transcript already lives
-              behind View Logs (right side of the row) — dumping it
-              inline made the list look like a stack trace. The
-              `:title` keeps the raw blob accessible on hover for
-              power users who want it without opening the sheet.
-            -->
             <span
               v-else-if="d.status === 'failed' && failureSummary(d.error)?.step"
               class="mt-0.5 inline-flex w-fit items-center rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs text-red-600 dark:text-red-400"
@@ -526,7 +460,10 @@ onMounted(fetchDeployments);
                 size="sm"
                 @click="openSteps(d)"
               >
-                <Icon name="simple-icons:githubactions" class="mr-2 block size-4" />
+                <Icon
+                  name="simple-icons:githubactions"
+                  class="mr-2 block size-4"
+                />
                 Steps
               </Button>
               <Button
@@ -558,7 +495,6 @@ onMounted(fetchDeployments);
       </div>
     </template>
 
-    <!-- Delete deployment confirmation -->
     <Dialog v-model:open="deleteOpen">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
@@ -604,12 +540,6 @@ onMounted(fetchDeployments);
       </DialogContent>
     </Dialog>
 
-    <!--
-      Logs sheet — same slide-in surface site DeploymentLogs uses.
-      Streams the live taskrunner output (or replays the file if the
-      task already finished). Mounting only when open keeps the WS
-      off until the user explicitly opens it.
-    -->
     <Sheet v-model:open="logSheetOpen">
       <SheetContent
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none"
@@ -634,8 +564,6 @@ onMounted(fetchDeployments);
       </SheetContent>
     </Sheet>
 
-    <!-- GitHub Actions live step timeline (#87). Mounted only while open
-         so the WS subscription + initial fetch don't run for closed rows. -->
     <Sheet v-model:open="stepsSheetOpen">
       <SheetContent
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-xl flex flex-col overflow-hidden outline-none"
