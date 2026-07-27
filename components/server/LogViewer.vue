@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, toRefs } from 'vue'
 import stripAnsi from 'strip-ansi'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
@@ -38,38 +39,62 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const config = useRuntimeConfig()
-const { token, isInitialized, waitForAuth } = useAuth()
+const { token, waitForAuth } = useAuth()
 const { getCurrentTeamId } = useApi()
-const rawLogs = ref('')
-// `emptyConfirmed` flips true ~2.5s after the WS connects if we still
-// haven't received a single byte — at that point the log file is
-// genuinely empty (daemon hasn't printed anything yet, log got
-// truncated, etc) and we surface a friendly empty state instead of
-// spinning forever. The delay is long enough to cover normal WS
-// handshake + first-frame latency, so users who DO have logs don't
-// see this state flash on the way in.
-const emptyConfirmed = ref(false)
-const streamEnded = ref(false)
-const streamError = ref('')
+interface LogViewerState {
+  rawLogs: string
+  emptyConfirmed: boolean
+  streamEnded: boolean
+  streamError: string
+  filteredLogs: LogLine[]
+  autoScroll: boolean
+  lines: number
+  search: string
+  typeFilter: string[]
+  scrollRef: HTMLDivElement | null
+  wsOpen: boolean
+  logType: string
+  showTimestamp: boolean
+}
+
+const state = reactive({
+  rawLogs: '',
+  emptyConfirmed: false,
+  streamEnded: false,
+  streamError: '',
+  filteredLogs: [],
+  autoScroll: true,
+  lines: 100,
+  search: '',
+  typeFilter: [],
+  scrollRef: null,
+  wsOpen: false,
+  logType: 'output',
+  showTimestamp: !props.noTimestamp,
+}) as LogViewerState
+
+const {
+  rawLogs,
+  emptyConfirmed,
+  streamEnded,
+  streamError,
+  filteredLogs,
+  autoScroll,
+  lines,
+  search,
+  typeFilter,
+  scrollRef,
+  wsOpen,
+  logType,
+  showTimestamp,
+} = toRefs(state)
 let emptyConfirmTimer: ReturnType<typeof setTimeout> | null = null
-const filteredLogs = ref<LogLine[]>([])
-const autoScroll = ref(true)
-const lines = ref(100)
 const linesString = computed({
   get: () => String(lines.value),
   set: (val: string) => {
     lines.value = parseInt(val, 10)
   },
 })
-const search = ref('')
-const typeFilter = ref<string[]>([])
-const scrollRef = ref<HTMLDivElement | null>(null)
-// Loading state is derived in the template from wsOpen + filteredLogs;
-// no separate isLoading boolean (removed to avoid the empty-state
-// flicker — see the template guard for the three explicit states).
-const wsOpen = ref(false)
-const logType = ref('output')
-const showTimestamp = ref(!props.noTimestamp)
 
 const lineOptions = [
   { value: '50', label: '50 lines' },
@@ -95,7 +120,11 @@ const statusColorClass = (status: number): string => {
 }
 
 const escapeHtml = (str: string): string => {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 const formatCaddyAccessLog = (parsed: Record<string, any>): string | null => {
@@ -104,7 +133,8 @@ const formatCaddyAccessLog = (parsed: Record<string, any>): string | null => {
   const status = parsed.resp_headers?.['Status'] || parsed.status
   const method = parsed.request?.method || ''
   const uri = parsed.request?.uri || ''
-  const duration = parsed.duration != null ? `${(parsed.duration * 1000).toFixed(2)}ms` : ''
+  const duration =
+    parsed.duration != null ? `${(parsed.duration * 1000).toFixed(2)}ms` : ''
   const clientIp = parsed.request?.client_ip || parsed.request?.remote_ip || ''
 
   if (!method || !uri) return null
@@ -117,8 +147,10 @@ const formatCaddyAccessLog = (parsed: Record<string, any>): string | null => {
     `<span class="text-zinc-100">${escapeHtml(method)}</span>`,
     `<span class="text-zinc-300">${escapeHtml(uri)}</span>`,
   ]
-  if (duration) parts.push(`<span class="text-zinc-500">${escapeHtml(duration)}</span>`)
-  if (clientIp) parts.push(`<span class="text-zinc-500">${escapeHtml(clientIp)}</span>`)
+  if (duration)
+    parts.push(`<span class="text-zinc-500">${escapeHtml(duration)}</span>`)
+  if (clientIp)
+    parts.push(`<span class="text-zinc-500">${escapeHtml(clientIp)}</span>`)
 
   return parts.join(' ')
 }
@@ -135,13 +167,20 @@ const getLogTypeFromJson = (parsed: Record<string, any>): LogLine['type'] => {
 const getLogType = (message: string): LogLine['type'] => {
   const lower = message.toLowerCase()
 
-  if (/\berror\b/.test(lower) || /\bfail(?:ed|ure)?\b/.test(lower) || /\bexception\b/.test(lower)) {
+  if (
+    /\berror\b/.test(lower) ||
+    /\bfail(?:ed|ure)?\b/.test(lower) ||
+    /\bexception\b/.test(lower)
+  ) {
     return 'error'
   }
   if (/\bwarn(?:ing)?\b/.test(lower)) {
     return 'warning'
   }
-  if (/\bsuccess(?:ful(?:ly)?)?\b/.test(lower) || /\bcomplete[d]?\b/.test(lower)) {
+  if (
+    /\bsuccess(?:ful(?:ly)?)?\b/.test(lower) ||
+    /\bcomplete[d]?\b/.test(lower)
+  ) {
     return 'success'
   }
   if (/\bdebug\b/.test(lower)) {
@@ -150,38 +189,6 @@ const getLogType = (message: string): LogLine['type'] => {
   return 'info'
 }
 
-// Patterns that are operational noise customers shouldn't see in the log
-// viewer. Each entry is matched against the trimmed (and ansi-stripped)
-// line; matches are dropped silently.
-//
-// Why each one is here:
-//
-// - `tail: cannot open ... no files remaining` — the log-tail SSH starts
-//   before the script's log file exists. Cosmetic.
-// - `SSH connection failed: ...` — early-provision SSH tail races sshd
-//   coming up. Leaks the IP and looks like a hard failure to non-technical
-//   users; instead we silently retry under the hood.
-// - `overall progress: X out of N tasks` / `verify: Waiting N seconds to
-//   verify that tasks are stable` — `docker service create` streams these
-//   on every poll until convergence (40+ identical lines). Legacy
-//   (pre-v2) docker servers used swarm + `docker service create` for
-//   Traefik; new servers run Traefik as a plain container so this
-//   pattern only appears in old provision logs we replay.
-// - `Canceled hold on cloud-init` / `cloud-init was already not on hold` —
-//   cosmetic chatter from `apt-mark unhold` in the cleanup step.
-// - `debconf: unable to initialize frontend ...` / `debconf: (...)` /
-//   `dpkg-preconfigure: unable to re-open stdin:` — every apt-get install
-//   over SSH lacks a controlling tty, so debconf falls back to teletype
-//   and prints 5+ lines of harmless warnings. Pure noise.
-// - `(Reading database ... NN%)` — apt's progress bar; emits ~20 lines
-//   per package operation. Useless without a terminal width.
-// - `SyntaxWarning: invalid escape sequence ...` — upstream fail2ban
-//   ships Python files with deprecation warnings (not our bug).
-// - `[Pp]rocessing triggers for ...` / `Setting up ...` / `Selecting
-//   previously unselected package ...` / `Preparing to unpack ...` /
-//   `Unpacking ...` — verbose apt step-by-step that buries the actionable
-//   lines. We keep the high-level `echo "Install essential packages"`
-//   line from our script — that's the one the customer needs.
 const NOISE_PATTERNS: RegExp[] = [
   /^tail: (?:cannot open '.*' for reading: No such file or directory|no files remaining)$/,
   /^SSH connection failed:/,
@@ -207,18 +214,9 @@ const NOISE_PATTERNS: RegExp[] = [
 
 const isNoise = (line: string): boolean => {
   const t = stripAnsi(line).trim()
-  return NOISE_PATTERNS.some(re => re.test(t))
+  return NOISE_PATTERNS.some((re) => re.test(t))
 }
 
-// Python prints SyntaxWarning headers like
-//   /usr/.../foo.py:224: SyntaxWarning: invalid escape sequence '\s'
-// followed by the *source line* the warning refers to:
-//   "1490349000 test failed.dns.ch", "^\s*test <F-ID>\S+</F-ID>"
-// The header matches NOISE_PATTERNS, but the source line is arbitrary
-// Python and doesn't. So we maintain a one-line look-back: once we drop
-// a SyntaxWarning header, we also drop the next non-empty line that
-// follows it (the snippet). Applies once per warning so we don't
-// accidentally swallow real log lines downstream.
 const SYNTAX_WARNING_RE = /SyntaxWarning: invalid escape sequence/
 
 const stripNoiseLines = (lines: string[]): string[] => {
@@ -242,84 +240,91 @@ const stripNoiseLines = (lines: string[]): string[] => {
 const parseLogs = (raw: string): LogLine[] => {
   if (!raw) return []
   const stripped = stripNoiseLines(
-    raw.split('\n').filter(line => line.trim() && !line.includes('::LAUNCH::')),
+    raw
+      .split('\n')
+      .filter((line) => line.trim() && !line.includes('::LAUNCH::')),
   )
-  return stripped
-    .map((line) => {
-      const cleanLine = stripAnsi(line)
+  return stripped.map((line) => {
+    const cleanLine = stripAnsi(line)
 
-      // Try JSON parsing first
-      if (cleanLine.trimStart().startsWith('{')) {
-        try {
-          const parsed = JSON.parse(cleanLine)
-          const logTypeResult = getLogTypeFromJson(parsed)
+    if (cleanLine.trimStart().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(cleanLine)
+        const logTypeResult = getLogTypeFromJson(parsed)
 
-          // Try to format as Caddy access log
-          const formatted = formatCaddyAccessLog(parsed)
-          if (formatted) {
-            return {
-              timestamp: parsed.ts ? new Date(parsed.ts * 1000) : null,
-              message: cleanLine,
-              rawLine: cleanLine,
-              type: logTypeResult,
-              html: formatted,
-            }
-          }
-
-          // Other JSON logs — show the msg field if available
-          const msg = parsed.msg || parsed.message || cleanLine
+        const formatted = formatCaddyAccessLog(parsed)
+        if (formatted) {
           return {
             timestamp: parsed.ts ? new Date(parsed.ts * 1000) : null,
-            message: msg,
+            message: cleanLine,
             rawLine: cleanLine,
             type: logTypeResult,
+            html: formatted,
           }
-        } catch {
-          // Not valid JSON, fall through
         }
-      }
 
-      // Standard text log parsing
-      const timestampMatch = cleanLine.match(/^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\]?\s*/)
-      let timestamp: Date | null = null
-      let message = cleanLine
-
-      if (timestampMatch) {
-        timestamp = new Date(timestampMatch[1].replace(',', '.'))
-        message = cleanLine.slice(timestampMatch[0].length)
-      }
-
-      // MySQL error log: "0 [System] [MY-013172] [Server] Message..."
-      const mysqlMatch = message.match(/^\d+\s+\[(System|Warning|Error|Note)\]\s+(\[MY-\d+\]\s+\[\w+\]\s+)(.*)/)
-      if (mysqlMatch) {
-        const levelMap: Record<string, LogLine['type']> = { System: 'info', Warning: 'warning', Error: 'error', Note: 'debug' }
+        const msg = parsed.msg || parsed.message || cleanLine
         return {
-          timestamp,
-          message: mysqlMatch[3],
+          timestamp: parsed.ts ? new Date(parsed.ts * 1000) : null,
+          message: msg,
           rawLine: cleanLine,
-          type: levelMap[mysqlMatch[1]] || 'info',
+          type: logTypeResult,
         }
-      }
+      } catch {}
+    }
 
-      // Supervisor log: "2026-01-29 06:30:30,178 WARN message..."
-      const supervisorMatch = message.match(/^(INFO|WARN|CRIT|DEBUG)\s+(.*)/)
-      if (supervisorMatch) {
-        const levelMap: Record<string, LogLine['type']> = { INFO: 'info', WARN: 'warning', CRIT: 'error', DEBUG: 'debug' }
-        return {
-          timestamp,
-          message: `${supervisorMatch[1]} ${supervisorMatch[2]}`,
-          rawLine: cleanLine,
-          type: levelMap[supervisorMatch[1]] || 'info',
-        }
-      }
+    const timestampMatch = cleanLine.match(
+      /^\[?(\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?)\]?\s*/,
+    )
+    let timestamp: Date | null = null
+    let message = cleanLine
 
+    if (timestampMatch) {
+      timestamp = new Date(timestampMatch[1].replace(',', '.'))
+      message = cleanLine.slice(timestampMatch[0].length)
+    }
+
+    const mysqlMatch = message.match(
+      /^\d+\s+\[(System|Warning|Error|Note)\]\s+(\[MY-\d+\]\s+\[\w+\]\s+)(.*)/,
+    )
+    if (mysqlMatch) {
+      const levelMap: Record<string, LogLine['type']> = {
+        System: 'info',
+        Warning: 'warning',
+        Error: 'error',
+        Note: 'debug',
+      }
       return {
         timestamp,
-        message,
+        message: mysqlMatch[3],
         rawLine: cleanLine,
-        type: getLogType(message),
+        type: levelMap[mysqlMatch[1]] || 'info',
       }
-    })
+    }
+
+    const supervisorMatch = message.match(/^(INFO|WARN|CRIT|DEBUG)\s+(.*)/)
+    if (supervisorMatch) {
+      const levelMap: Record<string, LogLine['type']> = {
+        INFO: 'info',
+        WARN: 'warning',
+        CRIT: 'error',
+        DEBUG: 'debug',
+      }
+      return {
+        timestamp,
+        message: `${supervisorMatch[1]} ${supervisorMatch[2]}`,
+        rawLine: cleanLine,
+        type: levelMap[supervisorMatch[1]] || 'info',
+      }
+    }
+
+    return {
+      timestamp,
+      message,
+      rawLine: cleanLine,
+      type: getLogType(message),
+    }
+  })
 }
 
 const typeColorMap: Record<string, string> = {
@@ -362,7 +367,6 @@ const handleDownload = () => {
   URL.revokeObjectURL(url)
 }
 
-// WebSocket connection
 let ws: WebSocket | null = null
 
 const connectWebSocket = async () => {
@@ -379,11 +383,6 @@ const connectWebSocket = async () => {
     clearTimeout(emptyConfirmTimer)
     emptyConfirmTimer = null
   }
-  // wsOpen flips true on ws.onopen — the "Connecting…" state below
-  // renders until then. Don't pre-set isLoading; the template derives
-  // the loading state from wsOpen + filteredLogs (see below).
-
-  // Wait for auth to be initialized before connecting
   await waitForAuth()
 
   const teamId = getCurrentTeamId()
@@ -413,23 +412,10 @@ const connectWebSocket = async () => {
 
   ws = new WebSocket(wsUrl)
 
-  // Loading state is now derived from wsOpen + filteredLogs in the
-  // template — no more no-data timeout, no more isLoading boolean.
-  // The three states are:
-  //   !wsOpen                         → Connecting
-  //   wsOpen && no parsed lines yet   → Loading logs
-  //   parsed lines present            → render them
-  // We never hard-show "No logs found" because the brief window
-  // between WS-open and the first parsed message was the source of the
-  // flicker users saw.
-
   ws.onopen = () => {
     wsOpen.value = true
     streamEnded.value = false
     streamError.value = ''
-    // Arm the empty-state timer — if we still haven't received any
-    // data after this window, swap the perpetual spinner for "No
-    // logs available". Cancelled on the first onmessage below.
     if (emptyConfirmTimer) clearTimeout(emptyConfirmTimer)
     emptyConfirmTimer = setTimeout(() => {
       if (rawLogs.value.length === 0) {
@@ -458,16 +444,11 @@ const connectWebSocket = async () => {
     }
 
     rawLogs.value += data
-    // First byte arrived — kill the empty-state timer so we don't
-    // race the "Loading…" → lines transition with an empty banner.
     if (emptyConfirmTimer) {
       clearTimeout(emptyConfirmTimer)
       emptyConfirmTimer = null
     }
     emptyConfirmed.value = false
-    // The watch(rawLogs) below parses into filteredLogs on the next
-    // microtask — that's what flips the rendered state from
-    // "Loading…" to the actual lines.
   }
 
   ws.onerror = () => {
@@ -490,11 +471,10 @@ watch([() => props.entityId, () => props.software, logType, lines], () => {
 
 watch(rawLogs, () => {
   const logs = parseLogs(rawLogs.value)
-  filteredLogs.value = typeFilter.value.length > 0
-    ? logs.filter((log) => typeFilter.value.includes(log.type))
-    : logs
-  // The template watches filteredLogs.length to drop the
-  // "Loading logs…" state; nothing else to do here.
+  filteredLogs.value =
+    typeFilter.value.length > 0
+      ? logs.filter((log) => typeFilter.value.includes(log.type))
+      : logs
 })
 
 watch(filteredLogs, () => {
@@ -516,16 +496,29 @@ onUnmounted(() => {
 
 <template>
   <div class="flex flex-col flex-1 min-h-0" :class="hideOptions ? '' : 'gap-4'">
-    <div class="flex flex-col flex-1 min-h-0" :class="hideOptions ? '' : 'rounded-lg'">
-      <div class="flex flex-col flex-1 min-h-0" :class="hideOptions ? '' : 'space-y-4'">
-        <div v-if="!hideOptions" class="flex flex-wrap items-center justify-between gap-3">
+    <div
+      class="flex flex-col flex-1 min-h-0"
+      :class="hideOptions ? '' : 'rounded-lg'"
+    >
+      <div
+        class="flex flex-col flex-1 min-h-0"
+        :class="hideOptions ? '' : 'space-y-4'"
+      >
+        <div
+          v-if="!hideOptions"
+          class="flex flex-wrap items-center justify-between gap-3"
+        >
           <div class="flex flex-wrap items-center gap-3">
             <Select v-model="linesString">
               <SelectTrigger class="w-[130px]">
                 <SelectValue placeholder="Lines" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="opt in lineOptions" :key="opt.value" :value="opt.value">
+                <SelectItem
+                  v-for="opt in lineOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                >
                   {{ opt.label }}
                 </SelectItem>
               </SelectContent>
@@ -558,7 +551,14 @@ onUnmounted(() => {
               <Icon name="lucide:clock" class="h-4 w-4" />
             </Button>
 
-            <Button variant="outline" size="icon" class="h-10 w-10" title="Download logs" :disabled="filteredLogs.length === 0" @click="handleDownload">
+            <Button
+              variant="outline"
+              size="icon"
+              class="h-10 w-10"
+              title="Download logs"
+              :disabled="filteredLogs.length === 0"
+              @click="handleDownload"
+            >
               <Icon name="lucide:download" class="h-4 w-4" />
             </Button>
           </div>
@@ -568,7 +568,7 @@ onUnmounted(() => {
           ref="scrollRef"
           :class="[
             'flex-1 min-h-0 relative overflow-y-auto rounded-md border border-zinc-800 bg-zinc-950 p-4 text-zinc-300',
-            containerClassName || 'h-[500px]'
+            containerClassName || 'h-[500px]',
           ]"
           @scroll="handleScroll"
         >
@@ -597,11 +597,23 @@ onUnmounted(() => {
               class="flex gap-2"
               :title="log.rawLine !== log.message ? log.rawLine : undefined"
             >
-              <span v-if="showTimestamp && log.timestamp" class="shrink-0 text-zinc-500">
+              <span
+                v-if="showTimestamp && log.timestamp"
+                class="shrink-0 text-zinc-500"
+              >
                 {{ log.timestamp.toLocaleTimeString() }}
               </span>
-              <span v-if="log.html" class="whitespace-pre-wrap break-all" v-html="log.html" />
-              <span v-else :class="typeColorMap[log.type]" class="whitespace-pre-wrap break-all">{{ log.message }}</span>
+              <span
+                v-if="log.html"
+                class="whitespace-pre-wrap break-all"
+                v-html="log.html"
+              />
+              <span
+                v-else
+                :class="typeColorMap[log.type]"
+                class="whitespace-pre-wrap break-all"
+                >{{ log.message }}</span
+              >
             </div>
           </div>
         </div>

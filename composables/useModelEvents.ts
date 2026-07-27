@@ -10,21 +10,6 @@ interface ModelEventData {
 
 type FilterFn = (data: ModelEventData) => boolean
 
-/**
- * Composable to subscribe to model events (created, updated, deleted)
- *
- * @param modelName - The model name (e.g., 'cron', 'daemon', 'server')
- * @param filterFn - Function to filter events (e.g., by server_id)
- * @param onEvent - Callback to run when a matching event is received
- *
- * @example
- * // Listen to all cron events for a specific server
- * useModelEvents(
- *   'cron',
- *   (data) => data.server_id === serverId,
- *   () => fetchData()
- * )
- */
 export const useModelEvents = (
   modelName: string | Ref<string>,
   filterFn: FilterFn | Ref<FilterFn>,
@@ -35,11 +20,9 @@ export const useModelEvents = (
   const modelNameValue = computed(() => unref(modelName))
   const filterFnValue = computed(() => unref(filterFn))
 
-  // Store unsubscribe functions
   const unsubscribes: (() => void)[] = []
 
   const setupSubscriptions = () => {
-    // Clean up previous subscriptions
     unsubscribes.forEach((unsub) => unsub())
     unsubscribes.length = 0
 
@@ -59,30 +42,20 @@ export const useModelEvents = (
     })
   }
 
-  // Setup subscriptions immediately and when model name changes
-  watch(modelNameValue, () => {
-    setupSubscriptions()
-  }, { immediate: true })
+  watch(
+    modelNameValue,
+    () => {
+      setupSubscriptions()
+    },
+    { immediate: true },
+  )
 
-  // Clean up on unmount (only if called within a component)
-  if (getCurrentInstance()) {
-    onUnmounted(() => {
-      unsubscribes.forEach((unsub) => unsub())
-    })
-  }
+  tryOnUnmounted(() => {
+    unsubscribes.forEach((unsub) => unsub())
+    unsubscribes.length = 0
+  })
 }
 
-/**
- * Composable to subscribe to multiple model events
- *
- * @param models - Array of model configurations
- *
- * @example
- * useMultipleModelEvents([
- *   { model: 'cron', filter: (d) => d.server_id === serverId, onEvent: fetchCrons },
- *   { model: 'daemon', filter: (d) => d.server_id === serverId, onEvent: fetchDaemons },
- * ])
- */
 export const useMultipleModelEvents = (
   models: Array<{
     model: string
@@ -95,14 +68,6 @@ export const useMultipleModelEvents = (
   })
 }
 
-/**
- * Composable to subscribe to server-related model events
- * Convenience wrapper that filters by server_id
- *
- * @param modelName - The model name
- * @param serverId - The server ID to filter by
- * @param onEvent - Callback to run when a matching event is received
- */
 export const useServerModelEvents = (
   modelName: string | Ref<string>,
   serverId: string | Ref<string>,
@@ -117,14 +82,6 @@ export const useServerModelEvents = (
   )
 }
 
-/**
- * Composable to subscribe to site-related model events
- * Convenience wrapper that filters by site_id
- *
- * @param modelName - The model name
- * @param siteId - The site ID to filter by
- * @param onEvent - Callback to run when a matching event is received
- */
 export const useSiteModelEvents = (
   modelName: string | Ref<string>,
   siteId: string | Ref<string>,

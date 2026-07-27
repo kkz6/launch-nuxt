@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, toRefs } from 'vue'
 import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
@@ -6,17 +7,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar'
 import { differenceInDays, format, formatDistanceToNow } from 'date-fns'
 import { certificateService } from '~/services/certificateService'
 import type { CertificateUsage, StoredCertificate } from '~/types'
+import {
+  dockerService,
+  type DockerRegistryCredential,
+} from '~/services/dockerService'
 
-// Loading states
-const isGitLoading = ref(true)
-const isServerProvidersLoading = ref(true)
-const isStorageProvidersLoading = ref(true)
-const isDnsProvidersLoading = ref(true)
-const isStoredCertificatesLoading = ref(true)
+const confirmationDialog = ref<InstanceType<
+  typeof import('~/components/shared/ConfirmationDialog.vue').default
+> | null>(null)
 
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
-
-// Git installations
 interface AppInstallation {
   id: string
   accountLogin: string
@@ -29,11 +28,6 @@ interface AppInstallation {
   repositoryCount?: number
 }
 
-const appInstallations = ref<Record<string, AppInstallation[]>>({})
-const refreshingInstallations = ref<Record<string, boolean>>({})
-const githubInstallations = computed(() => appInstallations.value.github || [])
-
-// Server providers
 interface ServerProvider {
   id: string
   profile: string
@@ -42,7 +36,6 @@ interface ServerProvider {
   created_at: string
 }
 
-const serverProviders = ref<ServerProvider[]>([])
 const serverProviderLabels: Record<string, string> = {
   aws: 'Amazon Web Services',
   digitalocean: 'DigitalOcean',
@@ -60,7 +53,6 @@ const serverProviderIcons: Record<string, string> = {
   custom: 'lucide:server',
 }
 
-// Storage providers
 interface StorageProvider {
   id: string
   label: string
@@ -68,7 +60,6 @@ interface StorageProvider {
   created_at: string
 }
 
-const storageProviders = ref<StorageProvider[]>([])
 const storageProviderLabels: Record<string, string> = {
   s3: 'Amazon S3',
   spaces: 'DigitalOcean Spaces',
@@ -82,7 +73,6 @@ const storageProviderIcons: Record<string, string> = {
   wasabi: 'lucide:database',
 }
 
-// DNS providers
 interface DnsProvider {
   id: string
   label: string
@@ -90,7 +80,70 @@ interface DnsProvider {
   created_at: string
 }
 
-const dnsProviders = ref<DnsProvider[]>([])
+interface ConnectionsState {
+  isGitLoading: boolean
+  isServerProvidersLoading: boolean
+  isStorageProvidersLoading: boolean
+  isDnsProvidersLoading: boolean
+  isStoredCertificatesLoading: boolean
+  appInstallations: Record<string, AppInstallation[]>
+  refreshingInstallations: Record<string, boolean>
+  serverProviders: ServerProvider[]
+  storageProviders: StorageProvider[]
+  dnsProviders: DnsProvider[]
+  storedCertificates: StoredCertificate[]
+  isAddCertificateOpen: boolean
+  editingCertificate: StoredCertificate | undefined
+  isEditCertificateOpen: boolean
+  registryCredentials: DockerRegistryCredential[]
+  isRegistryCredentialsLoading: boolean
+  editingRegistryCredential: DockerRegistryCredential | undefined
+  isRegistryDialogOpen: boolean
+}
+
+const state = reactive({
+  isGitLoading: true,
+  isServerProvidersLoading: true,
+  isStorageProvidersLoading: true,
+  isDnsProvidersLoading: true,
+  isStoredCertificatesLoading: true,
+  appInstallations: {},
+  refreshingInstallations: {},
+  serverProviders: [],
+  storageProviders: [],
+  dnsProviders: [],
+  storedCertificates: [],
+  isAddCertificateOpen: false,
+  editingCertificate: undefined,
+  isEditCertificateOpen: false,
+  registryCredentials: [],
+  isRegistryCredentialsLoading: true,
+  editingRegistryCredential: undefined,
+  isRegistryDialogOpen: false,
+}) as ConnectionsState
+
+const {
+  isGitLoading,
+  isServerProvidersLoading,
+  isStorageProvidersLoading,
+  isDnsProvidersLoading,
+  isStoredCertificatesLoading,
+  appInstallations,
+  refreshingInstallations,
+  serverProviders,
+  storageProviders,
+  dnsProviders,
+  storedCertificates,
+  isAddCertificateOpen,
+  editingCertificate,
+  isEditCertificateOpen,
+  registryCredentials,
+  isRegistryCredentialsLoading,
+  editingRegistryCredential,
+  isRegistryDialogOpen,
+} = toRefs(state)
+
+const githubInstallations = computed(() => appInstallations.value.github || [])
 const dnsProviderLabels: Record<string, string> = {
   cloudflare: 'Cloudflare',
   route53: 'Amazon Route 53',
@@ -102,7 +155,6 @@ const dnsProviderIcons: Record<string, string> = {
   digitalocean: 'simple-icons:digitalocean',
 }
 
-// Git providers list
 const gitProviders = [
   {
     key: 'github',
@@ -127,14 +179,14 @@ const gitProviders = [
   },
 ]
 
-// Fetch functions
 const fetchGitProviders = async () => {
   try {
     const response = await $api<{
       data?: { appInstallations: Record<string, AppInstallation[]> }
       appInstallations?: Record<string, AppInstallation[]>
     }>('/settings/git-providers')
-    appInstallations.value = response.data?.appInstallations || response.appInstallations || {}
+    appInstallations.value =
+      response.data?.appInstallations || response.appInstallations || {}
   } catch {
     toast.error('Failed to load git providers')
   } finally {
@@ -155,7 +207,9 @@ const fetchServerProviders = async () => {
 
 const fetchStorageProviders = async () => {
   try {
-    const response = await $api<{ data: StorageProvider[] }>('/storage-providers')
+    const response = await $api<{ data: StorageProvider[] }>(
+      '/storage-providers',
+    )
     storageProviders.value = response.data
   } catch {
     toast.error('Failed to load storage providers')
@@ -175,7 +229,6 @@ const fetchDnsProviders = async () => {
   }
 }
 
-// Git actions
 const getRepoLabel = (installation: AppInstallation) => {
   if (installation.repositorySelection === 'selected') {
     const count = installation.repositoryCount || 0
@@ -189,9 +242,12 @@ const handleRefreshRepositories = async (installationId: string) => {
   refreshingInstallations.value[key] = true
 
   try {
-    const response = await $api<{ data: { status: string } }>(`/settings/git-providers/github/installations/${installationId}/refresh-repositories`, {
-      method: 'POST',
-    })
+    const response = await $api<{ data: { status: string } }>(
+      `/settings/git-providers/github/installations/${installationId}/refresh-repositories`,
+      {
+        method: 'POST',
+      },
+    )
     if (response.data?.status === 'success') {
       toast.success('Repository refresh queued')
       setTimeout(() => window.location.reload(), 2000)
@@ -203,16 +259,11 @@ const handleRefreshRepositories = async (installationId: string) => {
   }
 }
 
-// The API wraps payloads as { success, message, data }, so the URL is
-// at response.data.url — reading response.url gave undefined, the guard
-// never passed, and nothing happened ("dialog closes, nothing else").
-// We also navigate via window.location rather than window.open after an
-// await: a popup opened post-await is outside the click's user-gesture
-// window and gets silently blocked. The provider redirects back to our
-// callback route once the app is installed.
 const handleConfigureInstallation = async () => {
   try {
-    const response = await $api<{ data: { url: string } }>('/settings/git-providers/github/installation-url')
+    const response = await $api<{ data: { url: string } }>(
+      '/settings/git-providers/github/installation-url',
+    )
     const url = response.data?.url
     if (url) {
       window.location.href = url
@@ -225,26 +276,24 @@ const handleConfigureInstallation = async () => {
 }
 
 const handleInstallApp = async (provider: string) => {
-  // The picker dialog closes on click, so surface progress as a loading
-  // toast until we redirect (or fail).
   const toastId = toast.loading('Connecting…')
   try {
-    const response = await $api<{ data: { url: string } }>(`/settings/git-providers/${provider}/installation-url`)
+    const response = await $api<{ data: { url: string } }>(
+      `/settings/git-providers/${provider}/installation-url`,
+    )
     const url = response.data?.url
     if (url) {
-      // Navigation unloads the page; the loading toast carries the user over.
       window.location.href = url
     } else {
       toast.error('No installation URL was returned', { id: toastId })
     }
   } catch {
-    toast.error('Could not start the connection. Please try again.', { id: toastId })
+    toast.error('Could not start the connection. Please try again.', {
+      id: toastId,
+    })
   }
 }
 
-// The per-installation gear opens that installation's own settings page
-// on GitHub (installation.htmlUrl). Falls back to the app's generic
-// configure page if the URL isn't present on the record.
 const handleManageInstallation = (installation: AppInstallation) => {
   if (installation.htmlUrl) {
     window.location.href = installation.htmlUrl
@@ -253,7 +302,6 @@ const handleManageInstallation = (installation: AppInstallation) => {
   }
 }
 
-// Delete functions
 const deleteServerProvider = async (provider: ServerProvider) => {
   if (!confirmationDialog.value) return
 
@@ -268,7 +316,9 @@ const deleteServerProvider = async (provider: ServerProvider) => {
   if (result.ok) {
     try {
       await $api(`/server-providers/${provider.id}`, { method: 'DELETE' })
-      serverProviders.value = serverProviders.value.filter((p) => p.id !== provider.id)
+      serverProviders.value = serverProviders.value.filter(
+        (p) => p.id !== provider.id,
+      )
       toast.success('Server provider deleted')
     } catch {
       toast.error('Failed to delete server provider')
@@ -290,7 +340,9 @@ const deleteStorageProvider = async (provider: StorageProvider) => {
   if (result.ok) {
     try {
       await $api(`/storage-providers/${provider.id}`, { method: 'DELETE' })
-      storageProviders.value = storageProviders.value.filter((p) => p.id !== provider.id)
+      storageProviders.value = storageProviders.value.filter(
+        (p) => p.id !== provider.id,
+      )
       toast.success('Storage provider deleted')
     } catch {
       toast.error('Failed to delete storage provider')
@@ -312,24 +364,15 @@ const deleteDnsProvider = async (provider: DnsProvider) => {
   if (result.ok) {
     try {
       await $api(`/dns-providers/${provider.id}`, { method: 'DELETE' })
-      dnsProviders.value = dnsProviders.value.filter((p) => p.id !== provider.id)
+      dnsProviders.value = dnsProviders.value.filter(
+        (p) => p.id !== provider.id,
+      )
       toast.success('DNS provider deleted')
     } catch {
       toast.error('Failed to delete DNS provider')
     }
   }
 }
-
-// --- Stored SSL Certificates --------------------------------------
-//
-// Team-scoped SSL certificate library. Manages user-provided PEM bundles
-// that PHP site SSL settings + Docker domain settings pick from. This
-// section is the CRUD surface; the picker components and the actual
-// hook-up at the site / docker-domain dialogs land in later phases.
-const storedCertificates = ref<StoredCertificate[]>([])
-const isAddCertificateOpen = ref(false)
-const editingCertificate = ref<StoredCertificate | undefined>(undefined)
-const isEditCertificateOpen = ref(false)
 
 const fetchStoredCertificates = async () => {
   isStoredCertificatesLoading.value = true
@@ -348,17 +391,12 @@ const editCertificate = (cert: StoredCertificate) => {
   isEditCertificateOpen.value = true
 }
 
-// Wired to the AddCertificate sheet's `viewExisting` event — fired when
-// the duplicate-fingerprint toast's action button is clicked. We open
-// the existing certificate in the Edit sheet so the user can update its
-// name / notes instead of being stuck on the duplicate.
 const viewExistingCertificate = async (id: string) => {
   const existing = storedCertificates.value.find((c) => c.id === id)
   if (existing) {
     editCertificate(existing)
     return
   }
-  // Library not yet refreshed — fetch the cert directly.
   try {
     const res = await certificateService.get(id)
     editCertificate(res.data)
@@ -377,11 +415,6 @@ const handleCertificateUpdated = (cert: StoredCertificate) => {
   )
 }
 
-// Relative expiry summary. <0 days → "expired"; 0..30 days → amber;
-// >30 days → plain muted. Uses date-fns formatDistanceToNow for the
-// "expires in N days" copy and a falls back to absolute date when the
-// cert is more than ~3 months out (matches what people scan for in
-// dashboards).
 const certificateExpiryInfo = (cert: StoredCertificate) => {
   const notAfter = new Date(cert.not_after)
   const daysUntil = differenceInDays(notAfter, new Date())
@@ -393,8 +426,6 @@ const certificateExpiryInfo = (cert: StoredCertificate) => {
   } else {
     label = `expires ${format(notAfter, 'MMM d, yyyy')}`
   }
-  // Tailwind class for the expiry text only — surrounding subtitle text
-  // stays muted-foreground.
   let className = 'text-muted-foreground'
   if (daysUntil < 0) {
     className = 'text-destructive'
@@ -422,8 +453,6 @@ const deleteCertificate = async (
 ) => {
   if (!confirmationDialog.value) return
 
-  // First pass: ask the user. On 409 we'll re-prompt with the usage
-  // list and a force-delete affordance.
   if (!opts.force) {
     const result = await confirmationDialog.value.show({
       title: 'Delete SSL Certificate',
@@ -437,9 +466,13 @@ const deleteCertificate = async (
 
   try {
     await certificateService.delete(cert.id, opts)
-    storedCertificates.value = storedCertificates.value.filter((c) => c.id !== cert.id)
+    storedCertificates.value = storedCertificates.value.filter(
+      (c) => c.id !== cert.id,
+    )
     toast.success(
-      opts.force ? 'Certificate deleted, dependents reset to Let\'s Encrypt' : 'Certificate deleted',
+      opts.force
+        ? "Certificate deleted, dependents reset to Let's Encrypt"
+        : 'Certificate deleted',
     )
   } catch (err: unknown) {
     const e = err as {
@@ -448,13 +481,18 @@ const deleteCertificate = async (
     }
 
     if (e.response?.status === 409 && e.data?.usages?.length) {
-      // In use. Surface the usages list and offer force-delete.
       const usages = e.data.usages
       const siteCount = usages.filter((u) => u.kind === 'site').length
-      const domainCount = usages.filter((u) => u.kind === 'docker_domain').length
+      const domainCount = usages.filter(
+        (u) => u.kind === 'docker_domain',
+      ).length
       const parts: string[] = []
-      if (siteCount > 0) parts.push(`${siteCount} site${siteCount === 1 ? '' : 's'}`)
-      if (domainCount > 0) parts.push(`${domainCount} docker domain${domainCount === 1 ? '' : 's'}`)
+      if (siteCount > 0)
+        parts.push(`${siteCount} site${siteCount === 1 ? '' : 's'}`)
+      if (domainCount > 0)
+        parts.push(
+          `${domainCount} docker domain${domainCount === 1 ? '' : 's'}`,
+        )
       const usedBy = parts.join(' and ')
 
       if (!confirmationDialog.value) return
@@ -464,7 +502,15 @@ const deleteCertificate = async (
         confirmText: 'Force Delete & Reset',
         cancelText: 'Cancel',
         destructive: true,
-        warning: usages.slice(0, 5).map((u) => `${u.kind === 'site' ? 'Site' : 'Docker domain'}: ${u.name}`).join(' · ') + (usages.length > 5 ? ` · …and ${usages.length - 5} more` : ''),
+        warning:
+          usages
+            .slice(0, 5)
+            .map(
+              (u) =>
+                `${u.kind === 'site' ? 'Site' : 'Docker domain'}: ${u.name}`,
+            )
+            .join(' · ') +
+          (usages.length > 5 ? ` · …and ${usages.length - 5} more` : ''),
       })
       if (forceResult.ok) {
         await deleteCertificate(cert, { force: true })
@@ -475,23 +521,6 @@ const deleteCertificate = async (
     toast.error(e.data?.message || 'Failed to delete certificate')
   }
 }
-
-// --- Docker registry credentials ----------------------------------
-//
-// Saved docker-image logins. Picked from the application + compose
-// create dialogs; deploy scripts run `docker login` for each before
-// pulling private images. Same row-card shape the storage/dns
-// sections use; the add+edit dialog component handles both modes.
-
-import {
-  dockerService,
-  type DockerRegistryCredential,
-} from '~/services/dockerService'
-
-const registryCredentials = ref<DockerRegistryCredential[]>([])
-const isRegistryCredentialsLoading = ref(true)
-const editingRegistryCredential = ref<DockerRegistryCredential | undefined>(undefined)
-const isRegistryDialogOpen = ref(false)
 
 const fetchRegistryCredentials = async () => {
   isRegistryCredentialsLoading.value = true
@@ -531,7 +560,9 @@ const deleteRegistryCredential = async (c: DockerRegistryCredential) => {
   if (!result.ok) return
   try {
     await dockerService.registryCredentials.delete(c.id)
-    registryCredentials.value = registryCredentials.value.filter((x) => x.id !== c.id)
+    registryCredentials.value = registryCredentials.value.filter(
+      (x) => x.id !== c.id,
+    )
     toast.success('Registry credential deleted')
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } }
@@ -558,20 +589,33 @@ onMounted(() => {
   <div class="divide-y">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!-- Source Control Section -->
     <div class="px-6 pb-6">
       <h3 class="mb-4 text-base font-semibold">Source Control</h3>
 
       <div v-if="isGitLoading" class="flex items-center justify-center py-4">
-        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
       </div>
 
       <template v-else>
-        <div v-if="githubInstallations.length === 0" class="rounded-lg border p-4">
+        <div
+          v-if="githubInstallations.length === 0"
+          class="rounded-lg border p-4"
+        >
           <div class="flex flex-col items-center gap-3 py-2">
-            <Icon name="simple-icons:git" class="h-8 w-8 text-muted-foreground" />
-            <span class="text-sm text-muted-foreground">No source control connected</span>
-            <GitAddProvider :providers="gitProviders" @install="handleInstallApp" />
+            <Icon
+              name="simple-icons:git"
+              class="h-8 w-8 text-muted-foreground"
+            />
+            <span class="text-sm text-muted-foreground"
+              >No source control connected</span
+            >
+            <GitAddProvider
+              :providers="gitProviders"
+              @install="handleInstallApp"
+            />
           </div>
         </div>
 
@@ -583,19 +627,36 @@ onMounted(() => {
           >
             <div class="flex items-center gap-3">
               <Avatar class="h-8 w-8">
-                <AvatarImage :src="installation.accountAvatarUrl" :alt="installation.accountLogin" />
-                <AvatarFallback>{{ installation.accountLogin.charAt(0).toUpperCase() }}</AvatarFallback>
+                <AvatarImage
+                  :src="installation.accountAvatarUrl"
+                  :alt="installation.accountLogin"
+                />
+                <AvatarFallback>{{
+                  installation.accountLogin.charAt(0).toUpperCase()
+                }}</AvatarFallback>
               </Avatar>
               <div>
                 <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium">{{ installation.accountLogin }}</span>
-                  <Badge variant="secondary" class="text-xs">{{ installation.accountType }}</Badge>
-                  <Badge v-if="installation.repositorySelection" variant="outline" class="text-xs">
+                  <span class="text-sm font-medium">{{
+                    installation.accountLogin
+                  }}</span>
+                  <Badge variant="secondary" class="text-xs">{{
+                    installation.accountType
+                  }}</Badge>
+                  <Badge
+                    v-if="installation.repositorySelection"
+                    variant="outline"
+                    class="text-xs"
+                  >
                     {{ getRepoLabel(installation) }}
                   </Badge>
                 </div>
-                <p v-if="installation.createdAt" class="text-xs text-muted-foreground">
-                  Installed {{ format(new Date(installation.createdAt), 'MMM dd, yyyy') }}
+                <p
+                  v-if="installation.createdAt"
+                  class="text-xs text-muted-foreground"
+                >
+                  Installed
+                  {{ format(new Date(installation.createdAt), 'MMM dd, yyyy') }}
                 </p>
               </div>
             </div>
@@ -609,32 +670,49 @@ onMounted(() => {
                 <Icon
                   name="lucide:refresh-cw"
                   class="h-4 w-4"
-                  :class="{ 'animate-spin': refreshingInstallations[`github-${installation.id}`] }"
+                  :class="{
+                    'animate-spin':
+                      refreshingInstallations[`github-${installation.id}`],
+                  }"
                 />
               </Button>
-              <Button variant="ghost" size="sm" @click="handleManageInstallation(installation)">
+              <Button
+                variant="ghost"
+                size="sm"
+                @click="handleManageInstallation(installation)"
+              >
                 <Icon name="lucide:settings" class="h-4 w-4" />
               </Button>
             </div>
           </div>
-          <GitAddProvider :providers="gitProviders" @install="handleInstallApp" />
+          <GitAddProvider
+            :providers="gitProviders"
+            @install="handleInstallApp"
+          />
         </div>
       </template>
     </div>
 
-    <!-- Server Providers Section -->
     <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">Server Providers</h3>
 
-      <div v-if="isServerProvidersLoading" class="flex items-center justify-center py-4">
-        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+      <div
+        v-if="isServerProvidersLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
       </div>
 
       <template v-else>
         <div v-if="serverProviders.length === 0" class="rounded-lg border p-4">
           <div class="flex flex-col items-center gap-3 py-2">
             <Icon name="lucide:server" class="h-8 w-8 text-muted-foreground" />
-            <span class="text-sm text-muted-foreground">No server providers connected</span>
+            <span class="text-sm text-muted-foreground"
+              >No server providers connected</span
+            >
             <SettingsAddServerProvider @created="fetchServerProviders" />
           </div>
         </div>
@@ -646,13 +724,26 @@ onMounted(() => {
             class="flex items-center justify-between rounded-lg border p-4"
           >
             <div class="flex items-center gap-3">
-              <Icon :name="serverProviderIcons[provider.provider] || 'lucide:server'" class="h-5 w-5" />
+              <Icon
+                :name="
+                  serverProviderIcons[provider.provider] || 'lucide:server'
+                "
+                class="h-5 w-5"
+              />
               <div>
                 <span class="text-sm font-medium">{{ provider.profile }}</span>
-                <p class="text-xs text-muted-foreground">{{ serverProviderLabels[provider.provider] || provider.provider }}</p>
+                <p class="text-xs text-muted-foreground">
+                  {{
+                    serverProviderLabels[provider.provider] || provider.provider
+                  }}
+                </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" @click="deleteServerProvider(provider)">
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="deleteServerProvider(provider)"
+            >
               <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
             </Button>
           </div>
@@ -661,19 +752,29 @@ onMounted(() => {
       </template>
     </div>
 
-    <!-- Storage Providers Section -->
     <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">Storage Providers</h3>
 
-      <div v-if="isStorageProvidersLoading" class="flex items-center justify-center py-4">
-        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+      <div
+        v-if="isStorageProvidersLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
       </div>
 
       <template v-else>
         <div v-if="storageProviders.length === 0" class="rounded-lg border p-4">
           <div class="flex flex-col items-center gap-3 py-2">
-            <Icon name="lucide:database" class="h-8 w-8 text-muted-foreground" />
-            <span class="text-sm text-muted-foreground">No storage providers connected</span>
+            <Icon
+              name="lucide:database"
+              class="h-8 w-8 text-muted-foreground"
+            />
+            <span class="text-sm text-muted-foreground"
+              >No storage providers connected</span
+            >
             <SettingsAddStorageProvider @created="fetchStorageProviders" />
           </div>
         </div>
@@ -685,13 +786,27 @@ onMounted(() => {
             class="flex items-center justify-between rounded-lg border p-4"
           >
             <div class="flex items-center gap-3">
-              <Icon :name="storageProviderIcons[provider.provider] || 'lucide:database'" class="h-5 w-5" />
+              <Icon
+                :name="
+                  storageProviderIcons[provider.provider] || 'lucide:database'
+                "
+                class="h-5 w-5"
+              />
               <div>
                 <span class="text-sm font-medium">{{ provider.label }}</span>
-                <p class="text-xs text-muted-foreground">{{ storageProviderLabels[provider.provider] || provider.provider }}</p>
+                <p class="text-xs text-muted-foreground">
+                  {{
+                    storageProviderLabels[provider.provider] ||
+                    provider.provider
+                  }}
+                </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" @click="deleteStorageProvider(provider)">
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="deleteStorageProvider(provider)"
+            >
               <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
             </Button>
           </div>
@@ -700,19 +815,26 @@ onMounted(() => {
       </template>
     </div>
 
-    <!-- DNS Providers Section -->
     <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">DNS Providers</h3>
 
-      <div v-if="isDnsProvidersLoading" class="flex items-center justify-center py-4">
-        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+      <div
+        v-if="isDnsProvidersLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
       </div>
 
       <template v-else>
         <div v-if="dnsProviders.length === 0" class="rounded-lg border p-4">
           <div class="flex flex-col items-center gap-3 py-2">
             <Icon name="lucide:globe" class="h-8 w-8 text-muted-foreground" />
-            <span class="text-sm text-muted-foreground">No DNS providers connected</span>
+            <span class="text-sm text-muted-foreground"
+              >No DNS providers connected</span
+            >
             <SettingsAddDnsProvider @created="fetchDnsProviders" />
           </div>
         </div>
@@ -724,13 +846,24 @@ onMounted(() => {
             class="flex items-center justify-between rounded-lg border p-4"
           >
             <div class="flex items-center gap-3">
-              <Icon :name="dnsProviderIcons[provider.provider] || 'lucide:globe'" class="h-5 w-5" />
+              <Icon
+                :name="dnsProviderIcons[provider.provider] || 'lucide:globe'"
+                class="h-5 w-5"
+              />
               <div>
                 <span class="text-sm font-medium">{{ provider.label }}</span>
-                <p class="text-xs text-muted-foreground">{{ dnsProviderLabels[provider.provider] || provider.provider }}</p>
+                <p class="text-xs text-muted-foreground">
+                  {{
+                    dnsProviderLabels[provider.provider] || provider.provider
+                  }}
+                </p>
               </div>
             </div>
-            <Button variant="ghost" size="sm" @click="deleteDnsProvider(provider)">
+            <Button
+              variant="ghost"
+              size="sm"
+              @click="deleteDnsProvider(provider)"
+            >
               <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
             </Button>
           </div>
@@ -739,14 +872,6 @@ onMounted(() => {
       </template>
     </div>
 
-    <!--
-      Stored SSL Certificates. Team library of user-provided certs that
-      PHP site SSL settings and Docker domain settings will pick from
-      (Phases 4 and 5). The empty state mirrors the bordered-card
-      pattern other sections use; the populated state shows each cert
-      as a row with name, primary domain, issuer, and a relative-time
-      expiry indicator coloured amber under 30 days and red on expiry.
-    -->
     <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">SSL Certificates</h3>
 
@@ -853,20 +978,6 @@ onMounted(() => {
       </template>
     </div>
 
-    <!--
-      Docker Registry Credentials. Same row-card shape as Storage /
-      DNS Providers. The dialog handles both create + edit modes; on
-      edit, leaving the password input blank keeps the stored value
-      so users can rotate the label / username / URL without
-      retyping the secret.
-    -->
-    <!--
-      Last section in ConnectionsTab — uses pt-6 only (no bottom
-      padding) because divide-y on the parent doesn't draw a line
-      below the last child, and the outer container's bottom padding
-      handles the rest. Same convention DNS Providers used to follow
-      when it was the last section.
-    -->
     <div class="px-6 pt-6">
       <h3 class="mb-4 text-base font-semibold">Docker Registry Credentials</h3>
 
@@ -875,7 +986,11 @@ onMounted(() => {
         :credential="editingRegistryCredential"
         @created="fetchRegistryCredentials"
         @updated="fetchRegistryCredentials"
-        @update:open="(v) => { if (!v) handleRegistryDialogClosed() }"
+        @update:open="
+          (v) => {
+            if (!v) handleRegistryDialogClosed()
+          }
+        "
       />
 
       <div
@@ -888,13 +1003,6 @@ onMounted(() => {
         />
       </div>
 
-      <!--
-        Empty + populated states mirror the SSL Certificates section
-        above: a centered card with icon + label + Connect button
-        when there are no credentials, and row cards + a flat Connect
-        button once at least one is stored. Keeps the two sections
-        visually consistent within the same tab.
-      -->
       <template v-else>
         <div
           v-if="registryCredentials.length === 0"
@@ -934,13 +1042,6 @@ onMounted(() => {
                 </p>
               </div>
             </div>
-            <!--
-              Edit + delete actions. Other sections only carry a
-              delete because their credentials are OAuth-style (no
-              user-rotatable secret); registry logins genuinely need
-              an edit affordance for password rotation, so we keep
-              both. Same ghost+sm style the others use for delete.
-            -->
             <div class="flex items-center gap-1">
               <Button
                 variant="ghost"

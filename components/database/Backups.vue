@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, toRefs } from "vue";
 import { toast } from "vue-sonner";
 import { formatDistanceToNow } from "date-fns";
 import {
@@ -37,37 +38,90 @@ interface Props {
 }
 const props = defineProps<Props>();
 
-// Server state ------------------------------------------------------
-const backup = ref<DockerDatabaseBackup | null>(null);
-const runs = ref<DockerDatabaseBackupRun[]>([]);
-const providers = ref<StorageProviderRecord[]>([]);
-const loading = ref(true);
-const runningNow = ref(false);
-const deleting = ref(false);
+interface BackupState {
+  backup: DockerDatabaseBackup | null;
+  runs: DockerDatabaseBackupRun[];
+  providers: StorageProviderRecord[];
+  loading: boolean;
+  runningNow: boolean;
+  deleting: boolean;
+  dialogOpen: boolean;
+  historySheetOpen: boolean;
+  logSheetOpen: boolean;
+  logSheetTaskId: string;
+  logRefreshNonce: number;
+  awaitingRunLogs: boolean;
+  restoreDialogOpen: boolean;
+  restoreRun: DockerDatabaseBackupRun | null;
+  storageProviderId: number | null;
+  databaseName: string;
+  path: string;
+  retention: number;
+  cronSchedule: string;
+  notifyOnSuccess: boolean;
+  notifyOnFailure: boolean;
+  enabled: boolean;
+  saving: boolean;
+  liveStep: string;
+}
 
-// Dialog + sheet open flags ----------------------------------------
-const dialogOpen = ref(false);
-const historySheetOpen = ref(false);
-// Live-logs sheet (ServerLogViewer entity="task") for a single run.
-const logSheetOpen = ref(false);
-const logSheetTaskId = ref("");
-// Bumped when the viewed run finishes, to remount the log viewer so it
-// re-fetches the final stored output — covers very fast runs where the
-// live tail attaches after the task's log file is already gone.
-const logRefreshNonce = ref(0);
-// True between clicking "Run now" and the run.started event arriving:
-// the sheet is open but we don't have the task id yet, so it shows a
-// "starting…" state and auto-attaches the live stream once it lands.
-const awaitingRunLogs = ref(false);
+const state = reactive({
+  backup: null,
+  runs: [],
+  providers: [],
+  loading: true,
+  runningNow: false,
+  deleting: false,
+  dialogOpen: false,
+  historySheetOpen: false,
+  logSheetOpen: false,
+  logSheetTaskId: "",
+  logRefreshNonce: 0,
+  awaitingRunLogs: false,
+  restoreDialogOpen: false,
+  restoreRun: null,
+  storageProviderId: null,
+  databaseName: "",
+  path: "",
+  retention: 10,
+  cronSchedule: "0 3 * * *",
+  notifyOnSuccess: false,
+  notifyOnFailure: true,
+  enabled: true,
+  saving: false,
+  liveStep: "",
+}) as BackupState;
+
+const {
+  backup,
+  runs,
+  providers,
+  loading,
+  runningNow,
+  deleting,
+  dialogOpen,
+  historySheetOpen,
+  logSheetOpen,
+  logSheetTaskId,
+  logRefreshNonce,
+  awaitingRunLogs,
+  restoreDialogOpen,
+  restoreRun,
+  storageProviderId,
+  databaseName,
+  path,
+  retention,
+  cronSchedule,
+  notifyOnSuccess,
+  notifyOnFailure,
+  enabled,
+  saving,
+  liveStep,
+} = toRefs(state);
+
 watch(logSheetOpen, (open) => {
   if (!open) awaitingRunLogs.value = false;
 });
-// Restore-from-snapshot dialog state. Held here (rather than inside
-// the dialog component) so the history sheet's per-row Restore button
-// can both open it AND tell it which run to operate on. Reset when
-// closed so a stale `restoreRun` value doesn't leak between opens.
-const restoreDialogOpen = ref(false);
-const restoreRun = ref<DockerDatabaseBackupRun | null>(null);
 const openRestoreDialog = (run: DockerDatabaseBackupRun) => {
   restoreRun.value = run;
   restoreDialogOpen.value = true;
@@ -80,29 +134,11 @@ const openRunLogs = (run: DockerDatabaseBackupRun) => {
 };
 watch(restoreDialogOpen, (isOpen) => {
   if (!isOpen) {
-    // Don't clear restoreRun synchronously — the dialog's close
-    // transition still needs the data to render its body. nextTick
-    // is enough to wait out the unmount.
     nextTick(() => {
       restoreRun.value = null;
     });
   }
 });
-
-// Form state — seeded when dialog opens, discarded on cancel -------
-const storageProviderId = ref<number | null>(null);
-// Optional in-engine database override. Empty string means "use the
-// database the row was provisioned with" — that's the historical
-// behaviour and what we want for backwards-compat with existing
-// configs created before this field existed.
-const databaseName = ref("");
-const path = ref("");
-const retention = ref<number>(10);
-const cronSchedule = ref("0 3 * * *");
-const notifyOnSuccess = ref(false);
-const notifyOnFailure = ref(true);
-const enabled = ref(true);
-const saving = ref(false);
 
 const cronPresets: { label: string; value: string }[] = [
   { label: "Hourly", value: "0 * * * *" },
@@ -142,9 +178,7 @@ const load = async () => {
     ]);
     backup.value = cfgRes.data ?? null;
     runs.value = runsRes.data ?? [];
-    providers.value = (provRes.data ?? []).filter(
-      (p) => p.provider === "s3",
-    );
+    providers.value = (provRes.data ?? []).filter((p) => p.provider === "s3");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to load backup configuration");
@@ -155,19 +189,10 @@ const load = async () => {
 
 onMounted(load);
 
-// Live updates. "Run now" is async — the worker dumps + uploads in the
-// background and emits run events over the team channel. Refresh the
-// history when a run for THIS database starts / finishes, and surface
-// the current step (dumping / uploading / done) live from progress
-// markers so the user sees motion instead of a frozen "triggered" pill.
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
-const liveStep = ref("");
-
 useDockerBackupEvents(teamId, (data, event) => {
   if (String(data.database_id ?? "") !== props.database.id) return;
-  // Attach the just-opened live console to the run we triggered, as
-  // soon as the worker reports its task id (run.started carries it).
   if (awaitingRunLogs.value && data.task_id) {
     logSheetTaskId.value = String(data.task_id);
     awaitingRunLogs.value = false;
@@ -181,21 +206,15 @@ useDockerBackupEvents(teamId, (data, event) => {
     event === "docker.database.backup.run.failed"
   ) {
     liveStep.value = "";
-    // Run finished — if its log console is open, remount the viewer so
-    // it re-fetches the final stored output (a fast run's live tail may
-    // have attached after the on-disk log file was already gone).
     if (logSheetOpen.value && logSheetTaskId.value) {
       setTimeout(() => logRefreshNonce.value++, 800);
     }
-    // Explicit terminal-state toast so the user gets clear success /
-    // failure feedback instead of inferring from row pills alone.
     if (event === "docker.database.backup.run.succeeded") {
       toast.success("Backup completed");
     } else {
       toast.error("Backup failed — check the log console for details");
     }
   }
-  // started / succeeded / failed → re-pull so the pills + history update.
   load();
 });
 
@@ -235,10 +254,6 @@ const saveConfig = async () => {
       props.database.id,
       {
         storage_provider_id: storageProviderId.value,
-        // Send undefined for blank input so the backend treats it as
-        // "clear the override" rather than persisting an empty string.
-        // The backend also normalises whitespace-only values to nil,
-        // belt-and-braces.
         database_name: databaseName.value.trim() || undefined,
         path: path.value.trim() || undefined,
         retention: retention.value,
@@ -272,17 +287,8 @@ const runNow = async () => {
       props.database.project_id,
       props.database.id,
     );
-    // Async now: the API returns a "triggered" run immediately; the
-    // worker dumps + uploads in the background and the run flips to
-    // running → success/failed live over WebSocket (see the
-    // useDockerBackupEvents subscription below).
     runs.value = [res.data, ...runs.value].slice(0, 50);
     toast.success("Backup triggered — running in the background");
-    // Mirror the deployment UX: pop the live log console open right
-    // away so the dump → upload streams as it happens, instead of
-    // making the user dig into View History. The task id arrives a
-    // beat later on the run.started event (handled in the WS
-    // subscription below), which attaches the live stream.
     logSheetTaskId.value = "";
     awaitingRunLogs.value = true;
     logSheetOpen.value = true;
@@ -324,7 +330,6 @@ const applyPreset = (value: string) => {
   cronSchedule.value = value;
 };
 
-// Format helpers ----------------------------------------------------
 const formatBytes = (n?: number | null) => {
   if (!n) return "—";
   const units = ["B", "KB", "MB", "GB", "TB"];
@@ -346,14 +351,15 @@ const formatTimeAgo = (s?: string | null) => {
   }
 };
 
-// Status pill styling — mirrors the existing
-// ServerSettingsBackupHistorySheet shape so the look matches across
-// the platform's backup features.
-const runStatusConfig: Record<string, { icon: string; label: string; class: string }> = {
+const runStatusConfig: Record<
+  string,
+  { icon: string; label: string; class: string }
+> = {
   success: {
     icon: "lucide:check-circle-2",
     label: "Finished",
-    class: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+    class:
+      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   },
   triggered: {
     icon: "lucide:loader-2",
@@ -373,7 +379,8 @@ const runStatusConfig: Record<string, { icon: string; label: string; class: stri
   pending: {
     icon: "lucide:clock",
     label: "Pending",
-    class: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+    class:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   },
 };
 
@@ -392,13 +399,6 @@ const currentProviderLabel = computed(() => {
 
 <template>
   <div class="space-y-4">
-    <!--
-      ─── Header row ──────────────────────────────────────────────
-      Title + description on the left, primary action on the right.
-      When not configured: [Create Backup] button. When configured:
-      single [Actions ▾] dropdown with Run now / View History /
-      Edit / Delete — mirrors the existing PHP server-backup UI.
-    -->
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0 space-y-1">
         <h2 class="text-base font-semibold">Backups</h2>
@@ -408,12 +408,6 @@ const currentProviderLabel = computed(() => {
         </p>
       </div>
 
-      <!--
-        Not configured → primary "Create Backup" button. When
-        configured, the actions live inline inside the card below
-        (Run now / View History / Edit / Delete) rather than a
-        separate top-right dropdown.
-      -->
       <Button
         v-if="!isConfigured"
         size="sm"
@@ -425,7 +419,6 @@ const currentProviderLabel = computed(() => {
       </Button>
     </div>
 
-    <!-- ─── No providers — shared empty state ────────────────────── -->
     <SharedEmptyState
       v-if="!loading && !hasProviders"
       icon="lucide:cloud-off"
@@ -440,12 +433,6 @@ const currentProviderLabel = computed(() => {
       </NuxtLink>
     </SharedEmptyState>
 
-    <!--
-      ─── Providers exist but no backup yet ───────────────────────
-      The header row above already carries the [Create Backup]
-      action, so the empty state stays purely informational — no
-      duplicate button inside it.
-    -->
     <SharedEmptyState
       v-else-if="!loading && !isConfigured"
       icon="lucide:database-backup"
@@ -453,11 +440,13 @@ const currentProviderLabel = computed(() => {
       description="Use the Create Backup button above to pick a storage provider and schedule. Snapshots upload on the cron you choose."
     />
 
-    <!-- ─── Summary card — current configuration ───────────────── -->
     <Card v-else-if="!loading && isConfigured">
       <CardHeader class="p-4">
         <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:database-backup" class="h-4 w-4 text-muted-foreground" />
+          <Icon
+            name="lucide:database-backup"
+            class="h-4 w-4 text-muted-foreground"
+          />
           Backup Configuration
           <span
             class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -478,9 +467,9 @@ const currentProviderLabel = computed(() => {
           </span>
         </CardTitle>
         <CardDescription class="text-xs">
-          Snapshots upload to the linked storage provider on the cron
-          schedule. Run a backup now, view past runs, or edit the
-          schedule with the buttons below.
+          Snapshots upload to the linked storage provider on the cron schedule.
+          Run a backup now, view past runs, or edit the schedule with the
+          buttons below.
         </CardDescription>
       </CardHeader>
 
@@ -488,13 +477,6 @@ const currentProviderLabel = computed(() => {
         <dl class="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-[140px_1fr]">
           <dt class="text-muted-foreground">Storage provider</dt>
           <dd class="font-medium">{{ currentProviderLabel }}</dd>
-          <!--
-            Effective target database — what the dump command actually
-            runs against. Falls back to the row's name when no override
-            is set (matches what the backend computes via
-            EffectiveDatabaseName). Shown so the user can verify their
-            backup targets the right DB without opening the dialog.
-          -->
           <dt class="text-muted-foreground">Database</dt>
           <dd class="break-all font-mono text-[11px]">
             {{ backup!.database_name || props.database.name }}
@@ -510,13 +492,19 @@ const currentProviderLabel = computed(() => {
             {{ backup!.path || "(bucket root)" }}
           </dd>
           <dt class="text-muted-foreground">Schedule</dt>
-          <dd class="font-mono text-[11px]">{{ backup!.cron_schedule || "—" }}</dd>
+          <dd class="font-mono text-[11px]">
+            {{ backup!.cron_schedule || "—" }}
+          </dd>
           <dt class="text-muted-foreground">Retention</dt>
           <dd>{{ backup!.retention }} runs</dd>
           <dt class="text-muted-foreground">Notifications</dt>
           <dd class="space-x-2">
-            <span v-if="backup!.notify_on_failure" class="text-[11px]">on failure</span>
-            <span v-if="backup!.notify_on_success" class="text-[11px]">on success</span>
+            <span v-if="backup!.notify_on_failure" class="text-[11px]"
+              >on failure</span
+            >
+            <span v-if="backup!.notify_on_success" class="text-[11px]"
+              >on success</span
+            >
             <span
               v-if="!backup!.notify_on_failure && !backup!.notify_on_success"
               class="text-[11px] text-muted-foreground"
@@ -540,12 +528,6 @@ const currentProviderLabel = computed(() => {
           </dd>
         </dl>
 
-        <!--
-          Inline actions — kept inside the card (instead of a separate
-          top-right Actions dropdown) so everything for this backup
-          lives in one place. Run now + View History are primary
-          affordances; Edit and Delete sit to the right.
-        -->
         <div class="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
           <Button size="sm" :disabled="runningNow" @click="runNow">
             <Icon
@@ -579,23 +561,19 @@ const currentProviderLabel = computed(() => {
       </CardContent>
     </Card>
 
-    <!--
-      ─── Create / Edit Dialog ──────────────────────────────────────
-      Same tight sizing as the Advanced tab: text-base title,
-      text-xs labels, h-9 inputs, [11px] help text, size="sm" footer
-      buttons. Mirrors the PHP CreateBackup field set minus the
-      "Databases to Include" multi-select (each docker DB has its
-      own backup row, so the database is implicit in the URL).
-    -->
     <Dialog v-model:open="dialogOpen">
       <DialogContent class="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle class="text-base">
-            {{ isEditing ? "Edit Backup Configuration" : "Create Backup Configuration" }}
+            {{
+              isEditing
+                ? "Edit Backup Configuration"
+                : "Create Backup Configuration"
+            }}
           </DialogTitle>
           <DialogDescription class="text-xs">
-            Configure scheduled backups for this database. Snapshots
-            upload to your selected storage provider.
+            Configure scheduled backups for this database. Snapshots upload to
+            your selected storage provider.
           </DialogDescription>
         </DialogHeader>
 
@@ -604,7 +582,9 @@ const currentProviderLabel = computed(() => {
             <Label for="bk-provider" class="text-xs">Storage Provider</Label>
             <Select
               :model-value="storageProviderId?.toString() || ''"
-              @update:model-value="(v) => (storageProviderId = v ? Number(v) : null)"
+              @update:model-value="
+                (v) => (storageProviderId = v ? Number(v) : null)
+              "
             >
               <SelectTrigger id="bk-provider" class="h-9 text-sm">
                 <SelectValue placeholder="Select storage provider" />
@@ -625,21 +605,6 @@ const currentProviderLabel = computed(() => {
             </p>
           </div>
 
-          <!--
-            Database name — optional override. By default a docker DB
-            row tracks ONE logical database inside the engine (the one
-            provisioned when the row was created), and the dump
-            command targets it via `pg_dump <db>` / `mysqldump <db>`.
-            If the user manually created extra databases inside the
-            engine, this field lets them point the backup at one of
-            those instead. Empty = today's behaviour.
-
-            Note for Mongo / Redis: the dump commands don't currently
-            scope by database name (Mongo dumps everything via
-            --archive; Redis dumps the whole RDB), so the override is
-            effectively a no-op for those engines. We still allow it
-            so the row is consistent across engines.
-          -->
           <div class="space-y-1">
             <Label for="bk-dbname" class="text-xs">
               Database Name
@@ -653,11 +618,12 @@ const currentProviderLabel = computed(() => {
               autocomplete="off"
             />
             <p class="text-[11px] text-muted-foreground">
-              Which database inside the engine to back up. Leave empty
-              to back up the database created with this row
-              (<span class="font-mono">{{ props.database.name }}</span>).
-              Set this if you've manually created additional databases
-              on the engine and want to target one of them instead.
+              Which database inside the engine to back up. Leave empty to back
+              up the database created with this row (<span class="font-mono">{{
+                props.database.name
+              }}</span
+              >). Set this if you've manually created additional databases on
+              the engine and want to target one of them instead.
             </p>
           </div>
 
@@ -782,21 +748,13 @@ const currentProviderLabel = computed(() => {
       </DialogContent>
     </Dialog>
 
-    <!--
-      ─── Run History Sheet ────────────────────────────────────────
-      Mirrors components/server/settings/BackupHistorySheet.vue —
-      right-side sheet with scrolling list of run cards (status pill +
-      relative time + size + error). Opens from the Actions dropdown's
-      "View History" item or the inline "View history" link in the
-      summary card.
-    -->
     <Sheet v-model:open="historySheetOpen">
       <SheetContent class="sm:max-w-lg">
         <SheetHeader>
           <SheetTitle>Backup History</SheetTitle>
           <SheetDescription>
-            Past backup runs for <strong>{{ props.database.name }}</strong>,
-            most recent first.
+            Past backup runs for <strong>{{ props.database.name }}</strong
+            >, most recent first.
           </SheetDescription>
         </SheetHeader>
 
@@ -805,7 +763,10 @@ const currentProviderLabel = computed(() => {
             v-if="runs.length === 0"
             class="flex flex-col items-center justify-center py-12 text-center"
           >
-            <Icon name="lucide:history" class="mb-4 h-10 w-10 text-muted-foreground" />
+            <Icon
+              name="lucide:history"
+              class="mb-4 h-10 w-10 text-muted-foreground"
+            />
             <p class="text-sm text-muted-foreground">No backup runs yet</p>
             <p class="mt-1 text-xs text-muted-foreground">
               Use the Actions menu → Run now to trigger one.
@@ -821,16 +782,23 @@ const currentProviderLabel = computed(() => {
               <div class="flex items-center justify-between">
                 <span
                   class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                  :class="(runStatusConfig[r.status] || runStatusConfig.pending).class"
+                  :class="
+                    (runStatusConfig[r.status] || runStatusConfig.pending).class
+                  "
                 >
                   <Icon
-                    :name="(runStatusConfig[r.status] || runStatusConfig.pending).icon"
+                    :name="
+                      (runStatusConfig[r.status] || runStatusConfig.pending)
+                        .icon
+                    "
                     :class="[
                       'h-3 w-3',
                       r.status === 'running' && 'animate-spin',
                     ]"
                   />
-                  {{ (runStatusConfig[r.status] || runStatusConfig.pending).label }}
+                  {{
+                    (runStatusConfig[r.status] || runStatusConfig.pending).label
+                  }}
                 </span>
                 <span class="text-[11px] text-muted-foreground">
                   {{ formatTimeAgo(r.started_at || r.created_at) }}
@@ -856,25 +824,10 @@ const currentProviderLabel = computed(() => {
                 {{ r.error }}
               </div>
 
-              <!--
-                Restore action — only rendered for successful runs
-                with an object_key (failed / running rows aren't
-                restorable, and a row missing its object_key is a
-                bug to investigate, not a snapshot to replay).
-                Sits at the bottom of the row card so users see the
-                pill / time / size context FIRST and only reach
-                "Restore" after they've identified the right run.
-              -->
               <div
                 v-if="r.task_id || (r.status === 'success' && r.object_key)"
                 class="flex justify-end gap-2 pt-1"
               >
-                <!--
-                  View Logs — streams the run's dump/upload output live
-                  while running (and replays it after) via the same
-                  task-logs websocket deployments use. Shown whenever the
-                  run has a linked task.
-                -->
                 <Button
                   v-if="r.task_id"
                   size="sm"
@@ -902,26 +855,12 @@ const currentProviderLabel = computed(() => {
       </SheetContent>
     </Sheet>
 
-    <!--
-      Restore-from-snapshot dialog. Mounted at the page level (rather
-      than inside the Sheet) so its z-index isn't trapped under the
-      Sheet's portal — Sheet → Dialog stacking gets messy fast in
-      reka-ui. The dialog reads `restoreRun` to decide which snapshot
-      it's operating on; setting it to null on close (via watch above)
-      keeps the dialog body from rendering stale data after the
-      transition completes.
-    -->
     <DatabaseRestoreBackupDialog
       v-model:open="restoreDialogOpen"
       :source-database="props.database"
       :run="restoreRun"
     />
 
-    <!--
-      Live backup logs. Streams the run's dump → upload output via the
-      task-logs websocket (ServerLogViewer entity="task") — live while
-      the run is in flight, replayed from the stored output afterwards.
-    -->
     <Sheet v-model:open="logSheetOpen">
       <SheetContent
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-3xl flex flex-col overflow-hidden outline-none"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, ref, toRefs } from "vue";
 import { toast } from "vue-sonner";
 import { Separator } from "~/components/ui/separator";
 import {
@@ -15,76 +16,16 @@ const emit = defineEmits<{
   deleted: [];
 }>();
 
-// Role gating — the Danger Zone (delete) is admin/owner only.
 const { canDelete } = useCan();
 
 const route = useRoute();
 
-// Advanced is organised into sub-sections. The sub-tab strip itself
-// lives in the navbar (components/layout/Navbar.vue) so it sits tight
-// under the workload tabs like the PHP server Advanced tab; this body
-// just renders the active section, read from ?section=. v-show keeps
-// each section mounted so in-progress form edits survive switching.
 const activeSection = computed(
   () => (route.query.section as string) || "general",
 );
 
 type RestartPolicy = "no" | "on-failure" | "always" | "unless-stopped";
 
-// All advanced-form state lives in this single block. Mirrors the
-// database Advanced layout — three cards (General / Container Runtime
-// / Danger Zone) plus a Ports card unique to applications. Empty
-// string in any input means "clear this knob"; the backend treats
-// empty as a delete on the build_config map.
-
-// General (rename) — used to live on the General subtab; moved here
-// so the General page can be a pure read-only info-card grid like the
-// database General. Settings live with settings.
-const nameForm = ref(props.application.name);
-const nameSaving = ref(false);
-
-// Container Runtime — CPU/memory limits + reservations + restart
-// policy. Merged into a single card with a single Save button, same
-// shape the database Advanced uses.
-const restartPolicy = ref<RestartPolicy>(
-  ((props.application.build_config?.restart_policy as RestartPolicy) ||
-    "unless-stopped") as RestartPolicy,
-);
-const cpuLimit = ref<string>(
-  (props.application.build_config?.cpu_limit as string) || "",
-);
-const memoryLimit = ref<string>(
-  (props.application.build_config?.memory_limit as string) || "",
-);
-const cpuReservation = ref<string>(
-  (props.application.build_config?.cpu_reservation as string) || "",
-);
-const memoryReservation = ref<string>(
-  (props.application.build_config?.memory_reservation as string) || "",
-);
-const healthcheckCommand = ref<string>(
-  (props.application.build_config?.healthcheck_command as string) || "",
-);
-const runtimeSaving = ref(false);
-
-// Ports — extra host:container mappings. App-specific (databases
-// have a single "Expose" toggle instead, because their port set is
-// fixed by the engine).
-const extraPortsRaw = ref<string>(
-  Array.isArray(props.application.build_config?.extra_ports)
-    ? (props.application.build_config!.extra_ports as string[]).join("\n")
-    : "",
-);
-const portsSaving = ref(false);
-
-// The container's internal port (top-level field, not a build_config knob).
-const internalPort = ref<number | undefined>(
-  props.application.internal_port || undefined,
-);
-
-// Security — single basic-auth row. The empty form (username and
-// password both blank) clears the middleware on save; otherwise it
-// writes both into build_config.security.
 const seedSecurity = () => {
   const raw = props.application.build_config?.security as
     | Record<string, unknown>
@@ -95,50 +36,123 @@ const seedSecurity = () => {
     password: typeof raw.password === "string" ? raw.password : "",
   };
 };
-const security = ref(seedSecurity());
-const securitySaving = ref(false);
-const securityRevealPassword = ref(false);
 
-// Build — builder + Dockerfile location. Only meaningful for git-source
-// apps (image / inline-Dockerfile sources have no repo build step). The
-// builder is modelled as "auto-detect" vs "dockerfile"; auto-detect maps
-// to the nixpacks build type, which the deploy job overrides to Dockerfile
-// when one is present. For a GitHub Actions app a saved change marks the
-// committed workflow out of sync — surfaced inline with a Re-sync button,
-// since the workflow YAML embeds the dockerfile path.
 const isGitSource = computed(() => props.application.source_type === "git");
 const isGhaApp = computed(
   () => props.application.build_location === "github_actions",
 );
-const seedBuilder = (
-  bt?: string | null,
-): "auto" | "nixpacks" | "dockerfile" =>
+const seedBuilder = (bt?: string | null): "auto" | "nixpacks" | "dockerfile" =>
   bt === "dockerfile" ? "dockerfile" : bt === "nixpacks" ? "nixpacks" : "auto";
-const builderType = ref<"auto" | "nixpacks" | "dockerfile">(
-  seedBuilder(props.application.build_type),
-);
-const dockerfilePath = ref<string>(
-  (props.application.build_config?.dockerfile_path as string) || "",
-);
-const buildSaving = ref(false);
-const buildResyncing = ref(false);
 
-const deleteLoading = ref(false);
+interface SecurityForm {
+  username: string;
+  password: string;
+}
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+interface AdvancedState {
+  nameForm: string;
+  nameSaving: boolean;
+  restartPolicy: RestartPolicy;
+  cpuLimit: string;
+  memoryLimit: string;
+  cpuReservation: string;
+  memoryReservation: string;
+  healthcheckCommand: string;
+  runtimeSaving: boolean;
+  extraPortsRaw: string;
+  portsSaving: boolean;
+  internalPort: number | undefined;
+  security: SecurityForm;
+  securitySaving: boolean;
+  securityRevealPassword: boolean;
+  builderType: "auto" | "nixpacks" | "dockerfile";
+  dockerfilePath: string;
+  buildSaving: boolean;
+  buildResyncing: boolean;
+  deleteLoading: boolean;
+  traefikFilename: string;
+  traefikContent: string;
+  traefikContentOnDisk: string;
+  traefikLoading: boolean;
+  traefikSaving: boolean;
+  traefikEditing: boolean;
+}
 
-// Re-seed when the parent refetches the application (rename / deploy
-// / WS updates push a new model). Mirrors the database Advanced
-// re-seed watcher — deep:true so build_config changes propagate.
+const state = reactive({
+  nameForm: props.application.name,
+  nameSaving: false,
+  restartPolicy: (props.application.build_config?.restart_policy ||
+    "unless-stopped") as RestartPolicy,
+  cpuLimit: (props.application.build_config?.cpu_limit as string) || "",
+  memoryLimit: (props.application.build_config?.memory_limit as string) || "",
+  cpuReservation:
+    (props.application.build_config?.cpu_reservation as string) || "",
+  memoryReservation:
+    (props.application.build_config?.memory_reservation as string) || "",
+  healthcheckCommand:
+    (props.application.build_config?.healthcheck_command as string) || "",
+  runtimeSaving: false,
+  extraPortsRaw: Array.isArray(props.application.build_config?.extra_ports)
+    ? (props.application.build_config.extra_ports as string[]).join("\n")
+    : "",
+  portsSaving: false,
+  internalPort: props.application.internal_port || undefined,
+  security: seedSecurity(),
+  securitySaving: false,
+  securityRevealPassword: false,
+  builderType: seedBuilder(props.application.build_type),
+  dockerfilePath:
+    (props.application.build_config?.dockerfile_path as string) || "",
+  buildSaving: false,
+  buildResyncing: false,
+  deleteLoading: false,
+  traefikFilename: "",
+  traefikContent: "",
+  traefikContentOnDisk: "",
+  traefikLoading: true,
+  traefikSaving: false,
+  traefikEditing: false,
+}) as AdvancedState;
+
+const {
+  nameForm,
+  nameSaving,
+  restartPolicy,
+  cpuLimit,
+  memoryLimit,
+  cpuReservation,
+  memoryReservation,
+  healthcheckCommand,
+  runtimeSaving,
+  extraPortsRaw,
+  portsSaving,
+  internalPort,
+  securitySaving,
+  securityRevealPassword,
+  builderType,
+  dockerfilePath,
+  buildSaving,
+  buildResyncing,
+  deleteLoading,
+  traefikFilename,
+  traefikContent,
+  traefikContentOnDisk,
+  traefikLoading,
+  traefikSaving,
+  traefikEditing,
+} = toRefs(state);
+const security = state.security;
+
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
+
 watch(
   () => props.application,
   (app) => {
     nameForm.value = app.name;
-    restartPolicy.value =
-      ((app.build_config?.restart_policy as RestartPolicy) ||
-        "unless-stopped") as RestartPolicy;
+    restartPolicy.value = ((app.build_config
+      ?.restart_policy as RestartPolicy) || "unless-stopped") as RestartPolicy;
     cpuLimit.value = (app.build_config?.cpu_limit as string) || "";
     memoryLimit.value = (app.build_config?.memory_limit as string) || "";
     cpuReservation.value = (app.build_config?.cpu_reservation as string) || "";
@@ -149,7 +163,7 @@ watch(
     extraPortsRaw.value = Array.isArray(app.build_config?.extra_ports)
       ? (app.build_config!.extra_ports as string[]).join("\n")
       : "";
-    security.value = seedSecurity();
+    Object.assign(security, seedSecurity());
     builderType.value = seedBuilder(app.build_type);
     dockerfilePath.value = (app.build_config?.dockerfile_path as string) || "";
   },
@@ -208,10 +222,6 @@ const saveBuild = async () => {
   }
 };
 
-// Re-commit the GitHub Actions workflow YAML with the current build
-// config. Same endpoint the GitHub Actions subtab's Re-sync uses; exposed
-// here so the user can apply a dockerfile-location change without leaving
-// the Build section.
 const resyncBuildWorkflow = async () => {
   buildResyncing.value = true;
   try {
@@ -261,7 +271,6 @@ const savePorts = async () => {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
-  // Light validation — host:container with optional protocol suffix.
   for (const p of ports) {
     if (!isValidPortMapping(p)) {
       toast.error(`"${p}" doesn't look like host:container`);
@@ -299,9 +308,8 @@ const savePorts = async () => {
 };
 
 const saveSecurity = async () => {
-  const u = security.value.username.trim();
-  const p = security.value.password;
-  // If one is set, both must be set (dokploy enforces the same).
+  const u = security.username.trim();
+  const p = security.password;
   if ((u && !p) || (!u && p)) {
     toast.error("Both username and password are required to enable basic auth");
     return;
@@ -328,27 +336,6 @@ const saveSecurity = async () => {
   }
 };
 
-// --- Traefik dynamic-config card ----------------------------------
-//
-// Mirrors dokploy's Advanced → Traefik surface. Read-only by default
-// (the deploy pipeline writes this file; hand-edits get clobbered on
-// the next domain change), with a "Modify" button that opens up the
-// editor for emergency tweaks. Save round-trips through the backend
-// which validates filename/size and writes via SSH; Traefik watches
-// the dir so the change takes effect with no reload.
-//
-// Stays in sync with the server when the user lands on the tab:
-// fetchTraefikConfig runs on mount AND whenever the lock is
-// re-engaged, so re-opening Modify shows the latest on-disk state
-// rather than a stale cached one.
-
-const traefikFilename = ref("");
-const traefikContent = ref("");
-const traefikContentOnDisk = ref("");
-const traefikLoading = ref(true);
-const traefikSaving = ref(false);
-const traefikEditing = ref(false);
-
 const traefikDirty = computed(
   () => traefikContent.value !== traefikContentOnDisk.value,
 );
@@ -365,11 +352,6 @@ const fetchTraefikConfig = async () => {
     traefikContent.value = res.data.content;
     traefikContentOnDisk.value = res.data.content;
   } catch {
-    // Silent: empty editor is fine. The card heading still loads;
-    // the user can save to create the file if Traefik hasn't been
-    // populated yet. Avoid a toast on the cold-load path because
-    // the Advanced tab also triggers other fetches and stacking
-    // error toasts is noisy.
     traefikFilename.value = "";
     traefikContent.value = "";
     traefikContentOnDisk.value = "";
@@ -379,8 +361,6 @@ const fetchTraefikConfig = async () => {
 };
 
 const beginModifyTraefik = () => {
-  // Re-pull so the operator edits the file as it is RIGHT NOW —
-  // domains added since the page load would otherwise be invisible.
   fetchTraefikConfig().then(() => {
     traefikEditing.value = true;
   });
@@ -403,9 +383,7 @@ const saveTraefikConfig = async () => {
     traefikContentOnDisk.value = res.data.content;
     traefikFilename.value = res.data.filename;
     traefikEditing.value = false;
-    toast.success(
-      "Traefik config saved — Traefik picks it up automatically.",
-    );
+    toast.success("Traefik config saved — Traefik picks it up automatically.");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to save Traefik config");
@@ -429,10 +407,6 @@ const deleteApplication = async () => {
     destructive: true,
     helpText: "Type the application name to confirm deletion:",
     inputVerificationText: props.application.name,
-    // Opt-in volume cleanup. Off by default so a misclicked Delete
-    // doesn't destroy the application's persistent state (named
-    // volumes declared via the Volumes subtab). Backend iterates
-    // type=volume rows and `docker volume rm` each when ticked.
     checkbox: {
       label: "Also delete attached named volumes (data will be lost)",
       checked: false,
@@ -465,27 +439,10 @@ const deleteApplication = async () => {
 </script>
 
 <template>
-  <!--
-    Flat sub-section layout — mirrors the PHP server Advanced tab
-    (components/server/settings/*): plain sections, each a heading +
-    muted description + fields, no elevated cards. Sections within a
-    sub-tab are split with <Separator />. The rose sub-tab strip itself
-    is rendered in the navbar (Navbar.vue, `showApplicationAdvancedSubTabs`)
-    so it sits tight under the workload tabs — the active section is
-    read from ?section= and rendered here.
-
-    No space-y on this root: the sections are mutually exclusive
-    (v-show / v-if on activeSection), so a `space-y` here would add a
-    stray top margin to every section after the first — Tailwind's
-    space utility keys off DOM order, not visibility. Each section
-    owns its internal spacing instead.
-  -->
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!-- ─── General ───────────────────────────────────────────── -->
     <div v-show="activeSection === 'general'" class="space-y-6">
-      <!-- Name -->
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-medium">General</h3>
@@ -515,8 +472,6 @@ const deleteApplication = async () => {
         </Button>
       </div>
 
-      <!-- Build — git-source apps only (image / inline-Dockerfile have no
-           repo build step to configure). -->
       <template v-if="isGitSource">
         <Separator />
         <div class="space-y-4">
@@ -527,8 +482,6 @@ const deleteApplication = async () => {
             </p>
           </div>
 
-          <!-- GitHub Actions: the committed workflow embeds the build
-               config, so a change leaves it out of date until re-synced. -->
           <div
             v-if="isGhaApp && application.gha_out_of_sync"
             class="flex flex-col gap-3 rounded-lg border border-amber-500/40 bg-amber-50 p-3 text-sm dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between"
@@ -606,20 +559,11 @@ const deleteApplication = async () => {
       </template>
     </div>
 
-    <!-- ─── Volumes (moved here from a top-level tab) ─────────── -->
     <ApplicationVolumes
       v-if="activeSection === 'volumes'"
       :application="application"
     />
 
-    <!-- ─── GitHub Actions ────────────────────────────────────── -->
-    <!--
-      Only for build_location=github_actions. The full GHA settings
-      panel (status, config, maintenance, disable) lives here now — it
-      used to be its own tab. Build-time secrets moved to the
-      Environment tab's Build-time section. @updated bubbles a refetch
-      up to the application page.
-    -->
     <div
       v-if="application.build_location === 'github_actions'"
       v-show="activeSection === 'build'"
@@ -627,18 +571,16 @@ const deleteApplication = async () => {
       <ApplicationGHA :application="application" @updated="$emit('updated')" />
     </div>
 
-    <!-- ─── Container Runtime / Security / Ports ──────────────── -->
     <div v-show="activeSection === 'runtime'" class="space-y-6">
       <div class="space-y-4">
         <div>
           <h3 class="text-lg font-medium">Container Runtime</h3>
           <p class="text-sm text-muted-foreground">
-            Resource caps + reservations, restart policy, and the
-            container HEALTHCHECK. Applied on the next deploy.
+            Resource caps + reservations, restart policy, and the container
+            HEALTHCHECK. Applied on the next deploy.
           </p>
         </div>
 
-        <!-- Resources block -->
         <div class="space-y-3">
           <div
             class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
@@ -700,7 +642,6 @@ const deleteApplication = async () => {
           </div>
         </div>
 
-        <!-- Restart policy block -->
         <div class="space-y-3">
           <div
             class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
@@ -722,13 +663,12 @@ const deleteApplication = async () => {
               </SelectContent>
             </Select>
             <p class="text-sm text-muted-foreground">
-              Whether the container restarts after the docker daemon
-              (or host) reboots.
+              Whether the container restarts after the docker daemon (or host)
+              reboots.
             </p>
           </div>
         </div>
 
-        <!-- Healthcheck block -->
         <div class="space-y-3">
           <div
             class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
@@ -744,8 +684,8 @@ const deleteApplication = async () => {
               autocomplete="off"
             />
             <p class="text-sm text-muted-foreground">
-              Single command run inside the container by docker's
-              HEALTHCHECK. Leave blank to skip.
+              Single command run inside the container by docker's HEALTHCHECK.
+              Leave blank to skip.
             </p>
           </div>
         </div>
@@ -795,11 +735,15 @@ const deleteApplication = async () => {
               <button
                 type="button"
                 class="absolute right-0 top-0 grid h-10 w-10 place-items-center text-muted-foreground hover:text-foreground"
-                :title="securityRevealPassword ? 'Hide password' : 'Show password'"
+                :title="
+                  securityRevealPassword ? 'Hide password' : 'Show password'
+                "
                 @click="securityRevealPassword = !securityRevealPassword"
               >
                 <Icon
-                  :name="securityRevealPassword ? 'lucide:eye-off' : 'lucide:eye'"
+                  :name="
+                    securityRevealPassword ? 'lucide:eye-off' : 'lucide:eye'
+                  "
                   class="h-4 w-4"
                 />
               </button>
@@ -807,8 +751,8 @@ const deleteApplication = async () => {
           </div>
         </div>
         <p class="text-sm text-muted-foreground">
-          Password is hashed by Traefik (htpasswd) at deploy time and
-          stored in the application's build_config.
+          Password is hashed by Traefik (htpasswd) at deploy time and stored in
+          the application's build_config.
         </p>
 
         <Button :disabled="securitySaving" @click="saveSecurity">
@@ -827,10 +771,9 @@ const deleteApplication = async () => {
         <div>
           <h3 class="text-lg font-medium">Ports</h3>
           <p class="text-sm text-muted-foreground">
-            Extra <code>host:container</code> mappings, one per line.
-            For HTTP apps prefer the Domains tab — Traefik handles TLS +
-            routing. These are for non-HTTP services that need a raw
-            host port.
+            Extra <code>host:container</code> mappings, one per line. For HTTP
+            apps prefer the Domains tab — Traefik handles TLS + routing. These
+            are for non-HTTP services that need a raw host port.
           </p>
         </div>
 
@@ -876,23 +819,13 @@ const deleteApplication = async () => {
       </div>
     </div>
 
-    <!-- ─── Traefik dynamic-config ────────────────────────────── -->
-    <!--
-      Mirrors dokploy's Advanced → Traefik card: read-only viewer with
-      a Modify button that opens up the editor for emergency tweaks.
-      The deploy task is the source of truth — adding a domain on the
-      Domains tab regenerates this file, so manual edits get clobbered
-      on the next domain change. The Save flow round-trips through
-      WriteTraefikDynamicFile, which validates filename + size cap;
-      Traefik watches the dir and picks up changes with no reload.
-    -->
     <div v-show="activeSection === 'proxy'" class="space-y-4">
       <div>
         <h3 class="text-lg font-medium">Traefik</h3>
         <p class="text-sm text-muted-foreground">
-          Modify the traefik config, in rare cases you may need to add
-          specific config, be careful because modifying incorrectly
-          can break traefik and your application.
+          Modify the traefik config, in rare cases you may need to add specific
+          config, be careful because modifying incorrectly can break traefik and
+          your application.
           <span
             v-if="traefikFilename"
             class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono text-xs"
@@ -915,26 +848,15 @@ const deleteApplication = async () => {
           />
         </div>
         <div v-else-if="!traefikContent && !traefikEditing" class="relative">
-          <!--
-            Empty state — file doesn't exist yet on the host (first
-            deploy hasn't run, or no domains attached). Modify still
-            works; saving creates the file.
-          -->
           <div
             class="flex h-32 flex-col items-center justify-center rounded-md border border-dashed text-center text-xs text-muted-foreground"
           >
             <Icon name="lucide:route-off" class="mb-2 h-5 w-5" />
-            No Traefik config on this server yet. Attach a domain on the
-            Domains tab and deploy — or hit Modify to write the file
-            yourself.
+            No Traefik config on this server yet. Attach a domain on the Domains
+            tab and deploy — or hit Modify to write the file yourself.
           </div>
         </div>
         <div v-else class="relative">
-          <!--
-            Modify button overlay matches the dokploy screenshot —
-            top-right above the editor. Hidden while editing because
-            the Save / Cancel actions move to the footer.
-          -->
           <Button
             v-if="!traefikEditing"
             size="sm"
@@ -977,24 +899,12 @@ const deleteApplication = async () => {
       </div>
     </div>
 
-    <!-- ─── Danger Zone ───────────────────────────────────────── -->
-    <!--
-      Same destructive-tinted border + divide-y row layout the
-      database Advanced uses. Only one action for applications — no
-      Rebuild row because Rebuild for apps is just "Deploy", which is
-      non-destructive and lives in the Actions dropdown.
-    -->
-    <div
-      v-if="canDelete"
-      v-show="activeSection === 'danger'"
-      class="space-y-4"
-    >
+    <div v-if="canDelete" v-show="activeSection === 'danger'" class="space-y-4">
       <div>
         <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
         <p class="text-sm text-muted-foreground">
-          Permanently delete this application. The container is stopped
-          and removed; volumes (if any) stay on disk. This action
-          cannot be undone.
+          Permanently delete this application. The container is stopped and
+          removed; volumes (if any) stay on disk. This action cannot be undone.
         </p>
       </div>
 

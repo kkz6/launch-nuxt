@@ -1,46 +1,32 @@
 import type { User } from "~/types";
 import { authService } from "~/services/authService";
 
-// Track initialization state globally
 let authInitPromise: Promise<void> | null = null;
 
-/**
- * Authentication composable for managing user state and auth operations
- */
 export const useAuth = () => {
   const { setTokens, clearTokens, getAccessToken, setCurrentTeamId } = useApi();
 
-  // Reactive state
   const user = useState<User | null>("auth_user", () => null);
   const isLoading = useState("auth_loading", () => false);
   const isInitialized = useState("auth_initialized", () => false);
 
-  // Computed
   const isAuthenticated = computed(() => !!getAccessToken() && !!user.value);
   const token = computed(() => getAccessToken());
 
-  /**
-   * Initialize auth state from stored token
-   * Returns a promise that resolves when initialization is complete
-   */
   const initAuth = async (): Promise<void> => {
-    // Skip on server
     if (import.meta.server) {
       isInitialized.value = true;
       return;
     }
 
-    // If already initialized, return immediately
     if (isInitialized.value) {
       return;
     }
 
-    // If initialization is in progress, wait for it
     if (authInitPromise) {
       return authInitPromise;
     }
 
-    // Start initialization
     authInitPromise = (async () => {
       try {
         const storedToken = getAccessToken();
@@ -56,109 +42,73 @@ export const useAuth = () => {
     return authInitPromise;
   };
 
-  /**
-   * Wait for auth to be initialized (for use in middleware)
-   */
   const waitForAuth = async (): Promise<void> => {
     if (import.meta.server) return;
 
-    // If already initialized, return
     if (isInitialized.value) return;
 
-    // If init is in progress, wait for it
     if (authInitPromise) {
       return authInitPromise;
     }
 
-    // Otherwise, initialize now
     return initAuth();
   };
 
-  /**
-   * Set the current user
-   */
   const setUser = (newUser: User | null) => {
     user.value = newUser;
-    // Update stored team ID when user is set
     if (newUser?.current_team_id) {
       setCurrentTeamId(newUser.current_team_id);
     }
   };
 
-  /**
-   * Check if a user exists by email
-   */
+  const withLoading = async <T>(operation: () => Promise<T>): Promise<T> => {
+    isLoading.value = true;
+    try {
+      return await operation();
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   const checkUserStatus = async (email: string) => {
     const response = await authService.checkUserStatus(email);
     return response.data;
   };
 
-  /**
-   * Login with email and password.
-   * If 2FA is enabled, returns { two_factor_required: true, challenge_token } without tokens.
-   */
-  const login = async (credentials: { email: string; password: string }) => {
-    isLoading.value = true;
-    try {
+  const login = (credentials: { email: string; password: string }) =>
+    withLoading(async () => {
       const response = await authService.login(credentials);
 
-      // If 2FA is required, don't store tokens — just return the challenge data
       if (response.data.two_factor_required) {
         return response.data;
       }
 
-      // Store tokens (guaranteed present when two_factor_required is false)
       setTokens(response.data.access_token!, response.data.refresh_token!);
-
-      // Set user state
       setUser(response.data.user ?? null);
-
-      // Mark as initialized
       isInitialized.value = true;
 
       return response.data;
-    } finally {
-      isLoading.value = false;
-    }
-  };
+    });
 
-  /**
-   * Register a new user
-   */
-  const register = async (data: {
+  const register = (data: {
     name: string;
     email: string;
     password: string;
     password_confirmation: string;
-  }) => {
-    isLoading.value = true;
-    try {
+  }) =>
+    withLoading(async () => {
       const response = await authService.register(data);
-
-      // Store tokens
       setTokens(response.data.access_token!, response.data.refresh_token!);
-
-      // Set user state
       setUser(response.data.user ?? null);
-
-      // Mark as initialized
       isInitialized.value = true;
 
       return response.data;
-    } finally {
-      isLoading.value = false;
-    }
-  };
+    });
 
-  /**
-   * Logout the current user
-   */
   const logout = async () => {
     try {
       if (getAccessToken()) {
-        await authService.logout().catch(() => {
-          // Ignore errors during logout
-        });
+        await authService.logout().catch(() => {});
       }
     } finally {
       clearTokens();
@@ -167,98 +117,64 @@ export const useAuth = () => {
     }
   };
 
-  /**
-   * Fetch the current user from the API
-   */
   const fetchUser = async () => {
     if (!getAccessToken()) return null;
 
-    isLoading.value = true;
-    try {
-      const response = await authService.getUser();
-      setUser(response.data);
-      return response.data;
-    } catch {
-      clearTokens();
-      setUser(null);
-      return null;
-    } finally {
-      isLoading.value = false;
-    }
+    return withLoading(async () => {
+      try {
+        const response = await authService.getUser();
+        setUser(response.data);
+        return response.data;
+      } catch {
+        clearTokens();
+        setUser(null);
+        return null;
+      }
+    });
   };
 
-  /**
-   * Update user profile
-   */
-  const updateProfile = async (data: {
+  const updateProfile = (data: {
     name?: string;
     email?: string;
     timezone?: string;
-  }) => {
-    isLoading.value = true;
-    try {
+  }) =>
+    withLoading(async () => {
       const response = await authService.updateProfile(data);
       setUser(response.data);
       return response.data;
-    } finally {
-      isLoading.value = false;
-    }
-  };
+    });
 
-  /**
-   * Update user password
-   */
-  const updatePassword = async (data: {
+  const updatePassword = (data: {
     current_password: string;
     password: string;
     password_confirmation: string;
-  }) => {
-    isLoading.value = true;
-    try {
+  }) =>
+    withLoading(async () => {
       await authService.updatePassword(data);
-    } finally {
-      isLoading.value = false;
-    }
-  };
+    });
 
-  /**
-   * Request password reset email
-   */
-  const forgotPassword = async (email: string) => {
-    isLoading.value = true;
-    try {
+  const forgotPassword = (email: string) =>
+    withLoading(async () => {
       await authService.forgotPassword(email);
-    } finally {
-      isLoading.value = false;
-    }
-  };
+    });
 
-  /**
-   * Reset password with token
-   */
-  const resetPassword = async (data: {
+  const resetPassword = (data: {
     token: string;
     email: string;
     password: string;
     password_confirmation: string;
-  }) => {
-    isLoading.value = true;
-    try {
+  }) =>
+    withLoading(async () => {
       await authService.resetPassword(data);
-    } finally {
-      isLoading.value = false;
-    }
-  };
+    });
 
   return {
-    // State
     user,
     token,
     isAuthenticated,
     isLoading,
     isInitialized,
 
-    // Methods
     initAuth,
     waitForAuth,
     setUser,
