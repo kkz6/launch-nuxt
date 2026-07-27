@@ -49,6 +49,8 @@ const rawLogs = ref('')
 // handshake + first-frame latency, so users who DO have logs don't
 // see this state flash on the way in.
 const emptyConfirmed = ref(false)
+const streamEnded = ref(false)
+const streamError = ref('')
 let emptyConfirmTimer: ReturnType<typeof setTimeout> | null = null
 const filteredLogs = ref<LogLine[]>([])
 const autoScroll = ref(true)
@@ -371,6 +373,8 @@ const connectWebSocket = async () => {
   rawLogs.value = ''
   filteredLogs.value = []
   emptyConfirmed.value = false
+  streamEnded.value = false
+  streamError.value = ''
   if (emptyConfirmTimer) {
     clearTimeout(emptyConfirmTimer)
     emptyConfirmTimer = null
@@ -421,6 +425,8 @@ const connectWebSocket = async () => {
 
   ws.onopen = () => {
     wsOpen.value = true
+    streamEnded.value = false
+    streamError.value = ''
     // Arm the empty-state timer — if we still haven't received any
     // data after this window, swap the perpetual spinner for "No
     // logs available". Cancelled on the first onmessage below.
@@ -433,7 +439,25 @@ const connectWebSocket = async () => {
   }
 
   ws.onmessage = (e) => {
-    rawLogs.value += e.data
+    const data = typeof e.data === 'string' ? e.data : String(e.data)
+    try {
+      const event = JSON.parse(data) as {
+        event?: string
+        message?: string
+        data?: { message?: string }
+      }
+      if (event.event === 'error') {
+        streamError.value =
+          event.data?.message || event.message || 'Unable to load logs'
+        streamEnded.value = true
+        wsOpen.value = false
+        return
+      }
+    } catch {
+      // Log output is plain text and may contain JSON-like lines.
+    }
+
+    rawLogs.value += data
     // First byte arrived — kill the empty-state timer so we don't
     // race the "Loading…" → lines transition with an empty banner.
     if (emptyConfirmTimer) {
@@ -448,10 +472,13 @@ const connectWebSocket = async () => {
 
   ws.onerror = () => {
     wsOpen.value = false
+    streamEnded.value = true
+    if (!streamError.value) streamError.value = 'Unable to connect to log stream'
   }
 
   ws.onclose = () => {
     wsOpen.value = false
+    streamEnded.value = true
   }
 }
 
@@ -545,22 +572,15 @@ onUnmounted(() => {
           ]"
           @scroll="handleScroll"
         >
-          <!--
-            Four-state machine for the empty overlay:
-              1. !wsOpen                                          → Connecting…
-              2. wsOpen && !emptyConfirmed && no parsed lines yet → Loading logs…
-              3. wsOpen && emptyConfirmed (no bytes after 2.5s)   → No logs available
-              4. parsed lines present                             → render the list
-            The "emptyConfirmed" timer prevents the spinner from
-            sitting forever on genuinely empty logs (daemon hasn't
-            printed anything, log file fresh), while still being long
-            enough to swallow normal WS-open + first-frame latency.
-          -->
           <div
             v-if="filteredLogs.length === 0"
             class="absolute inset-0 flex items-center justify-center gap-2 bg-zinc-950/80 text-sm text-zinc-400"
           >
-            <template v-if="wsOpen && emptyConfirmed">
+            <template v-if="streamError">
+              <Icon name="lucide:triangle-alert" class="h-4 w-4 text-red-400" />
+              <span>{{ streamError }}</span>
+            </template>
+            <template v-else-if="streamEnded || (wsOpen && emptyConfirmed)">
               <Icon name="lucide:file-x" class="h-4 w-4" />
               <span>No logs available</span>
             </template>
