@@ -140,31 +140,31 @@ onUnmounted(() => {
 
   <Sheet v-model:open="logsOpen">
     <SheetContent
-      class="!inset-y-auto !bottom-auto !right-0 !top-0 flex h-[100dvh] w-full flex-col gap-0 overflow-hidden border-l p-0 outline-none sm:!right-4 sm:!top-[8dvh] sm:h-[84dvh] sm:max-w-4xl sm:rounded-xl sm:border"
+      class="inset-y-0 right-0 flex h-[100dvh] w-full flex-col gap-0 overflow-hidden border-0 bg-background p-0 shadow-none outline-none sm:max-w-4xl sm:border-l sm:border-border/70 sm:shadow-[-18px_0_45px_-30px_rgba(15,23,42,0.4)]"
     >
       <SheetHeader
-        class="shrink-0 border-b bg-background px-5 py-5 pr-12 text-left sm:px-6 sm:pr-14"
+        class="shrink-0 gap-y-0 border-b border-border/70 bg-background px-5 py-4 pr-12 text-left sm:px-6 sm:py-5 sm:pr-14"
       >
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
-            <SheetDescription class="mb-1 text-xs font-medium uppercase tracking-wider">
-              Live deployment output
-            </SheetDescription>
-            <SheetTitle class="truncate text-lg sm:text-xl">
-              {{ selected?.label }}
-            </SheetTitle>
-          </div>
+        <SheetDescription
+          class="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+        >
+          Active deployment
+        </SheetDescription>
+        <div class="mt-1.5 flex min-w-0 flex-wrap items-center gap-2.5">
+          <SheetTitle class="truncate text-lg tracking-tight sm:text-xl">
+            {{ selected?.label }}
+          </SheetTitle>
           <span
             v-if="selected"
-            class="mt-0.5 inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary"
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/50 px-2 py-1 text-xs font-medium text-foreground"
           >
-            <Loader2 class="h-3 w-3 animate-spin" />
+            <Loader2 class="h-3 w-3 animate-spin text-muted-foreground" />
             {{ humanize(selected.status) }}
           </span>
         </div>
         <div
           v-if="selected"
-          class="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+          class="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
         >
           <span>{{ humanize(selected.kind) }}</span>
           <span aria-hidden="true">·</span>
