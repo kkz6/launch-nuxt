@@ -3,6 +3,7 @@ import { Activity, CircleAlert, CircleCheck, Loader2 } from 'lucide-vue-next'
 import {
   useCommandEvents,
   useDeploymentEvents,
+  useTaskEvents,
 } from '~/composables/useChannelEvents'
 import {
   DropdownMenu,
@@ -74,6 +75,11 @@ useDeploymentEvents(teamId, async (data, event) => {
 
 useCommandEvents(teamId, fetchActions)
 
+useTaskEvents(teamId, async (data, event) => {
+  selected.value = updateActionFromEvent(selected.value, data, event)
+  await fetchActions()
+})
+
 const elapsed = (action: ActiveAction) => {
   const startedAt = new Date(action.started_at || action.created_at).getTime()
   const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
@@ -84,9 +90,16 @@ const actionStateDescription = (action: ActiveAction) => {
   if (isActiveActionRunning(action)) return `Running for ${elapsed(action)}`
 
   const tone = activeActionStatusTone(action.status)
-  if (tone === 'success') return 'Deployment complete'
+  if (tone === 'success') return `${humanizeActionValue(action.kind)} complete`
   if (tone === 'failure') return activeActionStatusLabel(action)
   return humanizeActionValue(action.status)
+}
+
+const actionOutputContextLabel = (action: ActiveAction | null) => {
+  if (!action) return 'Live output'
+
+  const phase = isActiveActionRunning(action) ? 'Live' : 'Final'
+  return `${phase} ${humanizeActionValue(action.kind).toLowerCase()} output`
 }
 
 const outputModeLabel = (action: ActiveAction) =>
@@ -189,7 +202,7 @@ onUnmounted(() => {
             }"
             aria-hidden="true"
           />
-          Live deployment
+          {{ actionOutputContextLabel(selected) }}
         </SheetDescription>
         <div class="mt-2 flex min-w-0 flex-wrap items-center gap-3">
           <SheetTitle

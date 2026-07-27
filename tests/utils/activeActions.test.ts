@@ -83,6 +83,22 @@ describe('updateActionFromEvent', () => {
 
     expect(updated?.status).toBe('finished')
   })
+
+  it('updates a selected server task from task.updated', () => {
+    const updated = updateActionFromEvent(
+      action({
+        id: 'task-1',
+        kind: 'task',
+        status: 'running',
+        target_type: 'server',
+        target_id: 'server-1',
+      }),
+      { task_id: 'task-1', status: 'finished' },
+      'task.updated',
+    )
+
+    expect(updated?.status).toBe('finished')
+  })
 })
 
 describe('activeActionPath', () => {
@@ -108,5 +124,18 @@ describe('activeActionPath', () => {
         action({ id: 'command-1', kind: 'command', task_id: undefined }),
       ),
     ).toBe('/servers/server-1/sites/site-1?tab=commands')
+  })
+
+  it('routes server task actions to the server page', () => {
+    expect(
+      activeActionPath(
+        action({
+          id: 'task-1',
+          kind: 'task',
+          target_type: 'server',
+          target_id: 'server-1',
+        }),
+      ),
+    ).toBe('/servers/server-1')
   })
 })
