@@ -1,16 +1,11 @@
 <script setup lang="ts">
+import { reactive, toRefs } from "vue";
 import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import {
-  Alert,
-  AlertDescription,
-} from "~/components/ui/alert";
-import {
-  dockerService,
-  type DockerCompose,
-} from "~/services/dockerService";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { dockerService, type DockerCompose } from "~/services/dockerService";
 
 interface Props {
   compose: DockerCompose;
@@ -21,16 +16,52 @@ const emit = defineEmits<{
   deleted: [];
 }>();
 
-// Role gating — the Danger Zone (delete stack) is admin/owner only.
 const { canDelete } = useCan();
 
-// Rename form moved here from compose/General.vue so General stays
-// read-only (info-card grid only, matches application + database
-// detail pages). Stack name is the only mutable field today; future
-// per-stack knobs (pause toggle, restart-policy override, etc.) will
-// live in their own sections above the danger zone.
-const name = ref(props.compose.name);
-const isSaving = ref(false);
+interface ComposeAdvancedState {
+  name: string;
+  isSaving: boolean;
+  runCommand: string;
+  isSavingRunCommand: boolean;
+  defaultRunCommand: string;
+  deleteLoading: boolean;
+  traefikFilename: string;
+  traefikContent: string;
+  traefikContentOnDisk: string;
+  traefikLoading: boolean;
+  traefikSaving: boolean;
+  traefikEditing: boolean;
+}
+
+const state = reactive<ComposeAdvancedState>({
+  name: props.compose.name,
+  isSaving: false,
+  runCommand: props.compose.run_command || "",
+  isSavingRunCommand: false,
+  defaultRunCommand: "",
+  deleteLoading: false,
+  traefikFilename: "",
+  traefikContent: "",
+  traefikContentOnDisk: "",
+  traefikLoading: true,
+  traefikSaving: false,
+  traefikEditing: false,
+});
+
+const {
+  name,
+  isSaving,
+  runCommand,
+  isSavingRunCommand,
+  defaultRunCommand,
+  deleteLoading,
+  traefikFilename,
+  traefikContent,
+  traefikContentOnDisk,
+  traefikLoading,
+  traefikSaving,
+  traefikEditing,
+} = toRefs(state);
 
 watch(
   () => props.compose.name,
@@ -63,23 +94,6 @@ const saveSettings = async () => {
   }
 };
 
-// --- Run Command ---------------------------------------------------------
-//
-// Free-text override for the docker suffix the deploy script runs.
-// Empty = use default (`compose -p <name> -f <file> up -d --build
-// --remove-orphans`). Non-empty = run `docker <run_command>`
-// verbatim — operator owns the whole tail including the
-// `compose ...` shape. Matches dokploy's Run Command feature.
-//
-// We pull the live default-command preview from the backend so the
-// "Default Command (...)" hint shows the actual project-slug /
-// compose-file path the deploy job would resolve. Rendered through
-// the same code path as the deploy script so they can't drift.
-
-const runCommand = ref(props.compose.run_command || "");
-const isSavingRunCommand = ref(false);
-const defaultRunCommand = ref<string>("");
-
 watch(
   () => props.compose.run_command,
   (cmd) => {
@@ -96,8 +110,6 @@ const fetchDefaultCommand = async () => {
     );
     defaultRunCommand.value = res.data?.command || "";
   } catch {
-    // Silent: the input + Save still work. The hint just won't
-    // populate, which is a minor UX miss not worth a toast.
     defaultRunCommand.value = "";
   }
 };
@@ -111,10 +123,6 @@ const saveRunCommand = async () => {
       props.compose.server_id,
       props.compose.project_id,
       props.compose.id,
-      // Backend semantics: empty string CLEARS the override (reverts
-      // to default), non-empty replaces it. The `?? ""` is belt-and-
-      // braces — runCommand is already a string but the model can
-      // hold null for the type contract.
       { run_command: runCommand.value },
     );
     toast.success(
@@ -131,38 +139,9 @@ const saveRunCommand = async () => {
   }
 };
 
-// Compose Advanced mirrors components/application/Advanced.vue —
-// houses the destructive operations for the stack. General stays
-// read-only-ish (rename + info); Advanced owns Delete with the
-// opt-in named-volume cleanup.
-//
-// Future expansion candidates that map to this surface (NOT in
-// this slice):
-//   - Per-stack restart policy override (overrides whatever the
-//     YAML declares)
-//   - Pause / unpause toggle (`docker compose pause`)
-//   - Reset to inline YAML from a git source (or vice versa)
-
-const deleteLoading = ref(false);
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
-
-// --- Traefik dynamic-config card -----------------------------------
-//
-// Mirrors the application Advanced → Traefik card. Read-only by
-// default; Modify opens the editor for emergency tweaks. The
-// SyncComposeTraefikConfig job regenerates this file from compose
-// domain rows on every domain mutation + after each successful
-// deploy, so hand-edits survive until something triggers a re-render
-// — same caveat the application card spells out.
-
-const traefikFilename = ref("");
-const traefikContent = ref("");
-const traefikContentOnDisk = ref("");
-const traefikLoading = ref(true);
-const traefikSaving = ref(false);
-const traefikEditing = ref(false);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const traefikDirty = computed(
   () => traefikContent.value !== traefikContentOnDisk.value,
@@ -209,9 +188,7 @@ const saveTraefikConfig = async () => {
     traefikContentOnDisk.value = res.data.content;
     traefikFilename.value = res.data.filename;
     traefikEditing.value = false;
-    toast.success(
-      "Traefik config saved — Traefik picks it up automatically.",
-    );
+    toast.success("Traefik config saved — Traefik picks it up automatically.");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to save Traefik config");
@@ -232,10 +209,6 @@ const deleteCompose = async () => {
     destructive: true,
     helpText: "Type the stack name to confirm deletion:",
     inputVerificationText: props.compose.name,
-    // Opt-in volume cleanup. Off by default so a misclicked Delete
-    // preserves persistent data; the user has to explicitly tick the
-    // box to wipe state. Backend toggles `docker compose down` ↔
-    // `docker compose down -v` on this flag.
     checkbox: {
       label: "Also delete named volumes (data will be lost)",
       checked: false,
@@ -271,13 +244,6 @@ const deleteCompose = async () => {
   <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!--
-      General section — same Card-primitive sectioned layout the
-      application Advanced uses. Holds the rename today; future
-      stack-level toggles (pause, restart-policy override) land
-      here. Stays read-only-friendly: the Save button greys out
-      when there's nothing to apply.
-    -->
     <div class="rounded-lg border bg-card p-6">
       <div class="flex items-start gap-3">
         <div
@@ -288,8 +254,8 @@ const deleteCompose = async () => {
         <div class="min-w-0 flex-1">
           <h3 class="text-base font-semibold">General</h3>
           <p class="mt-0.5 text-sm text-muted-foreground">
-            Rename the stack. Source + compose body are immutable from
-            this page — reconfigure by recreating the stack.
+            Rename the stack. Source + compose body are immutable from this page
+            — reconfigure by recreating the stack.
           </p>
         </div>
       </div>
@@ -321,14 +287,6 @@ const deleteCompose = async () => {
       </div>
     </div>
 
-    <!--
-      Run Command — free-text override for the docker suffix the
-      deploy script runs. Matches dokploy's add-command card shape.
-      Trust the operator: anything they type lands as `docker
-      <run_command>` verbatim. Default Command hint comes from the
-      live backend renderer so the suggestion can't drift from what
-      a real deploy would do.
-    -->
     <div class="rounded-lg border bg-card p-6">
       <div class="flex items-start gap-3">
         <div
@@ -354,10 +312,10 @@ const deleteCompose = async () => {
             class="h-4 w-4 text-amber-600 dark:text-amber-400"
           />
           <AlertDescription class="text-sm">
-            Modifying the default command may affect deployment
-            stability, impacting logs and monitoring. Proceed
-            carefully and test thoroughly. By default, the command
-            starts with <strong>docker</strong>.
+            Modifying the default command may affect deployment stability,
+            impacting logs and monitoring. Proceed carefully and test
+            thoroughly. By default, the command starts with
+            <strong>docker</strong>.
           </AlertDescription>
         </Alert>
 
@@ -373,7 +331,9 @@ const deleteCompose = async () => {
           />
           <p class="text-xs text-muted-foreground">
             <template v-if="defaultRunCommand">
-              Default Command (<code class="font-mono">docker {{ defaultRunCommand }}</code>)
+              Default Command (<code class="font-mono"
+                >docker {{ defaultRunCommand }}</code
+              >)
             </template>
             <template v-else>
               Leave blank to use the default deploy command.
@@ -395,14 +355,6 @@ const deleteCompose = async () => {
       </div>
     </div>
 
-    <!--
-      Traefik dynamic-config card. Same shape as the application
-      Advanced Traefik card — read-only by default, Modify reveals
-      the editor + Save/Cancel in the footer. The
-      SyncComposeTraefikConfig job populates this file from compose
-      domain rows on every domain mutation and after every successful
-      deploy, so manual edits get clobbered when domains change.
-    -->
     <div class="rounded-lg border bg-card">
       <div class="flex items-start gap-3 p-4">
         <div
@@ -413,9 +365,9 @@ const deleteCompose = async () => {
         <div class="min-w-0 flex-1">
           <h3 class="text-base font-semibold">Traefik</h3>
           <p class="mt-0.5 text-sm text-muted-foreground">
-            Modify the traefik config, in rare cases you may need to
-            add specific config, be careful because modifying
-            incorrectly can break traefik and your application.
+            Modify the traefik config, in rare cases you may need to add
+            specific config, be careful because modifying incorrectly can break
+            traefik and your application.
             <span
               v-if="traefikFilename"
               class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono text-xs"
@@ -443,9 +395,9 @@ const deleteCompose = async () => {
             class="flex h-32 flex-col items-center justify-center rounded-md border border-dashed text-center text-xs text-muted-foreground"
           >
             <Icon name="lucide:route-off" class="mb-2 h-5 w-5" />
-            No Traefik config on this server yet. Add a domain on the
-            Domains tab and the platform will write the file — or hit
-            Modify to write it yourself.
+            No Traefik config on this server yet. Add a domain on the Domains
+            tab and the platform will write the file — or hit Modify to write it
+            yourself.
           </div>
         </div>
         <div v-else class="relative">
@@ -496,20 +448,15 @@ const deleteCompose = async () => {
       </div>
     </div>
 
-    <!--
-      Danger Zone — wrapped in a destructive-tinted card so the
-      visual weight matches the action. Mirrors the application
-      Advanced danger zone shape.
-    -->
     <div
       v-if="canDelete"
       class="rounded-lg border border-destructive/30 bg-destructive/[0.03] p-6"
     >
       <h3 class="text-base font-semibold text-destructive">Danger Zone</h3>
       <p class="mt-1 text-sm text-muted-foreground">
-        Permanently delete this compose stack. Every container the stack
-        runs is torn down on the server. Named volumes survive unless
-        you opt in via the checkbox in the confirmation.
+        Permanently delete this compose stack. Every container the stack runs is
+        torn down on the server. Named volumes survive unless you opt in via the
+        checkbox in the confirmation.
       </p>
 
       <Button
