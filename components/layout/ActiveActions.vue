@@ -89,6 +89,9 @@ const actionStateDescription = (action: ActiveAction) => {
   return humanizeActionValue(action.status)
 }
 
+const outputModeLabel = (action: ActiveAction) =>
+  isActiveActionRunning(action) ? 'Live output' : 'Final output'
+
 const openAction = (action: ActiveAction) => {
   selected.value = action
   if (action.task_id) {
@@ -164,33 +167,49 @@ onUnmounted(() => {
 
   <Sheet v-model:open="logsOpen">
     <SheetContent
-      class="inset-y-0 right-0 flex h-[100dvh] w-full flex-col gap-0 overflow-hidden border-0 bg-background p-0 shadow-none outline-none sm:max-w-4xl sm:border-l sm:border-border/70 sm:shadow-[-18px_0_45px_-30px_rgba(15,23,42,0.4)]"
+      class="inset-y-0 right-0 flex h-[100dvh] w-full flex-col gap-0 overflow-hidden border-0 bg-[#0b0c0e] p-0 shadow-none outline-none sm:max-w-5xl sm:shadow-[-28px_0_70px_-36px_rgba(15,23,42,0.65)] [&>button]:right-5 [&>button]:top-5 [&>button]:grid [&>button]:h-8 [&>button]:w-8 [&>button]:place-items-center [&>button]:rounded-lg [&>button]:ring-offset-0 [&>button]:transition-colors hover:[&>button]:bg-muted"
     >
       <SheetHeader
-        class="shrink-0 gap-y-0 border-b border-border/70 bg-background px-5 py-4 pr-12 text-left sm:px-6 sm:py-5 sm:pr-14"
+        class="relative z-10 shrink-0 gap-y-0 border-b border-border/60 bg-gradient-to-b from-background via-background to-muted/25 px-5 pb-5 pt-4 pr-14 text-left sm:px-7 sm:pb-6 sm:pt-5 sm:pr-16"
       >
         <SheetDescription
-          class="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+          class="flex items-center gap-2 text-xs font-medium text-muted-foreground"
         >
-          Deployment output
+          <span
+            class="h-1.5 w-1.5 rounded-full bg-muted-foreground/60"
+            :class="{
+              'animate-pulse bg-emerald-500':
+                selected && isActiveActionRunning(selected),
+              'bg-emerald-500':
+                selected &&
+                activeActionStatusTone(selected.status) === 'success',
+              'bg-red-500':
+                selected &&
+                activeActionStatusTone(selected.status) === 'failure',
+            }"
+            aria-hidden="true"
+          />
+          Live deployment
         </SheetDescription>
-        <div class="mt-1.5 flex min-w-0 flex-wrap items-center gap-2.5">
-          <SheetTitle class="truncate text-lg tracking-tight sm:text-xl">
+        <div class="mt-2 flex min-w-0 flex-wrap items-center gap-3">
+          <SheetTitle
+            class="truncate text-xl font-semibold tracking-[-0.025em] sm:text-2xl"
+          >
             {{ selected?.label }}
           </SheetTitle>
           <span
             v-if="selected"
-            class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/50 px-2 py-1 text-xs font-medium text-foreground"
+            class="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-zinc-50 shadow-sm dark:bg-zinc-100 dark:text-zinc-900"
             :class="{
-              'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400':
+              'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-white':
                 activeActionStatusTone(selected.status) === 'success',
-              'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400':
+              'bg-red-600 text-white dark:bg-red-500 dark:text-white':
                 activeActionStatusTone(selected.status) === 'failure',
             }"
           >
             <Loader2
               v-if="activeActionStatusTone(selected.status) === 'running'"
-              class="h-3 w-3 animate-spin text-muted-foreground"
+              class="h-3 w-3 animate-spin"
             />
             <CircleCheck
               v-else-if="activeActionStatusTone(selected.status) === 'success'"
@@ -205,26 +224,45 @@ onUnmounted(() => {
         </div>
         <div
           v-if="selected"
-          class="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
+          class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground"
         >
-          <span>{{ humanizeActionValue(selected.kind) }}</span>
-          <span aria-hidden="true">·</span>
+          <span class="font-medium text-foreground/70">{{
+            humanizeActionValue(selected.kind)
+          }}</span>
+          <span class="h-3 w-px bg-border" aria-hidden="true" />
           <span>{{ humanizeActionValue(selected.target_type) }}</span>
-          <span aria-hidden="true">·</span>
+          <span class="h-3 w-px bg-border" aria-hidden="true" />
           <span>{{ actionStateDescription(selected) }}</span>
         </div>
       </SheetHeader>
-      <div class="flex min-h-0 flex-1 bg-zinc-950">
-        <ServerLogViewer
-          v-if="logsOpen && selected?.task_id"
-          :server-id="selected.server_id"
-          entity="task"
-          :entity-id="selected.task_id"
-          :no-timestamp="true"
-          hide-options
-          container-class-name="h-full rounded-none border-0"
-        />
-      </div>
+      <section class="flex min-h-0 flex-1 flex-col bg-[#0b0c0e]">
+        <div
+          class="flex h-10 shrink-0 items-center justify-between border-b border-white/[0.06] px-5 text-[11px] text-zinc-500 sm:px-7"
+        >
+          <span class="font-mono">Task output</span>
+          <span v-if="selected" class="inline-flex items-center gap-2">
+            <span
+              class="h-1.5 w-1.5 rounded-full bg-zinc-600"
+              :class="{
+                'animate-pulse bg-emerald-400': isActiveActionRunning(selected),
+              }"
+              aria-hidden="true"
+            />
+            {{ outputModeLabel(selected) }}
+          </span>
+        </div>
+        <div class="flex min-h-0 flex-1">
+          <ServerLogViewer
+            v-if="logsOpen && selected?.task_id"
+            :server-id="selected.server_id"
+            entity="task"
+            :entity-id="selected.task_id"
+            :no-timestamp="true"
+            hide-options
+            container-class-name="h-full rounded-none border-0 bg-[#0b0c0e] px-5 py-4 sm:px-7 sm:py-5"
+          />
+        </div>
+      </section>
     </SheetContent>
   </Sheet>
 </template>
