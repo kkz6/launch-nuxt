@@ -7,6 +7,19 @@ interface ChannelEventData {
   status?: string;
   message?: string;
   error?: string;
+  command?: {
+    id: string;
+    site_id: string;
+    command: string;
+    status: "pending" | "running" | "finished" | "failed";
+    output?: string;
+    user?: {
+      id: string;
+      name: string;
+    };
+    created_at: string;
+    [key: string]: unknown;
+  };
   site?: {
     id?: string;
     server_id?: string;
@@ -116,16 +129,11 @@ const useTeamChannelEvents = (
   onEvent: ChannelEventHandler,
 ) => useScopedChannelEvents("team", teamId, events, onEvent);
 
-export const useSiteCommandEvents = (
-  siteId: string | Ref<string>,
+export const useCommandEvents = (
+  teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
 ) => {
-  return useScopedChannelEvents(
-    "site",
-    siteId,
-    ["command.running", "command.finished", "command.failed"],
-    onEvent,
-  );
+  return useTeamChannelEvents(teamId, ["command.updated"], onEvent);
 };
 
 export const useDeploymentEvents = (

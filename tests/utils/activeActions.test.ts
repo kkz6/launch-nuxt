@@ -3,7 +3,7 @@ import {
   activeActionPath,
   activeActionStatusLabel,
   activeActionStatusTone,
-  updateActionFromDeploymentEvent,
+  updateActionFromEvent,
   type ActiveAction,
 } from '../../utils/activeActions'
 
@@ -42,9 +42,9 @@ describe('activeActionStatusTone', () => {
   })
 })
 
-describe('updateActionFromDeploymentEvent', () => {
+describe('updateActionFromEvent', () => {
   it('updates the selected action from a terminal event payload', () => {
-    const updated = updateActionFromDeploymentEvent(
+    const updated = updateActionFromEvent(
       action(),
       { deployment_id: 'deployment-1', status: 'finished' },
       'deployment.finished',
@@ -54,7 +54,7 @@ describe('updateActionFromDeploymentEvent', () => {
   })
 
   it('uses the event name when a terminal event omits status', () => {
-    const updated = updateActionFromDeploymentEvent(
+    const updated = updateActionFromEvent(
       action(),
       { deployment_id: 'deployment-1' },
       'deployment.failed',
@@ -66,12 +66,22 @@ describe('updateActionFromDeploymentEvent', () => {
   it('does not update a different deployment', () => {
     const selected = action()
     expect(
-      updateActionFromDeploymentEvent(
+      updateActionFromEvent(
         selected,
         { deployment_id: 'deployment-2', status: 'finished' },
         'deployment.finished',
       ),
     ).toBe(selected)
+  })
+
+  it('updates a selected command from command.updated', () => {
+    const updated = updateActionFromEvent(
+      action({ id: 'command-1', kind: 'command', status: 'running' }),
+      { command_id: 'command-1', status: 'finished' },
+      'command.updated',
+    )
+
+    expect(updated?.status).toBe('finished')
   })
 })
 
@@ -90,5 +100,13 @@ describe('activeActionPath', () => {
     ).toBe(
       '/servers/server-1/projects/project-1/databases/database-1?tab=deployments',
     )
+  })
+
+  it('routes command actions to the site commands tab', () => {
+    expect(
+      activeActionPath(
+        action({ id: 'command-1', kind: 'command', task_id: undefined }),
+      ),
+    ).toBe('/servers/server-1/sites/site-1?tab=commands')
   })
 })
