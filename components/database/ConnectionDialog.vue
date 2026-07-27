@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { reactive, toRefs } from "vue";
+import { useClipboard } from "@vueuse/core";
 import { toast } from "vue-sonner";
 import {
   Dialog,
@@ -11,21 +13,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Switch } from "~/components/ui/switch";
 import { Button } from "~/components/ui/button";
-import {
-  dockerService,
-  type DockerDatabase,
-} from "~/services/dockerService";
-
-// Database connection-info dialog. Opens from the navbar's Actions
-// dropdown ("Connection info") on the database detail page. Replaces
-// the old Connection card that sat on General — General is now a
-// clean info-card grid like application + compose.
-//
-// Two reasons the dialog wins over the in-page card:
-//   - Credentials are sensitive. A modal is dismissible; a card
-//     that's always on the page risks accidental screenshots.
-//   - The data is read-only and consulted occasionally, not every
-//     page visit. Dialog matches that frequency.
+import { dockerService, type DockerDatabase } from "~/services/dockerService";
 
 interface Props {
   database: DockerDatabase;
@@ -34,17 +22,40 @@ const props = defineProps<Props>();
 
 const open = defineModel<boolean>("open", { default: false });
 
-// Reveal-on-demand for credentials — same pattern the previous card
-// used. We never load passwords into the page unless the user
-// explicitly asks, so a stray screenshare doesn't leak prod creds.
-const revealed = ref<DockerDatabase | null>(null);
-const isRevealing = ref(false);
-const showPassword = ref(false);
+type ConnectionMode = "internal" | "external";
+
+interface ConnectionDialogState {
+  revealed: DockerDatabase | null;
+  isRevealing: boolean;
+  showPassword: boolean;
+  connectionMode: ConnectionMode;
+  exposeEnabled: boolean;
+  exposePort: number | undefined;
+  exposeSaving: boolean;
+}
+
+const state = reactive({
+  revealed: null,
+  isRevealing: false,
+  showPassword: false,
+  connectionMode: "internal",
+  exposeEnabled: Boolean(props.database.external_port),
+  exposePort: props.database.external_port ?? undefined,
+  exposeSaving: false,
+}) as ConnectionDialogState;
+
+const {
+  revealed,
+  isRevealing,
+  showPassword,
+  connectionMode,
+  exposeEnabled,
+  exposePort,
+  exposeSaving,
+} = toRefs(state);
 
 const reveal = async () => {
   if (revealed.value) {
-    // Show ↔ Hide. Mask change re-flows the URL line wrap and the
-    // password row — wrap so the dialog grows / shrinks smoothly.
     await withSmoothResize(() => {
       showPassword.value = !showPassword.value;
     });
@@ -58,9 +69,6 @@ const reveal = async () => {
       props.database.id,
       { reveal: true },
     );
-    // First reveal — biggest size change of all (placeholder dots
-    // are short, real password can wrap the URL). Wrap so the
-    // dialog animates open instead of snapping.
     await withSmoothResize(() => {
       revealed.value = res.data;
       showPassword.value = true;
@@ -73,9 +81,6 @@ const reveal = async () => {
   }
 };
 
-// Reset reveal state every time the dialog opens so a stale reveal
-// from a previous session doesn't carry over. The fetch ran for a
-// reason — keep that contract.
 watch(open, (isOpen) => {
   if (!isOpen) {
     revealed.value = null;
@@ -84,18 +89,18 @@ watch(open, (isOpen) => {
   }
 });
 
+const { copy } = useClipboard();
+
 const copyValue = async (label: string, value: string) => {
   if (!value) return;
   try {
-    await navigator.clipboard.writeText(value);
+    await copy(value);
     toast.success(`${label} copied`);
   } catch {
     toast.error(`Couldn't copy ${label}`);
   }
 };
 
-// Engine catalog — per-engine icon + default port. Single source of
-// truth so future engines just add a row here.
 const engineInfo = computed(() => {
   switch (props.database.engine) {
     case "postgres":
@@ -114,21 +119,10 @@ const engineInfo = computed(() => {
 });
 
 const internalPort = computed(() => engineInfo.value.defaultPort);
-// CRITICAL — Use the backend-computed `container_name`
-// (`launch-db-<project>-<db>`), NOT the bare database name. Sibling
-// containers on launch-network resolve the database via its
-// container name, not its row label. The old General-card UI used
-// `props.database.name` here, which produced a connection URL that
-// looked right but didn't resolve (a stale screenshot is the only
-// evidence; bug fixed in this refactor).
 const internalHost = computed(
   () => props.database.container_name || props.database.name,
 );
 
-// The navbar already loaded the server (it powers the project +
-// workload breadcrumbs) and stashed its public IP in a shared
-// useState bus — re-use it here so External Host renders the real
-// address instead of a literal "<server-ip>" placeholder.
 const sharedServerIp = useState<string | null>(
   "currentServerPublicIp",
   () => null,
@@ -141,9 +135,7 @@ const username = computed(
 const databaseName = computed(
   () => revealed.value?.credentials?.database ?? props.database.name,
 );
-const rawPassword = computed(
-  () => revealed.value?.credentials?.password ?? "",
-);
+const rawPassword = computed(() => revealed.value?.credentials?.password ?? "");
 const passwordDisplay = computed(() => {
   if (!revealed.value?.credentials) return "•".repeat(12);
   return showPassword.value
@@ -151,17 +143,6 @@ const passwordDisplay = computed(() => {
     : "•".repeat(Math.min(16, revealed.value.credentials.password.length));
 });
 
-// The password slot in the connection URL respects the same
-// reveal+show state as the standalone password field. Three states:
-//
-//   - Not revealed yet → "<password>" literal placeholder. Clear
-//     signal that the URL isn't usable until reveal.
-//   - Revealed but hidden → dot mask. The toggle is now actually
-//     doing something to the URL view; Hide really hides.
-//   - Revealed and shown → real password.
-//
-// Mirrors `passwordDisplay`'s logic so the two fields can never
-// disagree about what state they're in.
 const urlPasswordSlot = computed(() => {
   if (!revealed.value) return "<password>";
   if (!showPassword.value) return "•".repeat(8);
@@ -187,15 +168,8 @@ const buildConnectionURL = (host: string, port: number) => {
   }
 };
 
-// Internal/External switcher. External tab disabled when no external
-// port is exposed — explicit feedback rather than hiding the option.
 const hasExternal = computed(() => Boolean(props.database.external_port));
-type ConnectionMode = "internal" | "external";
-const connectionMode = ref<ConnectionMode>("internal");
 
-// Switching modes can change the URL length (server IP usually
-// shorter than container DNS, or vice versa) so wrap the change
-// through the smooth-resize helper for consistency with Reveal.
 const setConnectionMode = (mode: ConnectionMode) => {
   if (mode === connectionMode.value) return;
   void withSmoothResize(() => {
@@ -204,9 +178,7 @@ const setConnectionMode = (mode: ConnectionMode) => {
 };
 
 const activeHost = computed(() =>
-  connectionMode.value === "external"
-    ? externalHost.value
-    : internalHost.value,
+  connectionMode.value === "external" ? externalHost.value : internalHost.value,
 );
 const activePort = computed(() =>
   connectionMode.value === "external"
@@ -217,14 +189,6 @@ const activeConnectionURL = computed(() =>
   buildConnectionURL(activeHost.value, activePort.value),
 );
 
-// Copy-the-URL builds with the REAL password regardless of whether
-// the password field is currently masked. The toggle controls what's
-// on screen (shoulder-surfing protection); Copy is for "I want to
-// use this URL." Once revealed, the user has already consented to
-// the password being in memory — masking is purely visual.
-//
-// Both branches still gate on `revealed.value` so we don't ship a
-// `<password>` placeholder into the clipboard.
 const copyableConnectionURL = computed(() => {
   if (!revealed.value) return "";
   const host = activeHost.value;
@@ -247,26 +211,8 @@ const copyableConnectionURL = computed(() => {
   }
 });
 
-// Copy-Connection-URL stays disabled until reveal so users don't
-// paste a `<password>` placeholder into a config.
 const urlCopyDisabled = computed(() => !revealed.value);
 
-// --- Public Access (expose-to-internet toggle) --------------------
-//
-// Moved here from the Advanced tab. The Connection dialog is where
-// users see "External" is disabled and naturally ask "how do I
-// enable it?" — having the toggle right here closes that loop
-// instead of pushing them to a different tab. Backend wiring is
-// unchanged: POST /expose recreates the container with/without the
-// `-p` flag.
-
-const exposeEnabled = ref(Boolean(props.database.external_port));
-const exposePort = ref<number | undefined>(
-  props.database.external_port ?? undefined,
-);
-const exposeSaving = ref(false);
-
-// Engine default port — placeholder + auto-fill when toggling on.
 const defaultExposePort = computed(() => {
   switch (props.database.engine) {
     case "postgres":
@@ -283,9 +229,6 @@ const defaultExposePort = computed(() => {
   }
 });
 
-// Re-seed from the prop when the parent refetches (the WS event
-// after a successful recreate updates props.database). Without
-// this, the toggle keeps its stale local value after the round-trip.
 watch(
   () => props.database.external_port,
   (port) => {
@@ -295,9 +238,6 @@ watch(
 );
 
 const onExposeToggle = (next: boolean) => {
-  // Toggling on shows the port input + Save row; toggling off may
-  // remove them (only if the toggle isn't dirty). Either way the
-  // dialog's body height changes — animate through it.
   void withSmoothResize(() => {
     exposeEnabled.value = next;
     if (next && !exposePort.value) {
@@ -330,7 +270,6 @@ const saveExpose = async () => {
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to update expose setting");
-    // Roll back the local state to what the backend last persisted.
     exposeEnabled.value = Boolean(props.database.external_port);
     exposePort.value = props.database.external_port ?? undefined;
   } finally {
@@ -338,9 +277,6 @@ const saveExpose = async () => {
   }
 };
 
-// Dirty flag — Save button only enabled when the toggle / port has
-// changed from what the backend currently has. Keeps the user from
-// firing a no-op recreate.
 const exposeDirty = computed(() => {
   const wasEnabled = Boolean(props.database.external_port);
   const wasPort = props.database.external_port ?? undefined;
@@ -349,26 +285,6 @@ const exposeDirty = computed(() => {
   return false;
 });
 
-// --- Smooth height transitions on the dialog --------------------
-//
-// History on this: the pure-CSS path (`interpolate-size:
-// allow-keywords`) only landed in Chrome/Firefox 129+ and Safari
-// hasn't shipped it. A previous attempt used a ResizeObserver +
-// Web Animations API as a reactive after-the-fact animator, but in
-// practice the animation either didn't fire (selector mismatch with
-// reka-ui's stamped attributes) or fought with `overflow-auto` so
-// the new-size content peeked out during the animation.
-//
-// New plan — FLIP technique:
-//   First (capture old height) → Last (let DOM update) →
-//   Invert (snap back via inline style) → Play (transition to new).
-//
-// We expose a `withSmoothResize` helper that takes the state change
-// as a thunk, runs it, then animates from the measured before-height
-// to the measured after-height. Every UI knob that changes the
-// dialog body's size routes through this helper (Reveal toggle,
-// connection-mode switch, expose toggle), so the dialog grows /
-// shrinks on a 200ms curve regardless of which control fired.
 const SMOOTH_RESIZE_SELECTOR = ".dialog-smooth-resize";
 
 async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
@@ -377,22 +293,14 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
   ) as HTMLElement | null;
   if (!el) return await fn();
 
-  // 1. Capture before height + pin it inline so the browser can't
-  //    paint a frame at the natural new size while Vue is patching.
-  //    overflow:hidden keeps the new (larger) content from peeking
-  //    out beyond the pinned box during measurement.
   const fromH = el.offsetHeight;
   el.style.height = `${fromH}px`;
   el.style.overflow = "hidden";
 
-  // 2. Run the state change. Vue queues a re-render.
   const result = await fn();
 
-  // 3. Wait for Vue's DOM patch.
   await nextTick();
 
-  // 4. Briefly release the pin to measure natural height, then
-  //    re-pin so the browser doesn't paint at the new size yet.
   el.style.height = "";
   const toH = el.offsetHeight;
   el.style.height = `${fromH}px`;
@@ -403,25 +311,18 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
     return result;
   }
 
-  // 5. Cancel any in-flight resize animation (so quick double-clicks
-  //    on Reveal/Hide don't stack), then animate via WAAPI.
   el.getAnimations().forEach((a) => a.cancel());
-  const anim = el.animate(
-    [{ height: `${fromH}px` }, { height: `${toH}px` }],
-    { duration: 200, easing: "ease-out", fill: "forwards" },
-  );
-  // Restore natural sizing once the animation settles. `fill: forwards`
-  // keeps the end height applied during the fill phase — calling
-  // `cancel()` after finish drops that hold so future external
-  // content changes (e.g. WS refresh) can resize the dialog freely.
+  const anim = el.animate([{ height: `${fromH}px` }, { height: `${toH}px` }], {
+    duration: 200,
+    easing: "ease-out",
+    fill: "forwards",
+  });
   const cleanup = () => {
     el.style.height = "";
     el.style.overflow = "";
     try {
       anim.cancel();
-    } catch {
-      /* already cancelled */
-    }
+    } catch {}
   };
   anim.addEventListener("finish", cleanup, { once: true });
   anim.addEventListener("cancel", cleanup, { once: true });
@@ -432,33 +333,20 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
 
 <template>
   <Dialog v-model:open="open">
-    <!--
-      `dialog-smooth-resize` is a marker class — the script-side
-      ResizeObserver finds the dialog by this selector in the portal,
-      watches its size, and animates from the previous height to the
-      new height via the Web Animations API on every change (Reveal
-      expanding, URL wrapping, port row sliding in). 200ms ease-out.
-      No CSS transition here — the JS path runs everywhere including
-      Safari, which doesn't yet ship `interpolate-size`.
-    -->
     <DialogContent class="dialog-smooth-resize sm:max-w-2xl">
       <DialogHeader>
         <DialogTitle>Connection</DialogTitle>
         <DialogDescription>
-          Connect to <span class="font-mono">{{ database.name }}</span>
-          ({{ engineInfo.label }}). Sibling containers reach the database
-          over <code class="font-mono text-xs">launch-network</code> via
-          its container name; external clients use the server's public
-          IP when the database exposes an external port.
+          Connect to <span class="font-mono">{{ database.name }}</span> ({{
+            engineInfo.label
+          }}). Sibling containers reach the database over
+          <code class="font-mono text-xs">launch-network</code> via its
+          container name; external clients use the server's public IP when the
+          database exposes an external port.
         </DialogDescription>
       </DialogHeader>
 
       <div class="space-y-4">
-        <!-- Internal/External segmented switcher.
-             External tab is disabled (not hidden) when no external
-             port is exposed so the user can SEE the option exists,
-             and the disabled state nudges them toward the Advanced
-             tab to enable it. -->
         <div class="inline-flex rounded-md border bg-muted p-0.5">
           <button
             type="button"
@@ -494,13 +382,11 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
           </button>
         </div>
 
-        <!-- Connection URL — the headline value. Single full-width
-             row with a Reveal toggle + Copy on the right. URL Copy
-             is disabled until reveal so users can't paste a
-             placeholder-password URL into config. -->
         <div class="rounded-lg border bg-card p-3">
           <div class="mb-2 flex items-center justify-between">
-            <p class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+            <p
+              class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
+            >
               Connection URL
             </p>
             <div class="flex items-center gap-1">
@@ -538,27 +424,20 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
               </button>
             </div>
           </div>
-          <!--
-            URL can wrap when the revealed password is long enough
-            that the whole string doesn't fit on one line. Dialog
-            grows to accommodate — see the transition wrapper on
-            DialogContent below for the smooth resize.
-          -->
           <code
             class="block w-full whitespace-pre-wrap break-all rounded bg-muted/60 px-2 py-1.5 font-mono text-xs"
-          >{{ activeConnectionURL }}</code>
+            >{{ activeConnectionURL }}</code
+          >
         </div>
 
-        <!-- Field grid — host / port / database / user / password.
-             Each row is a label + value + small copy icon. Keeps the
-             dialog compact vs the previous "input + button" pairs
-             that used 4× the vertical space for the same content. -->
         <div class="divide-y rounded-lg border bg-card text-sm">
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
             <span class="text-muted-foreground">
               {{ connectionMode === "external" ? "External Host" : "Host" }}
             </span>
-            <code class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs">
+            <code
+              class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
+            >
               <span class="truncate">{{ activeHost }}</span>
               <button
                 type="button"
@@ -572,7 +451,9 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
             <span class="text-muted-foreground">Port</span>
-            <code class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs">
+            <code
+              class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
+            >
               <span>{{ activePort }}</span>
               <button
                 type="button"
@@ -586,7 +467,9 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
             <span class="text-muted-foreground">Database</span>
-            <code class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs">
+            <code
+              class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
+            >
               <span class="truncate">{{ databaseName }}</span>
               <button
                 type="button"
@@ -600,7 +483,9 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
             <span class="text-muted-foreground">User</span>
-            <code class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs">
+            <code
+              class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
+            >
               <span class="truncate">{{ username }}</span>
               <button
                 type="button"
@@ -614,7 +499,9 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
             <span class="text-muted-foreground">Password</span>
-            <code class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs">
+            <code
+              class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
+            >
               <span class="truncate">{{ passwordDisplay }}</span>
               <button
                 type="button"
@@ -629,42 +516,36 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
           </div>
         </div>
 
-        <!-- Active-mode hint. Plain prose, no chrome. -->
         <p class="text-xs text-muted-foreground">
           <template v-if="connectionMode === 'internal'">
             <Icon name="lucide:info" class="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
             Use this from another container running on
-            <code class="font-mono">launch-network</code> (an application
-            in the same project, a worker, etc.).
+            <code class="font-mono">launch-network</code> (an application in the
+            same project, a worker, etc.).
           </template>
           <template v-else>
             <Icon name="lucide:info" class="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
-            Reachable from outside the docker server. Make sure the
-            host firewall allows the external port.
+            Reachable from outside the docker server. Make sure the host
+            firewall allows the external port.
           </template>
         </p>
 
-        <!--
-          Public Access — moved here from the Advanced tab.
-          This is the natural place: the External tab next to the
-          Internal one is disabled when no external port is set, and
-          users immediately ask "how do I enable it?". Toggle right
-          here closes that loop. Backend wiring unchanged
-          (POST /expose recreates the container).
-        -->
         <div class="rounded-lg border bg-card">
           <div class="flex items-start justify-between gap-4 px-4 py-3">
             <div class="min-w-0 space-y-0.5">
               <div class="flex items-center gap-2">
-                <Icon name="lucide:globe" class="h-4 w-4 text-muted-foreground" />
+                <Icon
+                  name="lucide:globe"
+                  class="h-4 w-4 text-muted-foreground"
+                />
                 <Label class="text-sm font-medium">
                   Expose to the internet
                 </Label>
               </div>
               <p class="text-xs text-muted-foreground">
-                Publish the database on the host's public IP so
-                clients outside the docker network can connect.
-                Toggling triggers a container recreate.
+                Publish the database on the host's public IP so clients outside
+                the docker network can connect. Toggling triggers a container
+                recreate.
               </p>
             </div>
             <Switch
@@ -675,17 +556,15 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
             />
           </div>
 
-          <!-- Port input + Save are part of the same card so the
-               two settings sit visually together. Port slot is
-               only rendered when the toggle is on; Save is only
-               enabled when something actually changed (no no-op
-               recreates). -->
           <div
             v-if="exposeEnabled || exposeDirty"
             class="flex items-end gap-3 border-t px-4 py-3"
           >
             <div class="flex-1 space-y-1">
-              <Label for="db-expose-port" class="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <Label
+                for="db-expose-port"
+                class="text-[11px] uppercase tracking-wide text-muted-foreground"
+              >
                 External Port
               </Label>
               <Input
@@ -716,4 +595,3 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
     </DialogContent>
   </Dialog>
 </template>
-
