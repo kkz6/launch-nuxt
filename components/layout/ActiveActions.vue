@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, Loader2 } from 'lucide-vue-next'
+import { Activity, CircleAlert, CircleCheck, Loader2 } from 'lucide-vue-next'
 import { useDeploymentEvents } from '~/composables/useChannelEvents'
 import {
   DropdownMenu,
@@ -15,20 +15,15 @@ import {
   SheetHeader,
   SheetTitle,
 } from '~/components/ui/sheet'
-
-interface ActiveAction {
-  id: string
-  kind: string
-  status: string
-  label: string
-  server_id: string
-  project_id?: string
-  target_type: 'site' | 'application' | 'compose'
-  target_id: string
-  task_id?: string
-  started_at?: string
-  created_at: string
-}
+import {
+  activeActionPath,
+  activeActionStatusLabel,
+  activeActionStatusTone,
+  humanizeActionValue,
+  isActiveActionRunning,
+  updateActionFromDeploymentEvent,
+  type ActiveAction,
+} from '~/utils/activeActions'
 
 const { user } = useAuth()
 const { get } = useApi()
@@ -45,13 +40,35 @@ const fetchActions = async () => {
   isLoading.value = true
   try {
     const response = await get<{ data: ActiveAction[] }>('/actions/active')
-    actions.value = response.data || []
+    const nextActions = response.data || []
+    actions.value = nextActions
+
+    const refreshedSelection = nextActions.find(
+      (action) => action.id === selected.value?.id,
+    )
+    if (
+      refreshedSelection &&
+      selected.value &&
+      isActiveActionRunning(selected.value)
+    ) {
+      selected.value = refreshedSelection
+    }
   } finally {
     isLoading.value = false
   }
 }
 
-useDeploymentEvents(teamId, fetchActions)
+useDeploymentEvents(
+  teamId,
+  async (data, event) => {
+    selected.value = updateActionFromDeploymentEvent(
+      selected.value,
+      data,
+      event,
+    )
+    await fetchActions()
+  },
+)
 
 const elapsed = (action: ActiveAction) => {
   const startedAt = new Date(action.started_at || action.created_at).getTime()
@@ -59,10 +76,14 @@ const elapsed = (action: ActiveAction) => {
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`
 }
 
-const humanize = (value: string) =>
-  value
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (character) => character.toUpperCase())
+const actionStateDescription = (action: ActiveAction) => {
+  if (isActiveActionRunning(action)) return `Running for ${elapsed(action)}`
+
+  const tone = activeActionStatusTone(action.status)
+  if (tone === 'success') return 'Deployment complete'
+  if (tone === 'failure') return activeActionStatusLabel(action)
+  return humanizeActionValue(action.status)
+}
 
 const openAction = (action: ActiveAction) => {
   selected.value = action
@@ -71,12 +92,7 @@ const openAction = (action: ActiveAction) => {
     return
   }
 
-  const base = `/servers/${action.server_id}`
-  const target =
-    action.target_type === 'site'
-      ? `${base}/sites/${action.target_id}?tab=deployments`
-      : `${base}/projects/${action.project_id}/${action.target_type === 'application' ? 'applications' : 'composes'}/${action.target_id}?tab=deployments`
-  router.push(target)
+  router.push(activeActionPath(action))
 }
 
 onMounted(() => {
@@ -130,7 +146,8 @@ onUnmounted(() => {
             action.label
           }}</span>
           <span class="block text-xs text-muted-foreground">
-            {{ humanize(action.kind) }} · {{ humanize(action.status) }} ·
+            {{ humanizeActionValue(action.kind) }} ·
+            {{ activeActionStatusLabel(action) }} ·
             {{ elapsed(action) }}
           </span>
         </span>
@@ -148,7 +165,7 @@ onUnmounted(() => {
         <SheetDescription
           class="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
         >
-          Active deployment
+          Deployment output
         </SheetDescription>
         <div class="mt-1.5 flex min-w-0 flex-wrap items-center gap-2.5">
           <SheetTitle class="truncate text-lg tracking-tight sm:text-xl">
@@ -157,20 +174,37 @@ onUnmounted(() => {
           <span
             v-if="selected"
             class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/50 px-2 py-1 text-xs font-medium text-foreground"
+            :class="{
+              'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400':
+                activeActionStatusTone(selected.status) === 'success',
+              'border-red-500/20 bg-red-500/10 text-red-700 dark:text-red-400':
+                activeActionStatusTone(selected.status) === 'failure',
+            }"
           >
-            <Loader2 class="h-3 w-3 animate-spin text-muted-foreground" />
-            {{ humanize(selected.status) }}
+            <Loader2
+              v-if="activeActionStatusTone(selected.status) === 'running'"
+              class="h-3 w-3 animate-spin text-muted-foreground"
+            />
+            <CircleCheck
+              v-else-if="activeActionStatusTone(selected.status) === 'success'"
+              class="h-3.5 w-3.5"
+            />
+            <CircleAlert
+              v-else-if="activeActionStatusTone(selected.status) === 'failure'"
+              class="h-3.5 w-3.5"
+            />
+            {{ activeActionStatusLabel(selected) }}
           </span>
         </div>
         <div
           v-if="selected"
           class="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground"
         >
-          <span>{{ humanize(selected.kind) }}</span>
+          <span>{{ humanizeActionValue(selected.kind) }}</span>
           <span aria-hidden="true">·</span>
-          <span>{{ humanize(selected.target_type) }}</span>
+          <span>{{ humanizeActionValue(selected.target_type) }}</span>
           <span aria-hidden="true">·</span>
-          <span>Running for {{ elapsed(selected) }}</span>
+          <span>{{ actionStateDescription(selected) }}</span>
         </div>
       </SheetHeader>
       <div class="flex min-h-0 flex-1 bg-zinc-950">
