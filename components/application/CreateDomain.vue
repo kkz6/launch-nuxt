@@ -40,8 +40,6 @@ const emit = defineEmits<{
 }>();
 
 const open = defineModel<boolean>("open", { default: false });
-const isLoading = ref(false);
-const errors = ref<Record<string, string>>({});
 
 interface DomainVerification {
   verified: boolean;
