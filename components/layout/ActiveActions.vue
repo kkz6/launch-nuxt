@@ -167,10 +167,10 @@ onUnmounted(() => {
 
   <Sheet v-model:open="logsOpen">
     <SheetContent
-      class="inset-y-0 right-0 flex h-[100dvh] w-full flex-col gap-0 overflow-hidden border-0 bg-[#0b0c0e] p-0 shadow-none outline-none sm:max-w-5xl sm:shadow-[-28px_0_70px_-36px_rgba(15,23,42,0.65)] [&>button]:right-5 [&>button]:top-5 [&>button]:grid [&>button]:h-8 [&>button]:w-8 [&>button]:place-items-center [&>button]:rounded-lg [&>button]:ring-offset-0 [&>button]:transition-colors hover:[&>button]:bg-muted"
+      class="inset-y-0 right-0 flex h-[100dvh] w-full flex-col gap-0 overflow-hidden border-0 bg-[#0b0c0e] p-0 shadow-none outline-none sm:max-w-5xl [&>button]:right-5 [&>button]:top-5 [&>button]:grid [&>button]:h-8 [&>button]:w-8 [&>button]:place-items-center [&>button]:rounded-lg [&>button]:ring-offset-0 [&>button]:transition-colors hover:[&>button]:bg-muted"
     >
       <SheetHeader
-        class="relative z-10 shrink-0 gap-y-0 border-b border-border/60 bg-gradient-to-b from-background via-background to-muted/25 px-5 pb-5 pt-4 pr-14 text-left sm:px-7 sm:pb-6 sm:pt-5 sm:pr-16"
+        class="relative z-10 shrink-0 gap-y-0 border-b border-border/60 bg-background px-5 pb-5 pt-4 pr-14 text-left sm:px-7 sm:pb-6 sm:pt-5 sm:pr-16"
       >
         <SheetDescription
           class="flex items-center gap-2 text-xs font-medium text-muted-foreground"
@@ -240,11 +240,18 @@ onUnmounted(() => {
           class="flex h-10 shrink-0 items-center justify-between border-b border-white/[0.06] px-5 text-[11px] text-zinc-500 sm:px-7"
         >
           <span class="font-mono">Task output</span>
-          <span v-if="selected" class="inline-flex items-center gap-2">
+          <span
+            v-if="selected"
+            class="inline-flex items-center gap-2 transition-colors duration-200"
+            :class="{
+              'font-medium text-emerald-400': isActiveActionRunning(selected),
+            }"
+          >
             <span
               class="h-1.5 w-1.5 rounded-full bg-zinc-600"
               :class="{
-                'animate-pulse bg-emerald-400': isActiveActionRunning(selected),
+                'animate-pulse bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.8)] ring-4 ring-emerald-400/10':
+                  isActiveActionRunning(selected),
               }"
               aria-hidden="true"
             />
