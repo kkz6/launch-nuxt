@@ -4,6 +4,7 @@ interface ChannelEventData {
   team_id?: string;
   deployment_id?: string;
   command_id?: string;
+  task_id?: string;
   status?: string;
   message?: string;
   error?: string;
@@ -134,6 +135,17 @@ export const useCommandEvents = (
   onEvent: ChannelEventHandler,
 ) => {
   return useTeamChannelEvents(teamId, ["command.updated"], onEvent);
+};
+
+export const useTaskEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+) => {
+  return useTeamChannelEvents(
+    teamId,
+    ["task.created", "task.running", "task.updated"],
+    onEvent,
+  );
 };
 
 export const useDeploymentEvents = (

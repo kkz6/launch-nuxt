@@ -1,5 +1,5 @@
 export type ActiveActionTargetType =
-  'site' | 'application' | 'compose' | 'database'
+  'server' | 'site' | 'application' | 'compose' | 'database'
 
 export interface ActiveAction {
   id: string
@@ -19,6 +19,7 @@ export interface ActiveAction {
 export interface ActiveActionEventData {
   deployment_id?: string
   command_id?: string
+  task_id?: string
   status?: string
 }
 
@@ -93,7 +94,11 @@ export const updateActionFromEvent = (
   if (!action) return action
 
   const eventActionId =
-    action.kind === 'command' ? data.command_id : data.deployment_id
+    action.kind === 'command'
+      ? data.command_id
+      : action.kind === 'task'
+        ? data.task_id
+        : data.deployment_id
   if (action.id !== eventActionId) return action
 
   const status = data.status || terminalEventStatuses[event]
@@ -102,6 +107,8 @@ export const updateActionFromEvent = (
 
 export const activeActionPath = (action: ActiveAction) => {
   const serverPath = `/servers/${action.server_id}`
+  if (action.target_type === 'server') return serverPath
+
   if (action.target_type === 'site') {
     const tab = action.kind === 'command' ? 'commands' : 'deployments'
     return `${serverPath}/sites/${action.target_id}?tab=${tab}`
