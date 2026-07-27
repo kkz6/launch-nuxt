@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { reactive, toRefs } from 'vue'
 import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
@@ -62,30 +63,75 @@ const props = defineProps<Props>()
 
 const isLoadBalancer = computed(() => props.serverType === 'loadbalancer')
 
-const services = ref<Service[]>([])
-const isLoading = ref(true)
-const loadingAction = ref<{ software: string; action: string } | null>(null)
-const isInstallDialogOpen = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const confirmationDialog = ref<InstanceType<
+  typeof import('~/components/shared/ConfirmationDialog.vue').default
+> | null>(null)
 
-// Launch Agent update banner
 interface AgentVersionInfo {
   service_id: string
   installed: string
   latest: string
   update_available: boolean
 }
-const agentVersion = ref<AgentVersionInfo | null>(null)
-const isUpdatingAgent = ref(false)
-
-// Persistent "update in progress" timestamp so the banner + agent-row
-// status stay on "Updating" across reloads. The service-operation job
-// has no started-event broadcast yet, so the UI drives this state on
-// its own and polls the version endpoint until installed catches up to
-// latest (or the TTL expires as a safety net).
-const agentUpdateStorageKey = computed(() => `launch:agent-update:${props.serverId}`)
-const agentUpdateStartedAt = ref<number | null>(null)
 const AGENT_UPDATE_TTL_MS = 5 * 60 * 1000
+
+interface ServicesState {
+  services: Service[]
+  isLoading: boolean
+  loadingAction: { software: string; action: string } | null
+  isInstallDialogOpen: boolean
+  agentVersion: AgentVersionInfo | null
+  isUpdatingAgent: boolean
+  agentUpdateStartedAt: number | null
+  isStatusDialogOpen: boolean
+  selectedServiceForStatus: Service | null
+  logsByService: Map<string, LogInfo>
+  isLogSheetOpen: boolean
+  selectedLog: LogInfo | null
+  isExtensionsDialogOpen: boolean
+  isOpcacheDialogOpen: boolean
+  selectedPhpService: any
+}
+
+const state = reactive({
+  services: [],
+  isLoading: true,
+  loadingAction: null,
+  isInstallDialogOpen: false,
+  agentVersion: null,
+  isUpdatingAgent: false,
+  agentUpdateStartedAt: null,
+  isStatusDialogOpen: false,
+  selectedServiceForStatus: null,
+  logsByService: new Map(),
+  isLogSheetOpen: false,
+  selectedLog: null,
+  isExtensionsDialogOpen: false,
+  isOpcacheDialogOpen: false,
+  selectedPhpService: null,
+}) as ServicesState
+
+const {
+  services,
+  isLoading,
+  loadingAction,
+  isInstallDialogOpen,
+  agentVersion,
+  isUpdatingAgent,
+  agentUpdateStartedAt,
+  isStatusDialogOpen,
+  selectedServiceForStatus,
+  logsByService,
+  isLogSheetOpen,
+  selectedLog,
+  isExtensionsDialogOpen,
+  isOpcacheDialogOpen,
+  selectedPhpService,
+} = toRefs(state)
+
+const agentUpdateStorageKey = computed(
+  () => `launch:agent-update:${props.serverId}`,
+)
 
 const readUpdateStarted = (): number | null => {
   if (typeof window === 'undefined') return null
@@ -110,17 +156,13 @@ const writeUpdateStarted = (ts: number | null) => {
   }
 }
 
-// True from the moment the user triggers Update until the version
-// endpoint confirms installed === latest (or until the TTL elapses).
 const agentUpdateInProgress = computed(() => {
   if (!agentUpdateStartedAt.value) return false
-  if (Date.now() - agentUpdateStartedAt.value > AGENT_UPDATE_TTL_MS) return false
+  if (Date.now() - agentUpdateStartedAt.value > AGENT_UPDATE_TTL_MS)
+    return false
   const v = agentVersion.value
-  // If we don't know the latest yet, stay in "updating" — better to
-  // keep the spinner than to flash back to "update available".
   if (!v) return true
   if (v.update_available === false) return false
-  // update_available true but installed already matches latest → done.
   if (v.installed && v.latest && v.installed === v.latest) return false
   return true
 })
@@ -142,26 +184,17 @@ const startAgentPoll = () => {
   }, 5000)
 }
 
-// Status dialog state
-const isStatusDialogOpen = ref(false)
-const selectedServiceForStatus = ref<Service | null>(null)
-
-// Log sheet state
-const logsByService = ref<Map<string, LogInfo>>(new Map())
-const isLogSheetOpen = ref(false)
-const selectedLog = ref<LogInfo | null>(null)
-
 const fetchLogs = async () => {
   try {
-    const data = await $api<{ data: LogInfo[] }>(`/servers/${props.serverId}/logs`)
+    const data = await $api<{ data: LogInfo[] }>(
+      `/servers/${props.serverId}/logs`,
+    )
     const map = new Map<string, LogInfo>()
     for (const log of data.data || []) {
       map.set(log.software, log)
     }
     logsByService.value = map
-  } catch {
-    // Silent fail - logs are optional
-  }
+  } catch {}
 }
 
 const openLogSheet = (service: Service) => {
@@ -172,15 +205,12 @@ const openLogSheet = (service: Service) => {
   }
 }
 
-// PHP dialog states
-const isExtensionsDialogOpen = ref(false)
-const isOpcacheDialogOpen = ref(false)
-const selectedPhpService = ref<any>(null)
-
 const fetchPhpVersionData = async (service: Service): Promise<any | null> => {
   try {
-    const response = await $api<any[] | { data: any[] }>(`/servers/${props.serverId}/php`)
-    const phpVersions = Array.isArray(response) ? response : (response.data || [])
+    const response = await $api<any[] | { data: any[] }>(
+      `/servers/${props.serverId}/php`,
+    )
+    const phpVersions = Array.isArray(response) ? response : response.data || []
     return phpVersions.find((v: any) => v.details?.id === service.id) || null
   } catch {
     toast.error('Failed to load PHP data')
@@ -261,7 +291,8 @@ const uninstallPhpVersion = async (service: Service) => {
 
   const { ok } = await confirmationDialog.value.show({
     title: `Uninstall ${service.name}`,
-    description: 'Are you sure? This will remove this PHP version and all its configurations.',
+    description:
+      'Are you sure? This will remove this PHP version and all its configurations.',
     confirmText: 'Uninstall',
     cancelText: 'Cancel',
     destructive: true,
@@ -284,7 +315,6 @@ const uninstallPhpVersion = async (service: Service) => {
   }
 }
 
-// WebSocket for real-time status updates
 const {
   services: liveStatuses,
   isConnected: wsConnected,
@@ -297,7 +327,6 @@ const {
   interval: 5,
 })
 
-// Listen for service broadcast events (install, remove, status changes)
 const { user } = useAuth()
 const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
@@ -308,18 +337,10 @@ useServiceEvents(teamId, (data) => {
   }
 })
 
-// Get live status for a service
 const getLiveStatus = (serviceId: string) => {
-  return liveStatuses.value.find(s => s.id === serviceId)
+  return liveStatuses.value.find((s) => s.id === serviceId)
 }
 
-// Heuristic for "do we trust the persisted DB status?". The Services
-// API hands back the last cached status alongside last_status_check —
-// when that timestamp is stale (older than 5 min) the cached value is
-// likely a leftover (e.g. one failed daemon-supervisor probe months
-// ago that latched the Launch Agent service as Failed even though the
-// agent itself is running fine). Until the live status WS catches up,
-// show "Checking…" instead of broadcasting a misleading state.
 const STATUS_FRESHNESS_MS = 5 * 60 * 1000
 const isPersistedStatusFresh = (service: Service): boolean => {
   if (!service.last_status_check) return false
@@ -328,12 +349,7 @@ const isPersistedStatusFresh = (service: Service): boolean => {
   return Date.now() - checkedAt < STATUS_FRESHNESS_MS
 }
 
-// Get display status (prefer live status over API status)
 const getDisplayStatus = (service: Service) => {
-  // While the agent self-upgrade is in flight the row should read
-  // "Updating" — the underlying systemd unit may still report Running
-  // (binary swap doesn't always stop the service), but the meaningful
-  // state for the user is "we're in the middle of swapping it out".
   if (service.software === 'launch_agent' && agentUpdateInProgress.value) {
     return {
       status: 'updating',
@@ -355,11 +371,6 @@ const getDisplayStatus = (service: Service) => {
       isLive: true,
     }
   }
-  // No live status yet AND the persisted check is stale → surface a
-  // neutral "Checking…" rather than the cached (possibly wrong)
-  // status. This is what kills the "Failed → Installed" flash on the
-  // Launch Agent row when the supervised-daemon webhook had latched
-  // a months-old FATAL into the parent service.status.
   if (!isPersistedStatusFresh(service)) {
     return {
       status: 'checking',
@@ -375,19 +386,17 @@ const getDisplayStatus = (service: Service) => {
     label: service.status_label,
     memory: service.status_details?.memory_usage,
     uptime: undefined,
-    pid: service.status_details?.pid ? Number(service.status_details.pid) : undefined,
+    pid: service.status_details?.pid
+      ? Number(service.status_details.pid)
+      : undefined,
     isLive: false,
   }
 }
 
-// Prefer the live-probed version (e.g. the real launch-agent version)
-// over the stored value, which can be an install-time placeholder like
-// "latest".
 const displayVersion = (service: Service) => {
   return getLiveStatus(service.id)?.version || service.version
 }
 
-// Map service types to image paths
 const getServiceImagePath = (service: Service) => {
   const imageMap: Record<string, string> = {
     php: '/images/services/php.svg',
@@ -400,8 +409,6 @@ const getServiceImagePath = (service: Service) => {
     bun: '/images/services/bun.svg',
     node: '/images/services/node.svg',
     launch_agent: '/images/services/launch_agent.svg',
-    // Docker / Traefik are keyed by their ServiceType string (not the
-    // software name): container_runtime = Docker, reverse_proxy = Traefik.
     container_runtime: '/images/services/docker.svg',
     reverse_proxy: '/images/services/traefik.svg',
   }
@@ -419,7 +426,9 @@ const getServiceImagePath = (service: Service) => {
 
 const fetchServices = async () => {
   try {
-    const data = await $api<{ data: Service[] }>(`/servers/${props.serverId}/services`)
+    const data = await $api<{ data: Service[] }>(
+      `/servers/${props.serverId}/services`,
+    )
     services.value = data.data || []
   } catch {
     toast.error('Failed to load services')
@@ -430,11 +439,11 @@ const fetchServices = async () => {
 
 const fetchAgentVersion = async () => {
   try {
-    const data = await $api<{ data: AgentVersionInfo }>(`/servers/${props.serverId}/agent-version`)
+    const data = await $api<{ data: AgentVersionInfo }>(
+      `/servers/${props.serverId}/agent-version`,
+    )
     agentVersion.value = data.data || null
   } catch {
-    // Non-fatal: GitHub lookup unavailable or agent not installed —
-    // the banner just doesn't render.
     agentVersion.value = null
   }
 }
@@ -445,14 +454,13 @@ const updateAgent = async () => {
 
   isUpdatingAgent.value = true
   try {
-    await $api(`/servers/${props.serverId}/services/${info.service_id}/update`, {
-      method: 'POST',
-    })
+    await $api(
+      `/servers/${props.serverId}/services/${info.service_id}/update`,
+      {
+        method: 'POST',
+      },
+    )
     toast.success(`Updating Launch Agent to v${info.latest}…`)
-    // Latch the "updating" state immediately so the banner + agent row
-    // status flip to "Updating" rather than continuing to show
-    // "Update available". The poll below clears it once the agent
-    // reports the new version.
     writeUpdateStarted(Date.now())
     fetchServices()
     fetchAgentVersion()
@@ -464,10 +472,18 @@ const updateAgent = async () => {
   }
 }
 
-const serviceAction = async (service: Service, action: 'start' | 'stop' | 'restart' | 'update') => {
+const serviceAction = async (
+  service: Service,
+  action: 'start' | 'stop' | 'restart' | 'update',
+) => {
   if (!confirmationDialog.value) return
 
-  const actionLabels: Record<string, string> = { start: 'Start', stop: 'Stop', restart: 'Restart', update: 'Update' }
+  const actionLabels: Record<string, string> = {
+    start: 'Start',
+    stop: 'Stop',
+    restart: 'Restart',
+    update: 'Update',
+  }
   const result = await confirmationDialog.value.show({
     title: `${actionLabels[action]} Service`,
     description: `Are you sure you want to ${action} "${service.name}"?`,
@@ -484,9 +500,6 @@ const serviceAction = async (service: Service, action: 'start' | 'stop' | 'resta
       method: 'POST',
     })
     toast.success(`${service.name} ${action} initiated`)
-    // Launch-Agent "update" path: latch the persistent updating state
-    // so the row badge + banner reflect "Updating" until the agent
-    // reports the new version (or the TTL elapses).
     if (action === 'update' && service.software === 'launch_agent') {
       writeUpdateStarted(Date.now())
       fetchAgentVersion()
@@ -505,7 +518,9 @@ const openStatusDialog = (service: Service) => {
   isStatusDialogOpen.value = true
 }
 
-const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
+const getStatusVariant = (
+  status?: string,
+): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
   if (!status) return 'secondary'
   switch (status.toLowerCase()) {
     case 'running':
@@ -522,8 +537,6 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
     case 'updating':
       return 'warning'
     case 'checking':
-      // Neutral secondary while we wait for the live WS probe — not
-      // an alarming colour and not a "stable" one, just transitional.
       return 'secondary'
     case 'installed':
       return 'default'
@@ -532,7 +545,6 @@ const getStatusVariant = (status?: string): 'default' | 'secondary' | 'destructi
   }
 }
 
-// Check if a service can be started/stopped/restarted based on live status
 const canStart = (service: Service) => {
   const live = getLiveStatus(service.id)
   const status = live?.status || service.status
@@ -552,16 +564,13 @@ const canRestart = (service: Service) => {
 }
 
 const sortedServices = computed(() =>
-  [...services.value].sort((a, b) => a.name.localeCompare(b.name))
+  [...services.value].sort((a, b) => a.name.localeCompare(b.name)),
 )
 
 onMounted(() => {
   fetchServices()
   fetchLogs()
   fetchAgentVersion()
-  // Rehydrate updating state on remount so a reload doesn't drop us
-  // back to "Update available". If we land mid-update, restart the
-  // poll until the version catches up.
   const persisted = readUpdateStarted()
   if (persisted) {
     agentUpdateStartedAt.value = persisted
@@ -569,9 +578,6 @@ onMounted(() => {
   }
 })
 
-// Clear the persistent flag the moment the version endpoint confirms
-// we're back in sync — no point keeping the row badge on "Updating"
-// after the agent has restarted reporting the new version.
 watch(agentUpdateInProgress, (inProgress) => {
   if (!inProgress && agentUpdateStartedAt.value !== null) {
     writeUpdateStarted(null)
@@ -589,30 +595,27 @@ onBeforeUnmount(() => {
   <div class="space-y-6">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <!--
-      Launch Agent update banner.
-
-      Three states drive the banner:
-        1. "Updating…" — agentUpdateInProgress (sticky after Run via
-           the persisted timestamp; cleared once installed === latest
-           or the TTL elapses).
-        2. "Update available" — the version endpoint reports installed
-           !== latest and we haven't triggered the update yet.
-        3. Hidden — installed === latest.
-    -->
     <div
       v-if="agentUpdateInProgress"
       class="flex flex-col gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-blue-800/60 dark:bg-blue-950/30"
     >
       <div class="flex items-start gap-2.5">
-        <Icon name="lucide:loader-2" class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400" />
+        <Icon
+          name="lucide:loader-2"
+          class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-blue-600 dark:text-blue-400"
+        />
         <div class="text-sm">
           <p class="font-medium text-blue-900 dark:text-blue-200">
             Updating Launch Agent<template v-if="agentVersion?.latest">
-              to <span class="font-semibold">v{{ agentVersion.latest }}</span></template>…
+              to
+              <span class="font-semibold"
+                >v{{ agentVersion.latest }}</span
+              ></template
+            >…
           </p>
           <p class="text-blue-700 dark:text-blue-300/90">
-            The install script is running on this server. The status will refresh automatically.
+            The install script is running on this server. The status will
+            refresh automatically.
           </p>
         </div>
       </div>
@@ -622,32 +625,50 @@ onBeforeUnmount(() => {
       class="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-amber-800/60 dark:bg-amber-950/30"
     >
       <div class="flex items-start gap-2.5">
-        <Icon name="lucide:arrow-up-circle" class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <Icon
+          name="lucide:arrow-up-circle"
+          class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
+        />
         <div class="text-sm">
           <p class="font-medium text-amber-900 dark:text-amber-200">
             Launch Agent update available
           </p>
           <p class="text-amber-700 dark:text-amber-300/90">
-            Version <span class="font-semibold">v{{ agentVersion.latest }}</span> is available<template v-if="agentVersion.installed">
-              — this server runs <span class="font-semibold">v{{ agentVersion.installed }}</span></template>.
+            Version
+            <span class="font-semibold">v{{ agentVersion.latest }}</span> is
+            available<template v-if="agentVersion.installed">
+              — this server runs
+              <span class="font-semibold"
+                >v{{ agentVersion.installed }}</span
+              ></template
+            >.
           </p>
         </div>
       </div>
-      <Button size="sm" :disabled="isUpdatingAgent" class="shrink-0" @click="updateAgent">
-        <Icon v-if="isUpdatingAgent" name="lucide:loader-2" class="mr-1.5 h-3.5 w-3.5 animate-spin" />
+      <Button
+        size="sm"
+        :disabled="isUpdatingAgent"
+        class="shrink-0"
+        @click="updateAgent"
+      >
+        <Icon
+          v-if="isUpdatingAgent"
+          name="lucide:loader-2"
+          class="mr-1.5 h-3.5 w-3.5 animate-spin"
+        />
         <Icon v-else name="lucide:download" class="mr-1.5 h-3.5 w-3.5" />
-        {{ isUpdatingAgent ? 'Updating…' : `Update to v${agentVersion.latest}` }}
+        {{
+          isUpdatingAgent ? 'Updating…' : `Update to v${agentVersion.latest}`
+        }}
       </Button>
     </div>
 
-    <!-- Install Service Dialog -->
     <ServerSettingsInstallServiceDialog
       v-model:open="isInstallDialogOpen"
       :server-id="serverId"
       @installed="fetchServices"
     />
 
-    <!-- PHP Extensions Dialog -->
     <ServerSettingsPhpExtensionsDialog
       v-if="selectedPhpService"
       v-model:open="isExtensionsDialogOpen"
@@ -656,7 +677,6 @@ onBeforeUnmount(() => {
       @updated="fetchServices"
     />
 
-    <!-- PHP OPcache Dialog -->
     <ServerSettingsPhpOpcacheDialog
       v-if="selectedPhpService"
       v-model:open="isOpcacheDialogOpen"
@@ -665,7 +685,6 @@ onBeforeUnmount(() => {
       @updated="fetchServices"
     />
 
-    <!-- Service Status Dialog -->
     <ServerSettingsServiceStatusDialog
       v-if="selectedServiceForStatus"
       v-model:open="isStatusDialogOpen"
@@ -679,7 +698,6 @@ onBeforeUnmount(() => {
       <div>
         <h3 class="flex items-center gap-2 text-lg font-medium">
           Services
-          <!-- Connection Status Indicator -->
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger as-child>
@@ -704,7 +722,13 @@ onBeforeUnmount(() => {
                           : 'bg-red-500',
                     ]"
                   />
-                  {{ wsConnected ? 'Live' : wsConnecting ? 'Connecting' : 'Disconnected' }}
+                  {{
+                    wsConnected
+                      ? 'Live'
+                      : wsConnecting
+                        ? 'Connecting'
+                        : 'Disconnected'
+                  }}
                 </button>
               </TooltipTrigger>
               <TooltipContent>
@@ -719,7 +743,8 @@ onBeforeUnmount(() => {
           </TooltipProvider>
         </h3>
         <p class="text-sm text-muted-foreground">
-          {{ services.length }} service{{ services.length !== 1 ? 's' : '' }} installed
+          {{ services.length }} service{{ services.length !== 1 ? 's' : '' }}
+          installed
         </p>
       </div>
       <div class="flex gap-2">
@@ -735,256 +760,102 @@ onBeforeUnmount(() => {
     </div>
 
     <div>
-        <div v-if="isLoading" class="flex items-center justify-center py-8">
-          <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <div v-if="isLoading" class="flex items-center justify-center py-8">
+        <Icon
+          name="lucide:loader-2"
+          class="h-6 w-6 animate-spin text-muted-foreground"
+        />
+      </div>
+
+      <template v-else>
+        <div
+          v-if="services.length === 0"
+          class="flex flex-col items-center justify-center py-16 text-center"
+        >
+          <div
+            class="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted"
+          >
+            <Icon name="lucide:package" class="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 class="mb-2 text-xl font-semibold">No services installed</h2>
+          <p class="mb-8 max-w-md text-muted-foreground">
+            Services like databases, caching systems, and runtimes help power
+            your applications.
+          </p>
+          <Button
+            v-if="!isLoadBalancer"
+            size="lg"
+            @click="isInstallDialogOpen = true"
+          >
+            <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
+            Install Your First Service
+          </Button>
         </div>
 
-        <template v-else>
-          <!-- Empty State -->
-          <div v-if="services.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
-            <div class="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-              <Icon name="lucide:package" class="h-8 w-8 text-muted-foreground" />
+        <div v-else class="overflow-hidden rounded-lg border">
+          <div
+            class="hidden border-b bg-muted/50 px-6 py-3 md:grid md:grid-cols-12 md:gap-4"
+          >
+            <div class="col-span-5 text-sm font-medium text-muted-foreground">
+              Service
             </div>
-            <h2 class="mb-2 text-xl font-semibold">No services installed</h2>
-            <p class="mb-8 max-w-md text-muted-foreground">
-              Services like databases, caching systems, and runtimes help power your applications.
-            </p>
-            <Button v-if="!isLoadBalancer" size="lg" @click="isInstallDialogOpen = true">
-              <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-              Install Your First Service
-            </Button>
+            <div class="col-span-4 text-sm font-medium text-muted-foreground">
+              Status
+            </div>
+            <div
+              class="col-span-3 text-right text-sm font-medium text-muted-foreground"
+            >
+              Actions
+            </div>
           </div>
 
-          <!-- Services Table -->
-          <div v-else class="overflow-hidden rounded-lg border">
-            <!-- Table Header -->
-            <div class="hidden border-b bg-muted/50 px-6 py-3 md:grid md:grid-cols-12 md:gap-4">
-              <div class="col-span-5 text-sm font-medium text-muted-foreground">Service</div>
-              <div class="col-span-4 text-sm font-medium text-muted-foreground">Status</div>
-              <div class="col-span-3 text-right text-sm font-medium text-muted-foreground">Actions</div>
-            </div>
-
-            <!-- Table Body -->
-            <div class="divide-y">
-              <div
-                v-for="service in sortedServices"
-                :key="service.id"
-                class="px-4 py-4 transition-colors hover:bg-muted/30 md:px-6"
-              >
-                <!-- Mobile Layout -->
-                <div class="flex flex-col gap-3 md:hidden">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-3">
-                      <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
-                        <img
-                          :src="getServiceImagePath(service)"
-                          :alt="service.name"
-                          class="h-6 w-6 object-contain"
-                          @error="($event.target as HTMLImageElement).style.display = 'none'"
-                        >
-                      </div>
-                      <div class="min-w-0">
-                        <div class="flex items-center gap-1.5">
-                          <span class="truncate font-medium">{{ service.name }}</span>
-                          <TooltipProvider v-if="service.type === 'php' && service.is_default">
-                            <Tooltip>
-                              <TooltipTrigger>
-                                <Icon name="lucide:star" class="h-3.5 w-3.5 shrink-0 fill-yellow-500 text-yellow-500" />
-                              </TooltipTrigger>
-                              <TooltipContent>Default CLI version</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                        <div class="font-mono text-xs text-muted-foreground">v{{ displayVersion(service) }}</div>
-                      </div>
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <Icon
-                        v-if="loadingAction?.software === service.software"
-                        name="lucide:loader-2"
-                        class="h-4 w-4 animate-spin text-muted-foreground"
-                      />
-                      <DropdownMenu>
-                        <DropdownMenuTrigger as-child>
-                          <Button variant="ghost" size="sm">
-                            <Icon name="lucide:more-horizontal" class="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" class="w-48">
-                          <DropdownMenuItem v-if="canStart(service)" @click="serviceAction(service, 'start')">
-                            <Icon name="lucide:play" class="mr-2 h-4 w-4" />
-                            Start
-                          </DropdownMenuItem>
-                          <DropdownMenuItem v-if="canStop(service)" @click="serviceAction(service, 'stop')">
-                            <Icon name="lucide:power" class="mr-2 h-4 w-4" />
-                            Stop
-                          </DropdownMenuItem>
-                          <DropdownMenuItem v-if="canRestart(service)" @click="serviceAction(service, 'restart')">
-                            <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
-                            Restart
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator v-if="canStart(service) || canStop(service) || canRestart(service)" />
-                          <DropdownMenuItem @click="openStatusDialog(service)">
-                            <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <!--
-                            Manual "Update" / re-install for the Launch Agent. The
-                            agent-version-available banner only fires when the
-                            comparison says installed < latest, but legacy v1.0
-                            binaries report ">v0.8.0" semver-wise so the banner
-                            stays hidden. This action is the always-available
-                            escape hatch — runs the existing service-operation
-                            update action (re-runs the install script, which
-                            self-upgrades to the latest published build).
-                          -->
-                          <DropdownMenuItem
-                            v-if="service.software === 'launch_agent'"
-                            @click="serviceAction(service, 'update')"
-                          >
-                            <Icon name="lucide:download" class="mr-2 h-4 w-4" />
-                            Update Agent
-                          </DropdownMenuItem>
-                          <DropdownMenuItem v-if="logsByService.has(service.software)" @click="openLogSheet(service)">
-                            <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
-                            View Logs
-                          </DropdownMenuItem>
-                          <template v-if="service.type === 'php'">
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem @click="openOpcacheDialog(service)">
-                              <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
-                              OPcache
-                            </DropdownMenuItem>
-                            <DropdownMenuItem @click="openExtensionsDialog(service)">
-                              <Icon name="lucide:package" class="mr-2 h-4 w-4" />
-                              Extensions
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem v-if="!service.is_default" @click="setPhpDefault(service)">
-                              <Icon name="lucide:star" class="mr-2 h-4 w-4" />
-                              Set as Default
-                            </DropdownMenuItem>
-                            <DropdownMenuItem @click="patchPhpVersion(service)">
-                              <Icon name="lucide:wrench" class="mr-2 h-4 w-4" />
-                              Patch Version
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem class="text-destructive focus:text-destructive" @click="uninstallPhpVersion(service)">
-                              <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
-                              Uninstall
-                            </DropdownMenuItem>
-                          </template>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Badge :variant="getStatusVariant(getDisplayStatus(service).status)" class="cursor-help">
-                            {{ getDisplayStatus(service).label }}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent class="max-w-xs">
-                          <div class="space-y-1.5 text-sm">
-                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                              <span class="text-muted-foreground">Status:</span>
-                              <span :class="getDisplayStatus(service).status === 'running' ? 'text-green-500' : 'text-red-500'">
-                                {{ getDisplayStatus(service).label }}
-                              </span>
-                              <template v-if="getDisplayStatus(service).pid">
-                                <span class="text-muted-foreground">PID:</span>
-                                <span>{{ getDisplayStatus(service).pid }}</span>
-                              </template>
-                              <template v-if="getDisplayStatus(service).memory">
-                                <span class="text-muted-foreground">Memory:</span>
-                                <span>{{ getDisplayStatus(service).memory }}</span>
-                              </template>
-                              <template v-if="getDisplayStatus(service).uptime">
-                                <span class="text-muted-foreground">Uptime:</span>
-                                <span>{{ getDisplayStatus(service).uptime }}</span>
-                              </template>
-                              <span class="text-muted-foreground">Version:</span>
-                              <span>{{ displayVersion(service) }}</span>
-                            </div>
-                            <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
-                              Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
-                            </p>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </div>
-
-                <!-- Desktop Layout -->
-                <div class="hidden items-center gap-4 md:grid md:grid-cols-12">
-                  <div class="col-span-5 flex items-center gap-3">
-                    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+          <div class="divide-y">
+            <div
+              v-for="service in sortedServices"
+              :key="service.id"
+              class="px-4 py-4 transition-colors hover:bg-muted/30 md:px-6"
+            >
+              <div class="flex flex-col gap-3 md:hidden">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <div
+                      class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted"
+                    >
                       <img
                         :src="getServiceImagePath(service)"
                         :alt="service.name"
                         class="h-6 w-6 object-contain"
-                        @error="($event.target as HTMLImageElement).style.display = 'none'"
-                      >
+                        @error="
+                          ($event.target as HTMLImageElement).style.display =
+                            'none'
+                        "
+                      />
                     </div>
                     <div class="min-w-0">
                       <div class="flex items-center gap-1.5">
-                        <span class="truncate font-medium">{{ service.name }}</span>
-                        <TooltipProvider v-if="service.type === 'php' && service.is_default">
+                        <span class="truncate font-medium">{{
+                          service.name
+                        }}</span>
+                        <TooltipProvider
+                          v-if="service.type === 'php' && service.is_default"
+                        >
                           <Tooltip>
                             <TooltipTrigger>
-                              <Icon name="lucide:star" class="h-3.5 w-3.5 shrink-0 fill-yellow-500 text-yellow-500" />
+                              <Icon
+                                name="lucide:star"
+                                class="h-3.5 w-3.5 shrink-0 fill-yellow-500 text-yellow-500"
+                              />
                             </TooltipTrigger>
                             <TooltipContent>Default CLI version</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       </div>
-                      <div class="text-xs text-muted-foreground">v{{ displayVersion(service) }}</div>
+                      <div class="font-mono text-xs text-muted-foreground">
+                        v{{ displayVersion(service) }}
+                      </div>
                     </div>
                   </div>
-
-                  <div class="col-span-4">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger as-child>
-                          <Badge :variant="getStatusVariant(getDisplayStatus(service).status)" class="cursor-help">
-                            {{ getDisplayStatus(service).label }}
-                          </Badge>
-                        </TooltipTrigger>
-                        <TooltipContent class="max-w-xs">
-                          <div class="space-y-1.5 text-sm">
-                            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                              <span class="text-muted-foreground">Status:</span>
-                              <span :class="getDisplayStatus(service).status === 'running' ? 'text-green-500' : 'text-red-500'">
-                                {{ getDisplayStatus(service).label }}
-                              </span>
-                              <template v-if="getDisplayStatus(service).pid">
-                                <span class="text-muted-foreground">PID:</span>
-                                <span>{{ getDisplayStatus(service).pid }}</span>
-                              </template>
-                              <template v-if="getDisplayStatus(service).memory">
-                                <span class="text-muted-foreground">Memory:</span>
-                                <span>{{ getDisplayStatus(service).memory }}</span>
-                              </template>
-                              <template v-if="getDisplayStatus(service).uptime">
-                                <span class="text-muted-foreground">Uptime:</span>
-                                <span>{{ getDisplayStatus(service).uptime }}</span>
-                              </template>
-                              <span class="text-muted-foreground">Version:</span>
-                              <span>{{ displayVersion(service) }}</span>
-                            </div>
-                            <p v-if="service.last_status_check" class="border-t pt-1.5 text-xs text-muted-foreground">
-                              Last checked: {{ new Date(service.last_status_check).toLocaleTimeString() }}
-                            </p>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-
-                  <div class="col-span-3 flex items-center justify-end gap-2">
+                  <div class="flex items-center gap-2">
                     <Icon
                       v-if="loadingAction?.software === service.software"
                       name="lucide:loader-2"
@@ -997,25 +868,53 @@ onBeforeUnmount(() => {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" class="w-48">
-                        <DropdownMenuItem v-if="canStart(service)" @click="serviceAction(service, 'start')">
+                        <DropdownMenuItem
+                          v-if="canStart(service)"
+                          @click="serviceAction(service, 'start')"
+                        >
                           <Icon name="lucide:play" class="mr-2 h-4 w-4" />
                           Start
                         </DropdownMenuItem>
-                        <DropdownMenuItem v-if="canStop(service)" @click="serviceAction(service, 'stop')">
+                        <DropdownMenuItem
+                          v-if="canStop(service)"
+                          @click="serviceAction(service, 'stop')"
+                        >
                           <Icon name="lucide:power" class="mr-2 h-4 w-4" />
                           Stop
                         </DropdownMenuItem>
-                        <DropdownMenuItem v-if="canRestart(service)" @click="serviceAction(service, 'restart')">
+                        <DropdownMenuItem
+                          v-if="canRestart(service)"
+                          @click="serviceAction(service, 'restart')"
+                        >
                           <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
                           Restart
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator v-if="canStart(service) || canStop(service) || canRestart(service)" />
+                        <DropdownMenuSeparator
+                          v-if="
+                            canStart(service) ||
+                            canStop(service) ||
+                            canRestart(service)
+                          "
+                        />
                         <DropdownMenuItem @click="openStatusDialog(service)">
                           <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
                           View Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem v-if="logsByService.has(service.software)" @click="openLogSheet(service)">
-                          <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
+                        <DropdownMenuItem
+                          v-if="service.software === 'launch_agent'"
+                          @click="serviceAction(service, 'update')"
+                        >
+                          <Icon name="lucide:download" class="mr-2 h-4 w-4" />
+                          Update Agent
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          v-if="logsByService.has(service.software)"
+                          @click="openLogSheet(service)"
+                        >
+                          <Icon
+                            name="lucide:scroll-text"
+                            class="mr-2 h-4 w-4"
+                          />
                           View Logs
                         </DropdownMenuItem>
                         <template v-if="service.type === 'php'">
@@ -1024,12 +923,17 @@ onBeforeUnmount(() => {
                             <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
                             OPcache
                           </DropdownMenuItem>
-                          <DropdownMenuItem @click="openExtensionsDialog(service)">
+                          <DropdownMenuItem
+                            @click="openExtensionsDialog(service)"
+                          >
                             <Icon name="lucide:package" class="mr-2 h-4 w-4" />
                             Extensions
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem v-if="!service.is_default" @click="setPhpDefault(service)">
+                          <DropdownMenuItem
+                            v-if="!service.is_default"
+                            @click="setPhpDefault(service)"
+                          >
                             <Icon name="lucide:star" class="mr-2 h-4 w-4" />
                             Set as Default
                           </DropdownMenuItem>
@@ -1038,7 +942,10 @@ onBeforeUnmount(() => {
                             Patch Version
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem class="text-destructive focus:text-destructive" @click="uninstallPhpVersion(service)">
+                          <DropdownMenuItem
+                            class="text-destructive focus:text-destructive"
+                            @click="uninstallPhpVersion(service)"
+                          >
                             <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
                             Uninstall
                           </DropdownMenuItem>
@@ -1047,15 +954,270 @@ onBeforeUnmount(() => {
                     </DropdownMenu>
                   </div>
                 </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Badge
+                          :variant="
+                            getStatusVariant(getDisplayStatus(service).status)
+                          "
+                          class="cursor-help"
+                        >
+                          {{ getDisplayStatus(service).label }}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent class="max-w-xs">
+                        <div class="space-y-1.5 text-sm">
+                          <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                            <span class="text-muted-foreground">Status:</span>
+                            <span
+                              :class="
+                                getDisplayStatus(service).status === 'running'
+                                  ? 'text-green-500'
+                                  : 'text-red-500'
+                              "
+                            >
+                              {{ getDisplayStatus(service).label }}
+                            </span>
+                            <template v-if="getDisplayStatus(service).pid">
+                              <span class="text-muted-foreground">PID:</span>
+                              <span>{{ getDisplayStatus(service).pid }}</span>
+                            </template>
+                            <template v-if="getDisplayStatus(service).memory">
+                              <span class="text-muted-foreground">Memory:</span>
+                              <span>{{
+                                getDisplayStatus(service).memory
+                              }}</span>
+                            </template>
+                            <template v-if="getDisplayStatus(service).uptime">
+                              <span class="text-muted-foreground">Uptime:</span>
+                              <span>{{
+                                getDisplayStatus(service).uptime
+                              }}</span>
+                            </template>
+                            <span class="text-muted-foreground">Version:</span>
+                            <span>{{ displayVersion(service) }}</span>
+                          </div>
+                          <p
+                            v-if="service.last_status_check"
+                            class="border-t pt-1.5 text-xs text-muted-foreground"
+                          >
+                            Last checked:
+                            {{
+                              new Date(
+                                service.last_status_check,
+                              ).toLocaleTimeString()
+                            }}
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+              </div>
+
+              <div class="hidden items-center gap-4 md:grid md:grid-cols-12">
+                <div class="col-span-5 flex items-center gap-3">
+                  <div
+                    class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted"
+                  >
+                    <img
+                      :src="getServiceImagePath(service)"
+                      :alt="service.name"
+                      class="h-6 w-6 object-contain"
+                      @error="
+                        ($event.target as HTMLImageElement).style.display =
+                          'none'
+                      "
+                    />
+                  </div>
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5">
+                      <span class="truncate font-medium">{{
+                        service.name
+                      }}</span>
+                      <TooltipProvider
+                        v-if="service.type === 'php' && service.is_default"
+                      >
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Icon
+                              name="lucide:star"
+                              class="h-3.5 w-3.5 shrink-0 fill-yellow-500 text-yellow-500"
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>Default CLI version</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <div class="text-xs text-muted-foreground">
+                      v{{ displayVersion(service) }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-span-4">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Badge
+                          :variant="
+                            getStatusVariant(getDisplayStatus(service).status)
+                          "
+                          class="cursor-help"
+                        >
+                          {{ getDisplayStatus(service).label }}
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent class="max-w-xs">
+                        <div class="space-y-1.5 text-sm">
+                          <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                            <span class="text-muted-foreground">Status:</span>
+                            <span
+                              :class="
+                                getDisplayStatus(service).status === 'running'
+                                  ? 'text-green-500'
+                                  : 'text-red-500'
+                              "
+                            >
+                              {{ getDisplayStatus(service).label }}
+                            </span>
+                            <template v-if="getDisplayStatus(service).pid">
+                              <span class="text-muted-foreground">PID:</span>
+                              <span>{{ getDisplayStatus(service).pid }}</span>
+                            </template>
+                            <template v-if="getDisplayStatus(service).memory">
+                              <span class="text-muted-foreground">Memory:</span>
+                              <span>{{
+                                getDisplayStatus(service).memory
+                              }}</span>
+                            </template>
+                            <template v-if="getDisplayStatus(service).uptime">
+                              <span class="text-muted-foreground">Uptime:</span>
+                              <span>{{
+                                getDisplayStatus(service).uptime
+                              }}</span>
+                            </template>
+                            <span class="text-muted-foreground">Version:</span>
+                            <span>{{ displayVersion(service) }}</span>
+                          </div>
+                          <p
+                            v-if="service.last_status_check"
+                            class="border-t pt-1.5 text-xs text-muted-foreground"
+                          >
+                            Last checked:
+                            {{
+                              new Date(
+                                service.last_status_check,
+                              ).toLocaleTimeString()
+                            }}
+                          </p>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+
+                <div class="col-span-3 flex items-center justify-end gap-2">
+                  <Icon
+                    v-if="loadingAction?.software === service.software"
+                    name="lucide:loader-2"
+                    class="h-4 w-4 animate-spin text-muted-foreground"
+                  />
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="sm">
+                        <Icon name="lucide:more-horizontal" class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" class="w-48">
+                      <DropdownMenuItem
+                        v-if="canStart(service)"
+                        @click="serviceAction(service, 'start')"
+                      >
+                        <Icon name="lucide:play" class="mr-2 h-4 w-4" />
+                        Start
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        v-if="canStop(service)"
+                        @click="serviceAction(service, 'stop')"
+                      >
+                        <Icon name="lucide:power" class="mr-2 h-4 w-4" />
+                        Stop
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        v-if="canRestart(service)"
+                        @click="serviceAction(service, 'restart')"
+                      >
+                        <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
+                        Restart
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator
+                        v-if="
+                          canStart(service) ||
+                          canStop(service) ||
+                          canRestart(service)
+                        "
+                      />
+                      <DropdownMenuItem @click="openStatusDialog(service)">
+                        <Icon name="lucide:activity" class="mr-2 h-4 w-4" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        v-if="logsByService.has(service.software)"
+                        @click="openLogSheet(service)"
+                      >
+                        <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
+                        View Logs
+                      </DropdownMenuItem>
+                      <template v-if="service.type === 'php'">
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem @click="openOpcacheDialog(service)">
+                          <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
+                          OPcache
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          @click="openExtensionsDialog(service)"
+                        >
+                          <Icon name="lucide:package" class="mr-2 h-4 w-4" />
+                          Extensions
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          v-if="!service.is_default"
+                          @click="setPhpDefault(service)"
+                        >
+                          <Icon name="lucide:star" class="mr-2 h-4 w-4" />
+                          Set as Default
+                        </DropdownMenuItem>
+                        <DropdownMenuItem @click="patchPhpVersion(service)">
+                          <Icon name="lucide:wrench" class="mr-2 h-4 w-4" />
+                          Patch Version
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          class="text-destructive focus:text-destructive"
+                          @click="uninstallPhpVersion(service)"
+                        >
+                          <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
+                          Uninstall
+                        </DropdownMenuItem>
+                      </template>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </div>
           </div>
-        </template>
-      </div>
+        </div>
+      </template>
+    </div>
 
-    <!-- Log Viewer Sheet -->
     <Sheet v-model:open="isLogSheetOpen">
-      <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col">
+      <SheetContent
+        class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col"
+      >
         <SheetHeader>
           <SheetTitle>{{ selectedLog?.name || 'Logs' }}</SheetTitle>
           <SheetDescription>Service logs</SheetDescription>
