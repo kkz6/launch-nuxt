@@ -574,19 +574,50 @@ onUnmounted(() => {
         >
           <div
             v-if="filteredLogs.length === 0"
-            class="absolute inset-0 flex items-center justify-center gap-2 bg-zinc-950/80 text-sm text-zinc-400"
+            class="absolute inset-0 flex items-center justify-center bg-zinc-950/90 px-6 text-center text-sm text-zinc-400"
+            aria-live="polite"
           >
             <template v-if="streamError">
-              <Icon name="lucide:triangle-alert" class="h-4 w-4 text-red-400" />
-              <span>{{ streamError }}</span>
+              <div class="flex max-w-md flex-col items-center">
+                <span
+                  class="grid h-10 w-10 place-items-center rounded-full border border-red-500/20 bg-red-500/10"
+                >
+                  <Icon
+                    name="lucide:triangle-alert"
+                    class="h-5 w-5 text-red-400"
+                  />
+                </span>
+                <p class="mt-4 font-medium text-zinc-100">
+                  Log stream unavailable
+                </p>
+                <p class="mt-1 leading-6 text-zinc-400">{{ streamError }}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="mt-4 border-zinc-700 bg-zinc-900 text-zinc-200 hover:bg-zinc-800 hover:text-white"
+                  @click="connectWebSocket"
+                >
+                  <Icon name="lucide:rotate-cw" class="mr-2 h-3.5 w-3.5" />
+                  Try again
+                </Button>
+              </div>
             </template>
             <template v-else-if="streamEnded || (wsOpen && emptyConfirmed)">
-              <Icon name="lucide:file-x" class="h-4 w-4" />
-              <span>No logs available</span>
+              <div class="flex flex-col items-center">
+                <Icon name="lucide:file-x" class="h-5 w-5" />
+                <p class="mt-3 font-medium text-zinc-200">No logs available</p>
+                <p class="mt-1 text-zinc-500">
+                  This action has not produced any output.
+                </p>
+              </div>
             </template>
             <template v-else>
-              <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
-              <span>{{ wsOpen ? 'Loading logs…' : 'Connecting…' }}</span>
+              <div class="flex flex-col items-center">
+                <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin" />
+                <span class="mt-3">{{
+                  wsOpen ? 'Loading logs…' : 'Connecting…'
+                }}</span>
+              </div>
             </template>
           </div>
 
