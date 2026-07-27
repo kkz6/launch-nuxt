@@ -41,10 +41,11 @@ const props = withDefaults(defineProps<Props>(), {
 const config = useRuntimeConfig()
 const { token, waitForAuth } = useAuth()
 const { getCurrentTeamId } = useApi()
-
 interface LogViewerState {
   rawLogs: string
   emptyConfirmed: boolean
+  streamEnded: boolean
+  streamError: string
   filteredLogs: LogLine[]
   autoScroll: boolean
   lines: number
@@ -59,6 +60,8 @@ interface LogViewerState {
 const state = reactive({
   rawLogs: '',
   emptyConfirmed: false,
+  streamEnded: false,
+  streamError: '',
   filteredLogs: [],
   autoScroll: true,
   lines: 100,
@@ -73,6 +76,8 @@ const state = reactive({
 const {
   rawLogs,
   emptyConfirmed,
+  streamEnded,
+  streamError,
   filteredLogs,
   autoScroll,
   lines,
@@ -83,7 +88,6 @@ const {
   logType,
   showTimestamp,
 } = toRefs(state)
-
 let emptyConfirmTimer: ReturnType<typeof setTimeout> | null = null
 const linesString = computed({
   get: () => String(lines.value),
@@ -373,6 +377,8 @@ const connectWebSocket = async () => {
   rawLogs.value = ''
   filteredLogs.value = []
   emptyConfirmed.value = false
+  streamEnded.value = false
+  streamError.value = ''
   if (emptyConfirmTimer) {
     clearTimeout(emptyConfirmTimer)
     emptyConfirmTimer = null
@@ -408,6 +414,8 @@ const connectWebSocket = async () => {
 
   ws.onopen = () => {
     wsOpen.value = true
+    streamEnded.value = false
+    streamError.value = ''
     if (emptyConfirmTimer) clearTimeout(emptyConfirmTimer)
     emptyConfirmTimer = setTimeout(() => {
       if (rawLogs.value.length === 0) {
@@ -417,7 +425,25 @@ const connectWebSocket = async () => {
   }
 
   ws.onmessage = (e) => {
-    rawLogs.value += e.data
+    const data = typeof e.data === 'string' ? e.data : String(e.data)
+    try {
+      const event = JSON.parse(data) as {
+        event?: string
+        message?: string
+        data?: { message?: string }
+      }
+      if (event.event === 'error') {
+        streamError.value =
+          event.data?.message || event.message || 'Unable to load logs'
+        streamEnded.value = true
+        wsOpen.value = false
+        return
+      }
+    } catch {
+      // Log output is plain text and may contain JSON-like lines.
+    }
+
+    rawLogs.value += data
     if (emptyConfirmTimer) {
       clearTimeout(emptyConfirmTimer)
       emptyConfirmTimer = null
@@ -427,10 +453,13 @@ const connectWebSocket = async () => {
 
   ws.onerror = () => {
     wsOpen.value = false
+    streamEnded.value = true
+    if (!streamError.value) streamError.value = 'Unable to connect to log stream'
   }
 
   ws.onclose = () => {
     wsOpen.value = false
+    streamEnded.value = true
   }
 }
 
@@ -547,7 +576,11 @@ onUnmounted(() => {
             v-if="filteredLogs.length === 0"
             class="absolute inset-0 flex items-center justify-center gap-2 bg-zinc-950/80 text-sm text-zinc-400"
           >
-            <template v-if="wsOpen && emptyConfirmed">
+            <template v-if="streamError">
+              <Icon name="lucide:triangle-alert" class="h-4 w-4 text-red-400" />
+              <span>{{ streamError }}</span>
+            </template>
+            <template v-else-if="streamEnded || (wsOpen && emptyConfirmed)">
               <Icon name="lucide:file-x" class="h-4 w-4" />
               <span>No logs available</span>
             </template>
