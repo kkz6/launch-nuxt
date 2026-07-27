@@ -1,4 +1,5 @@
-import { ref, reactive, computed, onMounted, type Ref } from "vue";
+import { computed, onMounted, reactive, toRefs } from "vue";
+import { useDebounceFn } from "@vueuse/core";
 import type {
   TableMeta,
   TableResponse,
@@ -13,66 +14,78 @@ export interface UseTableOptions {
   headers?: Record<string, string> | (() => Record<string, string>);
 }
 
+interface TableState<T> {
+  data: T[];
+  meta: TableMeta | null;
+  pagination: PaginationData | null;
+  isLoading: boolean;
+  hasLoaded: boolean;
+  currentPage: number;
+  perPage: number;
+  sortColumn: string | null;
+  sortDirection: "asc" | "desc";
+  search: string;
+  activeFilters: Record<string, Record<string, string>>;
+  visibleColumns: string[];
+}
+
 export function useTable<T = any>(
   endpoint: string,
   options: UseTableOptions = {},
 ) {
-  const data = ref<T[]>([]) as Ref<T[]>;
-  const meta = ref<TableMeta | null>(null);
-  const pagination = ref<PaginationData | null>(null);
-  const isLoading = ref(false);
-  // hasLoaded flips true once the first fetch settles (success OR failure), so
-  // the UI can show a loading skeleton from the very first render until then —
-  // instead of briefly rendering an empty state while isLoading is still false
-  // (before onMounted) or during SSR.
-  const hasLoaded = ref(false);
-  const isEmpty = computed(() => !isLoading.value && data.value.length === 0);
-
-  const currentPage = ref(1);
-  const perPage = ref(options.defaultPerPage ?? 15);
-  const sortColumn = ref<string | null>(null);
-  const sortDirection = ref<"asc" | "desc">("asc");
-  const search = ref("");
-  const activeFilters = reactive<Record<string, Record<string, string>>>({});
-  const visibleColumns = ref<string[]>([]);
-
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const state = reactive({
+    data: [] as T[],
+    meta: null as TableMeta | null,
+    pagination: null as PaginationData | null,
+    isLoading: false,
+    hasLoaded: false,
+    currentPage: 1,
+    perPage: options.defaultPerPage ?? 15,
+    sortColumn: null as string | null,
+    sortDirection: "asc" as "asc" | "desc",
+    search: "",
+    activeFilters: {} as Record<string, Record<string, string>>,
+    visibleColumns: [] as string[],
+  }) as TableState<T>;
+  const isEmpty = computed(() => !state.isLoading && state.data.length === 0);
+  const api = useApi();
 
   function initFromUrl() {
     if (!options.syncUrl || typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("page")) currentPage.value = Number(params.get("page"));
-    if (params.get("limit")) perPage.value = Number(params.get("limit"));
+    if (params.get("page")) state.currentPage = Number(params.get("page"));
+    if (params.get("limit")) state.perPage = Number(params.get("limit"));
     if (params.get("sort")) {
       const [col, dir] = params.get("sort")!.split(":");
-      sortColumn.value = col;
-      sortDirection.value = (dir as "asc" | "desc") || "asc";
+      state.sortColumn = col;
+      state.sortDirection = (dir as "asc" | "desc") || "asc";
     }
-    if (params.get("search")) search.value = params.get("search")!;
+    if (params.get("search")) state.search = params.get("search")!;
     params.forEach((value, key) => {
       const match = key.match(/^filters\[(\w+)]\[(\w+)]$/);
       if (match) {
         const [, filterKey, clause] = match;
-        if (!activeFilters[filterKey]) activeFilters[filterKey] = {};
-        activeFilters[filterKey][clause] = value;
+        if (!state.activeFilters[filterKey])
+          state.activeFilters[filterKey] = {};
+        state.activeFilters[filterKey][clause] = value;
       }
     });
   }
 
   function buildQueryString(): string {
     const params = new URLSearchParams();
-    params.set("page", String(currentPage.value));
-    params.set("limit", String(perPage.value));
-    if (sortColumn.value)
-      params.set("sort", `${sortColumn.value}:${sortDirection.value}`);
-    if (search.value) params.set("search", search.value);
-    for (const [key, clauseMap] of Object.entries(activeFilters)) {
+    params.set("page", String(state.currentPage));
+    params.set("limit", String(state.perPage));
+    if (state.sortColumn)
+      params.set("sort", `${state.sortColumn}:${state.sortDirection}`);
+    if (state.search) params.set("search", state.search);
+    for (const [key, clauseMap] of Object.entries(state.activeFilters)) {
       for (const [clause, value] of Object.entries(clauseMap)) {
         params.set(`filters[${key}][${clause}]`, value);
       }
     }
-    if (visibleColumns.value.length > 0) {
-      params.set("columns", visibleColumns.value.join(","));
+    if (state.visibleColumns.length > 0) {
+      params.set("columns", state.visibleColumns.join(","));
     }
     return params.toString();
   }
@@ -85,16 +98,9 @@ export function useTable<T = any>(
   }
 
   async function fetchData() {
-    isLoading.value = true;
+    state.isLoading = true;
     try {
       const queryString = buildQueryString();
-      // Use our shared useApi() wrapper so the bearer token, refresh-on-401
-      // retry, and team header are all handled in one place.
-      // `endpoint` is the table base (e.g. /users/table); /data hangs off it.
-      // The backend wraps the table payload in the standard
-      // `{ success, message, data: TableResponse }` envelope, so the
-      // TableResponse (meta + rows + pagination) lives under `envelope.data`.
-      const api = useApi();
       const headers =
         typeof options.headers === "function"
           ? options.headers()
@@ -107,96 +113,88 @@ export function useTable<T = any>(
       if (!result) {
         throw new Error("Table response was empty");
       }
-      data.value = result.data;
-      meta.value = result.meta;
-      pagination.value = result.pagination;
-      // On first meta load, seed visibleColumns with every toggleable column
-      // that the backend marked as visible. That way the column dropdown can
-      // treat the list as the source of truth — clicking a checked item
-      // removes it (hides the column) instead of being a sentinel for
-      // "all visible".
-      if (visibleColumns.value.length === 0 && result.meta?.columns?.length) {
-        visibleColumns.value = result.meta.columns
+      state.data = result.data;
+      state.meta = result.meta;
+      state.pagination = result.pagination;
+      if (state.visibleColumns.length === 0 && result.meta?.columns?.length) {
+        state.visibleColumns = result.meta.columns
           .filter((c: any) => c.toggleable !== false && c.visible !== false)
           .map((c: any) => c.key);
       }
     } catch (error) {
       console.error("Failed to fetch table data:", error);
     } finally {
-      isLoading.value = false;
-      hasLoaded.value = true;
+      state.isLoading = false;
+      state.hasLoaded = true;
     }
   }
 
-  function debouncedFetch() {
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      syncToUrl();
-      fetchData();
-    }, options.debounce ?? 300);
-  }
+  const debouncedFetch = useDebounceFn(() => {
+    syncToUrl();
+    void fetchData();
+  }, options.debounce ?? 300);
 
   function setPage(page: number) {
-    currentPage.value = page;
+    state.currentPage = page;
     syncToUrl();
-    fetchData();
+    void fetchData();
   }
 
   function setPerPage(value: number) {
-    perPage.value = value;
-    currentPage.value = 1;
+    state.perPage = value;
+    state.currentPage = 1;
     syncToUrl();
-    fetchData();
+    void fetchData();
   }
 
   function setSort(column: string) {
-    if (sortColumn.value === column) {
-      sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
+    if (state.sortColumn === column) {
+      state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
     } else {
-      sortColumn.value = column;
-      sortDirection.value = "asc";
+      state.sortColumn = column;
+      state.sortDirection = "asc";
     }
-    currentPage.value = 1;
+    state.currentPage = 1;
     syncToUrl();
-    fetchData();
+    void fetchData();
   }
 
   function setSearch(value: string) {
-    search.value = value;
-    currentPage.value = 1;
+    state.search = value;
+    state.currentPage = 1;
     debouncedFetch();
   }
 
   function addFilter(key: string, clause: string, value: string) {
-    if (!activeFilters[key]) activeFilters[key] = {};
-    activeFilters[key][clause] = value;
-    currentPage.value = 1;
+    if (!state.activeFilters[key]) state.activeFilters[key] = {};
+    state.activeFilters[key][clause] = value;
+    state.currentPage = 1;
     debouncedFetch();
   }
 
   function removeFilter(key: string) {
-    delete activeFilters[key];
-    currentPage.value = 1;
+    delete state.activeFilters[key];
+    state.currentPage = 1;
     debouncedFetch();
   }
 
   function updateFilter(key: string, clause: string, value: string) {
-    activeFilters[key] = { [clause]: value };
-    currentPage.value = 1;
+    state.activeFilters[key] = { [clause]: value };
+    state.currentPage = 1;
     debouncedFetch();
   }
 
   function toggleColumn(key: string) {
-    const idx = visibleColumns.value.indexOf(key);
+    const idx = state.visibleColumns.indexOf(key);
     if (idx >= 0) {
-      visibleColumns.value.splice(idx, 1);
+      state.visibleColumns.splice(idx, 1);
     } else {
-      visibleColumns.value.push(key);
+      state.visibleColumns.push(key);
     }
   }
 
   function refresh() {
-    fetchData();
+    void fetchData();
   }
 
   onMounted(() => {
@@ -205,19 +203,8 @@ export function useTable<T = any>(
   });
 
   return {
-    data,
-    meta,
-    pagination,
-    isLoading,
-    hasLoaded,
+    ...toRefs(state),
     isEmpty,
-    currentPage,
-    perPage,
-    sortColumn,
-    sortDirection,
-    search,
-    activeFilters,
-    visibleColumns,
     setPage,
     setPerPage,
     setSort,
