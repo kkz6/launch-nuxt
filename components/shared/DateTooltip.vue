@@ -6,53 +6,18 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 
-/**
- * SharedDateTooltip renders an ISO timestamp as live "X minutes ago"
- * text with a tooltip showing the absolute time in the browser's
- * timezone. One ticking instance per process (see useNow) keeps the
- * cost flat no matter how many rows are on screen.
- *
- * Backend hands every timestamp as ISO 8601 with offset (e.g.
- * "2026-05-30T11:11:15+02:00"). `new Date(string)` parses both Z and
- * offset forms reliably across browsers, so we hand it the string
- * directly without manual parsing.
- *
- * The tooltip uses `toLocaleString(undefined, …)` — the `undefined`
- * locale + no `timeZone` option asks the browser to render in the
- * user's own timezone, which is what every operator expects for
- * "when did this happen on my watch". Explicitly passing `undefined`
- * (rather than omitting) signals the intent so a later refactor
- * doesn't accidentally hard-code a TZ.
- */
 interface Props {
   date: string | Date | null | undefined;
-  /** Inline classes for the visible span (relative-time text). */
   className?: string;
 }
 
 const props = defineProps<Props>();
 const slots = useSlots();
 
-/**
- * Tolerant date parser. We get timestamps in three shapes:
- *
- *   1. ISO 8601 (the normal case): "2026-05-30T11:11:15+02:00"
- *   2. ISO with Z: "2026-05-30T11:11:15.123Z"
- *   3. `docker ps` output: "2026-05-30 11:11:15 +0200 CEST"
- *
- * Native `new Date(s)` parses (1) and (2) reliably, but on (3) V8
- * returns Invalid Date because of the trailing zone name and the
- * space between date and time. We normalise to ISO before parsing:
- * replace the first space with 'T' and strip anything after the
- * numeric offset.
- */
 function tolerantParse(raw: string | Date): Date | null {
   if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
-  // First try the native parser — handles every well-formed ISO.
   const direct = new Date(raw);
   if (!isNaN(direct.getTime())) return direct;
-  // Fallback for docker-ps style. "2026-05-30 11:11:15 +0200 CEST"
-  //   → "2026-05-30T11:11:15+0200"
   const match = raw.match(
     /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:\.\d+)?\s*([+-]\d{2}:?\d{2}|Z)/,
   );
@@ -69,15 +34,6 @@ const parsed = computed<Date | null>(() => {
   return tolerantParse(props.date);
 });
 
-// Ticking "now". Two shared clocks (see useNow):
-//   - coarse (30s): ambient "X minutes/hours ago" badges.
-//   - fast   (1s):  fresh timestamps, so "X seconds ago" counts up
-//                   smoothly instead of jumping in 30s steps.
-// We pick per timestamp by age: within two minutes (where second- and
-// minute-level granularity actually changes the label) we follow the
-// 1s clock; older than that the 30s clock is plenty. Because the
-// computed only reads `fast.value` while the date is recent, old rows
-// stop depending on the 1s tick and don't re-render every second.
 const coarse = useNow();
 const fast = useNow(1000);
 
@@ -92,8 +48,6 @@ const relativeDate = computed<string>(() => {
   const d = parsed.value;
   if (!d) return "—";
   const diffMs = now.value.getTime() - d.getTime();
-  // Negative → date is in the future (clock drift, scheduled job).
-  // Surface as "in N minutes" so the operator can spot it.
   const future = diffMs < 0;
   const absMs = Math.abs(diffMs);
   const secs = Math.floor(absMs / 1000);
@@ -116,9 +70,6 @@ const relativeDate = computed<string>(() => {
   if (days < 7) return fmt(days, "day");
   if (days < 30) return fmt(weeks, "week");
   if (months < 12) {
-    // Smooth over the day=30 boundary so a 28-day gap doesn't say
-    // "4 weeks ago" while a 31-day gap says "1 month ago" with the
-    // same on-screen badge width.
     if (days < 45) return future ? "in about 1 month" : "about 1 month ago";
     return fmt(months, "month");
   }
@@ -128,9 +79,6 @@ const relativeDate = computed<string>(() => {
 const fullDate = computed<string>(() => {
   const d = parsed.value;
   if (!d) return "—";
-  // `undefined` locale → browser's locale. No `timeZone` option →
-  // browser's timezone. Both are explicit-by-omission; see the
-  // header comment.
   return d.toLocaleString(undefined, {
     weekday: "short",
     year: "numeric",
