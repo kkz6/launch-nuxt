@@ -2,18 +2,8 @@
 import { toast } from 'vue-sonner'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
-
-interface Command {
-  id: string
-  command: string
-  status: 'pending' | 'running' | 'finished' | 'failed'
-  output?: string
-  user: {
-    id: string
-    name: string
-  }
-  created_at: string
-}
+import { useCommandEvents } from '~/composables/useChannelEvents'
+import { reconcileCommandUpdate, type SiteCommand } from '~/utils/siteCommands'
 
 interface Props {
   serverId: string
@@ -21,12 +11,20 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const { user } = useAuth()
 
-const commands = ref<Command[]>([])
+const commands = ref<SiteCommand[]>([])
 const isLoading = ref(true)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const confirmationDialog = ref<InstanceType<
+  typeof import('~/components/shared/ConfirmationDialog.vue').default
+> | null>(null)
+const teamId = computed(() => String(user.value?.current_team_id || ''))
+let commandStateVersion = 0
 
-const statusVariants: Record<string, 'default' | 'secondary' | 'success' | 'destructive' | 'warning'> = {
+const statusVariants: Record<
+  string,
+  'default' | 'secondary' | 'success' | 'destructive' | 'warning'
+> = {
   pending: 'warning',
   running: 'default',
   finished: 'success',
@@ -34,9 +32,14 @@ const statusVariants: Record<string, 'default' | 'secondary' | 'success' | 'dest
 }
 
 const fetchCommands = async () => {
+  const requestedAtVersion = commandStateVersion
   try {
-    const data = await $api<{ data: Command[] }>(`/servers/${props.serverId}/sites/${props.siteId}/commands`)
-    commands.value = data.data
+    const data = await $api<{ data: SiteCommand[] }>(
+      `/servers/${props.serverId}/sites/${props.siteId}/commands`,
+    )
+    if (requestedAtVersion === commandStateVersion) {
+      commands.value = data.data
+    }
   } catch {
     toast.error('Failed to load commands')
   } finally {
@@ -44,15 +47,19 @@ const fetchCommands = async () => {
   }
 }
 
-// Debounced refetch for WebSocket events
-let commandFetchTimeout: ReturnType<typeof setTimeout> | null = null
-
-useSiteCommandEvents(props.siteId, () => {
-  if (commandFetchTimeout) clearTimeout(commandFetchTimeout)
-  commandFetchTimeout = setTimeout(() => fetchCommands(), 300)
+useCommandEvents(teamId, (data) => {
+  const nextCommands = reconcileCommandUpdate(
+    commands.value,
+    data,
+    props.siteId,
+  )
+  if (nextCommands !== commands.value) {
+    commandStateVersion++
+    commands.value = nextCommands
+  }
 })
 
-const deleteCommand = async (command: Command) => {
+const deleteCommand = async (command: SiteCommand) => {
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -65,9 +72,13 @@ const deleteCommand = async (command: Command) => {
 
   if (result.ok) {
     try {
-      await $api(`/servers/${props.serverId}/sites/${props.siteId}/commands/${command.id}`, {
-        method: 'DELETE',
-      })
+      await $api(
+        `/servers/${props.serverId}/sites/${props.siteId}/commands/${command.id}`,
+        {
+          method: 'DELETE',
+        },
+      )
+      commandStateVersion++
       commands.value = commands.value.filter((c) => c.id !== command.id)
       toast.success('Command deleted')
     } catch {
@@ -76,7 +87,7 @@ const deleteCommand = async (command: Command) => {
   }
 }
 
-const runCommandAgain = async (command: Command) => {
+const runCommandAgain = async (command: SiteCommand) => {
   if (!confirmationDialog.value) return
 
   const result = await confirmationDialog.value.show({
@@ -110,13 +121,23 @@ onMounted(fetchCommands)
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
         <h3 class="text-lg font-semibold">SSH Commands</h3>
-        <p class="text-sm text-muted-foreground">Run and manage SSH commands on your site</p>
+        <p class="text-sm text-muted-foreground">
+          Run and manage SSH commands on your site
+        </p>
       </div>
-      <SiteRunCommand v-if="commands.length > 0" :server-id="serverId" :site-id="siteId" @executed="fetchCommands" />
+      <SiteRunCommand
+        v-if="commands.length > 0"
+        :server-id="serverId"
+        :site-id="siteId"
+        @executed="fetchCommands"
+      />
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <template v-else>
@@ -136,7 +157,9 @@ onMounted(fetchCommands)
         </template>
 
         <template #cell-command="{ row }">
-          <code class="rounded bg-muted px-2 py-1 text-sm">{{ row.command }}</code>
+          <code class="rounded bg-muted px-2 py-1 text-sm">{{
+            row.command
+          }}</code>
         </template>
 
         <template #cell-created_at="{ row }">
@@ -144,7 +167,10 @@ onMounted(fetchCommands)
         </template>
 
         <template #cell-status="{ row }">
-          <Badge :variant="statusVariants[row.status] || 'secondary'" class="gap-1.5">
+          <Badge
+            :variant="statusVariants[row.status] || 'secondary'"
+            class="gap-1.5"
+          >
             <Icon
               v-if="row.status === 'running'"
               name="lucide:loader-2"
@@ -165,7 +191,12 @@ onMounted(fetchCommands)
               <Icon name="lucide:terminal-square" class="h-4 w-4" />
             </Button>
           </SharedOutputViewer>
-          <Button variant="ghost" size="icon" title="Run Again" @click="runCommandAgain(item)">
+          <Button
+            variant="ghost"
+            size="icon"
+            title="Run Again"
+            @click="runCommandAgain(item)"
+          >
             <Icon name="lucide:rotate-ccw" class="h-4 w-4" />
           </Button>
           <Button
@@ -180,7 +211,11 @@ onMounted(fetchCommands)
         </template>
 
         <template #empty>
-          <SiteRunCommand :server-id="serverId" :site-id="siteId" @executed="fetchCommands" />
+          <SiteRunCommand
+            :server-id="serverId"
+            :site-id="siteId"
+            @executed="fetchCommands"
+          />
         </template>
       </SharedDataTable>
     </template>

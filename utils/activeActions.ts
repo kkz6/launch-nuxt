@@ -1,14 +1,12 @@
 export type ActiveActionTargetType =
-  | 'site'
-  | 'application'
-  | 'compose'
-  | 'database'
+  'site' | 'application' | 'compose' | 'database'
 
 export interface ActiveAction {
   id: string
   kind: string
   status: string
   label: string
+  description?: string
   server_id: string
   project_id?: string
   target_type: ActiveActionTargetType
@@ -18,16 +16,14 @@ export interface ActiveAction {
   created_at: string
 }
 
-export interface DeploymentEventData {
+export interface ActiveActionEventData {
   deployment_id?: string
+  command_id?: string
   status?: string
 }
 
 export type ActiveActionStatusTone =
-  | 'running'
-  | 'success'
-  | 'failure'
-  | 'neutral'
+  'running' | 'success' | 'failure' | 'neutral'
 
 const runningStatuses = new Set([
   'pending',
@@ -70,7 +66,8 @@ export const humanizeActionValue = (value: string) =>
 export const activeActionStatusLabel = (action: ActiveAction) => {
   if (action.kind === 'deployment') {
     return (
-      deploymentStatusLabels[action.status] || humanizeActionValue(action.status)
+      deploymentStatusLabels[action.status] ||
+      humanizeActionValue(action.status)
     )
   }
   return humanizeActionValue(action.status)
@@ -88,12 +85,16 @@ export const activeActionStatusTone = (
 export const isActiveActionRunning = (action: ActiveAction) =>
   activeActionStatusTone(action.status) === 'running'
 
-export const updateActionFromDeploymentEvent = (
+export const updateActionFromEvent = (
   action: ActiveAction | null,
-  data: DeploymentEventData,
+  data: ActiveActionEventData,
   event: string,
 ) => {
-  if (!action || action.id !== data.deployment_id) return action
+  if (!action) return action
+
+  const eventActionId =
+    action.kind === 'command' ? data.command_id : data.deployment_id
+  if (action.id !== eventActionId) return action
 
   const status = data.status || terminalEventStatuses[event]
   return status ? { ...action, status } : action
@@ -102,7 +103,8 @@ export const updateActionFromDeploymentEvent = (
 export const activeActionPath = (action: ActiveAction) => {
   const serverPath = `/servers/${action.server_id}`
   if (action.target_type === 'site') {
-    return `${serverPath}/sites/${action.target_id}?tab=deployments`
+    const tab = action.kind === 'command' ? 'commands' : 'deployments'
+    return `${serverPath}/sites/${action.target_id}?tab=${tab}`
   }
 
   const segment =

@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { Activity, CircleAlert, CircleCheck, Loader2 } from 'lucide-vue-next'
-import { useDeploymentEvents } from '~/composables/useChannelEvents'
+import {
+  useCommandEvents,
+  useDeploymentEvents,
+} from '~/composables/useChannelEvents'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,7 +24,7 @@ import {
   activeActionStatusTone,
   humanizeActionValue,
   isActiveActionRunning,
-  updateActionFromDeploymentEvent,
+  updateActionFromEvent,
   type ActiveAction,
 } from '~/utils/activeActions'
 
@@ -33,13 +36,17 @@ const isLoading = ref(false)
 const logsOpen = ref(false)
 const selected = ref<ActiveAction | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
+let fetchSequence = 0
 
 const teamId = computed(() => String(user.value?.current_team_id || ''))
 const fetchActions = async () => {
   if (!teamId.value) return
+  const sequence = ++fetchSequence
   isLoading.value = true
   try {
     const response = await get<{ data: ActiveAction[] }>('/actions/active')
+    if (sequence !== fetchSequence) return
+
     const nextActions = response.data || []
     actions.value = nextActions
 
@@ -54,21 +61,18 @@ const fetchActions = async () => {
       selected.value = refreshedSelection
     }
   } finally {
-    isLoading.value = false
+    if (sequence === fetchSequence) {
+      isLoading.value = false
+    }
   }
 }
 
-useDeploymentEvents(
-  teamId,
-  async (data, event) => {
-    selected.value = updateActionFromDeploymentEvent(
-      selected.value,
-      data,
-      event,
-    )
-    await fetchActions()
-  },
-)
+useDeploymentEvents(teamId, async (data, event) => {
+  selected.value = updateActionFromEvent(selected.value, data, event)
+  await fetchActions()
+})
+
+useCommandEvents(teamId, fetchActions)
 
 const elapsed = (action: ActiveAction) => {
   const startedAt = new Date(action.started_at || action.created_at).getTime()
@@ -112,10 +116,7 @@ onUnmounted(() => {
         class="relative grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         aria-label="Active actions"
       >
-        <Activity
-          class="h-4 w-4"
-          :class="actions.length && 'text-primary'"
-        />
+        <Activity class="h-4 w-4" :class="actions.length && 'text-primary'" />
         <span
           v-if="actions.length"
           class="absolute right-0.5 top-0.5 grid min-h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
@@ -145,6 +146,12 @@ onUnmounted(() => {
           <span class="block truncate text-sm font-medium">{{
             action.label
           }}</span>
+          <span
+            v-if="action.description"
+            class="block truncate font-mono text-xs text-foreground/75"
+          >
+            {{ action.description }}
+          </span>
           <span class="block text-xs text-muted-foreground">
             {{ humanizeActionValue(action.kind) }} ·
             {{ activeActionStatusLabel(action) }} ·
