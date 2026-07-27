@@ -146,7 +146,6 @@ const {
 const agentUpdateStorageKey = computed(
   () => `launch:agent-update:${props.serverId}`,
 )
-
 const readUpdateStarted = (): number | null => {
   if (typeof window === 'undefined') return null
   const raw = window.localStorage.getItem(agentUpdateStorageKey.value)

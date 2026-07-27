@@ -6,6 +6,7 @@ import {
   type DockerDeploymentGhaStep,
 } from "~/services/dockerService";
 import { useDeploymentGhaStepsEvents } from "~/composables/useChannelEvents";
+import { getGhaStepsEmptyState } from "~/utils/ghaSteps";
 
 /**
  * Live GitHub Actions step timeline for a single deployment (#87).
@@ -68,8 +69,8 @@ const jobs = computed<DockerDeploymentGhaJob[]>(() => data.value?.jobs ?? []);
 const runUrl = computed(() => data.value?.run_url ?? "");
 const runStatus = computed(() => data.value?.run_status ?? "pending");
 
-const isWaiting = computed(
-  () => !loading.value && !errored.value && jobs.value.length === 0,
+const emptyState = computed(() =>
+  getGhaStepsEmptyState(runStatus.value, jobs.value.length),
 );
 
 // Per-step visual mapping.
@@ -91,13 +92,21 @@ const stepVisual = (step: DockerDeploymentGhaStep): StepVisual => {
       case "timed_out":
         return { icon: "lucide:x", spin: false, cls: "text-red-500" };
       case "skipped":
-        return { icon: "lucide:minus", spin: false, cls: "text-muted-foreground" };
+        return {
+          icon: "lucide:minus",
+          spin: false,
+          cls: "text-muted-foreground",
+        };
       default:
         return { icon: "lucide:check", spin: false, cls: "text-green-500" };
     }
   }
   // queued / pending
-  return { icon: "lucide:circle", spin: false, cls: "text-muted-foreground/50" };
+  return {
+    icon: "lucide:circle",
+    spin: false,
+    cls: "text-muted-foreground/50",
+  };
 };
 
 const jobStatusLabel = (job: DockerDeploymentGhaJob): string => {
@@ -108,8 +117,7 @@ const jobStatusLabel = (job: DockerDeploymentGhaJob): string => {
 const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
   if (!step.started_at || !step.completed_at) return "";
   const ms =
-    new Date(step.completed_at).getTime() -
-    new Date(step.started_at).getTime();
+    new Date(step.completed_at).getTime() - new Date(step.started_at).getTime();
   if (ms < 0) return "";
   const secs = Math.round(ms / 1000);
   if (secs < 60) return `${secs}s`;
@@ -173,29 +181,43 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
       </button>
     </div>
 
-    <!-- No steps yet. Two cases: a run link exists (terminal / older
-         deploy whose live steps aren't retrievable) vs a fresh deploy
-         whose run hasn't appeared yet. Always show something actionable. -->
+    <!-- Active runs can have a URL before GitHub exposes their jobs. -->
     <div
-      v-else-if="isWaiting"
+      v-else-if="emptyState === 'waiting'"
       class="flex flex-col gap-3 py-6 text-sm text-muted-foreground"
     >
-      <template v-if="runUrl">
-        <p>Step details aren't available for this deployment.</p>
-        <a
-          :href="runUrl"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="inline-flex items-center gap-1 text-foreground underline"
-        >
-          View the run on GitHub
-          <Icon name="lucide:external-link" class="size-3" />
-        </a>
-      </template>
-      <div v-else class="flex items-center gap-2">
+      <div class="flex items-center gap-2">
         <Icon name="lucide:loader-circle" class="size-4 animate-spin" />
-        Waiting for the GitHub Actions run to start…
+        Waiting for workflow steps…
       </div>
+      <a
+        v-if="runUrl"
+        :href="runUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1 text-foreground underline"
+      >
+        View the run on GitHub
+        <Icon name="lucide:external-link" class="size-3" />
+      </a>
+    </div>
+
+    <!-- A completed run with no captured jobs is genuinely unavailable. -->
+    <div
+      v-else-if="emptyState === 'unavailable'"
+      class="flex flex-col gap-3 py-6 text-sm text-muted-foreground"
+    >
+      <p>Step details aren't available for this deployment.</p>
+      <a
+        v-if="runUrl"
+        :href="runUrl"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-1 text-foreground underline"
+      >
+        View the run on GitHub
+        <Icon name="lucide:external-link" class="size-3" />
+      </a>
     </div>
 
     <!-- Jobs + steps -->

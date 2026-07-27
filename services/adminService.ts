@@ -9,6 +9,9 @@ import type {
   AdminPlan,
   PlatformInvitation,
   Server,
+  ObservabilitySnapshot,
+  QueryEntry,
+  N1Pattern,
 } from "~/types";
 import type { ApiResponse } from "~/composables/useApi";
 
@@ -204,5 +207,34 @@ export const adminService = {
   stopImpersonating: () => {
     const { post } = useApi();
     return post<ApiResponse<null>>("/admin/impersonate/stop");
+  },
+
+  observabilitySnapshot: () => {
+    const { get } = useApi();
+    return get<ApiResponse<ObservabilitySnapshot>>(
+      "/admin/observability/snapshot",
+    );
+  },
+
+  observabilityQueries: (params: { limit?: number } = {}) => {
+    const { get } = useApi();
+    return get<ApiResponse<QueryEntry[]>>("/admin/observability/queries", {
+      query: params,
+    });
+  },
+
+  observabilitySlowQueries: (params: { limit?: number } = {}) => {
+    const { get } = useApi();
+    return get<ApiResponse<QueryEntry[]>>(
+      "/admin/observability/queries/slow",
+      { query: params },
+    );
+  },
+
+  observabilityN1: (params: { limit?: number } = {}) => {
+    const { get } = useApi();
+    return get<ApiResponse<N1Pattern[]>>("/admin/observability/queries/n1", {
+      query: params,
+    });
   },
 };
