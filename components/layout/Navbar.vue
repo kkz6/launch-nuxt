@@ -1801,6 +1801,7 @@ onMounted(fetchTeams);
       </div>
 
       <div class="flex items-center space-x-2">
+        <LayoutActiveActions />
         <!-- User Menu (with Teams) -->
         <ClientOnly>
           <DropdownMenu v-model:open="isOpen">
