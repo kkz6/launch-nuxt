@@ -77,16 +77,25 @@ interface AgentVersionInfo {
 }
 const agentVersion = ref<AgentVersionInfo | null>(null)
 const isUpdatingAgent = ref(false)
+const agentUpdateTaskId = ref<string | null>(null)
+const isTaskLogSheetOpen = ref(false)
 
 // Persistent "update in progress" timestamp so the banner + agent-row
 // status stay on "Updating" across reloads. The service-operation job
-// has no started-event broadcast yet, so the UI drives this state on
-// its own and polls the version endpoint until installed catches up to
-// latest (or the TTL expires as a safety net).
+// polls the version endpoint until installed catches up to latest (or the
+// TTL expires as a safety net).
 const agentUpdateStorageKey = computed(() => `launch:agent-update:${props.serverId}`)
 const agentUpdateStartedAt = ref<number | null>(null)
 const AGENT_UPDATE_TTL_MS = 5 * 60 * 1000
 
+interface ServiceOperationEvent {
+  server_id?: string
+  service_id?: string
+  operation?: string
+  task_id?: string
+  status?: string
+  output?: string
+}
 const readUpdateStarted = (): number | null => {
   if (typeof window === 'undefined') return null
   const raw = window.localStorage.getItem(agentUpdateStorageKey.value)
@@ -302,8 +311,18 @@ const { user } = useAuth()
 const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
 useServiceEvents(teamId, (data) => {
-  const eventServerId = data.server_id
+  const event = data as ServiceOperationEvent
+  const eventServerId = event.server_id
   if (eventServerId === props.serverId) {
+    if (event.operation === 'update' && event.task_id) {
+      agentUpdateTaskId.value = event.task_id
+    }
+    if (event.operation === 'update' && event.status === 'failed') {
+      writeUpdateStarted(null)
+      stopAgentPoll()
+      toast.error('Launch Agent update failed. Open the update log for details.')
+      if (event.task_id) isTaskLogSheetOpen.value = true
+    }
     fetchServices()
   }
 })
@@ -453,6 +472,7 @@ const updateAgent = async () => {
     // status flip to "Updating" rather than continuing to show
     // "Update available". The poll below clears it once the agent
     // reports the new version.
+    agentUpdateTaskId.value = null
     writeUpdateStarted(Date.now())
     fetchServices()
     fetchAgentVersion()
@@ -488,6 +508,7 @@ const serviceAction = async (service: Service, action: 'start' | 'stop' | 'resta
     // so the row badge + banner reflect "Updating" until the agent
     // reports the new version (or the TTL elapses).
     if (action === 'update' && service.software === 'launch_agent') {
+      agentUpdateTaskId.value = null
       writeUpdateStarted(Date.now())
       fetchAgentVersion()
       startAgentPoll()
@@ -614,6 +635,15 @@ onBeforeUnmount(() => {
           <p class="text-blue-700 dark:text-blue-300/90">
             The install script is running on this server. The status will refresh automatically.
           </p>
+          <Button
+            v-if="agentUpdateTaskId"
+            variant="link"
+            size="sm"
+            class="mt-1 h-auto px-0 text-blue-800 dark:text-blue-200"
+            @click="isTaskLogSheetOpen = true"
+          >
+            View update log
+          </Button>
         </div>
       </div>
     </div>
@@ -1069,6 +1099,27 @@ onBeforeUnmount(() => {
             :entity-id="serverId"
             :software="selectedLog.software"
             :route="selectedLog.show_route"
+            no-timestamp
+          />
+        </div>
+      </SheetContent>
+    </Sheet>
+
+    <Sheet v-model:open="isTaskLogSheetOpen">
+      <SheetContent
+        class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col"
+      >
+        <SheetHeader>
+          <SheetTitle>Launch Agent update log</SheetTitle>
+          <SheetDescription>Output from the update script running on this server.</SheetDescription>
+        </SheetHeader>
+        <div class="mt-4 flex-1 min-h-0 flex flex-col">
+          <ServerLogViewer
+            v-if="isTaskLogSheetOpen && agentUpdateTaskId"
+            :key="agentUpdateTaskId"
+            :server-id="serverId"
+            entity="task"
+            :entity-id="agentUpdateTaskId"
             no-timestamp
           />
         </div>
