@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from '~/components/ui/alert-dialog'
 import { usePhpExtensionEvents } from '~/composables/useChannelEvents'
+import { installedPhpServiceId } from '~/utils/phpVersions'
 
 interface PhpExtension {
   value: string
@@ -94,9 +95,15 @@ const formatPhpVersion = (version: string): string => {
 }
 
 const handleInstall = async (extension: string) => {
+  const serviceId = installedPhpServiceId(props.service)
+  if (!serviceId) {
+    toast.error('Unable to identify the installed PHP service')
+    return
+  }
+
   loadingStates.value = { ...loadingStates.value, [extension]: true }
   try {
-    await $api(`/servers/${props.serverId}/php/${props.service.details?.id}/extensions`, {
+    await $api(`/servers/${props.serverId}/php/${serviceId}/extensions`, {
       method: 'POST',
       body: { extension },
     })
@@ -110,9 +117,15 @@ const handleInstall = async (extension: string) => {
 }
 
 const handleUninstall = async (extension: string) => {
+  const serviceId = installedPhpServiceId(props.service)
+  if (!serviceId) {
+    toast.error('Unable to identify the installed PHP service')
+    return
+  }
+
   loadingStates.value = { ...loadingStates.value, [extension]: true }
   try {
-    await $api(`/servers/${props.serverId}/php/${props.service.details?.id}/extensions/${extension}`, {
+    await $api(`/servers/${props.serverId}/php/${serviceId}/extensions/${extension}`, {
       method: 'DELETE',
     })
     toast.success('Extension uninstall initiated')

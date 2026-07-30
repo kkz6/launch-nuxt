@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { installedPhpServiceId } from '~/utils/phpVersions'
 
 interface OpcacheSettings {
   enabled: boolean
@@ -180,10 +181,21 @@ const formatBytes = (bytes: number): string => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`
 }
 
+const getServiceId = () => {
+  const serviceId = installedPhpServiceId(props.service)
+  if (!serviceId) {
+    toast.error('Unable to identify the installed PHP service')
+  }
+  return serviceId
+}
+
 const fetchStatus = async () => {
+  const serviceId = getServiceId()
+  if (!serviceId) return
+
   statusLoading.value = true
   try {
-    const response = await $api<{ data: OpcacheStatus }>(`/servers/${props.serverId}/php/${props.service.details?.id}/opcache/status`)
+    const response = await $api<{ data: OpcacheStatus }>(`/servers/${props.serverId}/php/${serviceId}/opcache/status`)
     status.value = response.data
     hasLoadedStatus.value = true
   } catch {
@@ -196,6 +208,8 @@ const fetchStatus = async () => {
 
 const handleReset = async () => {
   if (!confirmationDialog.value) return
+  const serviceId = getServiceId()
+  if (!serviceId) return
 
   const result = await confirmationDialog.value.show({
     title: 'Reset OPcache',
@@ -208,7 +222,7 @@ const handleReset = async () => {
 
   resetLoading.value = true
   try {
-    await $api(`/servers/${props.serverId}/php/${props.service.details?.id}/opcache/reset`, {
+    await $api(`/servers/${props.serverId}/php/${serviceId}/opcache/reset`, {
       method: 'POST',
     })
     toast.success('OPcache reset initiated')
@@ -222,6 +236,8 @@ const handleReset = async () => {
 
 const handleSubmit = async () => {
   if (!confirmationDialog.value) return
+  const serviceId = getServiceId()
+  if (!serviceId) return
 
   const isEnabling = form.value.enabled && !props.service?.details?.opcache?.enabled
   const isDisabling = !form.value.enabled && props.service?.details?.opcache?.enabled
@@ -244,7 +260,7 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
-    await $api(`/servers/${props.serverId}/php/${props.service.details?.id}/opcache/configure`, {
+    await $api(`/servers/${props.serverId}/php/${serviceId}/opcache/configure`, {
       method: 'POST',
       body: form.value,
     })

@@ -2,6 +2,7 @@
 import { toast } from 'vue-sonner'
 import { useForm } from 'vee-validate'
 import { toTypedSchema } from '@vee-validate/zod'
+import { useIntervalFn } from '@vueuse/core'
 import * as z from 'zod'
 import { Button } from '~/components/ui/button'
 import { Separator } from '~/components/ui/separator'
@@ -23,6 +24,12 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import type { Site } from '~/types'
+import {
+  phpVersionKey,
+  phpVersionOptions,
+  sitePhpVersionState,
+  type InstalledPhpVersion,
+} from '~/utils/phpVersions'
 
 interface Props {
   serverId: string
@@ -41,6 +48,9 @@ const { canDelete } = useCan()
 
 const isLoading = ref(false)
 const phpVersions = ref<Record<string, string>>({})
+const initialPhpVersionState = sitePhpVersionState(props.site)
+const persistedPhpVersion = ref(initialPhpVersionState.persisted)
+const pendingPhpVersion = ref(initialPhpVersionState.pending)
 const tlsOptions = ref<Record<string, string>>({})
 const sourceControlData = ref<{ id: string; provider: string; login: string; name: string; type: string } | null>(null)
 const repositoryData = ref<{ id: number; name: string; full_name: string; default_branch: string; html_url: string } | null>(null)
@@ -55,33 +65,61 @@ const siteSchema = toTypedSchema(
   })
 )
 
-const { handleSubmit, setFieldError } = useForm({
-  validationSchema: siteSchema,
-  validateOnMount: false,
-  initialValues: {
-    php_version: props.site.php_version,
-    web_folder: props.site.web_folder,
-    repository_branch: props.site.repository_branch || '',
-  },
+const getSiteFormValues = (site: Site) => ({
+  php_version: phpVersionKey(site.php_version || ''),
+  web_folder: site.web_folder,
+  repository_branch: site.repository_branch || '',
 })
 
-const fetchSettings = async () => {
+const { handleSubmit, resetField, resetForm, setFieldError } = useForm({
+  validationSchema: siteSchema,
+  validateOnMount: false,
+  initialValues: getSiteFormValues(props.site),
+})
+
+type FormSyncMode = 'all' | 'php'
+
+let settingsFetchSequence = 0
+let terminalNotificationVersion: string | null = null
+let isPhpUpdatePollInFlight = false
+
+const applyPhpVersionState = (site: Site, syncMode: FormSyncMode) => {
+  const state = sitePhpVersionState(site)
+  persistedPhpVersion.value = state.persisted
+  pendingPhpVersion.value = state.pending
+
+  if (syncMode === 'php') {
+    resetField('php_version', { value: state.selected })
+  }
+
+  return state
+}
+
+const fetchSettings = async (syncMode: FormSyncMode = 'all') => {
+  const sequence = ++settingsFetchSequence
   try {
     const response = await $api<{
       data: {
         site: Site
-        php_versions: Array<{ version: string; is_default: boolean }>
+        php_versions: InstalledPhpVersion[]
         tls_options: Array<{ value: string; label: string }>
         source_control: { id: string; provider: string; login: string; name: string; type: string } | null
         repository: { id: number; name: string; full_name: string; default_branch: string; html_url: string } | null
       }
     }>(`/servers/${props.serverId}/sites/${props.site.id}/settings`)
 
-    // Transform php_versions array to Record
-    phpVersions.value = (response.data.php_versions || []).reduce((acc, v) => {
-      acc[`php${v.version.replace('.', '')}`] = `PHP ${v.version}${v.is_default ? ' (Default)' : ''}`
-      return acc
-    }, {} as Record<string, string>)
+    if (sequence !== settingsFetchSequence) return null
+
+    phpVersions.value = phpVersionOptions(response.data.php_versions || [])
+    const phpState = applyPhpVersionState(response.data.site, syncMode)
+    if (syncMode === 'all') {
+      resetForm({
+        values: {
+          ...getSiteFormValues(response.data.site),
+          php_version: phpState.selected,
+        },
+      })
+    }
 
     // Transform tls_options array to Record
     tlsOptions.value = (response.data.tls_options || []).reduce((acc, opt) => {
@@ -92,8 +130,10 @@ const fetchSettings = async () => {
     // Store source control and repository data directly
     sourceControlData.value = response.data.source_control || null
     repositoryData.value = response.data.repository || null
+    return response.data.site
   } catch {
     // Use defaults
+    return null
   }
 }
 
@@ -118,6 +158,64 @@ const currentSourceControl = computed(() => {
     provider: sourceControlData.value.provider,
   }
 })
+
+const isPhpUpdatePending = computed(() => Boolean(pendingPhpVersion.value))
+
+const pendingPhpVersionLabel = computed(() => {
+  if (!pendingPhpVersion.value) return null
+  return (
+    phpVersions.value[pendingPhpVersion.value]?.replace(' (Default)', '') ||
+    pendingPhpVersion.value
+  )
+})
+
+const notifyPhpUpdateResolved = (requestedVersion: string, error?: string) => {
+  if (terminalNotificationVersion === requestedVersion) return
+  terminalNotificationVersion = requestedVersion
+
+  if (error) {
+    toast.error(error)
+    return
+  }
+  if (persistedPhpVersion.value === requestedVersion) {
+    toast.success('PHP version updated')
+  } else {
+    toast.error('PHP version update failed')
+  }
+}
+
+const pollPhpUpdate = async () => {
+  if (isPhpUpdatePollInFlight) return
+
+  const requestedVersion = pendingPhpVersion.value
+  if (!requestedVersion) return
+
+  isPhpUpdatePollInFlight = true
+  try {
+    const site = await fetchSettings('php')
+    if (!site || isPhpUpdatePending.value) return
+
+    emit('updated')
+    notifyPhpUpdateResolved(requestedVersion)
+  } finally {
+    isPhpUpdatePollInFlight = false
+  }
+}
+
+const { pause: pausePhpUpdatePolling, resume: resumePhpUpdatePolling } =
+  useIntervalFn(pollPhpUpdate, 5000, { immediate: false })
+
+watch(
+  isPhpUpdatePending,
+  (pending) => {
+    if (pending) {
+      resumePhpUpdatePolling()
+    } else {
+      pausePhpUpdatePolling()
+    }
+  },
+  { immediate: true },
+)
 
 const getProviderIcon = (providerName: string) => {
   const name = providerName.toLowerCase()
@@ -156,11 +254,38 @@ const onSubmit = handleSubmit(async (values) => {
     // /settings sub-resource — the latter is GET-only. Hitting the
     // old PATCH /settings path used to return 405 and the toast
     // said "Failed to update settings".
-    await $api(`/servers/${props.serverId}/sites/${props.site.id}`, {
-      method: 'PUT',
-      body: values,
-    })
-    toast.success('Settings updated')
+    const phpVersionChanged = values.php_version !== persistedPhpVersion.value
+    if (phpVersionChanged) {
+      terminalNotificationVersion = null
+    }
+    const response = await $api<{ data: Site }>(
+      `/servers/${props.serverId}/sites/${props.site.id}`,
+      {
+        method: 'PUT',
+        body: values,
+      },
+    )
+
+    if (phpVersionChanged) {
+      const responseState = applyPhpVersionState(response.data, 'php')
+      resetForm({
+        values: {
+          ...getSiteFormValues(response.data),
+          php_version: responseState.pending || values.php_version,
+        },
+      })
+      await fetchSettings('php')
+      if (isPhpUpdatePending.value) {
+        toast.success(
+          `${pendingPhpVersionLabel.value || 'PHP version'} update queued`,
+        )
+      } else {
+        notifyPhpUpdateResolved(values.php_version)
+      }
+    } else {
+      resetForm({ values: getSiteFormValues(response.data) })
+      toast.success('Settings updated')
+    }
     emit('updated')
   } catch (error: unknown) {
     const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
@@ -173,6 +298,56 @@ const onSubmit = handleSubmit(async (values) => {
     }
   } finally {
     isLoading.value = false
+  }
+})
+
+const { user } = useAuth()
+const teamId = computed(() => String(user.value?.current_team_id || ''))
+
+useSiteEvents(teamId, async (data, eventName) => {
+  if (data.site_id !== props.site.id) return
+
+  if (eventName === 'site.php_version_update_requested') {
+    if (data.php_version) {
+      pendingPhpVersion.value = phpVersionKey(data.php_version)
+      terminalNotificationVersion = null
+      resetField('php_version', { value: pendingPhpVersion.value })
+      await fetchSettings('php')
+    }
+    return
+  }
+
+  if (
+    eventName !== 'site.php_version_updated' &&
+    eventName !== 'site.php_version_update_failed'
+  ) {
+    return
+  }
+
+  const eventVersion = data.php_version ? phpVersionKey(data.php_version) : null
+  if (
+    pendingPhpVersion.value &&
+    eventVersion &&
+    eventVersion !== pendingPhpVersion.value
+  ) {
+    return
+  }
+  const requestedVersion = pendingPhpVersion.value || eventVersion
+  if (eventName === 'site.php_version_updated' && data.php_version) {
+    persistedPhpVersion.value = phpVersionKey(data.php_version)
+  }
+  pendingPhpVersion.value = null
+  resetField('php_version', { value: persistedPhpVersion.value })
+  await fetchSettings('php')
+  emit('updated')
+
+  if (requestedVersion) {
+    notifyPhpUpdateResolved(
+      requestedVersion,
+      eventName === 'site.php_version_update_failed'
+        ? data.error || 'PHP version update failed'
+        : undefined,
+    )
   }
 })
 
@@ -207,7 +382,15 @@ const deleteSite = async () => {
   }
 }
 
+watch(
+  () => [props.site.php_version, props.site.pending_php_version] as const,
+  () => {
+    applyPhpVersionState(props.site, 'php')
+  },
+)
+
 onMounted(fetchSettings)
+onBeforeUnmount(pausePhpUpdatePolling)
 </script>
 
 <template>
@@ -227,7 +410,7 @@ onMounted(fetchSettings)
           <FormField v-slot="{ componentField }" name="php_version">
             <FormItem>
               <FormLabel>PHP Version</FormLabel>
-              <Select v-bind="componentField">
+              <Select v-bind="componentField" :disabled="isPhpUpdatePending">
                 <FormControl>
                   <SelectTrigger>
                     <SelectValue placeholder="Select PHP version" />
@@ -243,6 +426,23 @@ onMounted(fetchSettings)
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <FormDescription
+                v-if="isPhpUpdatePending"
+                role="status"
+                aria-live="polite"
+              >
+                <span class="inline-flex items-center gap-1.5">
+                  <Icon
+                    name="lucide:loader-2"
+                    class="h-3.5 w-3.5 animate-spin"
+                  />
+                  {{
+                    pendingPhpVersionLabel
+                      ? `Switching to ${pendingPhpVersionLabel}`
+                      : 'PHP version update in progress'
+                  }}
+                </span>
+              </FormDescription>
               <FormMessage />
             </FormItem>
           </FormField>
@@ -303,9 +503,9 @@ onMounted(fetchSettings)
           </template>
         </div>
 
-        <Button type="submit" :disabled="isLoading">
+        <Button type="submit" :disabled="isLoading || isPhpUpdatePending">
           <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          Update Settings
+          {{ isPhpUpdatePending ? 'Update in progress' : 'Update Settings' }}
         </Button>
         </form>
         <Separator />

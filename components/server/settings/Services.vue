@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { reactive, toRefs } from 'vue'
 import { toast } from 'vue-sonner'
+import { useIntervalFn } from '@vueuse/core'
 import { Button } from '~/components/ui/button'
 import { Badge } from '~/components/ui/badge'
 import {
@@ -24,6 +25,13 @@ import {
   TooltipTrigger,
 } from '~/components/ui/tooltip'
 import type { LogInfo } from '~/types'
+import {
+  hasPendingDefaultPhpChange,
+  phpDefaultEndpoint,
+  phpPatchErrorSummary,
+  phpPatchEndpoint,
+  updatingPhpServiceIds,
+} from '~/utils/phpVersions'
 
 interface ServiceStatusDetails {
   pid?: string
@@ -44,6 +52,7 @@ interface Service {
   status: string
   status_label: string
   is_default: boolean
+  default_change_pending?: boolean
   software: string
   software_label: string
   created_at: string
@@ -51,6 +60,9 @@ interface Service {
   last_status_check?: string
   status_details?: ServiceStatusDetails
   status_output?: string
+  task_id?: string
+  patch_status?: string
+  patch_error?: string
   image_path?: string
 }
 
@@ -80,7 +92,17 @@ interface ServiceOperationEvent {
   task_id?: string
   status?: string
   output?: string
+  error?: string
+  version?: string
 }
+
+interface TaskLogSelection {
+  taskId: string
+  title: string
+  description: string
+  error?: string
+}
+
 const AGENT_UPDATE_TTL_MS = 5 * 60 * 1000
 
 interface ServicesState {
@@ -98,9 +120,12 @@ interface ServicesState {
   isLogSheetOpen: boolean
   selectedLog: LogInfo | null
   isTaskLogSheetOpen: boolean
+  selectedTaskLog: TaskLogSelection | null
   isExtensionsDialogOpen: boolean
   isOpcacheDialogOpen: boolean
   selectedPhpService: any
+  patchingServiceIds: Set<string>
+  phpPatchLogsByService: Map<string, TaskLogSelection>
 }
 
 const state = reactive({
@@ -118,9 +143,12 @@ const state = reactive({
   isLogSheetOpen: false,
   selectedLog: null,
   isTaskLogSheetOpen: false,
+  selectedTaskLog: null,
   isExtensionsDialogOpen: false,
   isOpcacheDialogOpen: false,
   selectedPhpService: null,
+  patchingServiceIds: new Set(),
+  phpPatchLogsByService: new Map(),
 }) as ServicesState
 
 const {
@@ -138,10 +166,65 @@ const {
   isLogSheetOpen,
   selectedLog,
   isTaskLogSheetOpen,
+  selectedTaskLog,
   isExtensionsDialogOpen,
   isOpcacheDialogOpen,
   selectedPhpService,
+  patchingServiceIds,
+  phpPatchLogsByService,
 } = toRefs(state)
+
+const setPhpPatching = (serviceId: string, isPatching: boolean) => {
+  const next = new Set(patchingServiceIds.value)
+  if (isPatching) {
+    next.add(serviceId)
+  } else {
+    next.delete(serviceId)
+  }
+  patchingServiceIds.value = next
+}
+
+const setPhpPatchLog = (
+  serviceId: string,
+  selection: TaskLogSelection | null,
+) => {
+  const next = new Map(phpPatchLogsByService.value)
+  if (selection) {
+    next.set(serviceId, selection)
+  } else {
+    next.delete(serviceId)
+  }
+  phpPatchLogsByService.value = next
+}
+
+const openTaskLog = (selection: TaskLogSelection) => {
+  selectedTaskLog.value = selection
+  isTaskLogSheetOpen.value = true
+}
+
+const openAgentUpdateLog = () => {
+  if (!agentUpdateTaskId.value) return
+
+  openTaskLog({
+    taskId: agentUpdateTaskId.value,
+    title: 'Launch Agent update log',
+    description: 'Output from the update script running on this server.',
+  })
+}
+
+const openPhpPatchLog = (serviceId: string) => {
+  const selection = phpPatchLogsByService.value.get(serviceId)
+  if (selection) openTaskLog(selection)
+}
+
+const isPhpPatching = (service: Service) =>
+  service.type === 'php' &&
+  (patchingServiceIds.value.has(service.id) || service.status === 'updating')
+
+const isServiceActionPending = (service: Service) =>
+  loadingAction.value?.software === service.software ||
+  service.default_change_pending ||
+  isPhpPatching(service)
 
 const agentUpdateStorageKey = computed(
   () => `launch:agent-update:${props.serverId}`,
@@ -261,10 +344,11 @@ const setPhpDefault = async (service: Service) => {
 
   loadingAction.value = { software: service.software, action: 'default' }
   try {
-    await $api(`/servers/${props.serverId}/php/${service.software}/default`, {
+    await $api(phpDefaultEndpoint(props.serverId, service.id), {
       method: 'POST',
     })
-    toast.success('Default PHP version updated')
+    service.default_change_pending = true
+    toast.success('Default PHP version update queued')
     fetchServices()
   } catch {
     toast.error('Failed to set default PHP version')
@@ -287,13 +371,15 @@ const patchPhpVersion = async (service: Service) => {
 
   loadingAction.value = { software: service.software, action: 'patch' }
   try {
-    await $api(`/servers/${props.serverId}/php/${service.software}/patch`, {
+    await $api(phpPatchEndpoint(props.serverId, service.id), {
       method: 'POST',
     })
-    toast.success('PHP patch initiated')
-    fetchServices()
-  } catch {
-    toast.error('Failed to patch PHP version')
+    setPhpPatching(service.id, true)
+    toast.success(`${service.name} patch queued`)
+    await fetchServices()
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } }
+    toast.error(err.data?.message || `Failed to patch ${service.name}`)
   } finally {
     loadingAction.value = null
   }
@@ -343,18 +429,80 @@ const {
 const { user } = useAuth()
 const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
-useServiceEvents(teamId, (data) => {
+useServiceEvents(teamId, (data, eventName) => {
   const event = data as ServiceOperationEvent
   const eventServerId = event.server_id
   if (eventServerId === props.serverId) {
+    if (eventName === 'php.patch' && event.service_id) {
+      const isPatching =
+        event.status === 'queued' ||
+        event.status === 'running' ||
+        event.status === 'updating'
+      setPhpPatching(event.service_id, isPatching)
+      const phpLabel = event.version ? `PHP ${event.version}` : 'PHP'
+      const error = phpPatchErrorSummary(event.output)
+
+      if (event.status === 'queued') {
+        setPhpPatchLog(event.service_id, null)
+      } else {
+        const taskId =
+          event.task_id ||
+          phpPatchLogsByService.value.get(event.service_id)?.taskId
+        if (taskId) {
+          setPhpPatchLog(event.service_id, {
+            taskId,
+            title: `${phpLabel} patch log`,
+            description:
+              'Output from the PHP patch task running on this server.',
+            error: event.status === 'failed' ? error || undefined : undefined,
+          })
+        }
+      }
+
+      if (event.status === 'finished') {
+        setPhpPatchLog(event.service_id, null)
+        toast.success(`${phpLabel} patched successfully`)
+      } else if (event.status === 'failed') {
+        const patchLog = phpPatchLogsByService.value.get(event.service_id)
+        if (patchLog) openTaskLog(patchLog)
+        toast.error(
+          error
+            ? `${phpLabel} patch failed: ${error}`
+            : `${phpLabel} patch failed`,
+        )
+      }
+    }
+    if (eventName === 'php.default_change') {
+      const phpLabel = event.version ? `PHP ${event.version}` : 'PHP'
+      if (event.status === 'finished') {
+        toast.success(`${phpLabel} is now the default`)
+      } else if (event.status === 'failed') {
+        const error = phpPatchErrorSummary(event.error || event.output)
+        toast.error(
+          error
+            ? `Default PHP update failed: ${error}`
+            : 'Default PHP update failed',
+        )
+      }
+    }
     if (event.operation === 'update' && event.task_id) {
       agentUpdateTaskId.value = event.task_id
     }
     if (event.operation === 'update' && event.status === 'failed') {
       writeUpdateStarted(null)
       stopAgentPoll()
-      toast.error('Launch Agent update failed. Open the update log for details.')
-      if (event.task_id) isTaskLogSheetOpen.value = true
+      toast.error(
+        'Launch Agent update failed. Open the update log for details.',
+      )
+      const taskId = event.task_id || agentUpdateTaskId.value
+      if (taskId) {
+        openTaskLog({
+          taskId,
+          title: 'Launch Agent update log',
+          description: 'Output from the update script running on this server.',
+          error: phpPatchErrorSummary(event.output) || undefined,
+        })
+      }
     }
     fetchServices()
   }
@@ -373,6 +521,26 @@ const isPersistedStatusFresh = (service: Service): boolean => {
 }
 
 const getDisplayStatus = (service: Service) => {
+  if (isPhpPatching(service)) {
+    return {
+      status: 'updating',
+      label: 'Patching',
+      memory: undefined,
+      uptime: undefined,
+      pid: undefined,
+      isLive: false,
+    }
+  }
+  if (service.type === 'php' && service.status === 'failed') {
+    return {
+      status: 'failed',
+      label: service.status_label || 'Failed',
+      memory: undefined,
+      uptime: undefined,
+      pid: undefined,
+      isLive: false,
+    }
+  }
   if (service.software === 'launch_agent' && agentUpdateInProgress.value) {
     return {
       status: 'updating',
@@ -447,16 +615,59 @@ const getServiceImagePath = (service: Service) => {
   return '/images/services/package_manager.svg'
 }
 
-const fetchServices = async () => {
+let servicesFetchSequence = 0
+let isServicePollInFlight = false
+
+const loadServices = async (showError: boolean) => {
+  const sequence = ++servicesFetchSequence
   try {
     const data = await $api<{ data: Service[] }>(
       `/servers/${props.serverId}/services`,
     )
+    if (sequence !== servicesFetchSequence) return
+
     services.value = data.data || []
+    patchingServiceIds.value = updatingPhpServiceIds(services.value)
+
+    const persistedLogs = new Map(phpPatchLogsByService.value)
+    for (const service of services.value) {
+      if (
+        service.type !== 'php' ||
+        !service.task_id ||
+        !service.patch_status ||
+        (service.status === 'updating' && service.patch_status !== 'running')
+      ) {
+        continue
+      }
+      persistedLogs.set(service.id, {
+        taskId: service.task_id,
+        title: `${service.name} patch log`,
+        description: 'Output from the PHP patch task on this server.',
+        error:
+          service.patch_status === 'failed'
+            ? phpPatchErrorSummary(service.patch_error) || undefined
+            : undefined,
+      })
+    }
+    phpPatchLogsByService.value = persistedLogs
   } catch {
-    toast.error('Failed to load services')
+    if (showError) toast.error('Failed to load services')
   } finally {
-    isLoading.value = false
+    if (sequence === servicesFetchSequence) {
+      isLoading.value = false
+    }
+  }
+}
+
+const fetchServices = () => loadServices(true)
+const pollPhpOperations = async () => {
+  if (isServicePollInFlight) return
+
+  isServicePollInFlight = true
+  try {
+    await loadServices(false)
+  } finally {
+    isServicePollInFlight = false
   }
 }
 
@@ -592,6 +803,27 @@ const sortedServices = computed(() =>
   [...services.value].sort((a, b) => a.name.localeCompare(b.name)),
 )
 
+const hasPendingPhpOperation = computed(
+  () =>
+    patchingServiceIds.value.size > 0 ||
+    hasPendingDefaultPhpChange(services.value),
+)
+
+const { pause: pausePhpPatchPolling, resume: resumePhpPatchPolling } =
+  useIntervalFn(pollPhpOperations, 5000, { immediate: false })
+
+watch(
+  hasPendingPhpOperation,
+  (hasPendingOperation) => {
+    if (hasPendingOperation) {
+      resumePhpPatchPolling()
+    } else {
+      pausePhpPatchPolling()
+    }
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   fetchServices()
   fetchLogs()
@@ -613,6 +845,7 @@ watch(agentUpdateInProgress, (inProgress) => {
 
 onBeforeUnmount(() => {
   stopAgentPoll()
+  pausePhpPatchPolling()
 })
 </script>
 
@@ -647,7 +880,7 @@ onBeforeUnmount(() => {
             variant="link"
             size="sm"
             class="mt-1 h-auto px-0 text-blue-800 dark:text-blue-200"
-            @click="isTaskLogSheetOpen = true"
+            @click="openAgentUpdateLog"
           >
             View update log
           </Button>
@@ -891,13 +1124,17 @@ onBeforeUnmount(() => {
                   </div>
                   <div class="flex items-center gap-2">
                     <Icon
-                      v-if="loadingAction?.software === service.software"
+                      v-if="isServiceActionPending(service)"
                       name="lucide:loader-2"
                       class="h-4 w-4 animate-spin text-muted-foreground"
                     />
                     <DropdownMenu>
                       <DropdownMenuTrigger as-child>
-                        <Button variant="ghost" size="sm">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          :disabled="isServiceActionPending(service)"
+                        >
                           <Icon name="lucide:more-horizontal" class="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -971,9 +1208,34 @@ onBeforeUnmount(() => {
                             <Icon name="lucide:star" class="mr-2 h-4 w-4" />
                             Set as Default
                           </DropdownMenuItem>
-                          <DropdownMenuItem @click="patchPhpVersion(service)">
-                            <Icon name="lucide:wrench" class="mr-2 h-4 w-4" />
-                            Patch Version
+                          <DropdownMenuItem
+                            :disabled="isPhpPatching(service)"
+                            @click="patchPhpVersion(service)"
+                          >
+                            <Icon
+                              :name="
+                                isPhpPatching(service)
+                                  ? 'lucide:loader-2'
+                                  : 'lucide:wrench'
+                              "
+                              class="mr-2 h-4 w-4"
+                              :class="isPhpPatching(service) && 'animate-spin'"
+                            />
+                            {{
+                              isPhpPatching(service)
+                                ? 'Patching…'
+                                : 'Patch Version'
+                            }}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            v-if="phpPatchLogsByService.has(service.id)"
+                            @click="openPhpPatchLog(service.id)"
+                          >
+                            <Icon
+                              name="lucide:scroll-text"
+                              class="mr-2 h-4 w-4"
+                            />
+                            View Patch Log
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -1155,13 +1417,17 @@ onBeforeUnmount(() => {
 
                 <div class="col-span-3 flex items-center justify-end gap-2">
                   <Icon
-                    v-if="loadingAction?.software === service.software"
+                    v-if="isServiceActionPending(service)"
                     name="lucide:loader-2"
                     class="h-4 w-4 animate-spin text-muted-foreground"
                   />
                   <DropdownMenu>
                     <DropdownMenuTrigger as-child>
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        :disabled="isServiceActionPending(service)"
+                      >
                         <Icon name="lucide:more-horizontal" class="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1225,9 +1491,34 @@ onBeforeUnmount(() => {
                           <Icon name="lucide:star" class="mr-2 h-4 w-4" />
                           Set as Default
                         </DropdownMenuItem>
-                        <DropdownMenuItem @click="patchPhpVersion(service)">
-                          <Icon name="lucide:wrench" class="mr-2 h-4 w-4" />
-                          Patch Version
+                        <DropdownMenuItem
+                          :disabled="isPhpPatching(service)"
+                          @click="patchPhpVersion(service)"
+                        >
+                          <Icon
+                            :name="
+                              isPhpPatching(service)
+                                ? 'lucide:loader-2'
+                                : 'lucide:wrench'
+                            "
+                            class="mr-2 h-4 w-4"
+                            :class="isPhpPatching(service) && 'animate-spin'"
+                          />
+                          {{
+                            isPhpPatching(service)
+                              ? 'Patching…'
+                              : 'Patch Version'
+                          }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          v-if="phpPatchLogsByService.has(service.id)"
+                          @click="openPhpPatchLog(service.id)"
+                        >
+                          <Icon
+                            name="lucide:scroll-text"
+                            class="mr-2 h-4 w-4"
+                          />
+                          View Patch Log
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
@@ -1276,16 +1567,28 @@ onBeforeUnmount(() => {
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col"
       >
         <SheetHeader>
-          <SheetTitle>Launch Agent update log</SheetTitle>
-          <SheetDescription>Output from the update script running on this server.</SheetDescription>
+          <SheetTitle>{{ selectedTaskLog?.title || 'Task log' }}</SheetTitle>
+          <SheetDescription>
+            {{
+              selectedTaskLog?.description ||
+              'Output from the task running on this server.'
+            }}
+          </SheetDescription>
         </SheetHeader>
         <div class="mt-4 flex-1 min-h-0 flex flex-col">
+          <div
+            v-if="selectedTaskLog?.error"
+            class="mb-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+          >
+            {{ selectedTaskLog.error }}
+          </div>
           <ServerLogViewer
-            v-if="isTaskLogSheetOpen && agentUpdateTaskId"
-            :key="agentUpdateTaskId"
+            v-if="isTaskLogSheetOpen && selectedTaskLog"
+            :key="selectedTaskLog.taskId"
             :server-id="serverId"
             entity="task"
-            :entity-id="agentUpdateTaskId"
+            :entity-id="selectedTaskLog.taskId"
             no-timestamp
           />
         </div>

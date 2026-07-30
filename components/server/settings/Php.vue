@@ -16,6 +16,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
+import {
+  installedPhpServiceId,
+  phpDefaultEndpoint,
+  phpPatchEndpoint,
+} from '~/utils/phpVersions'
 
 interface PhpExtension {
   value: string
@@ -103,14 +108,22 @@ const availableVersions = computed(() => phpVersions.value.filter(v => !v.is_ins
 
 const isAnyInstalling = computed(() => {
   return phpVersions.value.some(
-    v => v.details?.status === 'installing' || v.details?.status === 'pending'
+    (v) =>
+      v.details?.status === 'installing' ||
+      v.details?.status === 'pending' ||
+      v.details?.status === 'updating',
   )
 })
 
 const isServiceInstalling = (service: PhpVersionData) => {
   const status = service.details?.status
-  return status === 'installing' || status === 'pending'
+  return (
+    status === 'installing' || status === 'pending' || status === 'updating'
+  )
 }
+
+const serviceProgressLabel = (service: PhpVersionData) =>
+  service.details?.status === 'updating' ? 'Patching' : 'Installing'
 
 const handleAction = async (action: () => Promise<void>, version: string) => {
   loadingStates.value = { ...loadingStates.value, [version]: true }
@@ -134,9 +147,9 @@ const installPhp = async (version: string) => {
 
   if (ok) {
     await handleAction(async () => {
-      await $api(`/servers/${props.serverId}/php`, {
+      await $api(`/servers/${props.serverId}/services`, {
         method: 'POST',
-        body: { version },
+        body: { software: version },
       })
       toast.success('PHP installation initiated')
       selectedVersion.value = ''
@@ -148,6 +161,12 @@ const installPhp = async (version: string) => {
 const setDefault = async (php: PhpVersionData) => {
   if (!confirmationDialog.value) return
 
+  const serviceId = installedPhpServiceId(php)
+  if (!serviceId) {
+    toast.error('Unable to identify the installed PHP service')
+    return
+  }
+
   const { ok } = await confirmationDialog.value.show({
     title: `Set ${php.display_name} as default`,
     description: 'This will make this version the default CLI PHP version.',
@@ -157,10 +176,10 @@ const setDefault = async (php: PhpVersionData) => {
 
   if (ok) {
     await handleAction(async () => {
-      await $api(`/servers/${props.serverId}/php/${php.key}/default`, {
+      await $api(phpDefaultEndpoint(props.serverId, serviceId), {
         method: 'POST',
       })
-      toast.success('Default PHP version updated')
+      toast.success('Default PHP version update queued')
       fetchPhpVersions()
     }, php.key)
   }
@@ -168,6 +187,12 @@ const setDefault = async (php: PhpVersionData) => {
 
 const patchVersion = async (php: PhpVersionData) => {
   if (!confirmationDialog.value) return
+
+  const serviceId = installedPhpServiceId(php)
+  if (!serviceId) {
+    toast.error('Unable to identify the installed PHP service')
+    return
+  }
 
   const { ok } = await confirmationDialog.value.show({
     title: `Patch ${php.display_name}`,
@@ -177,18 +202,41 @@ const patchVersion = async (php: PhpVersionData) => {
   })
 
   if (ok) {
-    await handleAction(async () => {
-      await $api(`/servers/${props.serverId}/php/${php.key}/patch`, {
-        method: 'POST',
-      })
-      toast.success('PHP patch initiated')
-      fetchPhpVersions()
-    }, php.key)
+    try {
+      await handleAction(async () => {
+        await $api(phpPatchEndpoint(props.serverId, serviceId), {
+          method: 'POST',
+        })
+        toast.success(`${php.display_name} patch queued`)
+        await fetchPhpVersions()
+      }, php.key)
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string } }
+      toast.error(err.data?.message || `Failed to patch ${php.display_name}`)
+    }
   }
 }
 
+const { user } = useAuth()
+const teamId = computed(() => String(user.value?.current_team_id || ''))
+
+useServiceEvents(teamId, (data, eventName) => {
+  if (
+    (eventName === 'php.patch' || eventName === 'php.default_changed') &&
+    data.server_id === props.serverId
+  ) {
+    fetchPhpVersions()
+  }
+})
+
 const uninstall = async (php: PhpVersionData) => {
   if (!confirmationDialog.value) return
+
+  const serviceId = installedPhpServiceId(php)
+  if (!serviceId) {
+    toast.error('Unable to identify the installed PHP service')
+    return
+  }
 
   const { ok } = await confirmationDialog.value.show({
     title: `Uninstall ${php.display_name}`,
@@ -200,8 +248,9 @@ const uninstall = async (php: PhpVersionData) => {
 
   if (ok) {
     await handleAction(async () => {
-      await $api(`/servers/${props.serverId}/php/${php.details?.id || php.key}`, {
-        method: 'DELETE',
+      await $api(`/servers/${props.serverId}/services/${serviceId}`, {
+        method: 'POST',
+        body: { operation: 'remove' },
       })
       toast.success('PHP version uninstalled')
       fetchPhpVersions()
@@ -369,8 +418,11 @@ onMounted(fetchPhpVersions)
                           variant="secondary"
                           class="gap-1.5"
                         >
-                          <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin" />
-                          Installing
+                          <Icon
+                            name="lucide:loader-2"
+                            class="h-3 w-3 animate-spin"
+                          />
+                          {{ serviceProgressLabel(service) }}
                         </Badge>
                       </div>
                       <span v-if="service.is_default" class="text-xs text-muted-foreground">
@@ -455,8 +507,11 @@ onMounted(fetchPhpVersions)
                         variant="secondary"
                         class="gap-1.5"
                       >
-                        <Icon name="lucide:loader-2" class="h-3 w-3 animate-spin" />
-                        Installing
+                        <Icon
+                          name="lucide:loader-2"
+                          class="h-3 w-3 animate-spin"
+                        />
+                        {{ serviceProgressLabel(service) }}
                       </Badge>
                     </div>
                     <span v-if="service.is_default" class="text-xs text-muted-foreground">
