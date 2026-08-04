@@ -8,6 +8,7 @@ interface ChannelEventData {
   status?: string;
   message?: string;
   error?: string;
+  php_version?: string;
   command?: {
     id: string;
     site_id: string;
@@ -220,6 +221,9 @@ export const useSiteEvents = (
       "site.deleted",
       "site.installed",
       "site.installation_failed",
+      "site.php_version_update_requested",
+      "site.php_version_updated",
+      "site.php_version_update_failed",
     ],
     onEvent,
   );
@@ -408,6 +412,9 @@ export const useServiceEvents = (
       "service.removed",
       "service.status_changed",
       "service.operation",
+      "php.default_changed",
+      "php.default_change",
+      "php.patch",
     ],
     onEvent,
   );

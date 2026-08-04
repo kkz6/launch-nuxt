@@ -238,8 +238,9 @@ export interface Site extends InstallationStatus {
   web_folder: string;
   app_directory: string;
   php_version?: string | undefined;
-  pending_tls_update_since?: Date | null;
-  pending_caddyfile_update_since?: Date | null;
+  pending_php_version?: string | null;
+  pending_tls_update_since?: string | null;
+  pending_caddyfile_update_since?: string | null;
   shared_directories: string[];
   writeable_directories: string[];
   shared_files: string[];
@@ -429,8 +430,12 @@ export interface Service {
   version: string;
   status: string;
   is_default: number;
+  default_change_pending?: boolean;
   unit: string;
   software: string;
+  task_id?: string;
+  patch_status?: string;
+  patch_error?: string;
   created_at: string;
   updated_at: string;
 }
