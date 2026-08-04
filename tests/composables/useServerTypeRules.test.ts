@@ -152,7 +152,7 @@ describe("getProviderIcon", () => {
 });
 
 describe("tabs per server type", () => {
-  it("docker servers default to Projects and don't carry Sites/Databases/Daemons", () => {
+  it("docker servers default to Projects and include host-management tabs", () => {
     // Driving tabs from the composable is what stops Navbar.vue from
     // showing the PHP-stack tabs on a docker server. Lock the docker tab
     // set so a refactor doesn't silently regress.
@@ -170,14 +170,12 @@ describe("tabs per server type", () => {
     expect(tabs).toContain("advanced");
     expect(tabs).not.toContain("sites");
     expect(tabs).not.toContain("databases");
-    expect(tabs).not.toContain("daemons");
+    expect(tabs).toContain("daemons");
     // Traefik moved into Advanced as a sub-tab — it shouldn't be a
     // top-level docker tab anymore.
     expect(tabs).not.toContain("traefik");
-    // Networks removed: Launch manages launch-network for the user,
-    // and there's no Create-network flow, so the tab was empty for
-    // every customer. SSH covers any remaining debugging needs.
-    expect(tabs).not.toContain("networks");
+    // Networks manages host UFW rules, not Docker overlay networks.
+    expect(tabs).toContain("networks");
   });
 
   it("php servers default to Sites and include Databases", () => {

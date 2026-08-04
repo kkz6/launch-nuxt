@@ -8,7 +8,6 @@ definePageMeta({
 })
 
 const route = useRoute()
-const router = useRouter()
 const serverId = computed(() => route.params.id as string)
 const siteId = computed(() => route.params.siteId as string)
 
@@ -139,6 +138,15 @@ const fetchSite = async () => {
   }
 }
 
+const handleAutoRestartUpdated = (enabled: boolean) => {
+  if (!site.value) return
+
+  site.value = {
+    ...site.value,
+    auto_restart_queue: enabled,
+  }
+}
+
 onMounted(async () => {
   try {
     const [serverData, siteData] = await Promise.all([
@@ -184,7 +192,13 @@ onMounted(async () => {
     </div>
 
     <div v-else-if="activeTab === 'queues'">
-      <SiteQueues :server-id="server.id" :site-id="site.id" :site="site" :auto-restart-queue="site.auto_restart_queue" />
+      <SiteQueues
+        :server-id="server.id"
+        :site-id="site.id"
+        :site="site"
+        :auto-restart-queue="site.auto_restart_queue"
+        @updated="handleAutoRestartUpdated"
+      />
     </div>
 
     <div v-else-if="activeTab === 'redirects'">
