@@ -4,6 +4,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
 
   modules: [
+    "@nuxt/eslint",
     "@nuxtjs/tailwindcss",
     "@nuxtjs/color-mode",
     "@pinia/nuxt",
@@ -123,12 +124,6 @@ export default defineNuxtConfig({
       ignore: ["ui/**", "content/**"],
     },
   ],
-
-  hooks: {
-    close: () => {
-      process.exit(0);
-    },
-  },
 
   build: {
     transpile: ["@xterm/xterm", "@xterm/addon-fit"],

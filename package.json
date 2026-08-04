@@ -8,12 +8,15 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "prelint": "nuxt prepare",
     "lint": "eslint .",
+    "prelint:fix": "nuxt prepare",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "pretest": "test -f .nuxt/tsconfig.server.json || nuxt prepare; test -f .nuxt/tsconfig.json || cp .nuxt/tsconfig.server.json .nuxt/tsconfig.json",
+    "pretest": "nuxt prepare",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "nuxt typecheck"
   },
   "dependencies": {
     "@codemirror/lang-json": "^6.0.2",

@@ -49,6 +49,10 @@ const props = withDefaults(defineProps<Props>(), {
   autoRestartQueue: false,
 })
 
+const emit = defineEmits<{
+  updated: [enabled: boolean]
+}>()
+
 const queues = ref<Queue[]>([])
 const isLoading = ref(true)
 const selectedQueue = ref<Queue | null>(null)
@@ -208,7 +212,12 @@ onMounted(fetchQueues)
         <p class="text-sm text-muted-foreground">Manage Laravel queue workers for this site</p>
       </div>
       <div class="flex items-center gap-2">
-        <SiteAutoRestartQueue :server-id="serverId" :site-id="siteId" :auto-restart-queue="autoRestartQueue" />
+        <SiteAutoRestartQueue
+          :server-id="serverId"
+          :site-id="siteId"
+          :auto-restart-queue="autoRestartQueue"
+          @updated="emit('updated', $event)"
+        />
         <Button v-if="queues.length > 0" variant="outline" size="sm" :disabled="isSyncing" @click="syncStatus">
           <Icon name="lucide:refresh-cw" :class="['mr-2 h-4 w-4', isSyncing && 'animate-spin']" />
           {{ isSyncing ? 'Syncing...' : 'Sync' }}
