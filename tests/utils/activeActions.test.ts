@@ -3,7 +3,9 @@ import {
   activeActionPath,
   activeActionStatusLabel,
   activeActionStatusTone,
+  pruneDismissedIds,
   updateActionFromEvent,
+  visibleActiveActions,
   type ActiveAction,
 } from '../../utils/activeActions'
 
@@ -137,5 +139,39 @@ describe('activeActionPath', () => {
         }),
       ),
     ).toBe('/servers/server-1')
+  })
+})
+
+describe('visibleActiveActions', () => {
+  const actions = [
+    { id: 'a', status: 'running' },
+    { id: 'b', status: 'failed' },
+    { id: 'c', status: 'finished' },
+  ] as ActiveAction[]
+
+  it('hides dismissed actions and keeps the rest in order', () => {
+    expect(visibleActiveActions(actions, ['b']).map((a) => a.id)).toEqual([
+      'a',
+      'c',
+    ])
+  })
+
+  it('returns everything when nothing is dismissed', () => {
+    expect(visibleActiveActions(actions, [])).toHaveLength(3)
+  })
+
+  it('ignores ids that are not present', () => {
+    expect(visibleActiveActions(actions, ['zzz'])).toHaveLength(3)
+  })
+})
+
+describe('pruneDismissedIds', () => {
+  it('drops ids the server no longer returns', () => {
+    const actions = [{ id: 'a' }, { id: 'b' }] as ActiveAction[]
+    expect(pruneDismissedIds(['a', 'gone'], actions)).toEqual(['a'])
+  })
+
+  it('empties out once the actions are gone', () => {
+    expect(pruneDismissedIds(['a', 'b'], [])).toEqual([])
   })
 })
