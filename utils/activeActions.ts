@@ -123,3 +123,26 @@ export const activeActionPath = (action: ActiveAction) => {
 
   return `${serverPath}/projects/${action.project_id}/${segment}/${action.target_id}?tab=deployments`
 }
+
+// Terminal actions are retained server-side for a while so a failure is still
+// readable after it finishes, which means the list can hold work the user has
+// already dealt with. These two keep that dismissal honest.
+
+export const visibleActiveActions = (
+  actions: ActiveAction[],
+  dismissedIds: string[],
+) => {
+  const dismissed = new Set(dismissedIds)
+  return actions.filter((action) => !dismissed.has(action.id))
+}
+
+// Drop ids the server no longer returns. Without this the dismissed list
+// grows forever, and an id could later suppress an unrelated action that
+// happened to reuse it.
+export const pruneDismissedIds = (
+  dismissedIds: string[],
+  actions: ActiveAction[],
+) => {
+  const live = new Set(actions.map((action) => action.id))
+  return dismissedIds.filter((id) => live.has(id))
+}

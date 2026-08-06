@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, CircleAlert, CircleCheck, Loader2 } from 'lucide-vue-next'
+import { Activity, CircleAlert, CircleCheck, Loader2, X } from 'lucide-vue-next'
 import {
   useCommandEvents,
   useDeploymentEvents,
@@ -25,7 +25,9 @@ import {
   activeActionStatusTone,
   humanizeActionValue,
   isActiveActionRunning,
+  pruneDismissedIds,
   updateActionFromEvent,
+  visibleActiveActions,
   type ActiveAction,
 } from '~/utils/activeActions'
 
@@ -39,6 +41,49 @@ const selected = ref<ActiveAction | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
 let fetchSequence = 0
 
+// Terminal actions linger server-side so a failure is still readable after
+// it finishes. They are not work in progress though, so let the user clear
+// them, and remember that across reloads — the row would otherwise reappear
+// on the next poll for as long as the backend retains it.
+const DISMISSED_KEY = 'launch:dismissed-actions'
+const dismissed = ref<string[]>([])
+
+const loadDismissed = () => {
+  if (!import.meta.client) return
+  try {
+    const stored = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')
+    dismissed.value = Array.isArray(stored) ? stored.map(String) : []
+  } catch {
+    dismissed.value = []
+  }
+}
+
+const dismiss = (action: ActiveAction) => {
+  dismissed.value = [...new Set([...dismissed.value, action.id])]
+  if (import.meta.client) {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed.value))
+  }
+}
+
+// Only keep ids we could still receive, so the list cannot grow forever.
+const pruneDismissed = (current: ActiveAction[]) => {
+  const kept = pruneDismissedIds(dismissed.value, current)
+  if (kept.length === dismissed.value.length) return
+  dismissed.value = kept
+  if (import.meta.client) {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(kept))
+  }
+}
+
+const visibleActions = computed(() =>
+  visibleActiveActions(actions.value, dismissed.value),
+)
+const failedActions = computed(() =>
+  visibleActions.value.filter(
+    (action) => activeActionStatusTone(action.status) === 'failure',
+  ),
+)
+
 const teamId = computed(() => String(user.value?.current_team_id || ''))
 const fetchActions = async () => {
   if (!teamId.value) return
@@ -50,6 +95,7 @@ const fetchActions = async () => {
 
     const nextActions = response.data || []
     actions.value = nextActions
+    pruneDismissed(nextActions)
 
     const refreshedSelection = nextActions.find(
       (action) => action.id === selected.value?.id,
@@ -116,6 +162,7 @@ const openAction = (action: ActiveAction) => {
 }
 
 onMounted(() => {
+  loadDismissed()
   fetchActions()
   timer = setInterval(fetchActions, 10_000)
 })
@@ -132,11 +179,25 @@ onUnmounted(() => {
         class="relative grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         aria-label="Active actions"
       >
-        <Activity class="h-4 w-4" :class="actions.length && 'text-primary'" />
+        <Activity
+          class="h-4 w-4"
+          :class="
+            failedActions.length
+              ? 'text-destructive'
+              : visibleActions.length
+                ? 'text-primary'
+                : undefined
+          "
+        />
         <span
-          v-if="actions.length"
-          class="absolute right-0.5 top-0.5 grid min-h-4 min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground"
-          >{{ actions.length }}</span
+          v-if="visibleActions.length"
+          class="absolute right-0.5 top-0.5 grid min-h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] font-semibold"
+          :class="
+            failedActions.length
+              ? 'bg-destructive text-destructive-foreground'
+              : 'bg-primary text-primary-foreground'
+          "
+          >{{ visibleActions.length }}</span
         >
       </button>
     </DropdownMenuTrigger>
@@ -146,18 +207,26 @@ onUnmounted(() => {
         Active actions
       </DropdownMenuLabel>
       <p
-        v-if="!actions.length && !isLoading"
+        v-if="!visibleActions.length && !isLoading"
         class="px-2 py-5 text-center text-sm text-muted-foreground"
       >
         No actions are running.
       </p>
       <DropdownMenuItem
-        v-for="action in actions"
+        v-for="action in visibleActions"
         :key="action.id"
-        class="cursor-pointer items-start gap-3 rounded-md px-2 py-2"
+        class="group cursor-pointer items-start gap-3 rounded-md px-2 py-2"
         @click="openAction(action)"
       >
-        <Loader2 class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary" />
+        <Loader2
+          v-if="isActiveActionRunning(action)"
+          class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-primary"
+        />
+        <CircleAlert
+          v-else-if="activeActionStatusTone(action.status) === 'failure'"
+          class="mt-0.5 h-4 w-4 shrink-0 text-destructive"
+        />
+        <CircleCheck v-else class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
         <span class="min-w-0 flex-1">
           <span class="block truncate text-sm font-medium">{{
             action.label
@@ -168,12 +237,28 @@ onUnmounted(() => {
           >
             {{ action.description }}
           </span>
-          <span class="block text-xs text-muted-foreground">
+          <span
+            class="block text-xs"
+            :class="
+              activeActionStatusTone(action.status) === 'failure'
+                ? 'text-destructive'
+                : 'text-muted-foreground'
+            "
+          >
             {{ humanizeActionValue(action.kind) }} ·
             {{ activeActionStatusLabel(action) }} ·
             {{ elapsed(action) }}
           </span>
         </span>
+        <button
+          v-if="!isActiveActionRunning(action)"
+          type="button"
+          class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 group-hover:opacity-100"
+          :aria-label="`Dismiss ${action.label}`"
+          @click.stop="dismiss(action)"
+        >
+          <X class="h-3.5 w-3.5" />
+        </button>
       </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
