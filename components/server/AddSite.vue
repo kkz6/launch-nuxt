@@ -155,6 +155,10 @@ const advancedOptions = ref({
   database_user_password: '',
   create_scheduler: false,
   create_queue: false,
+  hook_before_updating_repository: '',
+  hook_after_updating_repository: '',
+  hook_before_making_current: '',
+  hook_after_making_current: '',
 })
 
 // Base schema - type-specific validation is done in validate()
@@ -446,9 +450,32 @@ const onSubmit = async () => {
   isLoading.value = true
   try {
     // Merge advanced options and DNS options into payload
+    // An empty hook is not the same as an absent one: the API reads ""
+    // as "clear the default for this site type", so sending the untouched
+    // fields would strip the defaults off every site created here.
+    const {
+      hook_before_updating_repository: beforeUpdating,
+      hook_after_updating_repository: afterUpdating,
+      hook_before_making_current: beforeCurrent,
+      hook_after_making_current: afterCurrent,
+      ...advanced
+    } = advancedOptions.value
+
+    const hooks = Object.fromEntries(
+      (
+        [
+          ['hook_before_updating_repository', beforeUpdating],
+          ['hook_after_updating_repository', afterUpdating],
+          ['hook_before_making_current', beforeCurrent],
+          ['hook_after_making_current', afterCurrent],
+        ] as const
+      ).filter(([, value]) => value?.trim()),
+    )
+
     const payload = {
       ...data,
-      ...advancedOptions.value,
+      ...advanced,
+      ...hooks,
       // DNS record creation options
       create_dns_record: createDnsRecord.value && domainVerification.value?.can_create_record,
       connected_domain_id: domainVerification.value?.connected_domain_id || null,
@@ -493,6 +520,10 @@ const resetAdvancedOptions = () => {
     database_user_password: '',
     create_scheduler: false,
     create_queue: false,
+    hook_before_updating_repository: '',
+    hook_after_updating_repository: '',
+    hook_before_making_current: '',
+    hook_after_making_current: '',
   }
 }
 
