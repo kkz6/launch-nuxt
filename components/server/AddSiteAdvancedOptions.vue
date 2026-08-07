@@ -20,6 +20,7 @@ import {
 } from '~/components/ui/select'
 import { Separator } from '~/components/ui/separator'
 import { Switch } from '~/components/ui/switch'
+import { Textarea } from '~/components/ui/textarea'
 
 interface AdvancedOptions {
   create_database: boolean
@@ -32,6 +33,10 @@ interface AdvancedOptions {
   database_user_password: string
   create_scheduler: boolean
   create_queue: boolean
+  hook_before_updating_repository: string
+  hook_after_updating_repository: string
+  hook_before_making_current: string
+  hook_after_making_current: string
 }
 
 interface Props {
@@ -61,6 +66,25 @@ const createQueue = computed({
   get: () => options.value?.create_queue ?? false,
   set: (val: boolean) => { if (options.value) options.value.create_queue = val }
 })
+
+const hookModel = (
+  field:
+    | 'hook_before_updating_repository'
+    | 'hook_after_updating_repository'
+    | 'hook_before_making_current'
+    | 'hook_after_making_current',
+) =>
+  computed({
+    get: () => options.value?.[field] ?? '',
+    set: (val: string) => {
+      if (options.value) options.value[field] = val
+    },
+  })
+
+const hookBeforeUpdatingRepository = hookModel('hook_before_updating_repository')
+const hookAfterUpdatingRepository = hookModel('hook_after_updating_repository')
+const hookBeforeMakingCurrent = hookModel('hook_before_making_current')
+const hookAfterMakingCurrent = hookModel('hook_after_making_current')
 
 const databaseOption = computed({
   get: () => options.value?.database_option ?? 'new',
@@ -280,6 +304,65 @@ const generatePassword = () => {
               </p>
             </div>
             <Switch v-model="createQueue" />
+          </div>
+        </div>
+
+        <!-- Deployment Hooks -->
+        <div class="space-y-4">
+          <div class="space-y-1">
+            <h3 class="text-sm font-medium text-foreground">Deployment Hooks</h3>
+            <p class="text-sm text-muted-foreground">
+              Commands run around each deployment, including the first. Leave
+              blank to use the defaults for this site type.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="hook_before_updating_repository">Before updating the repository</Label>
+            <Textarea
+              id="hook_before_updating_repository"
+              v-model="hookBeforeUpdatingRepository"
+              rows="2"
+              class="font-mono text-xs"
+              placeholder="Runs before the repository is fetched"
+            />
+          </div>
+
+          <div class="space-y-2">
+            <Label for="hook_after_updating_repository">After updating the repository</Label>
+            <Textarea
+              id="hook_after_updating_repository"
+              v-model="hookAfterUpdatingRepository"
+              rows="2"
+              class="font-mono text-xs"
+              placeholder="git submodule update --init --recursive"
+            />
+            <p class="text-xs text-muted-foreground">
+              Use this for repositories with submodules — they are not fetched
+              by default and the first deployment will fail without it.
+            </p>
+          </div>
+
+          <div class="space-y-2">
+            <Label for="hook_before_making_current">Before making the release current</Label>
+            <Textarea
+              id="hook_before_making_current"
+              v-model="hookBeforeMakingCurrent"
+              rows="2"
+              class="font-mono text-xs"
+              placeholder="Runs before the site goes live"
+            />
+          </div>
+
+          <div class="space-y-2">
+            <Label for="hook_after_making_current">After making the release current</Label>
+            <Textarea
+              id="hook_after_making_current"
+              v-model="hookAfterMakingCurrent"
+              rows="2"
+              class="font-mono text-xs"
+              placeholder="Runs once the site is live"
+            />
           </div>
         </div>
       </div>
