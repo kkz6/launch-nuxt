@@ -161,6 +161,25 @@ const advancedOptions = ref({
   hook_after_making_current: '',
 })
 
+const HOOK_FIELDS = [
+  'hook_before_updating_repository',
+  'hook_after_updating_repository',
+  'hook_before_making_current',
+  'hook_after_making_current',
+] as const
+
+// Snapshot of the hook defaults last written into advancedOptions, so an
+// edit can be told apart from a value we filled in ourselves. Laravel's
+// default is not a placeholder — it is the actual composer install / artisan
+// caching script — so leaving the field blank would have shown nothing and
+// submitting a blank field would have deleted that script from the site.
+const hookDefaults = ref<Record<(typeof HOOK_FIELDS)[number], string>>({
+  hook_before_updating_repository: '',
+  hook_after_updating_repository: '',
+  hook_before_making_current: '',
+  hook_after_making_current: '',
+})
+
 // Base schema - type-specific validation is done in validate()
 const schema = z.object({
   address: z.string().min(1, 'Domain is required'),
@@ -219,6 +238,30 @@ const resetForm = () => {
   errors.value = {}
 }
 
+// Fetches the real hook defaults for the current type/zero-downtime
+// combination and fills any field that still matches the LAST default we
+// applied — never one the user has typed something different into. A field
+// left alone here keeps whatever the user put there, even across a type or
+// zero-downtime change.
+const fetchHookDefaults = async () => {
+  try {
+    const result = await $api<{ data: Record<(typeof HOOK_FIELDS)[number], string> }>(
+      '/sites/hook-defaults',
+      { params: { type: siteType.value, zero_downtime: zeroDowntimeDeployment.value } },
+    )
+    const next = result.data
+    for (const field of HOOK_FIELDS) {
+      if (advancedOptions.value[field] === hookDefaults.value[field]) {
+        advancedOptions.value[field] = next[field] ?? ''
+      }
+      hookDefaults.value[field] = next[field] ?? ''
+    }
+  } catch {
+    // Leave whatever is currently shown. Creation still works without a
+    // pre-filled default — the field is just blank instead of helpful.
+  }
+}
+
 const fetchOptions = async () => {
   try {
     const [phpData, scData, siteTypeData] = await Promise.all([
@@ -234,6 +277,8 @@ const fetchOptions = async () => {
       const defaultVersion = phpVersions.value.find(v => v.is_default)
       phpVersion.value = defaultVersion?.key ?? phpVersions.value[0].key
     }
+
+    await fetchHookDefaults()
   } catch {
     // Silent fail - options will be empty
   }
@@ -450,9 +495,12 @@ const onSubmit = async () => {
   isLoading.value = true
   try {
     // Merge advanced options and DNS options into payload
-    // An empty hook is not the same as an absent one: the API reads ""
-    // as "clear the default for this site type", so sending the untouched
-    // fields would strip the defaults off every site created here.
+    // Hook fields are pre-filled with the site type's real default (for
+    // Laravel that is the composer install / artisan caching script, not a
+    // placeholder), so "blank" no longer means "untouched". A field is sent
+    // only if it no longer matches the last default fetchHookDefaults wrote
+    // into it — which covers both an edit and a deliberate clearing, and
+    // omits it whenever the user never opened this section at all.
     const {
       hook_before_updating_repository: beforeUpdating,
       hook_after_updating_repository: afterUpdating,
@@ -469,7 +517,7 @@ const onSubmit = async () => {
           ['hook_before_making_current', beforeCurrent],
           ['hook_after_making_current', afterCurrent],
         ] as const
-      ).filter(([, value]) => value?.trim()),
+      ).filter(([field, value]) => value !== hookDefaults.value[field]),
     )
 
     const payload = {
@@ -525,6 +573,12 @@ const resetAdvancedOptions = () => {
     hook_before_making_current: '',
     hook_after_making_current: '',
   }
+  hookDefaults.value = {
+    hook_before_updating_repository: '',
+    hook_after_updating_repository: '',
+    hook_before_making_current: '',
+    hook_after_making_current: '',
+  }
 }
 
 watch(siteType, () => {
@@ -533,6 +587,8 @@ watch(siteType, () => {
     webFolder.value = st.default_web_folder === '/' ? '/' : `/${st.default_web_folder}`
   }
 })
+
+watch([siteType, zeroDowntimeDeployment], fetchHookDefaults)
 
 watch(isOpen, (open) => {
   if (open) {

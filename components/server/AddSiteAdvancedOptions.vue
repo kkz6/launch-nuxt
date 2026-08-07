@@ -312,8 +312,11 @@ const generatePassword = () => {
           <div class="space-y-1">
             <h3 class="text-sm font-medium text-foreground">Deployment Hooks</h3>
             <p class="text-sm text-muted-foreground">
-              Commands run around each deployment, including the first. Leave
-              blank to use the defaults for this site type.
+              Commands run around each deployment, including the first. These
+              are pre-filled with what this site type runs by default — for
+              Laravel, that includes composer install and the artisan cache
+              commands — so edit in place rather than replacing the whole
+              script. Clear a field to disable that step entirely.
             </p>
           </div>
 
