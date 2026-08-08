@@ -76,9 +76,7 @@ const validateDns = async (d: DockerDomain) => {
     if (v.ok) {
       toast.success(v.message || "DNS resolves to the docker server");
     } else if (v.proxied) {
-      // Cloudflare hides the origin IP by design — this is not
-      // necessarily a misconfiguration, so it gets a neutral tone
-      // rather than the "something's wrong" warning below.
+      // Not necessarily a misconfiguration, so a neutral tone.
       toast.info(v.message || "Domain is proxied through Cloudflare", {
         duration: 8000,
       });

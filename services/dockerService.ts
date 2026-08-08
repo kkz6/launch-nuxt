@@ -182,9 +182,7 @@ export interface DockerDomainDnsValidation {
   host: string;
   ok: boolean;
   wildcard: boolean;
-  /** True when the resolved IP is Cloudflare's proxy edge rather than the
-   * origin server — the domain may be correctly configured with the orange
-   * cloud on; the origin behind it just can't be checked from outside. */
+  /** True when the resolved IP is Cloudflare's edge, not the origin. */
   proxied: boolean;
   expected_ip?: string;
   resolved_ips?: string[];
