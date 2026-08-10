@@ -49,6 +49,8 @@ interface BackupState {
   historySheetOpen: boolean;
   logSheetOpen: boolean;
   logSheetTaskId: string;
+  logSheetRunId: string;
+  logSheetError: string;
   logRefreshNonce: number;
   awaitingRunLogs: boolean;
   restoreDialogOpen: boolean;
@@ -63,7 +65,26 @@ interface BackupState {
   enabled: boolean;
   saving: boolean;
   liveStep: string;
+  liveStepRunId: string;
 }
+
+type BufferedRunConsoleEvent = {
+  taskId?: string;
+  error?: string;
+  step?: string;
+  terminal?: "succeeded" | "failed";
+};
+
+const bufferedRunConsoleEvents = new Map<string, BufferedRunConsoleEvent>();
+const terminalToastRunIds = new Set<string>();
+const RUN_RECONCILE_INTERVAL_MS = 1000;
+const RUN_RECONCILE_MAX_ATTEMPTS = 60;
+let activeRunRequestToken = 0;
+let pendingManualRunRequestToken: number | null = null;
+let loadRequestToken = 0;
+let componentUnmounted = false;
+let logRefreshTimer: ReturnType<typeof setTimeout> | undefined;
+let runReconcileTimer: ReturnType<typeof setTimeout> | undefined;
 
 const state = reactive({
   backup: null,
@@ -76,6 +97,8 @@ const state = reactive({
   historySheetOpen: false,
   logSheetOpen: false,
   logSheetTaskId: "",
+  logSheetRunId: "",
+  logSheetError: "",
   logRefreshNonce: 0,
   awaitingRunLogs: false,
   restoreDialogOpen: false,
@@ -90,6 +113,7 @@ const state = reactive({
   enabled: true,
   saving: false,
   liveStep: "",
+  liveStepRunId: "",
 }) as BackupState;
 
 const {
@@ -103,6 +127,8 @@ const {
   historySheetOpen,
   logSheetOpen,
   logSheetTaskId,
+  logSheetRunId,
+  logSheetError,
   logRefreshNonce,
   awaitingRunLogs,
   restoreDialogOpen,
@@ -117,11 +143,72 @@ const {
   enabled,
   saving,
   liveStep,
+  liveStepRunId,
 } = toRefs(state);
 
+const cancelLogRefresh = () => {
+  if (logRefreshTimer !== undefined) {
+    clearTimeout(logRefreshTimer);
+    logRefreshTimer = undefined;
+  }
+};
+
+const cancelRunReconciliation = () => {
+  if (runReconcileTimer !== undefined) {
+    clearTimeout(runReconcileTimer);
+    runReconcileTimer = undefined;
+  }
+};
+
+const resetLiveStepOwnership = () => {
+  liveStep.value = "";
+  liveStepRunId.value = "";
+};
+
+const invalidateRunConsole = () => {
+  activeRunRequestToken++;
+  if (pendingManualRunRequestToken === null) {
+    bufferedRunConsoleEvents.clear();
+  }
+  cancelLogRefresh();
+  cancelRunReconciliation();
+  return activeRunRequestToken;
+};
+
+const scheduleLogRefresh = (runId: string) => {
+  cancelLogRefresh();
+  const requestToken = activeRunRequestToken;
+  logRefreshTimer = setTimeout(() => {
+    logRefreshTimer = undefined;
+    if (
+      requestToken !== activeRunRequestToken ||
+      !logSheetOpen.value ||
+      logSheetRunId.value !== runId
+    ) {
+      return;
+    }
+    logRefreshNonce.value++;
+  }, 800);
+};
+
 watch(logSheetOpen, (open) => {
-  if (!open) awaitingRunLogs.value = false;
+  if (!open) {
+    invalidateRunConsole();
+    awaitingRunLogs.value = false;
+    logSheetTaskId.value = "";
+    logSheetRunId.value = "";
+    logSheetError.value = "";
+  }
 });
+
+onBeforeUnmount(() => {
+  componentUnmounted = true;
+  pendingManualRunRequestToken = null;
+  loadRequestToken++;
+  invalidateRunConsole();
+  resetLiveStepOwnership();
+});
+
 const openRestoreDialog = (run: DockerDatabaseBackupRun) => {
   restoreRun.value = run;
   restoreDialogOpen.value = true;
@@ -129,7 +216,11 @@ const openRestoreDialog = (run: DockerDatabaseBackupRun) => {
 
 const openRunLogs = (run: DockerDatabaseBackupRun) => {
   if (!run.task_id) return;
+  invalidateRunConsole();
+  awaitingRunLogs.value = false;
+  logSheetRunId.value = run.id;
   logSheetTaskId.value = run.task_id;
+  logSheetError.value = "";
   logSheetOpen.value = true;
 };
 watch(restoreDialogOpen, (isOpen) => {
@@ -161,58 +252,339 @@ const canSubmit = computed(() => {
 });
 
 const load = async () => {
+  const requestToken = ++loadRequestToken;
+  const databaseId = props.database.id;
+  const projectId = props.database.project_id;
+  const serverId = props.database.server_id;
   loading.value = true;
   try {
     const [cfgRes, runsRes, provRes] = await Promise.all([
-      dockerService.databases.getBackup(
-        props.database.server_id,
-        props.database.project_id,
-        props.database.id,
-      ),
-      dockerService.databases.listBackupRuns(
-        props.database.server_id,
-        props.database.project_id,
-        props.database.id,
-      ),
+      dockerService.databases.getBackup(serverId, projectId, databaseId),
+      dockerService.databases.listBackupRuns(serverId, projectId, databaseId),
       $api<{ data: StorageProviderRecord[] }>("/storage-providers"),
     ]);
+    if (requestToken !== loadRequestToken || databaseId !== props.database.id) {
+      return;
+    }
     backup.value = cfgRes.data ?? null;
     runs.value = runsRes.data ?? [];
     providers.value = (provRes.data ?? []).filter((p) => p.provider === "s3");
   } catch (err: unknown) {
+    if (requestToken !== loadRequestToken || databaseId !== props.database.id) {
+      return;
+    }
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || "Failed to load backup configuration");
   } finally {
-    loading.value = false;
+    if (requestToken === loadRequestToken && databaseId === props.database.id) {
+      loading.value = false;
+    }
   }
 };
 
 onMounted(load);
 
+watch(
+  () => props.database.id,
+  (databaseId, previousDatabaseId) => {
+    if (databaseId === previousDatabaseId) return;
+    pendingManualRunRequestToken = null;
+    activeRunRequestToken++;
+    cancelLogRefresh();
+    cancelRunReconciliation();
+    bufferedRunConsoleEvents.clear();
+    terminalToastRunIds.clear();
+    awaitingRunLogs.value = false;
+    logSheetTaskId.value = "";
+    logSheetRunId.value = "";
+    logSheetError.value = "";
+    logSheetOpen.value = false;
+    resetLiveStepOwnership();
+    backup.value = null;
+    runs.value = [];
+    dialogOpen.value = false;
+    historySheetOpen.value = false;
+    restoreDialogOpen.value = false;
+    restoreRun.value = null;
+    void load();
+  },
+);
+
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+
+const bufferRunConsoleEvent = (
+  runId: string,
+  data: Record<string, unknown>,
+  event: string,
+) => {
+  const buffered = bufferedRunConsoleEvents.get(runId) ?? {};
+  if (data.task_id) buffered.taskId = String(data.task_id);
+  if (
+    event === "docker.database.backup.run.progress" &&
+    data.type === "backup_step"
+  ) {
+    buffered.step = String(data.value ?? "");
+  }
+  if (event === "docker.database.backup.run.failed") {
+    buffered.terminal = "failed";
+    buffered.error =
+      String(data.error ?? "").trim() ||
+      "Backup failed before log streaming could start.";
+  } else if (event === "docker.database.backup.run.succeeded") {
+    buffered.terminal = "succeeded";
+  }
+  bufferedRunConsoleEvents.set(runId, buffered);
+};
+
+const takeBufferedRunConsole = (runId: string) => {
+  const buffered = bufferedRunConsoleEvents.get(runId);
+  bufferedRunConsoleEvents.clear();
+  return buffered;
+};
+
+const applyBufferedRunConsole = (
+  runId: string,
+  buffered?: BufferedRunConsoleEvent,
+) => {
+  if (!buffered) return;
+  if (buffered.taskId) {
+    logSheetTaskId.value = buffered.taskId;
+    logSheetError.value = "";
+    awaitingRunLogs.value = false;
+    cancelRunReconciliation();
+  }
+  if (buffered.terminal) {
+    awaitingRunLogs.value = false;
+    if (buffered.terminal === "failed" && !buffered.taskId) {
+      logSheetError.value =
+        buffered.error || "Backup failed before log streaming could start.";
+    }
+    if (buffered.taskId) {
+      scheduleLogRefresh(runId);
+    }
+  }
+};
+
+const applyBufferedRunProgress = (
+  runId: string,
+  buffered?: BufferedRunConsoleEvent,
+) => {
+  if (!buffered) return;
+  if (buffered.terminal) {
+    if (liveStepRunId.value === runId) resetLiveStepOwnership();
+    return;
+  }
+  if (buffered.step !== undefined) {
+    liveStepRunId.value = runId;
+    liveStep.value = buffered.step;
+  }
+};
+
+const applyRunSnapshotToConsole = (
+  runId: string,
+  run: DockerDatabaseBackupRun,
+) => {
+  const taskId = String(run.task_id ?? "");
+  if (taskId) {
+    logSheetTaskId.value = taskId;
+    logSheetError.value = "";
+    awaitingRunLogs.value = false;
+    cancelRunReconciliation();
+  }
+
+  const status = String(run.status ?? "").toLowerCase();
+  const terminal =
+    status === "success" || status === "finished"
+      ? "succeeded"
+      : status === "failed" ||
+          status === "cancelled" ||
+          status === "canceled" ||
+          status === "timeout" ||
+          status === "timed_out"
+        ? "failed"
+        : undefined;
+  if (!terminal) return undefined;
+
+  awaitingRunLogs.value = false;
+  cancelRunReconciliation();
+  if (liveStepRunId.value === runId) resetLiveStepOwnership();
+  if (terminal === "failed") {
+    logSheetError.value =
+      String(run.error ?? "").trim() ||
+      (logSheetTaskId.value
+        ? ""
+        : "Backup failed before log streaming could start.");
+  } else {
+    logSheetError.value = "";
+  }
+  if (logSheetTaskId.value) scheduleLogRefresh(runId);
+  return terminal;
+};
+
+const ownsRunReconciliation = (runId: string, requestToken: number) =>
+  !componentUnmounted &&
+  requestToken === activeRunRequestToken &&
+  logSheetOpen.value &&
+  awaitingRunLogs.value &&
+  logSheetRunId.value === runId;
+
+const scheduleRunReconciliation = (
+  runId: string,
+  requestToken: number,
+  attempt = 0,
+) => {
+  cancelRunReconciliation();
+  if (!ownsRunReconciliation(runId, requestToken)) {
+    return;
+  }
+  if (attempt >= RUN_RECONCILE_MAX_ATTEMPTS) {
+    awaitingRunLogs.value = false;
+    logSheetError.value =
+      "Live output is not available yet. Follow this backup in Active actions.";
+    return;
+  }
+  runReconcileTimer = setTimeout(() => {
+    runReconcileTimer = undefined;
+    void reconcileRunConsole(runId, requestToken, attempt + 1);
+  }, RUN_RECONCILE_INTERVAL_MS);
+};
+
+async function reconcileRunConsole(
+  runId: string,
+  requestToken: number,
+  attempt: number,
+) {
+  if (!ownsRunReconciliation(runId, requestToken)) return;
+  try {
+    const response = await dockerService.databases.listBackupRuns(
+      props.database.server_id,
+      props.database.project_id,
+      props.database.id,
+    );
+    if (!ownsRunReconciliation(runId, requestToken)) return;
+
+    const snapshots = response.data ?? [];
+    runs.value = snapshots;
+    const snapshot = snapshots.find((run) => run.id === runId);
+    if (snapshot) {
+      const terminal = applyRunSnapshotToConsole(runId, snapshot);
+      if (terminal) {
+        toastRunTerminal(
+          runId,
+          terminal,
+          String(snapshot.error ?? "").trim(),
+          Boolean(logSheetTaskId.value),
+        );
+        return;
+      }
+    }
+  } catch {
+    if (!ownsRunReconciliation(runId, requestToken)) return;
+  }
+  scheduleRunReconciliation(runId, requestToken, attempt);
+}
+
+const toastRunTerminal = (
+  runId: string,
+  terminal: "succeeded" | "failed",
+  error: string | undefined,
+  showLogHint: boolean,
+) => {
+  if (runId && terminalToastRunIds.has(runId)) return;
+  if (runId) terminalToastRunIds.add(runId);
+  if (terminal === "succeeded") {
+    toast.success("Backup completed");
+    return;
+  }
+  toast.error(
+    showLogHint
+      ? "Backup failed — check the log console for details"
+      : error || "Backup failed before log streaming could start",
+  );
+};
+
 useDockerBackupEvents(teamId, (data, event) => {
   if (String(data.database_id ?? "") !== props.database.id) return;
-  if (awaitingRunLogs.value && data.task_id) {
+
+  const eventRunId = String(data.run_id ?? "");
+  const eventSource = String(data.source ?? "");
+  if (
+    event === "docker.database.backup.configured" ||
+    event === "docker.database.backup.deleted"
+  ) {
+    resetLiveStepOwnership();
+  }
+  const waitingForResponse =
+    logSheetOpen.value && awaitingRunLogs.value && !logSheetRunId.value;
+  const isPendingManualCandidate =
+    pendingManualRunRequestToken !== null &&
+    Boolean(eventRunId) &&
+    (!eventSource || eventSource === "manual");
+  if (isPendingManualCandidate) {
+    bufferRunConsoleEvent(eventRunId, data, event);
+  }
+  const matchesOpenRun =
+    logSheetOpen.value &&
+    Boolean(logSheetRunId.value) &&
+    eventRunId === logSheetRunId.value;
+  if (matchesOpenRun && data.task_id) {
     logSheetTaskId.value = String(data.task_id);
+    logSheetError.value = "";
     awaitingRunLogs.value = false;
+    cancelRunReconciliation();
   }
   if (event === "docker.database.backup.run.progress") {
-    if (data.type === "backup_step") liveStep.value = String(data.value ?? "");
+    if (data.type !== "backup_step" || !eventRunId) return;
+    if (pendingManualRunRequestToken !== null || waitingForResponse) return;
+
+    const activeManualRunId =
+      logSheetOpen.value && awaitingRunLogs.value ? logSheetRunId.value : "";
+    if (activeManualRunId) {
+      if (eventRunId === activeManualRunId) {
+        liveStepRunId.value = eventRunId;
+        liveStep.value = String(data.value ?? "");
+      }
+      return;
+    }
+
+    if (!liveStepRunId.value || liveStepRunId.value === eventRunId) {
+      liveStepRunId.value = eventRunId;
+      liveStep.value = String(data.value ?? "");
+    }
     return;
   }
   if (
     event === "docker.database.backup.run.succeeded" ||
     event === "docker.database.backup.run.failed"
   ) {
-    liveStep.value = "";
-    if (logSheetOpen.value && logSheetTaskId.value) {
-      setTimeout(() => logRefreshNonce.value++, 800);
+    if (eventRunId && liveStepRunId.value === eventRunId) {
+      resetLiveStepOwnership();
     }
-    if (event === "docker.database.backup.run.succeeded") {
-      toast.success("Backup completed");
-    } else {
-      toast.error("Backup failed — check the log console for details");
+    if (matchesOpenRun) {
+      awaitingRunLogs.value = false;
+      cancelRunReconciliation();
+      if (
+        event === "docker.database.backup.run.failed" &&
+        !logSheetTaskId.value
+      ) {
+        logSheetError.value =
+          String(data.error ?? "").trim() ||
+          "Backup failed before log streaming could start.";
+      }
+    }
+    if (matchesOpenRun && logSheetTaskId.value) {
+      scheduleLogRefresh(eventRunId);
+    }
+    if (!isPendingManualCandidate) {
+      toastRunTerminal(
+        eventRunId,
+        event === "docker.database.backup.run.succeeded"
+          ? "succeeded"
+          : "failed",
+        String(data.error ?? "").trim(),
+        matchesOpenRun && Boolean(logSheetTaskId.value),
+      );
     }
   }
   load();
@@ -264,6 +636,7 @@ const saveConfig = async () => {
       },
     );
     backup.value = res.data;
+    resetLiveStepOwnership();
     toast.success(
       isEditing.value
         ? "Backup configuration updated"
@@ -281,20 +654,98 @@ const saveConfig = async () => {
 const runNow = async () => {
   if (!isConfigured.value) return;
   runningNow.value = true;
+  const requestedDatabaseId = props.database.id;
+  const runRequestToken = invalidateRunConsole();
+  resetLiveStepOwnership();
+  logSheetTaskId.value = "";
+  logSheetRunId.value = "";
+  logSheetError.value = "";
+  pendingManualRunRequestToken = runRequestToken;
+  awaitingRunLogs.value = true;
+  logSheetOpen.value = true;
   try {
     const res = await dockerService.databases.runBackup(
       props.database.server_id,
       props.database.project_id,
       props.database.id,
     );
-    runs.value = [res.data, ...runs.value].slice(0, 50);
-    toast.success("Backup triggered — running in the background");
-    logSheetTaskId.value = "";
-    awaitingRunLogs.value = true;
-    logSheetOpen.value = true;
+    const runId = String(res.data.id ?? "");
+    if (!runId)
+      throw new Error("Backup started without a valid run identifier");
+    const ownsPendingRequest = pendingManualRunRequestToken === runRequestToken;
+    if (ownsPendingRequest) pendingManualRunRequestToken = null;
+    const isCurrentDatabase = requestedDatabaseId === props.database.id;
+
+    const ownsOpenConsole =
+      ownsPendingRequest &&
+      isCurrentDatabase &&
+      runRequestToken === activeRunRequestToken &&
+      logSheetOpen.value;
+    const buffered = ownsPendingRequest
+      ? takeBufferedRunConsole(runId)
+      : undefined;
+    if (ownsPendingRequest && isCurrentDatabase) {
+      applyBufferedRunProgress(runId, buffered);
+    }
+    let responseTerminal: "succeeded" | "failed" | undefined;
+    if (ownsOpenConsole) {
+      logSheetRunId.value = runId;
+      responseTerminal = applyRunSnapshotToConsole(runId, res.data);
+      applyBufferedRunConsole(runId, buffered);
+      if (!buffered?.terminal && responseTerminal) {
+        toastRunTerminal(
+          runId,
+          responseTerminal,
+          String(res.data.error ?? "").trim(),
+          Boolean(logSheetTaskId.value),
+        );
+      }
+    }
+    if (buffered?.terminal) {
+      toastRunTerminal(
+        runId,
+        buffered.terminal,
+        buffered.error,
+        ownsOpenConsole && Boolean(buffered.taskId),
+      );
+    }
+
+    if (
+      ownsOpenConsole &&
+      runRequestToken === activeRunRequestToken &&
+      logSheetOpen.value &&
+      !buffered?.terminal &&
+      !responseTerminal
+    ) {
+      toast.success("Backup triggered — running in the background");
+      if (awaitingRunLogs.value) {
+        scheduleRunReconciliation(runId, runRequestToken);
+      }
+    }
+
+    if (!componentUnmounted) await load();
   } catch (err: unknown) {
-    const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to run backup");
+    const e = err as { data?: { message?: string }; message?: string };
+    const message = e.data?.message || e.message || "Failed to run backup";
+    const ownsPendingRequest = pendingManualRunRequestToken === runRequestToken;
+    if (ownsPendingRequest) {
+      pendingManualRunRequestToken = null;
+      bufferedRunConsoleEvents.clear();
+    }
+    if (
+      ownsPendingRequest &&
+      requestedDatabaseId === props.database.id &&
+      runRequestToken === activeRunRequestToken &&
+      logSheetOpen.value
+    ) {
+      awaitingRunLogs.value = false;
+      logSheetRunId.value = "";
+      logSheetTaskId.value = "";
+      logSheetError.value = message;
+      cancelLogRefresh();
+    }
+    toast.error(message);
+    if (!componentUnmounted) await load();
   } finally {
     runningNow.value = false;
   }
@@ -317,6 +768,7 @@ const deleteConfig = async () => {
       props.database.id,
     );
     backup.value = null;
+    resetLiveStepOwnership();
     toast.success("Backup configuration deleted");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
@@ -882,6 +1334,18 @@ const currentProviderLabel = computed(() => {
             hide-options
             container-class-name="h-full rounded-b-lg"
           />
+          <div
+            v-else-if="logSheetOpen && logSheetError"
+            class="flex flex-1 items-center justify-center px-6 text-center"
+          >
+            <div class="max-w-lg space-y-2 text-destructive">
+              <Icon name="lucide:circle-alert" class="mx-auto h-5 w-5" />
+              <p class="text-sm font-medium">Backup output unavailable</p>
+              <p class="whitespace-pre-wrap break-words text-xs">
+                {{ logSheetError }}
+              </p>
+            </div>
+          </div>
           <div
             v-else-if="logSheetOpen"
             class="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground"

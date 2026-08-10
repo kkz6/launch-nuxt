@@ -1,0 +1,30 @@
+coverage:
+  status:
+    project:
+      frontend:
+        target: auto
+        threshold: 0%
+        flags:
+          - frontend
+    patch:
+      frontend:
+        target: 100%
+        threshold: 0%
+        flags:
+          - frontend
+
+flags:
+  frontend:
+    carryforward: false
+    paths:
+      - app.vue
+      - components/
+      - composables/
+      - layouts/
+      - middleware/
+      - pages/
+      - plugins/
+      - server/
+      - services/
+      - stores/
+      - utils/

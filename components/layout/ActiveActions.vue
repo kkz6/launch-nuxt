@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Activity, CircleAlert, CircleCheck, Loader2, X } from 'lucide-vue-next'
 import {
+  useBackupEvents,
   useCommandEvents,
   useDeploymentEvents,
+  useDockerBackupEvents,
   useTaskEvents,
 } from '~/composables/useChannelEvents'
 import {
@@ -23,12 +25,14 @@ import {
   activeActionPath,
   activeActionStatusLabel,
   activeActionStatusTone,
+  createActiveActionRequestGuard,
   humanizeActionValue,
   isActiveActionRunning,
   pruneDismissedIds,
   updateActionFromEvent,
   visibleActiveActions,
   type ActiveAction,
+  type ActiveActionEventData,
 } from '~/utils/activeActions'
 
 const { user } = useAuth()
@@ -39,7 +43,7 @@ const isLoading = ref(false)
 const logsOpen = ref(false)
 const selected = ref<ActiveAction | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
-let fetchSequence = 0
+const fetchGuard = createActiveActionRequestGuard()
 
 // Terminal actions linger server-side so a failure is still readable after
 // it finishes. They are not work in progress though, so let the user clear
@@ -49,7 +53,7 @@ const DISMISSED_KEY = 'launch:dismissed-actions'
 const dismissed = ref<string[]>([])
 
 const loadDismissed = () => {
-  if (!import.meta.client) return
+  if (typeof window === 'undefined') return
   try {
     const stored = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')
     dismissed.value = Array.isArray(stored) ? stored.map(String) : []
@@ -60,7 +64,7 @@ const loadDismissed = () => {
 
 const dismiss = (action: ActiveAction) => {
   dismissed.value = [...new Set([...dismissed.value, action.id])]
-  if (import.meta.client) {
+  if (typeof window !== 'undefined') {
     localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed.value))
   }
 }
@@ -70,7 +74,7 @@ const pruneDismissed = (current: ActiveAction[]) => {
   const kept = pruneDismissedIds(dismissed.value, current)
   if (kept.length === dismissed.value.length) return
   dismissed.value = kept
-  if (import.meta.client) {
+  if (typeof window !== 'undefined') {
     localStorage.setItem(DISMISSED_KEY, JSON.stringify(kept))
   }
 }
@@ -87,11 +91,11 @@ const failedActions = computed(() =>
 const teamId = computed(() => String(user.value?.current_team_id || ''))
 const fetchActions = async () => {
   if (!teamId.value) return
-  const sequence = ++fetchSequence
+  const request = fetchGuard.start()
   isLoading.value = true
   try {
     const response = await get<{ data: ActiveAction[] }>('/actions/active')
-    if (sequence !== fetchSequence) return
+    if (!fetchGuard.isCurrent(request)) return
 
     const nextActions = response.data || []
     actions.value = nextActions
@@ -107,23 +111,40 @@ const fetchActions = async () => {
     ) {
       selected.value = refreshedSelection
     }
+  } catch {
+    return
   } finally {
-    if (sequence === fetchSequence) {
+    if (fetchGuard.isCurrent(request)) {
       isLoading.value = false
     }
   }
 }
 
-useDeploymentEvents(teamId, async (data, event) => {
+const handleLifecycleEvent = async (
+  data: ActiveActionEventData,
+  event: string,
+) => {
   selected.value = updateActionFromEvent(selected.value, data, event)
   await fetchActions()
-})
+}
+
+useDeploymentEvents(teamId, handleLifecycleEvent)
+useBackupEvents(teamId, handleLifecycleEvent)
+useDockerBackupEvents(teamId, handleLifecycleEvent)
 
 useCommandEvents(teamId, fetchActions)
 
-useTaskEvents(teamId, async (data, event) => {
-  selected.value = updateActionFromEvent(selected.value, data, event)
-  await fetchActions()
+useTaskEvents(teamId, handleLifecycleEvent)
+
+watch(teamId, (currentTeamId, previousTeamId) => {
+  if (currentTeamId === previousTeamId) return
+
+  fetchGuard.invalidate()
+  actions.value = []
+  isLoading.value = false
+  selected.value = null
+  logsOpen.value = false
+  if (currentTeamId) void fetchActions()
 })
 
 const elapsed = (action: ActiveAction) => {
@@ -168,6 +189,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  fetchGuard.invalidate()
   if (timer) clearInterval(timer)
 })
 </script>

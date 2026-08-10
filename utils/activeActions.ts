@@ -20,13 +20,34 @@ export interface ActiveActionEventData {
   deployment_id?: string
   command_id?: string
   task_id?: string
+  job_id?: string
+  run_id?: string
   status?: string
 }
 
 export type ActiveActionStatusTone =
   'running' | 'success' | 'failure' | 'neutral'
 
+export interface ActiveActionRequestGuard {
+  start: () => number
+  invalidate: () => void
+  isCurrent: (request: number) => boolean
+}
+
+export const createActiveActionRequestGuard = (): ActiveActionRequestGuard => {
+  let sequence = 0
+
+  return {
+    start: () => ++sequence,
+    invalidate: () => {
+      sequence += 1
+    },
+    isCurrent: (request) => request === sequence,
+  }
+}
+
 const runningStatuses = new Set([
+  'triggered',
   'pending',
   'installing',
   'building',
@@ -51,12 +72,35 @@ const deploymentStatusLabels: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
-const terminalEventStatuses: Record<string, string> = {
+const backupStatusLabels: Record<string, string> = {
+  triggered: 'Queued',
+  pending: 'Queued',
+  running: 'Running',
+  finished: 'Completed',
+  completed: 'Completed',
+  success: 'Completed',
+  failed: 'Failed',
+  timeout: 'Timed out',
+  cancelled: 'Cancelled',
+}
+
+const eventStatuses: Record<string, string> = {
+  'deployment.started': 'deploying',
   'deployment.finished': 'finished',
   'deployment.failed': 'failed',
   'deployment.timeout': 'timeout',
+  'deployment.rollback.started': 'deploying',
   'deployment.rollback.completed': 'finished',
   'deployment.rollback.failed': 'failed',
+  'backup.run.queued': 'pending',
+  'backup.run.started': 'running',
+  'backup.run.succeeded': 'finished',
+  'backup.run.failed': 'failed',
+  'docker.database.backup.run.queued': 'pending',
+  'docker.database.backup.run.started': 'running',
+  'docker.database.backup.run.progress': 'running',
+  'docker.database.backup.run.succeeded': 'success',
+  'docker.database.backup.run.failed': 'failed',
 }
 
 export const humanizeActionValue = (value: string) =>
@@ -71,6 +115,13 @@ export const activeActionStatusLabel = (action: ActiveAction) => {
       humanizeActionValue(action.status)
     )
   }
+
+  if (action.kind === 'server_backup' || action.kind === 'database_backup') {
+    return (
+      backupStatusLabels[action.status] || humanizeActionValue(action.status)
+    )
+  }
+
   return humanizeActionValue(action.status)
 }
 
@@ -86,27 +137,58 @@ export const activeActionStatusTone = (
 export const isActiveActionRunning = (action: ActiveAction) =>
   activeActionStatusTone(action.status) === 'running'
 
+const eventActionId = (
+  action: ActiveAction,
+  data: ActiveActionEventData,
+): string | undefined => {
+  switch (action.kind) {
+    case 'command':
+      return data.command_id
+    case 'task':
+      return data.task_id
+    case 'server_backup':
+      return data.job_id
+    case 'database_backup':
+      return data.run_id
+    default:
+      return data.deployment_id
+  }
+}
+
 export const updateActionFromEvent = (
   action: ActiveAction | null,
   data: ActiveActionEventData,
   event: string,
 ) => {
-  if (!action) return action
+  if (!action || action.id !== eventActionId(action, data)) return action
 
-  const eventActionId =
-    action.kind === 'command'
-      ? data.command_id
-      : action.kind === 'task'
-        ? data.task_id
-        : data.deployment_id
-  if (action.id !== eventActionId) return action
+  const status = data.status || eventStatuses[event]
+  if (!status) return action
 
-  const status = data.status || terminalEventStatuses[event]
-  return status ? { ...action, status } : action
+  const currentTone = activeActionStatusTone(action.status)
+  const isBackup =
+    action.kind === 'server_backup' || action.kind === 'database_backup'
+  if (
+    isBackup &&
+    (currentTone === 'success' || currentTone === 'failure')
+  ) {
+    return action
+  }
+
+  return { ...action, status }
 }
 
 export const activeActionPath = (action: ActiveAction) => {
   const serverPath = `/servers/${action.server_id}`
+
+  if (action.kind === 'server_backup') {
+    return `${serverPath}?tab=advanced&subtab=backups`
+  }
+
+  if (action.kind === 'database_backup') {
+    return `${serverPath}/projects/${action.project_id}/databases/${action.target_id}?subtab=backups`
+  }
+
   if (action.target_type === 'server') return serverPath
 
   if (action.target_type === 'site') {
