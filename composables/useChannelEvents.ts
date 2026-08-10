@@ -346,6 +346,7 @@ export const useDockerBackupEvents = (
       "docker.database.backup.configured",
       "docker.database.backup.deleted",
       "docker.database.backup.restored",
+      "docker.database.backup.run.queued",
       "docker.database.backup.run.started",
       "docker.database.backup.run.progress",
       "docker.database.backup.run.succeeded",
@@ -361,7 +362,13 @@ export const useBackupEvents = (
 ) => {
   return useTeamChannelEvents(
     teamId,
-    ["backup.run.started", "backup.run.succeeded", "backup.run.failed"],
+    [
+      "backup.job.status",
+      "backup.run.queued",
+      "backup.run.started",
+      "backup.run.succeeded",
+      "backup.run.failed",
+    ],
     onEvent,
   );
 };
