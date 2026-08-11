@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   navigateTo: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  reconnect: vi.fn(),
 }));
 
 vi.mock("vue-sonner", () => ({
@@ -19,6 +20,7 @@ vi.mock("vue-sonner", () => ({
 
 const user = ref({ id: "owner", current_team_id: "source" });
 const teamsRefreshKey = ref(0);
+const teamsState = ref([] as Array<typeof source>);
 const source = {
   id: "source",
   user_id: "owner",
@@ -116,6 +118,7 @@ describe("team settings", () => {
   beforeEach(() => {
     source.name = "Source";
     teamsRefreshKey.value = 0;
+    teamsState.value = [source, destination];
     mocks.api
       .mockReset()
       .mockImplementation(
@@ -152,6 +155,7 @@ describe("team settings", () => {
     mocks.navigateTo.mockReset().mockResolvedValue(undefined);
     mocks.success.mockReset();
     mocks.error.mockReset();
+    mocks.reconnect.mockReset();
     vi.stubGlobal("$api", mocks.api);
     vi.stubGlobal("computed", computed);
     vi.stubGlobal("onMounted", onMounted);
@@ -162,6 +166,26 @@ describe("team settings", () => {
     }));
     vi.stubGlobal("useSettingsSheet", () => ({ close: mocks.closeSettings }));
     vi.stubGlobal("useCan", () => ({ canManageTeam: ref(true) }));
+    vi.stubGlobal("useTeams", () => ({
+      teams: teamsState,
+      loadTeams: vi.fn().mockResolvedValue(teamsState.value),
+      updateTeam: (team: typeof source) => {
+        const index = teamsState.value.findIndex((item) => item.id === team.id);
+        if (index === -1) teamsState.value.push(team);
+        else teamsState.value[index] = team;
+      },
+      removeTeam: (teamId: string) => {
+        teamsState.value = teamsState.value.filter(
+          (team) => team.id !== teamId,
+        );
+      },
+    }));
+    vi.stubGlobal("useActiveTeamRefresh", () => ({
+      refreshActiveTeam: () => {
+        mocks.reconnect();
+        teamsRefreshKey.value++;
+      },
+    }));
     vi.stubGlobal("useState", () => teamsRefreshKey);
     vi.stubGlobal("navigateTo", mocks.navigateTo);
   });
@@ -194,7 +218,9 @@ describe("team settings", () => {
     });
     expect(mocks.fetchUser).toHaveBeenCalled();
     expect(mocks.success).toHaveBeenCalledWith("Team name updated");
-    expect(teamsRefreshKey.value).toBe(1);
+    expect(teamsState.value.find((team) => team.id === "source")?.name).toBe(
+      "Renamed",
+    );
   });
 
   it("transfers resources before deleting and switches team context", async () => {

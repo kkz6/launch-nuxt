@@ -43,11 +43,11 @@ const { user, fetchUser } = useAuth();
 const { setCurrentTeamId } = useApi();
 const { close: closeSettings } = useSettingsSheet();
 const { canManageTeam } = useCan();
-const teamsRefreshKey = useState("teamsRefreshKey", () => 0);
+const { teams, loadTeams, updateTeam, removeTeam } = useTeams();
+const { refreshActiveTeam } = useActiveTeamRefresh();
 
 const members = ref<TeamMember[]>([]);
 const invitations = ref<TeamInvitation[]>([]);
-const teams = ref<Team[]>([]);
 const currentTeam = ref<Team | null>(null);
 const teamName = ref("");
 const transferToTeamId = ref("");
@@ -108,20 +108,19 @@ const fetchTeamMembers = async () => {
     const teamId = user.value?.current_team_id;
     if (!teamId) return;
 
-    const [teamResponse, membersResponse, invitationsResponse, teamsResponse] =
+    const [teamResponse, membersResponse, invitationsResponse] =
       await Promise.all([
         $api<{ data: Team }>(`/teams/${teamId}`),
         $api<{ data: TeamMember[] }>(`/teams/${teamId}/members`),
         $api<{ data: TeamInvitation[] }>(`/teams/${teamId}/invitations`).catch(
           () => ({ data: [] as TeamInvitation[] }),
         ),
-        $api<{ data: Team[] }>("/teams"),
+        loadTeams(),
       ]);
     currentTeam.value = teamResponse.data;
     teamName.value = teamResponse.data.name;
     members.value = membersResponse.data;
     invitations.value = invitationsResponse.data;
-    teams.value = teamsResponse.data;
     transferToTeamId.value = transferTeams.value[0]?.id || "";
   } catch {
     toast.error("Failed to load team settings");
@@ -144,10 +143,8 @@ const renameTeam = async () => {
     );
     currentTeam.value = response.data;
     teamName.value = response.data.name;
-    const listedTeam = teams.value.find((team) => team.id === response.data.id);
-    if (listedTeam) listedTeam.name = response.data.name;
+    updateTeam(response.data);
     await fetchUser();
-    teamsRefreshKey.value++;
     toast.success("Team name updated");
   } catch (error) {
     toast.error(errorMessage(error, "Failed to update team name"));
@@ -160,13 +157,16 @@ const deleteTeam = async () => {
   if (!currentTeam.value || !transferToTeamId.value) return;
   isDeleting.value = true;
   try {
-    await $api(`/teams/${currentTeam.value.id}`, {
+    const deletedTeamId = currentTeam.value.id;
+    const response = await $api<{ data: Team }>(`/teams/${deletedTeamId}`, {
       method: "DELETE",
       body: { transfer_to_team_id: transferToTeamId.value },
     });
-    setCurrentTeamId(transferToTeamId.value);
+    removeTeam(deletedTeamId);
+    updateTeam(response.data);
+    setCurrentTeamId(response.data.id);
     await fetchUser();
-    teamsRefreshKey.value++;
+    refreshActiveTeam();
     isDeleteOpen.value = false;
     closeSettings();
     toast.success("Team deleted and resources transferred");
@@ -251,27 +251,25 @@ onMounted(fetchTeamMembers);
         <p class="mt-1 text-sm text-muted-foreground">
           Change the name shown to everyone in this team.
         </p>
-        <form
-          class="mt-4 flex max-w-xl items-end gap-2"
-          @submit.prevent="renameTeam"
-        >
-          <div class="flex-1 space-y-2">
-            <Label for="team-name">Team name</Label>
+        <form class="mt-4 max-w-xl" @submit.prevent="renameTeam">
+          <Label for="team-name">Team name</Label>
+          <div class="mt-2 flex items-center gap-2">
             <Input
               id="team-name"
               v-model="teamName"
+              class="flex-1"
               minlength="2"
               maxlength="255"
             />
+            <Button type="submit" class="shrink-0" :disabled="!canRename">
+              <Icon
+                v-if="isRenaming"
+                name="lucide:loader-2"
+                class="mr-2 h-4 w-4 animate-spin"
+              />
+              Save
+            </Button>
           </div>
-          <Button type="submit" :disabled="!canRename">
-            <Icon
-              v-if="isRenaming"
-              name="lucide:loader-2"
-              class="mr-2 h-4 w-4 animate-spin"
-            />
-            Save
-          </Button>
         </form>
       </div>
 
@@ -457,20 +455,19 @@ onMounted(fetchTeamMembers);
         </AlertDialogHeader>
         <div class="space-y-2 py-2">
           <Label for="transfer-team">Transfer resources to</Label>
-          <Select v-model="transferToTeamId">
-            <SelectTrigger id="transfer-team"
-              ><SelectValue placeholder="Select a team"
-            /></SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="team in transferTeams"
-                :key="team.id"
-                :value="team.id"
-              >
-                {{ team.name }}{{ team.personal_team ? " (Personal)" : "" }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <select
+            id="transfer-team"
+            v-model="transferToTeamId"
+            class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <option
+              v-for="team in transferTeams"
+              :key="team.id"
+              :value="team.id"
+            >
+              {{ team.name }}{{ team.personal_team ? " (Personal)" : "" }}
+            </option>
+          </select>
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel>

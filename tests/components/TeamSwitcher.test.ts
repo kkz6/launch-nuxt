@@ -1,5 +1,5 @@
 import { flushPromises, shallowMount } from "@vue/test-utils";
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TeamSwitcher from "../../components/shared/TeamSwitcher.vue";
 
@@ -35,6 +35,18 @@ const teams = [
     is_owner: false,
   },
 ];
+const teamState = ref<Array<(typeof teams)[number]>>([]);
+const teamLoading = ref(true);
+
+const loadTeams = vi.fn(async () => {
+  try {
+    const response = await mocks.api("/teams");
+    teamState.value = response.data;
+    return teamState.value;
+  } finally {
+    teamLoading.value = false;
+  }
+});
 
 interface TeamSwitcherState {
   loading: boolean;
@@ -62,6 +74,9 @@ const mountSwitcher = () =>
 describe("team switcher", () => {
   beforeEach(() => {
     states.clear();
+    teamState.value = [];
+    teamLoading.value = true;
+    loadTeams.mockClear();
     mocks.api.mockReset().mockImplementation((url: string) => {
       if (url === "/teams") return Promise.resolve({ data: teams });
       return Promise.resolve({ data: null });
@@ -77,12 +92,31 @@ describe("team switcher", () => {
     vi.stubGlobal("navigateTo", mocks.navigateTo);
     vi.stubGlobal("onMounted", onMounted);
     vi.stubGlobal("ref", ref);
-    vi.stubGlobal("watch", watch);
     vi.stubGlobal("useApi", () => ({
       setCurrentTeamId: mocks.setCurrentTeamId,
     }));
     vi.stubGlobal("useAuth", () => ({ user, fetchUser: mocks.fetchUser }));
     vi.stubGlobal("useWebSocket", () => ({ reconnect: mocks.reconnect }));
+    vi.stubGlobal("useTeams", () => ({
+      teams: teamState,
+      loading: teamLoading,
+      loadTeams,
+    }));
+    vi.stubGlobal("useActiveTeamRefresh", () => ({
+      refreshActiveTeam: () => {
+        mocks.reconnect();
+        for (const key of [
+          "serversRefreshKey",
+          "dashboardRefreshKey",
+          "scriptsRefreshKey",
+          "dnsRefreshKey",
+        ]) {
+          const state = states.get(key) || ref(0);
+          states.set(key, state);
+          state.value = (state.value ?? 0) + 1;
+        }
+      },
+    }));
     vi.stubGlobal("useState", (key: string, factory: () => number) => {
       if (!states.has(key)) states.set(key, ref(factory()));
       return states.get(key);
@@ -108,7 +142,7 @@ describe("team switcher", () => {
     expect(mocks.fetchUser).toHaveBeenCalled();
     expect(mocks.reconnect).toHaveBeenCalled();
     expect([...states.values()].map((state) => state.value)).toEqual([
-      0, 1, 1, 1, 1,
+      1, 1, 1, 1,
     ]);
     expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
     expect(mocks.success).toHaveBeenCalledWith("Switched to Launch");
