@@ -5,8 +5,6 @@ import {
   LogOut,
   Settings,
   Shield,
-  Plus,
-  Check,
   Sun,
   Moon,
   Monitor,
@@ -20,27 +18,15 @@ import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 
-interface Team {
-  id: string;
-  name: string;
-  personal_team: boolean;
-  image_url?: string;
-  is_subscribed?: boolean;
-}
-
-const { user, logout, fetchUser } = useAuth();
+const { user, logout } = useAuth();
 // Role gating — hide create/mutate actions for read-only members.
 const { canEdit, canDelete } = useCan();
-const { setCurrentTeamId } = useApi();
-const { reconnect: reconnectWebSocket } = useWebSocket();
 const { open: openSettingsSheet } = useSettingsSheet();
 const colorMode = useColorMode();
 const route = useRoute();
@@ -1646,101 +1632,6 @@ const setColorMode = (mode: "light" | "dark" | "system") => {
 };
 
 const isOpen = ref(false);
-const isCreateTeamOpen = ref(false);
-const teams = ref<Team[]>([]);
-const isTeamsLoading = ref(true);
-const confirmationDialog = ref<InstanceType<
-  typeof import("~/components/shared/ConfirmationDialog.vue").default
-> | null>(null);
-
-const currentTeam = computed(() =>
-  teams.value.find((t) => t.id === String(user.value?.current_team_id)),
-);
-
-const fetchTeams = async () => {
-  try {
-    const response = await $api<{ data: Team[] }>("/teams");
-    teams.value = response.data;
-  } catch {
-    // Silent fail
-  } finally {
-    isTeamsLoading.value = false;
-  }
-};
-
-// Refresh triggers for team switch
-const serversRefreshKey = useState("serversRefreshKey", () => 0);
-const dashboardRefreshKey = useState("dashboardRefreshKey", () => 0);
-
-const switchTeam = async (teamId: string) => {
-  if (teamId === String(user.value?.current_team_id)) return;
-
-  // Find the team name for the toast
-  const targetTeam = teams.value.find((t) => t.id === teamId);
-
-  try {
-    await $api(`/teams/${teamId}/switch`, { method: "POST" });
-    // Update stored team ID
-    setCurrentTeamId(teamId);
-    // Refresh user data to get updated current_team_id
-    await fetchUser();
-    // Reconnect WebSocket with new team context
-    reconnectWebSocket();
-    // Navigate to dashboard and trigger refresh
-    navigateTo("/dashboard");
-    // Trigger refresh for various pages
-    serversRefreshKey.value++;
-    dashboardRefreshKey.value++;
-    scriptsRefreshKey.value++;
-    dnsRefreshKey.value++;
-    // Show success toast
-    toast.success(`Switched to ${targetTeam?.name || "team"}`);
-  } catch {
-    toast.error("Failed to switch team");
-  }
-};
-
-const deleteTeam = async (team: Team) => {
-  if (!confirmationDialog.value) return;
-  if (team.personal_team) {
-    toast.error("Cannot delete personal team");
-    return;
-  }
-
-  const result = await confirmationDialog.value.show({
-    title: "Delete Team",
-    description: `Are you sure you want to delete "${team.name}"? This action cannot be undone and will remove all team data.`,
-    confirmText: "Delete Team",
-    cancelText: "Cancel",
-    destructive: true,
-  });
-
-  if (result.ok) {
-    try {
-      await $api(`/teams/${team.id}`, { method: "DELETE" });
-      teams.value = teams.value.filter((t) => t.id !== team.id);
-      toast.success("Team deleted");
-      if (team.id === String(user.value?.current_team_id)) {
-        window.location.reload();
-      }
-    } catch {
-      toast.error("Failed to delete team");
-    }
-  }
-};
-
-const canDeleteTeam = (team: Team) => {
-  return !team.personal_team;
-};
-
-const getTeamInitials = (name: string) => {
-  return name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-};
 
 const openSettings = () => {
   isOpen.value = false;
@@ -1766,20 +1657,12 @@ const navigateTo = (path: string) => {
   isOpen.value = false;
   useRouter().push(path);
 };
-
-const onTeamCreated = () => {
-  fetchTeams();
-};
-
-onMounted(fetchTeams);
 </script>
 
 <template>
   <nav
     class="z-40 w-full shrink-0 border-b border-divider bg-background/70 backdrop-blur-lg"
   >
-    <SharedConfirmationDialog ref="confirmationDialog" />
-
     <div class="flex h-16 items-center justify-between px-4 lg:px-8">
       <NuxtLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
@@ -1834,39 +1717,7 @@ onMounted(fetchTeams);
               </div>
               <DropdownMenuSeparator class="my-1" />
 
-              <!-- Teams Section -->
-              <div
-                v-if="isTeamsLoading"
-                class="flex items-center justify-center py-2"
-              >
-                <Icon
-                  name="lucide:loader-2"
-                  class="h-3 w-3 animate-spin text-muted-foreground"
-                />
-              </div>
-              <template v-else>
-                <DropdownMenuGroup>
-                  <DropdownMenuItem
-                    v-for="team in teams"
-                    :key="team.id"
-                    class="cursor-pointer justify-between gap-2 rounded-md px-2 py-1.5 text-sm"
-                    @click="switchTeam(team.id)"
-                  >
-                    <span class="truncate">{{ team.name }}</span>
-                    <Check
-                      v-if="team.id === String(user?.current_team_id)"
-                      class="h-3.5 w-3.5 text-primary"
-                    />
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
-                    @click="isCreateTeamOpen = true"
-                  >
-                    <Plus class="h-3.5 w-3.5" />
-                    <span>New team</span>
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </template>
+              <SharedTeamSwitcher />
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Menu Items -->
@@ -2790,12 +2641,6 @@ onMounted(fetchTeams);
         </NuxtLink>
       </nav>
     </div>
-
-    <!-- Create Team Dialog -->
-    <SettingsCreateTeam
-      v-model:open="isCreateTeamOpen"
-      @created="onTeamCreated"
-    />
 
     <SettingsSheet />
 

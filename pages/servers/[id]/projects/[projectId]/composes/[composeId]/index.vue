@@ -171,11 +171,6 @@ const statusBadge = computed(() => {
 </script>
 
 <template>
-  <!--
-    Chrome renders immediately; only the per-subtab body waits on the
-    `compose` ref. No inline back link — navbar breadcrumb handles
-    the trail.
-  -->
   <div class="space-y-6 pb-10">
     <!--
       No on-page header — name + status are in the navbar breadcrumb.

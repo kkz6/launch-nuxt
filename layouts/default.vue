@@ -46,10 +46,6 @@ const showAuthedShell = computed(
 </script>
 
 <template>
-  <!-- Single-root template: the conditional content lives *inside* one
-       wrapper element so Nuxt's layout <Transition> always has a single
-       node to animate. The wrapper has no visual styling — it inherits
-       block layout from the page tree. -->
   <div class="contents">
     <div
       v-if="showAuthedShell"

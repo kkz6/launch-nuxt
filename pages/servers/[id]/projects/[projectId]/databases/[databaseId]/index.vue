@@ -159,13 +159,6 @@ const statusBadge = computed(() => {
 </script>
 
 <template>
-  <!--
-    Single-root template. Nuxt config sets pageTransition
-    { mode: 'out-in' } which wraps every page in a <Transition>; that
-    in turn requires exactly one root vnode or the page silently
-    fails to mount on SPA navigation (only hard reload works). Keep
-    chrome + subtab nav + content all under this one wrapper.
-  -->
   <div class="space-y-6 pb-10">
     <!--
       No on-page header — the navbar's last breadcrumb segment carries
