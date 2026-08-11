@@ -944,8 +944,11 @@ const currentProviderLabel = computed(() => {
             {{ backup!.path || "(bucket root)" }}
           </dd>
           <dt class="text-muted-foreground">Schedule</dt>
-          <dd class="font-mono text-[11px]">
-            {{ backup!.cron_schedule || "—" }}
+          <dd>
+            <SharedCronSchedule
+              :expression="backup!.cron_schedule"
+              time-zone="UTC"
+            />
           </dd>
           <dt class="text-muted-foreground">Retention</dt>
           <dd>{{ backup!.retention }} runs</dd>

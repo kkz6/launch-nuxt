@@ -38,27 +38,6 @@ const editScheduler = (cron: Cron) => {
   isEditDialogOpen.value = true
 }
 
-const frequencyLabels: Record<string, string> = {
-  every_minute: 'Every Minute',
-  every_5_minutes: 'Every 5 Minutes',
-  every_15_minutes: 'Every 15 Minutes',
-  every_30_minutes: 'Every 30 Minutes',
-  hourly: 'Hourly',
-  daily: 'Daily',
-  daily_2am: 'Daily at 2 AM',
-  daily_3am: 'Daily at 3 AM',
-  weekly: 'Weekly',
-  monthly: 'Monthly',
-}
-
-const formatFrequency = (cron: Cron) => {
-  if (cron.frequency && frequencyLabels[cron.frequency]) {
-    return frequencyLabels[cron.frequency]
-  }
-
-  return cron.expression || cron.frequency || '-'
-}
-
 const fetchData = async () => {
   try {
     const data = await $api<{ data: Cron[] }>(`/servers/${serverId.value}/crons`)
@@ -195,7 +174,7 @@ onMounted(fetchData)
         </template>
 
         <template #cell-frequency="{ row }">
-          <span class="text-sm">{{ formatFrequency(row) }}</span>
+          <SharedCronSchedule :expression="row.expression || row.frequency" />
         </template>
 
         <template #cell-status="{ row }">

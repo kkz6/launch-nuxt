@@ -751,7 +751,7 @@ const actions = computed(() => [
           </template>
 
           <template #cell-schedule="{ row }">
-            <code class="rounded bg-muted px-1.5 py-0.5 text-xs">{{ row.cron_expression }}</code>
+            <SharedCronSchedule :expression="row.cron_expression" />
           </template>
 
           <template #cell-status="{ row }">
