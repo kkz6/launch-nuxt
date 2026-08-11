@@ -7,7 +7,6 @@ import type { User } from "~/types";
 
 definePageMeta({
   layout: "guest",
-  middleware: "guest",
 });
 
 useHead({
@@ -22,9 +21,7 @@ const token = computed(() => route.params.token as string);
 
 const email = ref("");
 const teamName = ref("");
-// Whether the invited email already has an account. When true the page
-// asks for the existing password to join the team instead of registering
-// a fresh account (#71).
+const teamId = ref("");
 const userExists = ref(false);
 const name = ref("");
 const password = ref("");
@@ -33,13 +30,18 @@ const errors = ref<Record<string, string>>({});
 const loading = ref(false);
 const invitationLoading = ref(true);
 
-// Fetch invitation details
 onMounted(async () => {
   try {
     const response = await $api<{
-      data: { email: string; team_name: string; user_exists: boolean };
+      data: {
+        email: string;
+        team_id: string;
+        team_name: string;
+        user_exists: boolean;
+      };
     }>(`/auth/invitations/${token.value}`);
     email.value = response.data.email;
+    teamId.value = response.data.team_id;
     teamName.value = response.data.team_name;
     userExists.value = response.data.user_exists;
   } catch {
@@ -55,8 +57,6 @@ const handleSubmit = async () => {
   errors.value = {};
 
   try {
-    // Existing accounts join with just their password; new invitees
-    // register with name + password + confirmation.
     const body: Record<string, string> = {
       invitation_token: token.value,
       password: password.value,
@@ -133,14 +133,19 @@ const handleSubmit = async () => {
           You already have an account. Enter your password to join
           <span class="font-medium text-foreground">{{
             teamName || "the team"
-          }}</span>.
+          }}</span
+          >.
         </template>
         <template v-else>
           You've been invited to join
           <span class="font-medium text-foreground">{{
             teamName || "the team"
-          }}</span>. Please complete your account setup.
+          }}</span
+          >. Please complete your account setup.
         </template>
+      </p>
+      <p class="-mt-6 mb-8 text-xs text-muted-foreground">
+        Team code: {{ teamId.slice(-6) }}
       </p>
 
       <form class="space-y-4" @submit.prevent="handleSubmit">

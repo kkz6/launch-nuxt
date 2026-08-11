@@ -100,6 +100,7 @@ export interface Team {
   image_url: string;
   personal_team: boolean;
   is_subscribed: boolean;
+  is_owner?: boolean;
   created_at: string;
   updated_at: string;
   owner?: User;

@@ -83,13 +83,6 @@ const dockerProjectEnvOpen = useState<boolean>(
 </script>
 
 <template>
-  <!--
-    Single-root template — required because Nuxt config has
-    pageTransition { mode: "out-in" }. Multi-root templates break the
-    transition leave/enter cycle and the destination page silently
-    fails to mount on SPA navigation (only hard reload works). Keep
-    the loading branch and the loaded branch under one wrapper.
-  -->
   <div>
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon

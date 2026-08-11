@@ -172,12 +172,6 @@ useDockerApplicationEvents(teamId, (data, event) => {
 </script>
 
 <template>
-  <!--
-    Chrome renders immediately; the per-subtab body waits on `app`.
-    No inline "Back to project" link — the navbar's workload-detail
-    breadcrumb (Servers / serverName / projectName / appName) does
-    the trail.
-  -->
   <div class="space-y-6 pb-10">
     <!--
       No on-page header — name + status are in the navbar breadcrumb.
