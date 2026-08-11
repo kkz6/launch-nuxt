@@ -72,7 +72,12 @@ const mountComponent = (serverId = "server-1") =>
         SharedConfirmationDialog: true,
         ServerCreateBackup: true,
         ServerSettingsBackupHistorySheet: true,
-        SharedDataTable: true,
+        SharedCronSchedule: true,
+        SharedDataTable: {
+          props: ["data"],
+          template:
+            '<div><slot v-if="data.length" name="cell-schedule" :row="data[0]" /></div>',
+        },
         SharedDateTooltip: true,
         Sheet: { template: "<div><slot /></div>" },
         SheetContent: { template: "<div><slot /></div>" },

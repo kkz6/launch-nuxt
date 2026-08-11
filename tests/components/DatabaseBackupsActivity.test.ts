@@ -85,6 +85,7 @@ const mountComponent = (databaseId = "database-1") =>
         SelectItem: true,
         SelectTrigger: true,
         SelectValue: true,
+        SharedCronSchedule: true,
         SharedEmptyState: true,
         Card: { template: "<div><slot /></div>" },
         CardContent: { template: "<div><slot /></div>" },

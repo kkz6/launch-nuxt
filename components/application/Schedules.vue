@@ -53,27 +53,6 @@ const confirmationDialog = ref<
   InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
 >(null);
 
-// Friendly labels for the common cron presets — same wording the
-// PHP-site CreateScheduler dialog uses. Falls back to the raw
-// expression for custom rows.
-const frequencyLabels: Record<string, string> = {
-  "* * * * *": "Every Minute",
-  "*/5 * * * *": "Every 5 Minutes",
-  "*/15 * * * *": "Every 15 Minutes",
-  "*/30 * * * *": "Every 30 Minutes",
-  "0 * * * *": "Hourly",
-  "0 0 * * *": "Daily",
-  "0 2 * * *": "Daily at 2 AM",
-  "0 3 * * *": "Daily at 3 AM",
-  "0 0 * * 0": "Weekly",
-  "0 0 1 * *": "Monthly",
-};
-
-const formatFrequency = (s: DockerSchedule) => {
-  if (s.cron && frequencyLabels[s.cron]) return frequencyLabels[s.cron];
-  return s.cron || "—";
-};
-
 const fetchSchedules = async () => {
   isLoading.value = true;
   try {
@@ -212,10 +191,7 @@ onMounted(fetchSchedules);
         </template>
 
         <template #cell-frequency="{ row }">
-          <span class="text-sm">{{ formatFrequency(row) }}</span>
-          <p class="mt-0.5 font-mono text-[11px] text-muted-foreground">
-            {{ row.cron }}
-          </p>
+          <SharedCronSchedule :expression="row.cron" time-zone="UTC" />
         </template>
 
         <template #cell-command="{ row }">
