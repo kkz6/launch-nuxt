@@ -68,7 +68,10 @@ interface MetricsEvent {
 
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
-const MAX_HISTORY_LENGTH = 60;
+const STREAM_INTERVAL_MS = 500;
+const HISTORY_DURATION_SECONDS = 60;
+const MAX_HISTORY_LENGTH =
+  (HISTORY_DURATION_SECONDS * 1000) / STREAM_INTERVAL_MS;
 
 interface MetricsStreamState {
   metrics: MetricsData | null;
@@ -177,7 +180,7 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
 
     const wsBase = config.public.wsBase as string;
     const teamId = getCurrentTeamId();
-    const wsUrl = `${wsBase}/metrics/stream?serverId=${serverIdValue}&token=${token.value}${teamId ? `&team_id=${teamId}` : ""}`;
+    const wsUrl = `${wsBase}/metrics/stream?serverId=${serverIdValue}&token=${token.value}&interval_ms=${STREAM_INTERVAL_MS}${teamId ? `&team_id=${teamId}` : ""}`;
 
     console.log("[MetricsStream] Connecting...");
 
