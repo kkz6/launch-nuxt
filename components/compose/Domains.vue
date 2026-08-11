@@ -75,6 +75,11 @@ const validateDns = async (d: DockerDomain) => {
     const v = res.data;
     if (v.ok) {
       toast.success(v.message || "DNS resolves to the docker server");
+    } else if (v.proxied) {
+      // Not necessarily a misconfiguration, so a neutral tone.
+      toast.info(v.message || "Domain is proxied through Cloudflare", {
+        duration: 8000,
+      });
     } else {
       toast.warning(v.message || "DNS does not point at this server", {
         duration: 6000,

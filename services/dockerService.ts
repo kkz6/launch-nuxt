@@ -182,6 +182,8 @@ export interface DockerDomainDnsValidation {
   host: string;
   ok: boolean;
   wildcard: boolean;
+  /** True when the resolved IP is Cloudflare's edge, not the origin. */
+  proxied: boolean;
   expected_ip?: string;
   resolved_ips?: string[];
   message: string;
