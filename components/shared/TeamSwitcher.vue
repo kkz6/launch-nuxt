@@ -5,26 +5,20 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
 } from "~/components/ui/dropdown-menu";
-import type { Team } from "~/types";
 import { duplicateTeamNames, teamQualifier } from "~/utils/teams";
 
 const { user, fetchUser } = useAuth();
 const { setCurrentTeamId } = useApi();
-const { reconnect } = useWebSocket();
-const teams = ref<Team[]>([]);
-const loading = ref(true);
+const { refreshActiveTeam } = useActiveTeamRefresh();
+const { teams, loading, loadTeams } = useTeams();
 const createOpen = ref(false);
-const refreshKey = useState("teamsRefreshKey", () => 0);
 const repeatedNames = computed(() => duplicateTeamNames(teams.value));
 
 const fetchTeams = async () => {
   try {
-    const response = await $api<{ data: Team[] }>("/teams");
-    teams.value = response.data;
+    await loadTeams();
   } catch {
-    teams.value = [];
-  } finally {
-    loading.value = false;
+    toast.error("Failed to load teams");
   }
 };
 
@@ -35,11 +29,7 @@ const switchTeam = async (teamId: string) => {
     await $api(`/teams/${teamId}/switch`, { method: "POST" });
     setCurrentTeamId(teamId);
     await fetchUser();
-    reconnect();
-    useState("serversRefreshKey", () => 0).value++;
-    useState("dashboardRefreshKey", () => 0).value++;
-    useState("scriptsRefreshKey", () => 0).value++;
-    useState("dnsRefreshKey", () => 0).value++;
+    refreshActiveTeam();
     await navigateTo("/dashboard");
     toast.success(`Switched to ${team?.name || "team"}`);
   } catch {
@@ -47,8 +37,7 @@ const switchTeam = async (teamId: string) => {
   }
 };
 
-onMounted(fetchTeams);
-watch(refreshKey, fetchTeams);
+void fetchTeams();
 </script>
 
 <template>
@@ -85,6 +74,6 @@ watch(refreshKey, fetchTeams);
         <span>New team</span>
       </DropdownMenuItem>
     </DropdownMenuGroup>
-    <SettingsCreateTeam v-model:open="createOpen" @created="fetchTeams" />
+    <SettingsCreateTeam v-model:open="createOpen" @created="loadTeams(true)" />
   </template>
 </template>
