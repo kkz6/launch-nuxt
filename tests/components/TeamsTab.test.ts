@@ -123,7 +123,11 @@ describe("team settings", () => {
           url: string,
           options?: { method?: string; body?: { name?: string } },
         ) => {
-          if (url === "/teams/source" && options?.method === "PUT") {
+          if (
+            url === "/teams/source" &&
+            options?.method === "PUT" &&
+            options.body
+          ) {
             return Promise.resolve({
               data: { ...source, name: options.body.name },
             });
