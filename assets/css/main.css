@@ -81,6 +81,7 @@
 
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
+    --focus-ring: 240 3.8% 46.1%;
     --ring: transparent;
 
     --radius: 0.5rem;
@@ -145,6 +146,7 @@
 
     --border: 240 3.7% 15.9%;
     --input: 240 4% 10%;
+    --focus-ring: 240 5% 64.9%;
     --ring: transparent;
 
     --overlay: rgba(0, 0, 0, 0.5);
@@ -181,6 +183,22 @@
 @layer base {
   * {
     @apply border-border;
+  }
+
+  /* Browser focus heuristics vary, so a client plugin records the actual
+     input modality. Pointer-driven routing stays visually quiet everywhere;
+     keyboard navigation gets the app's neutral, accessible focus token. */
+  html[data-focus-modality="keyboard"] {
+    --ring: var(--focus-ring);
+  }
+
+  html[data-focus-modality] :focus {
+    outline: none;
+  }
+
+  html[data-focus-modality="keyboard"] :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 
   html,

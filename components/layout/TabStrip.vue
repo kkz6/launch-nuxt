@@ -140,7 +140,7 @@ export interface TabItem {
         :ref="(el: unknown) => setTabRef(tab.value, el)"
         :to="toLink ? toLink(tab) : undefined"
         :type="toLink ? undefined : 'button'"
-        class="relative flex items-center gap-1.5 whitespace-nowrap px-3 py-2 text-sm font-medium transition-colors"
+        class="relative flex items-center gap-1.5 whitespace-nowrap rounded-sm px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:!outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         :class="
           activeKey === tab.value
             ? activeTextClass
