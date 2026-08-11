@@ -20,10 +20,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run test:coverage
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           use_oidc: true
           files: coverage/lcov.info
           disable_search: true
+          plugins: noop
           flags: frontend
           fail_ci_if_error: true
