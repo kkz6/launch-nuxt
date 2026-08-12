@@ -63,6 +63,7 @@ const getStatusColor = (status?: string) => {
       return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800'
     case 'stopped':
     case 'failed':
+    case 'missing':
       return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800'
     case 'pending':
       return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800'
@@ -81,6 +82,8 @@ const getStatusIconName = (status?: string) => {
       return 'lucide:server'
     case 'failed':
       return 'lucide:zap'
+    case 'missing':
+      return 'lucide:circle-off'
     case 'pending':
       return 'lucide:loader-2'
     default:
@@ -110,6 +113,7 @@ const formatRelativeTime = (date?: Date | null) => {
 const displayStatus = computed(() => props.liveStatus?.status || props.service.status)
 const displayStatusLabel = computed(() => {
   const status = displayStatus.value
+  if (status === 'missing') return 'Not Installed'
   return status.charAt(0).toUpperCase() + status.slice(1)
 })
 const displayMemory = computed(() => props.liveStatus?.memory || props.service.status_details?.memory_usage)
@@ -147,8 +151,9 @@ const filteredAdditionalInfo = computed(() => {
                     displayStatus === 'running' && 'text-green-600 dark:text-green-500',
                     displayStatus === 'stopped' && 'text-red-600 dark:text-red-500',
                     displayStatus === 'failed' && 'text-red-600 dark:text-red-500',
+                    displayStatus === 'missing' && 'text-red-600 dark:text-red-500',
                     displayStatus === 'pending' && 'animate-spin text-yellow-600 dark:text-yellow-500',
-                    !['running', 'stopped', 'failed', 'pending'].includes(displayStatus) && 'text-muted-foreground',
+                    !['running', 'stopped', 'failed', 'missing', 'pending'].includes(displayStatus) && 'text-muted-foreground',
                   ]"
                 />
               </div>

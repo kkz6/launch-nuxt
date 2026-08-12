@@ -53,6 +53,7 @@ interface Service {
   status_label: string
   is_default: boolean
   default_change_pending?: boolean
+  can_remove?: boolean
   software: string
   software_label: string
   created_at: string
@@ -385,13 +386,13 @@ const patchPhpVersion = async (service: Service) => {
   }
 }
 
-const uninstallPhpVersion = async (service: Service) => {
+const uninstallService = async (service: Service) => {
   if (!confirmationDialog.value) return
 
   const { ok } = await confirmationDialog.value.show({
     title: `Uninstall ${service.name}`,
     description:
-      'Are you sure? This will remove this PHP version and all its configurations.',
+      'Are you sure? This will remove the service and its configuration from the server.',
     confirmText: 'Uninstall',
     cancelText: 'Cancel',
     destructive: true,
@@ -405,10 +406,10 @@ const uninstallPhpVersion = async (service: Service) => {
       method: 'POST',
       body: { operation: 'remove' },
     })
-    toast.success('PHP version removal initiated')
+    toast.success(`${service.name} removal initiated`)
     fetchServices()
   } catch {
-    toast.error('Failed to uninstall PHP version')
+    toast.error(`Failed to uninstall ${service.name}`)
   } finally {
     loadingAction.value = null
   }
@@ -555,7 +556,9 @@ const getDisplayStatus = (service: Service) => {
   if (live) {
     return {
       status: live.status,
-      label: live.status.charAt(0).toUpperCase() + live.status.slice(1),
+      label: live.status === 'missing'
+        ? 'Not Installed'
+        : live.status.charAt(0).toUpperCase() + live.status.slice(1),
       memory: live.memory,
       uptime: live.uptime,
       pid: live.pid,
@@ -766,6 +769,7 @@ const getStatusVariant = (
     case 'failed':
       return 'destructive'
     case 'unknown':
+    case 'missing':
       return 'warning'
     case 'pending':
     case 'installing':
@@ -1237,10 +1241,12 @@ onBeforeUnmount(() => {
                             />
                             View Patch Log
                           </DropdownMenuItem>
+                        </template>
+                        <template v-if="service.can_remove">
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             class="text-destructive focus:text-destructive"
-                            @click="uninstallPhpVersion(service)"
+                            @click="uninstallService(service)"
                           >
                             <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
                             Uninstall
@@ -1520,10 +1526,12 @@ onBeforeUnmount(() => {
                           />
                           View Patch Log
                         </DropdownMenuItem>
+                      </template>
+                      <template v-if="service.can_remove">
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           class="text-destructive focus:text-destructive"
-                          @click="uninstallPhpVersion(service)"
+                          @click="uninstallService(service)"
                         >
                           <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
                           Uninstall
