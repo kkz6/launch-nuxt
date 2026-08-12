@@ -1,3 +1,5 @@
+import { reactive, toRefs } from "vue";
+
 export interface MetricsMemory {
   total: number;
   used: number;
@@ -69,6 +71,7 @@ interface MetricsEvent {
 type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
 const STREAM_INTERVAL_MS = 500;
+const METRICS_ANIMATION_MS = 480;
 const HISTORY_DURATION_SECONDS = 60;
 const MAX_HISTORY_LENGTH =
   (HISTORY_DURATION_SECONDS * 1000) / STREAM_INTERVAL_MS;
@@ -118,6 +121,84 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
   } = toRefs(state);
   const maxReconnectAttempts = 10;
   const baseReconnectDelay = 1000;
+  let metricsAnimationFrame: number | null = null;
+
+  const interpolate = (from: number, to: number, progress: number) => {
+    return from + (to - from) * progress;
+  };
+
+  const interpolateMetrics = (
+    from: MetricsData,
+    to: MetricsData,
+    progress: number,
+  ): MetricsData => ({
+    timestamp: to.timestamp,
+    cpu: interpolate(from.cpu, to.cpu, progress),
+    load: [
+      interpolate(from.load[0], to.load[0], progress),
+      interpolate(from.load[1], to.load[1], progress),
+      interpolate(from.load[2], to.load[2], progress),
+    ],
+    memory: {
+      total: interpolate(from.memory.total, to.memory.total, progress),
+      used: interpolate(from.memory.used, to.memory.used, progress),
+      free: interpolate(from.memory.free, to.memory.free, progress),
+      percent: interpolate(from.memory.percent, to.memory.percent, progress),
+    },
+    disk: {
+      total: interpolate(from.disk.total, to.disk.total, progress),
+      used: interpolate(from.disk.used, to.disk.used, progress),
+      free: interpolate(from.disk.free, to.disk.free, progress),
+      percent: interpolate(from.disk.percent, to.disk.percent, progress),
+    },
+    processes: to.processes,
+    network: {
+      rx_bytes: interpolate(
+        from.network.rx_bytes,
+        to.network.rx_bytes,
+        progress,
+      ),
+      tx_bytes: interpolate(
+        from.network.tx_bytes,
+        to.network.tx_bytes,
+        progress,
+      ),
+      rx_rate: interpolate(from.network.rx_rate, to.network.rx_rate, progress),
+      tx_rate: interpolate(from.network.tx_rate, to.network.tx_rate, progress),
+    },
+  });
+
+  const animateMetrics = (nextMetrics: MetricsData) => {
+    if (metricsAnimationFrame !== null) {
+      cancelAnimationFrame(metricsAnimationFrame);
+      metricsAnimationFrame = null;
+    }
+
+    const currentMetrics = metrics.value;
+    const prefersReducedMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (!currentMetrics || prefersReducedMotion) {
+      metrics.value = nextMetrics;
+      return;
+    }
+
+    const startedAt = performance.now();
+    const animate = (now: number) => {
+      const progress = Math.min((now - startedAt) / METRICS_ANIMATION_MS, 1);
+      metrics.value = interpolateMetrics(currentMetrics, nextMetrics, progress);
+
+      if (progress < 1) {
+        metricsAnimationFrame = requestAnimationFrame(animate);
+        return;
+      }
+
+      metricsAnimationFrame = null;
+    };
+
+    metricsAnimationFrame = requestAnimationFrame(animate);
+  };
 
   const clearReconnectTimeout = () => {
     if (reconnectTimeout.value) {
@@ -231,7 +312,7 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
             },
           };
 
-          metrics.value = metricsData;
+          animateMetrics(metricsData);
 
           history.value = [...history.value, metricsData].slice(
             -MAX_HISTORY_LENGTH,
@@ -277,11 +358,22 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
   };
 
   const clearHistory = () => {
+    if (metricsAnimationFrame !== null) {
+      cancelAnimationFrame(metricsAnimationFrame);
+      metricsAnimationFrame = null;
+    }
+
     history.value = [];
     metrics.value = null;
   };
 
-  tryOnUnmounted(disconnect);
+  tryOnUnmounted(() => {
+    if (metricsAnimationFrame !== null) {
+      cancelAnimationFrame(metricsAnimationFrame);
+    }
+
+    disconnect();
+  });
 
   return {
     metrics,
@@ -295,4 +387,3 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
     clearHistory,
   };
 };
-import { reactive, toRefs } from "vue";

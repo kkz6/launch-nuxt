@@ -13,8 +13,11 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const renderedData = ref<number[]>([])
+const animationDuration = 480
+let animationFrame: number | null = null
 
-const draw = () => {
+const draw = (data = renderedData.value) => {
   const canvas = canvasRef.value
   if (!canvas) return
 
@@ -30,7 +33,6 @@ const draw = () => {
 
   const width = rect.width
   const height = rect.height
-  const data = props.data
   const max = props.max
 
   if (data.length < 2) {
@@ -86,15 +88,64 @@ const draw = () => {
   ctx.stroke()
 }
 
-watch(() => props.data, draw, { deep: true })
+const alignPreviousData = (previous: number[], next: number[]) => {
+  if (previous.length === 0) return [...next]
+
+  const offset = previous.length - next.length
+  return next.map((value, index) => {
+    const previousIndex = index + offset
+    if (previousIndex < 0) return previous[0] ?? value
+    return previous[previousIndex] ?? previous.at(-1) ?? value
+  })
+}
+
+const animateTo = (next: number[]) => {
+  if (animationFrame !== null) cancelAnimationFrame(animationFrame)
+
+  const prefersReducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const previous = alignPreviousData(renderedData.value, next)
+
+  if (prefersReducedMotion || renderedData.value.length === 0) {
+    renderedData.value = [...next]
+    draw()
+    animationFrame = null
+    return
+  }
+
+  const startedAt = performance.now()
+  const animate = (now: number) => {
+    const progress = Math.min((now - startedAt) / animationDuration, 1)
+    renderedData.value = next.map((value, index) => {
+      const start = previous[index] ?? value
+      return start + (value - start) * progress
+    })
+    draw()
+
+    if (progress < 1) {
+      animationFrame = requestAnimationFrame(animate)
+      return
+    }
+
+    animationFrame = null
+  }
+
+  animationFrame = requestAnimationFrame(animate)
+}
+
+const handleResize = () => draw()
+
+watch(() => props.data, (data) => animateTo([...data]), { deep: true })
+watch(() => [props.color, props.max], () => draw())
 
 onMounted(() => {
+  renderedData.value = [...props.data]
   draw()
-  window.addEventListener('resize', draw)
+  window.addEventListener('resize', handleResize)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', draw)
+  if (animationFrame !== null) cancelAnimationFrame(animationFrame)
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
