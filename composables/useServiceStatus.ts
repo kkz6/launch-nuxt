@@ -2,7 +2,7 @@ interface ServiceStatus {
   id: string
   software: string
   name: string
-  status: 'running' | 'stopped' | 'failed' | 'unknown' | 'installed'
+  status: 'running' | 'stopped' | 'failed' | 'unknown' | 'installed' | 'missing'
   is_active: boolean
   memory?: string
   uptime?: string
