@@ -1,162 +1,81 @@
 ---
 title: Deployment Commands
-description: CLI commands for deployments
+description: Trigger deployments, follow task output, inspect history, and roll back
 ---
 
-Trigger and monitor deployments from the command line.
-
-::callout{type="info"}
-CLI commands are currently in development. Syntax may change.
-::
-
-## Deploy Site
-```bash
-lctl deploy <site>
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--branch <branch>` | Branch to deploy |
-| `--commit <sha>` | Specific commit |
-| `--wait` | Wait for completion |
-| `--follow` | Follow deployment logs |
-
-### Examples
+## Trigger a deployment
 
 ```bash
-# Deploy default branch
-lctl deploy example.com
-
-# Deploy specific branch
-lctl deploy example.com --branch staging
-
-# Deploy and follow logs
-lctl deploy example.com --follow
+lctl deploy trigger <site-id> --server <server-id>
 ```
+Interactive terminals open a full-screen deployment view. It follows team deployment events, filters them by the exact `deployment_id`, discovers the backing task, and streams task output. Press `q` to leave it running in the background.
 
-## List Deployments
-```bash
-lctl deployments <site>
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--limit <n>` | Number of deployments |
-| `--status <status>` | Filter by status |
-
-### Example Output
-
-```
-ID    COMMIT   BRANCH   STATUS     STARTED              DURATION
-5     abc123   main     finished   2024-01-15 10:30    2m 15s
-4     def456   main     finished   2024-01-14 15:20    1m 45s
-3     ghi789   main     failed     2024-01-14 10:00    0m 30s
-```
-
-## View Deployment
-```bash
-lctl deployments:show <deployment-id>
-```
-
-### Output
-
-```
-Deployment #5
-Site: example.com
-Commit: abc123 (Fix login bug)
-Branch: main
-Status: finished
-Started: 2024-01-15 10:30:00
-Finished: 2024-01-15 10:32:15
-Duration: 2m 15s
-```
-
-## Deployment Logs
-```bash
-lctl logs <site>
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--deployment <id>` | Specific deployment |
-| `--follow` | Stream live logs |
-| `--tail <n>` | Last n lines |
-
-### Examples
+For a pipeline, use a bounded wait:
 
 ```bash
-# Latest deployment logs
-lctl logs example.com
-
-# Specific deployment
-lctl logs example.com --deployment 5
-
-# Follow live
-lctl logs example.com --follow
+lctl deploy trigger <site-id> \
+  --server <server-id> \
+  --ci --wait --timeout 600
 ```
 
-## Rollback
-```bash
-lctl rollback <site>
-```
+The command returns non-zero for failed deployments or timeouts.
 
-Rolls back to the previous successful deployment.
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--deployment <id>` | Rollback to specific deployment |
-| `--force` | Skip confirmation |
-
-### Example
+## History and details
 
 ```bash
-# Rollback to previous
-lctl rollback example.com
-
-# Rollback to specific deployment
-lctl rollback example.com --deployment 3
+lctl deploy list <site-id> --server <server-id>
+lctl deploy show <deployment-id> \
+  --server <server-id> \
+  --site <site-id>
 ```
 
-## CI/CD Integration
-### GitHub Actions
+Add `--json` for machine-readable deployment records, commit data, task IDs, and timestamps.
+
+## Logs
+
+Show stored output for the latest deployment:
+
+```bash
+lctl deploy logs <site-id> --server <server-id>
+```
+
+Choose a deployment or follow an active one:
+
+```bash
+lctl deploy logs <site-id> <deployment-id> --server <server-id>
+lctl deploy logs <site-id> <deployment-id> --server <server-id> --follow
+```
+
+Live output survives transient API restarts: the event connection reconnects, restores subscriptions, and retains the deployment filter. REST polling is used to discover the task record and stored task output remains available after completion.
+
+## Roll back
+
+```bash
+lctl deploy rollback <deployment-id> \
+  --server <server-id> \
+  --site <site-id>
+```
+
+The CLI displays the selected commit and asks for confirmation before creating the rollback deployment.
+
+## Observe every deployment
+
+```bash
+lctl events --filter 'deployment.*'
+lctl events --filter 'deployment.*' --json
+```
+
+This is useful in a dedicated tmux pane while another pane triggers deployments or runs remote commands.
+
+## GitHub Actions example
 
 ```yaml
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to launchctl
-        run: |
-          npm install -g @launchctl/cli
-          lctl deploy example.com --wait
-        env:
-          LAUNCH_TOKEN: ${{ secrets.LAUNCH_TOKEN }}
-```
-
-### GitLab CI
-
-```yaml
-deploy:
-  stage: deploy
-  script:
-    - npm install -g @launchctl/cli
-    - lctl deploy example.com --wait
-  only:
-    - main
-  variables:
-    LAUNCH_TOKEN: $LAUNCH_TOKEN
+- name: Deploy
+  env:
+    LAUNCHCTL_TOKEN: ${{ secrets.LAUNCHCTL_TOKEN }}
+    LAUNCHCTL_TEAM_ID: ${{ secrets.LAUNCHCTL_TEAM_ID }}
+  run: |
+    lctl deploy trigger "$SITE_ID" \
+      --server "$SERVER_ID" \
+      --ci --wait --timeout 600
 ```

@@ -1,203 +1,112 @@
 ---
 title: CLI Reference
-description: launchctl command-line interface for server management
+description: Operate launchctl from a fast, resilient terminal interface
 ---
 
-The launchctl CLI provides command-line access to manage your servers, sites, and deployments directly from your terminal.
+`lctl` gives you typed commands for daily operations, full-screen terminal views for live work, and an authenticated API command for every backend feature. It works in a local terminal, over SSH, and inside tmux.
 
-::callout{type="info"}
-The launchctl CLI is currently in development. This documentation will be updated as features are released.
-::
+## Install
 
-## Installation
-### macOS
+### Homebrew
 
 ```bash
-brew tap launchctl/tap
+brew tap kkz6/tap
 brew install lctl
 ```
 
-### Linux
+### Go
 
 ```bash
-curl -fsSL https://cli.launchctl.io/install.sh | bash
+go install github.com/kkz6/launchctl@latest
 ```
 
-### Windows
+Release archives for macOS and Linux on AMD64 and ARM64 are also published from the [CLI repository](https://github.com/kkz6/launchctl-cli/releases).
 
-```powershell
-scoop bucket add launchctl https://github.com/launchctl/scoop-bucket
-scoop install lctl
-```
-
-### NPM
+Verify the install:
 
 ```bash
-npm install -g @launchctl/cli
+lctl version
+lctl completion zsh > "${fpath[1]}/_lctl"
 ```
 
-## Authentication
-### Login
+## Authenticate
+
+Create a personal API token in the launchctl dashboard, then run:
 
 ```bash
 lctl login
-```
-
-This opens your browser to authenticate with launchctl.
-
-### Using API Token
-
-```bash
-lctl login --token YOUR_API_TOKEN
-```
-
-### Check Authentication
-
-```bash
 lctl whoami
 ```
 
-## Quick Start
+Login validates the token, handles two-factor verification when enabled, and stores credentials with the active team in `~/.config/launchctl/config.json`.
+
+## First workflow
+
 ```bash
-# Login to launchctl
-lctl login
+# Inspect the account
+lctl servers list
 
-# List your servers
-lctl servers
+# Bind this repository to a server and site
+lctl init
 
-# List sites on a server
-lctl sites --server production
+# Trigger a deploy; the terminal follows progress and task output
+lctl deploy trigger <site-id>
 
-# Deploy a site
-lctl deploy --site example.com
-
-# View deployment logs
-lctl logs --site example.com
+# Open the live team event console
+lctl events
 ```
 
-## Available Commands
+Once `lctl init` creates `.launchctl.yml`, commands that accept `--server` and `--site` can resolve those values from the current project.
+
+## Command map
+
 :::card-group
 ::doc-card{title="Servers" to="/docs/cli/servers"}
-Manage servers from the command line
+Inspect, reboot, connect, measure, and watch provisioning
 ::
 ::doc-card{title="Sites" to="/docs/cli/sites"}
-Create and manage sites
+Resolve projects, environment files, logs, services, and certificates
 ::
 ::doc-card{title="Deployments" to="/docs/cli/deployments"}
-Trigger and monitor deployments
+Deploy, stream output, inspect history, and roll back
 ::
-::doc-card{title="SSH" to="/docs/cli/ssh"}
-Connect to servers via SSH
+::doc-card{title="Live operations" to="/docs/cli/realtime"}
+WebSocket events, task consoles, dashboards, and tmux workflows
+::
+::doc-card{title="Operations" to="/docs/cli/operations"}
+Databases, SSH keys, firewall, cron, daemons, and services
+::
+::doc-card{title="Automation" to="/docs/cli/automation"}
+Profiles, CI, JSON, project config, self-hosting, and raw API access
 ::
 :::
 
-## Global Options
-| Option | Description |
-|--------|-------------|
-| `--help` | Show help for a command |
-| `--version` | Show CLI version |
-| `--team <name>` | Specify team context |
-| `--json` | Output in JSON format |
-| `--quiet` | Suppress non-essential output |
+## Global flags
 
-## Configuration
-### Config File
+| Flag | Purpose |
+| --- | --- |
+| `--json` | Machine-readable output; live commands emit NDJSON |
+| `--ci` | Disable interactive workflows for CI/CD |
+| `--profile <name>` | Use a profile for this invocation without switching globally |
+| `--api-url <origin>` | Override the hosted or profile API origin |
+| `--help` | Show command-specific syntax and flags |
 
-The CLI stores configuration in `~/.lctl/config.json`:
+## Configuration precedence
 
-```json
-{
-  "token": "your-api-token",
-  "team": "default-team",
-  "defaults": {
-    "server": "production"
-  }
-}
-```
-
-### Environment Variables
-
-| Variable | Description |
-|----------|-------------|
-| `LAUNCH_TOKEN` | API token for authentication |
-| `LAUNCH_TEAM` | Default team |
-| `LAUNCH_API_URL` | API endpoint (for self-hosted) |
-
-## Shell Completion
-### Bash
+`--api-url` has the highest priority, followed by `LAUNCHCTL_API_URL`, the active profile, and finally `https://launchctl.io`. Authentication can be supplied by `LAUNCHCTL_TOKEN` and `LAUNCHCTL_TEAM_ID` in CI.
 
 ```bash
-lctl completion bash > /etc/bash_completion.d/lctl
+LAUNCHCTL_TOKEN="$TOKEN" \
+LAUNCHCTL_TEAM_ID="$TEAM_ID" \
+lctl servers list --json --ci
 ```
 
-### Zsh
+## Interactive dashboard
 
-```bash
-lctl completion zsh > ~/.zsh/completions/_lctl
-```
-
-### Fish
-
-```bash
-lctl completion fish > ~/.config/fish/completions/lctl.fish
-```
-
-## Examples
-### Deploy on Git Push
-
-Add to your CI/CD pipeline:
-
-```yaml
-# GitHub Actions
-- name: Deploy to launchctl
-  run: |
-    lctl deploy --site ${{ secrets.SITE_ID }}
-  env:
-    LAUNCH_TOKEN: ${{ secrets.LAUNCH_TOKEN }}
-```
-
-### Quick SSH Access
-
-```bash
-# Connect to server
-lctl ssh production
-
-# Run a command
-lctl ssh production -- php artisan migrate
-```
-
-### Tail Logs
-
-```bash
-# View live logs
-lctl logs --site example.com --follow
-
-# View deployment output
-lctl logs --deployment 123
-```
-
-## Troubleshooting
-### Command Not Found
-
-Ensure the CLI is in your PATH:
-
-```bash
-which lctl
-```
-
-### Authentication Failed
-
-Re-authenticate:
-
-```bash
-lctl logout
-lctl login
-```
-
-### Connection Issues
-
-Check your network and API status:
+Run `lctl` without a command for the navigation interface, or open the live overview directly:
 
 ```bash
 lctl status
 ```
+
+The dashboard updates from WebSocket events immediately and performs a REST reconciliation every 30 seconds. Press `r` to refresh and `q` to quit.

@@ -1,143 +1,67 @@
 ---
-title: SSH Commands
-description: CLI commands for SSH access
+title: SSH and Remote Commands
+description: Open resilient terminal sessions and run site commands safely
 ---
 
-Connect to your servers directly from the command line.
+## Interactive server terminal
+
+```bash
+lctl servers ssh <server-id>
+lctl servers ssh <server-id> --user root
+```
+
+The terminal is proxied over an authenticated WebSocket. The CLI preserves raw-mode cleanup, resize handling, scroll regions, keepalive, and normal close frames—even when the session exits unexpectedly.
 
 ::callout{type="info"}
-CLI commands are currently in development. Syntax may change.
+The default user comes from the server record. Use `--user` only when that account exists and your launchctl permissions allow it.
 ::
 
-## SSH into Server
-```bash
-lctl ssh <server>
-```
-
-Opens an interactive SSH session to the server.
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--user <user>` | SSH user (default: launch) |
-
-### Example
+## Run a site command
 
 ```bash
-# Connect as launch user
-lctl ssh production
-
-# Connect as root
-lctl ssh production --user root
+lctl run "php artisan cache:clear" \
+  --server <server-id> \
+  --site <site-id>
 ```
 
-## Run Command
-Execute a command on the server without interactive session:
+With project context, the IDs are optional:
 
 ```bash
-lctl ssh <server> -- <command>
+lctl init
+lctl run "php artisan migrate --force"
 ```
 
-### Examples
+The command creates a remote task, polls its status, prints output, and returns the remote exit status. Review recent executions with:
 
 ```bash
-# Check disk space
-lctl ssh production -- df -h
-
-# Run artisan command
-lctl ssh production -- "cd /home/launch/example.com && php artisan migrate"
-
-# View logs
-lctl ssh production -- tail -f /var/log/syslog
+lctl run --history --server <server-id>
+lctl tasks list --server <server-id>
+lctl tasks watch <task-id> --server <server-id>
 ```
 
-## Site Commands
-Run commands in a site's directory:
+## Team SSH keys
 
 ```bash
-lctl run <site> <command>
+lctl ssh-keys list
+lctl ssh-keys add --name "Workstation" --key ~/.ssh/id_ed25519.pub
+lctl ssh-keys add --name "CI" --key ./ci.pub --global
 ```
 
-### Examples
+Attach and detach an existing team key:
 
 ```bash
-# Run artisan command
-lctl run example.com "php artisan cache:clear"
-
-# Run composer
-lctl run example.com "composer install"
-
-# Run npm
-lctl run example.com "npm run build"
+lctl ssh-keys attach <key-id> --server <server-id>
+lctl ssh-keys server-list --server <server-id>
+lctl ssh-keys detach <key-id> --server <server-id>
+lctl ssh-keys delete <key-id>
 ```
 
-## Copy Files
-### Upload
-
-```bash
-lctl scp:up <server> <local-path> <remote-path>
-```
-
-### Download
-
-```bash
-lctl scp:down <server> <remote-path> <local-path>
-```
-
-### Examples
-
-```bash
-# Upload file
-lctl scp:up production ./config.json /home/launch/config.json
-
-# Download logs
-lctl scp:down production /var/log/app.log ./app.log
-```
-
-## SSH Config
-Generate SSH config for direct access:
-
-```bash
-lctl ssh:config
-```
-
-### Output
-
-```
-# launchctl Servers
-Host launch-production
-    HostName 192.168.1.100
-    User launch
-    IdentityFile ~/.ssh/launch_key
-
-Host launch-staging
-    HostName 192.168.1.101
-    User launch
-    IdentityFile ~/.ssh/launch_key
-```
-
-Add to `~/.ssh/config` for direct access:
-
-```bash
-ssh launch-production
-```
+Delete affects the team key; detach only removes its association with one server.
 
 ## Troubleshooting
-### Connection Refused
 
-1. Verify server is running: `lctl servers:show <server>`
-2. Check firewall rules allow SSH
-3. Verify your SSH key is added
-
-### Permission Denied
-
-1. Check you're using the correct user
-2. Verify SSH key is on the server
-3. Re-add your SSH key if needed
-
-### Timeout
-
-1. Check server connectivity
-2. Verify server IP address
-3. Check network/firewall settings
+1. Confirm connectivity with `lctl servers show <server-id>`.
+2. Confirm the active account and team with `lctl whoami`.
+3. Inspect attached keys with `lctl ssh-keys server-list --server <server-id>`.
+4. Check firewall rules with `lctl firewall list --server <server-id>`.
+5. For self-hosting, verify both HTTP and WebSocket traffic reach the origin passed with `--api-url` or `LAUNCHCTL_API_URL`.

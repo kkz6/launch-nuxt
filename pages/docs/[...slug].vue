@@ -47,20 +47,21 @@ const breadcrumb = computed(() =>
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="mx-auto max-w-[49rem]">
     <!-- Page header -->
-    <div v-if="page" class="mb-8">
-      <div class="mb-3 flex items-center gap-1.5 font-mono text-xs text-[hsl(var(--site-text-muted))]">
+    <div v-if="page" class="relative mb-10 overflow-hidden border-b border-[hsl(var(--site-border))] pb-9">
+      <div class="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-[hsl(var(--site-accent))]/10 blur-3xl" />
+      <div class="relative mb-5 flex items-center gap-1.5 font-docs-mono text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--site-text-muted))]">
         <span class="text-[hsl(var(--site-accent))]">~</span>
         <template v-for="(crumb, i) in breadcrumb" :key="i">
           <span v-if="i > 0" class="text-[hsl(var(--site-text-muted))]/50">/</span>
           <span>{{ crumb }}</span>
         </template>
       </div>
-      <h1 class="text-3xl font-bold tracking-tight text-[hsl(var(--site-text))]">
+      <h1 class="relative max-w-3xl text-4xl font-bold leading-[1.08] tracking-[-0.045em] text-[hsl(var(--site-text))] md:text-5xl">
         {{ page.title }}
       </h1>
-      <p v-if="page.description" class="mt-3 text-base leading-relaxed text-[hsl(var(--site-text-muted))]">
+      <p v-if="page.description" class="relative mt-5 max-w-2xl text-lg leading-8 text-[hsl(var(--site-text-muted))]">
         {{ page.description }}
       </p>
     </div>
@@ -79,18 +80,18 @@ const breadcrumb = computed(() =>
 
 /* Headings */
 .docs-content h1 {
-  @apply mb-6 mt-10 text-3xl font-bold tracking-tight first:mt-0;
+  @apply mb-6 mt-10 text-3xl font-bold tracking-[-0.035em] first:mt-0;
   color: hsl(var(--site-text));
 }
 
 .docs-content h2 {
-  @apply mb-4 mt-12 scroll-mt-20 pb-2 text-2xl font-semibold tracking-tight first:mt-0;
+  @apply mb-4 mt-14 scroll-mt-24 pb-3 text-2xl font-semibold tracking-[-0.03em] first:mt-0;
   color: hsl(var(--site-text));
   border-bottom: 1px solid hsl(var(--site-border));
 }
 
 .docs-content h3 {
-  @apply mb-3 mt-8 scroll-mt-20 text-xl font-semibold tracking-tight;
+  @apply mb-3 mt-9 scroll-mt-24 text-xl font-semibold tracking-[-0.02em];
   color: hsl(var(--site-text));
 }
 
@@ -101,7 +102,7 @@ const breadcrumb = computed(() =>
 
 /* Paragraphs */
 .docs-content p {
-  @apply mb-4 leading-7;
+  @apply mb-5 text-[15px] leading-7;
   color: hsl(var(--site-text-muted));
 }
 
@@ -149,7 +150,7 @@ const breadcrumb = computed(() =>
 
 /* Code - inline */
 .docs-content :not(pre) > code {
-  @apply rounded-md px-1.5 py-0.5 font-mono text-[0.85em];
+  @apply rounded-md px-1.5 py-0.5 font-docs-mono text-[0.82em];
   background: hsl(var(--site-surface));
   border: 1px solid hsl(var(--site-border));
   color: hsl(var(--site-text));
@@ -157,9 +158,10 @@ const breadcrumb = computed(() =>
 
 /* Code - blocks: always-dark terminal panels, like the landing */
 .docs-content pre {
-  @apply mb-6 overflow-x-auto rounded-lg p-4 font-mono text-sm;
-  background: #0b0e14;
-  border: 1px solid hsl(220 10% 18%);
+  @apply mb-7 overflow-x-auto rounded-xl p-5 font-docs-mono text-[13px] leading-6;
+  background: linear-gradient(145deg, #0b1018, #0c111b 60%, #101722);
+  border: 1px solid hsl(220 12% 20%);
+  box-shadow: 0 22px 55px -32px rgb(2 6 23 / 0.8), inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
 .docs-content pre code {
@@ -169,7 +171,7 @@ const breadcrumb = computed(() =>
 
 /* Blockquotes */
 .docs-content blockquote {
-  @apply mb-6 rounded-lg py-3 pl-4 pr-4 not-italic;
+  @apply mb-7 rounded-xl py-4 pl-5 pr-5 not-italic;
   border-left: 3px solid hsl(var(--site-accent));
   background: hsl(var(--site-surface));
 }
@@ -181,7 +183,7 @@ const breadcrumb = computed(() =>
 
 /* Tables */
 .docs-content table {
-  @apply mb-6 w-full border-collapse overflow-hidden rounded-lg text-sm;
+  @apply mb-7 w-full border-collapse overflow-hidden rounded-xl text-sm;
   border: 1px solid hsl(var(--site-border));
 }
 
@@ -190,7 +192,7 @@ const breadcrumb = computed(() =>
 }
 
 .docs-content th {
-  @apply px-4 py-3 text-left font-mono text-xs font-semibold uppercase tracking-wider;
+  @apply px-4 py-3 text-left font-docs-mono text-[10px] font-semibold uppercase tracking-[0.12em];
   color: hsl(var(--site-text));
 }
 
