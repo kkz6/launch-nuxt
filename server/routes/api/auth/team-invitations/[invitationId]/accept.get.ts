@@ -1,6 +1,6 @@
 export default defineEventHandler(async (event) => {
   const invitationId = getRouterParam(event, "invitationId");
-  const { backendBase } = useRuntimeConfig();
+  const backendBase = String(useRuntimeConfig().backendBase);
   const query = getRequestURL(event).search;
   const target = `${backendBase.replace(/\/$/, "")}/auth/team-invitations/${invitationId}/accept${query}`;
 

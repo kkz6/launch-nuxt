@@ -1,139 +1,87 @@
 ---
 title: Site Commands
-description: CLI commands for site management
+description: Inspect sites and operate project files, logs, services, and TLS
 ---
 
-Manage your sites from the command line.
-
-::callout{type="info"}
-CLI commands are currently in development. Syntax may change.
-::
-
-## List Sites
-```bash
-lctl sites
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--server <server>` | Filter by server |
-| `--json` | Output as JSON |
-
-### Example Output
-
-```
-ID    DOMAIN           SERVER        PHP    STATUS
-1     example.com      production    8.3    active
-2     staging.app      staging       8.3    active
-3     dev.local        development   8.2    active
-```
-
-## Get Site Details
-```bash
-lctl sites:show <site>
-```
-
-### Example
+## List and inspect
 
 ```bash
-lctl sites:show example.com
+lctl sites list --server <server-id>
+lctl sites show <site-id> --server <server-id>
 ```
 
-### Output
-
-```
-Site: example.com
-ID: 1
-Server: production
-Type: laravel
-PHP Version: 8.3
-Repository: github.com/user/repo
-Branch: main
-SSL: enabled
-Status: active
-```
-
-## Create Site
-```bash
-lctl sites:create <server>
-```
-
-Interactive prompts guide you through site creation.
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--domain <domain>` | Domain name |
-| `--type <type>` | Site type (laravel, php, static) |
-| `--php <version>` | PHP version |
-| `--directory <path>` | Web directory |
-
-### Example
+Both commands support `--json`. After running `lctl init`, the server can be resolved from `.launchctl.yml`:
 
 ```bash
-lctl sites:create production \
-  --domain example.com \
-  --type laravel \
-  --php 8.3 \
-  --directory public
+lctl sites list
 ```
 
-## Delete Site
-```bash
-lctl sites:delete <site>
-```
+## Project context
 
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--force` | Skip confirmation |
-
-## Environment Variables
-### View Environment
+Run the interactive initializer from a repository:
 
 ```bash
-lctl env <site>
+lctl init
 ```
 
-### Edit Environment
+It creates:
+
+```yaml
+server: 01SERVERID
+site: 01SITEID
+```
+
+The CLI searches parent directories for `.launchctl.yml` until it reaches the Git root, so commands work from nested project folders.
+
+## Environment files
 
 ```bash
-lctl env:edit <site>
+# Print the remote environment file
+lctl env pull --server <server-id> --site <site-id>
+
+# Save it locally
+lctl env pull --output .env.production
+
+# Preview changes and confirm before writing
+lctl env push --file .env.production
 ```
 
-Opens your default editor to modify the `.env` file.
+`env push` shows a redacted diff. In CI, pass `--ci` only when the pipeline is intentionally authorized to update remote environment values.
 
-### Set Variable
+## Site and server logs
 
 ```bash
-lctl env:set <site> KEY=value
+# Discover available site logs
+lctl logs --site <site-id> --server <server-id>
+
+# Tail a selected log
+lctl logs --site <site-id> --type laravel --lines 100
+lctl logs --site <site-id> --type laravel --follow
+
+# Discover server logs instead
+lctl logs --server <server-id>
 ```
 
-### Example
+Error and warning lines receive terminal-aware color while output remains readable without ANSI support.
+
+## Certificates
 
 ```bash
-lctl env:set example.com APP_DEBUG=false
+lctl ssl list --server <server-id>
+lctl ssl list --server <server-id> --site <site-id> --json
 ```
 
-## SSL Certificates
-### Enable SSL
+Certificate creation, renewal, and newer DNS workflows are available through their authenticated API paths:
 
 ```bash
-lctl ssl:enable <site>
+lctl api GET '/api/servers/<server-id>/sites/<site-id>/certificates'
 ```
 
-### Disable SSL
+## Deploy and run
 
 ```bash
-lctl ssl:disable <site>
+lctl deploy trigger <site-id> --server <server-id>
+lctl run "php artisan about" --server <server-id> --site <site-id>
 ```
 
-### Renew Certificate
-
-```bash
-lctl ssl:renew <site>
-```
+See [Deployment commands](/docs/cli/deployments) for live output, history, rollback, and CI waiting.

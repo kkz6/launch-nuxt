@@ -1,139 +1,83 @@
 ---
 title: Server Commands
-description: CLI commands for server management
+description: Inspect servers, open terminals, stream metrics, and follow provisioning
 ---
 
-Manage your servers from the command line.
+Server commands use immutable server IDs. Get them with `lctl servers list --json` or select a project default with `lctl init`.
 
-::callout{type="info"}
-CLI commands are currently in development. Syntax may change.
-::
-
-## List Servers
-```bash
-lctl servers
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--team <name>` | Filter by team |
-| `--status <status>` | Filter by status |
-| `--json` | Output as JSON |
-
-### Example Output
-
-```
-ID    NAME           IP              PROVIDER       STATUS
-1     production     192.168.1.100   digitalocean   active
-2     staging        192.168.1.101   digitalocean   active
-3     development    192.168.1.102   hetzner        active
-```
-
-## Get Server Details
-```bash
-lctl servers:show <server>
-```
-
-### Example
+## List and inspect
 
 ```bash
-lctl servers:show production
+lctl servers list
+lctl servers list --json
+lctl servers show <server-id>
 ```
 
-### Output
+The detail view includes connectivity, provider, operating system, capacity, IP address, provisioning status, progress, and installed feature counts.
 
-```
-Server: production
-ID: 1
-IP Address: 192.168.1.100
-Provider: digitalocean
-Region: nyc1
-Size: s-2vcpu-4gb
-PHP Version: 8.3
-Status: active
-Created: 2024-01-15
-```
-
-## Create Server
-```bash
-lctl servers:create
-```
-
-Interactive prompts guide you through server creation.
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--name <name>` | Server name |
-| `--provider <provider>` | Cloud provider |
-| `--region <region>` | Server region |
-| `--size <size>` | Server size |
-| `--php <version>` | PHP version |
-
-### Example
+## Watch provisioning
 
 ```bash
-lctl servers:create \
-  --name my-server \
-  --provider digitalocean \
-  --region nyc1 \
-  --size s-2vcpu-4gb \
-  --php 8.3
+lctl servers watch <server-id>
 ```
 
-## Delete Server
-```bash
-lctl servers:delete <server>
-```
+The tmux-friendly console displays the current REST state, then follows `server.<id>` events over a reconnecting WebSocket. It shows live connection status and supports:
 
-### Options
+| Key | Action |
+| --- | --- |
+| `Space` or `p` | Pause/resume rendering |
+| `c` | Clear captured output |
+| `↑` / `↓`, `PgUp` / `PgDn` | Scroll |
+| `q` | Leave the console; the server continues provisioning |
 
-| Option | Description |
-|--------|-------------|
-| `--force` | Skip confirmation |
-
-## Reboot Server
-```bash
-lctl servers:reboot <server>
-```
-
-## Server Services
-### List Services
+Use NDJSON for automation. The process exits after a terminal provisioning event:
 
 ```bash
-lctl services <server>
+lctl servers watch <server-id> --json \
+  | jq -c 'select(.event | startswith("server.provision"))'
 ```
 
-### Restart Service
+## Metrics
 
 ```bash
-lctl services:restart <server> <service>
+lctl servers metrics <server-id>
+lctl servers metrics <server-id> --watch
 ```
 
-### Example
+The watch view streams CPU, memory, disk, load, uptime, and network data. Use `--json` without `--watch` for scripts.
+
+## Reboot
 
 ```bash
-lctl services:restart production nginx
+lctl servers reboot <server-id>
 ```
 
-## SSH Keys
-### List Keys
+The command resolves the server first and asks for confirmation before sending the reboot request.
+
+## Terminal access
 
 ```bash
-lctl ssh-keys <server>
+lctl servers ssh <server-id>
+lctl servers ssh <server-id> --user root
 ```
 
-### Add Key
+This opens an authenticated WebSocket terminal through launchctl. Resize events, terminal raw mode, mouse state, keepalive, and cleanup are handled by the client, so it behaves correctly inside tmux and nested SSH sessions.
+
+For non-interactive site commands, use `lctl run`:
 
 ```bash
-lctl ssh-keys:add <server> --name "My Key" --key "ssh-ed25519 AAAA..."
+lctl run "php artisan migrate" --server <server-id> --site <site-id>
+lctl run --history --server <server-id>
 ```
 
-### Remove Key
+## Newly released server APIs
+
+Provider creation, backups, scripts, platform updates, Docker projects, DNS, load balancers, and notification endpoints remain accessible even before a dedicated high-level command ships:
 
 ```bash
-lctl ssh-keys:remove <server> <key-id>
+lctl api GET /api/servers/create-options
+lctl api GET /api/servers/<server-id>/backups
+lctl api GET /api/servers/<server-id>/docker/projects
 ```
+
+Use `lctl api --help` for request bodies and self-hosted origins.

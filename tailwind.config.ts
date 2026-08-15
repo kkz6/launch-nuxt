@@ -34,6 +34,8 @@ const config = {
         display: ["Plus Jakarta Sans", "sans-serif"],
         site: ["Plus Jakarta Sans", "sans-serif"],
         inter: ["Inter", "system-ui", "sans-serif"],
+        docs: ["Manrope", "system-ui", "sans-serif"],
+        "docs-mono": ["IBM Plex Mono", "ui-monospace", "monospace"],
       },
       fontSize: {
         xs: ["0.75rem", { lineHeight: "1.5" }],
