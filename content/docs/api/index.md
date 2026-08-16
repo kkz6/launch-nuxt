@@ -63,7 +63,8 @@ All responses are JSON formatted:
 }
 ```
 
-## Available Endpoints
+## Core infrastructure endpoints
+
 :::card-group
 ::doc-card{title="Servers" to="/docs/api/servers"}
 Manage server provisioning and configuration
@@ -74,6 +75,11 @@ Create and manage sites on your servers
 ::doc-card{title="Deployments" to="/docs/api/deployments"}
 Trigger and monitor deployments
 ::
+:::
+
+## Data and access endpoints
+
+:::card-group
 ::doc-card{title="Databases" to="/docs/api/databases"}
 Manage MySQL databases and users
 ::
@@ -82,6 +88,14 @@ Manage SSH keys for server access
 ::
 ::doc-card{title="Teams" to="/docs/api/teams"}
 Access team information
+::
+:::
+
+## Container endpoints
+
+:::card-group
+::doc-card{title="Docker Applications" to="/docs/api/docker-applications"}
+Create, configure, deploy, and monitor containerized applications
 ::
 :::
 

@@ -31,6 +31,45 @@ interface DocNavSection {
   items: DocNavItem[]
 }
 
+// Keep the documentation ordered by workflow rather than filename. New pages
+// that are not listed here still appear after the curated entries.
+const navOrder: Record<string, number> = {
+  '/docs': 0,
+  '/docs/application': 10,
+  '/docs/application/servers': 11,
+  '/docs/application/sites': 12,
+  '/docs/application/docker': 13,
+  '/docs/application/databases': 14,
+  '/docs/application/backups': 15,
+  '/docs/application/dns': 16,
+  '/docs/application/notifications': 17,
+  '/docs/application/teams': 18,
+  '/docs/application/account': 19,
+  '/docs/cli': 20,
+  '/docs/cli/servers': 21,
+  '/docs/cli/sites': 22,
+  '/docs/cli/deployments': 23,
+  '/docs/cli/operations': 24,
+  '/docs/cli/realtime': 25,
+  '/docs/cli/automation': 26,
+  '/docs/cli/ai-skill': 27,
+  '/docs/api': 30,
+  '/docs/api/servers': 31,
+  '/docs/api/sites': 32,
+  '/docs/api/deployments': 33,
+  '/docs/api/docker-applications': 34,
+  '/docs/api/databases': 35,
+  '/docs/api/ssh-keys': 36,
+  '/docs/api/teams': 37,
+}
+
+const sortNavNodes = <T extends { path: string }>(nodes: T[]): T[] =>
+  [...nodes].sort((a, b) =>
+    (navOrder[a.path] ?? Number.MAX_SAFE_INTEGER) -
+      (navOrder[b.path] ?? Number.MAX_SAFE_INTEGER) ||
+    a.path.localeCompare(b.path),
+  )
+
 // Build the sidebar from the actual @nuxt/content tree so it always reflects
 // the markdown files under content/docs.
 const { data: navTree } = await useAsyncData('docs-nav', () =>
@@ -42,9 +81,9 @@ const { data: navTree } = await useAsyncData('docs-nav', () =>
 const mapItem = (node: NavNode): DocNavItem => ({
   title: node.title,
   path: node.path,
-  items: (node.children ?? [])
-    .filter((child) => child.path !== node.path)
-    .map(mapItem),
+  items: sortNavNodes(
+    (node.children ?? []).filter((child) => child.path !== node.path),
+  ).map(mapItem),
 })
 
 const docsRoot = computed<NavNode[]>(
@@ -56,18 +95,20 @@ const docsRoot = computed<NavNode[]>(
 const topLevelItems = computed<DocNavItem[]>(() =>
   docsRoot.value
     .filter((node) => !node.children || node.children.length === 0)
+    .sort((a, b) => (navOrder[a.path] ?? 999) - (navOrder[b.path] ?? 999))
     .map(mapItem)
 )
 
 const docsNavigation = computed<DocNavSection[]>(() =>
-  docsRoot.value
-    .filter((node) => node.children && node.children.length > 0)
+  sortNavNodes(
+    docsRoot.value.filter((node) => node.children && node.children.length > 0),
+  )
     .map((node) => ({
       title: node.title,
       path: node.path,
-      items: node.children!
-        .filter((child) => child.path !== node.path)
-        .map(mapItem),
+      items: sortNavNodes(
+        node.children!.filter((child) => child.path !== node.path),
+      ).map(mapItem),
     }))
 )
 

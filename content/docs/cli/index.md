@@ -58,7 +58,7 @@ lctl events
 
 Once `lctl init` creates `.launchctl.yml`, commands that accept `--server` and `--site` can resolve those values from the current project.
 
-## Command map
+## Core operations
 
 :::card-group
 ::doc-card{title="Servers" to="/docs/cli/servers"}
@@ -76,8 +76,16 @@ WebSocket events, task consoles, dashboards, and tmux workflows
 ::doc-card{title="Operations" to="/docs/cli/operations"}
 Databases, SSH keys, firewall, cron, daemons, and services
 ::
+:::
+
+## Live, automation, and AI
+
+:::card-group
 ::doc-card{title="Automation" to="/docs/cli/automation"}
 Profiles, CI, JSON, project config, self-hosting, and raw API access
+::
+::doc-card{title="AI Skill" to="/docs/cli/ai-skill"}
+Install the Codex skill and operate every CLI and API feature with AI
 ::
 :::
 

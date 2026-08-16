@@ -1,4 +1,5 @@
 import type { ApiResponse } from "~/composables/useApi";
+import type { CertificateStatusResult } from "~/types";
 
 /**
  * Docker project — the grouping layer between a server and its workloads
@@ -786,11 +787,7 @@ export interface UpdateDockerComposeData {
 // ---- Managed databases ----------------------------------------------------
 
 export type DockerDatabaseEngine =
-  | "postgres"
-  | "mysql"
-  | "mariadb"
-  | "redis"
-  | "mongo";
+  "postgres" | "mysql" | "mariadb" | "redis" | "mongo";
 
 export interface DockerDatabaseCredentials {
   username: string;
@@ -941,12 +938,7 @@ export interface DockerDeployment {
   // application + compose rows where the implicit verb is "deploy".
   action?: string | null;
   status:
-    | "pending"
-    | "building"
-    | "deploying"
-    | "success"
-    | "failed"
-    | "cancelled";
+    "pending" | "building" | "deploying" | "success" | "failed" | "cancelled";
   // task_id binds the row to a running server-task so the UI can
   // stream live SSH output via ServerLogViewer entity="task". Null
   // until the worker has dispatched the task.
@@ -980,13 +972,7 @@ export interface DockerDeployment {
 export interface DockerDeploymentGhaStep {
   name: string;
   status: "queued" | "in_progress" | "completed" | string;
-  conclusion?:
-    | "success"
-    | "failure"
-    | "skipped"
-    | "cancelled"
-    | string
-    | null;
+  conclusion?: "success" | "failure" | "skipped" | "cancelled" | string | null;
   number: number;
   started_at?: string | null;
   completed_at?: string | null;
@@ -1167,10 +1153,9 @@ export const dockerService = {
 
     /**
      * Lifecycle action against the running container.
-     * - "reload" RECREATES the container from the image already on the
-     *   host with the current env/config (no rebuild) — this is how
-     *   saved env-var changes get applied. A plain docker-restart would
-     *   keep the env baked in at create time.
+     * - "reload" maps to docker restart for the existing container.
+     *   It does not recreate the container, so saved env/config changes
+     *   still require a deploy.
      * - "stop" / "start" are passthrough docker stop/start.
      * Rebuild isn't here — Rebuild = Deploy (same endpoint above).
      */
@@ -1374,6 +1359,30 @@ export const dockerService = {
       const { get } = useApi();
       return get<ApiResponse<DockerDomainDnsValidation>>(
         `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}/validate-dns`,
+      );
+    },
+
+    checkDomainCertificate: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      domainId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<CertificateStatusResult>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}/certificate`,
+      );
+    },
+
+    retryDomainCertificate: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      domainId: string,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}/certificate/retry`,
       );
     },
 
@@ -2052,6 +2061,28 @@ export const dockerService = {
         const { get } = useApi();
         return get<ApiResponse<DockerDomainDnsValidation>>(
           `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}/validate-dns`,
+        );
+      },
+      checkCertificate: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        domainId: string,
+      ) => {
+        const { get } = useApi();
+        return get<ApiResponse<CertificateStatusResult>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}/certificate`,
+        );
+      },
+      retryCertificate: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        domainId: string,
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<null>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}/certificate/retry`,
         );
       },
     },

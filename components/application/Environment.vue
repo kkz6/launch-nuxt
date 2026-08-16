@@ -236,7 +236,7 @@ const resyncWorkflow = async () => {
       :on-restart="onRestart"
       restart-label="Reload"
       title="Runtime environment"
-      description="Env vars passed to the container as -e KEY=VALUE — available while it runs. Save, then Reload to apply (recreates the container, no rebuild)."
+      description="Env vars passed to the container as -e KEY=VALUE — available while it runs. Save, then Deploy to recreate the container with the new values. Reload only restarts the existing container."
       :on-create="onCreate"
       :on-update="onUpdate"
       :on-delete="onDelete"

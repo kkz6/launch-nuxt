@@ -35,8 +35,9 @@ Before creating a server, you need to connect your cloud provider account:
 3. Choose a region closest to your users
 4. Select a server size based on your needs
 5. Choose the operating system (Ubuntu 20.04, 22.04, or 24.04 recommended)
-6. Give your server a name
-7. Click **Create Server**
+6. Select the server type. Choose **Docker** for Docker CE, Traefik routing, projects, applications, Compose stacks, and container databases.
+7. Give your server a name
+8. Click **Create Server**
 
 ### Step 3: Server Provisioning
 
@@ -51,6 +52,17 @@ After creation, launchctl will automatically:
 The provisioning process typically takes 3-5 minutes.
 
 ## Server Features
+### Server Types
+
+| Type | Runtime | Primary workloads |
+| --- | --- | --- |
+| PHP | PHP, Caddy, optional databases | Laravel, PHP, WordPress, and static sites |
+| Database | MySQL or PostgreSQL | Dedicated database hosting |
+| Load balancer | Caddy | Traffic routing to application servers |
+| Docker | Docker CE and Traefik | Applications, Compose stacks, and container databases |
+
+Docker servers expose **Projects** and **Containers** tabs instead of the PHP site workflow. See [Docker Workloads](/docs/application/docker) for the complete deployment path.
+
 ### SSH Keys
 
 Manage SSH keys for server access:

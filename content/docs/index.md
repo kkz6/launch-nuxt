@@ -3,11 +3,13 @@ title: Getting Started
 description: Welcome to launchctl - Modern server management and deployment platform
 ---
 
-launchctl is a comprehensive server management and deployment platform that helps you provision servers, deploy applications, and manage your infrastructure with ease.
+launchctl is a comprehensive server management and deployment platform that helps you provision servers, deploy traditional sites and containerized applications, and manage your infrastructure with ease.
 
 ## Key Features
 - **Server Management** - Provision and manage servers across multiple cloud providers (AWS, DigitalOcean, Linode, Vultr, Hetzner)
 - **Site Deployments** - Zero-downtime deployments with Git integration (GitHub, GitLab, Bitbucket)
+- **Docker Workloads** - Deploy images, Git repositories, Dockerfiles, Compose stacks, and managed databases behind Traefik
+- **AI Operations** - Install the `operate-launchctl` Codex skill and safely operate infrastructure through `lctl`
 - **Database Management** - MySQL database and user management
 - **SSL Certificates** - Automatic Let's Encrypt SSL certificates
 - **Backups** - Automated backups to S3 or Dropbox
@@ -16,16 +18,28 @@ launchctl is a comprehensive server management and deployment platform that help
 - **API Access** - Full REST API for automation and integrations
 - **Notifications** - Get alerts via Slack, Discord, Telegram, or Email
 
-## Quick Start
+## Dashboard workflows
+
 :::card-group
 ::doc-card{title="Application Guide" to="/docs/application"}
 Learn how to use the launchctl dashboard to manage your infrastructure
 ::
+::doc-card{title="Docker Applications" to="/docs/application/docker/applications"}
+Build, deploy, expose, and monitor containerized applications
+::
+:::
+
+## Automation and AI
+
+:::card-group
+::doc-card{title="CLI Documentation" to="/docs/cli"}
+Use the launchctl CLI for command-line server management
+::
 ::doc-card{title="API Reference" to="/docs/api"}
 Integrate launchctl with your tools using our REST API
 ::
-::doc-card{title="CLI Documentation" to="/docs/cli"}
-Use the launchctl CLI for command-line server management
+::doc-card{title="AI Skill" to="/docs/cli/ai-skill"}
+Install the Codex skill and ask AI to operate launchctl safely
 ::
 :::
 
