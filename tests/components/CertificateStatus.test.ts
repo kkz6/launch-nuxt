@@ -31,17 +31,30 @@ const status = (
 const mountStatus = (
   check: () => Promise<{ data: CertificateStatusResult }>,
   retry?: () => Promise<unknown>,
+  compact = false,
 ) =>
   mount(CertificateStatus, {
-    props: { check, retry },
+    props: { check, retry, compact },
     global: {
       stubs: {
         Icon: true,
+        Badge: {
+          template: "<span><slot /></span>",
+        },
         Button: {
           props: ["disabled"],
           emits: ["click"],
           template:
             '<button :disabled="disabled" @click="$emit(\'click\')"><slot /></button>',
+        },
+        Popover: {
+          template: "<div><slot /></div>",
+        },
+        PopoverTrigger: {
+          template: "<div><slot /></div>",
+        },
+        PopoverContent: {
+          template: "<div><slot /></div>",
         },
       },
     },
@@ -104,6 +117,25 @@ describe("CertificateStatus", () => {
     await vi.advanceTimersByTimeAsync(12_000);
     await flushPromises();
     expect(check).toHaveBeenCalledTimes(2);
+    wrapper.unmount();
+  });
+
+  it("shows a clear diagnosis beside an invalid compact badge", async () => {
+    const check = vi.fn().mockResolvedValue({
+      data: status({
+        status: "invalid",
+        valid: false,
+        message: "The server is not presenting a certificate for this hostname.",
+      }),
+    });
+    const wrapper = mountStatus(check, undefined, true);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("Invalid");
+    expect(wrapper.text()).toContain("Hostname does not match");
+    expect(wrapper.text()).toContain(
+      "The proxy is serving a certificate for another hostname.",
+    );
     wrapper.unmount();
   });
 });
