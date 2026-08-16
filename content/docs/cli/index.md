@@ -82,7 +82,7 @@ Databases, SSH keys, firewall, cron, daemons, and services
 
 :::card-group
 ::doc-card{title="Automation" to="/docs/cli/automation"}
-Profiles, CI, JSON, project config, self-hosting, and raw API access
+Profiles, CI, JSON, project config, and raw API access
 ::
 ::doc-card{title="AI Skill" to="/docs/cli/ai-skill"}
 Install the Codex skill and operate every CLI and API feature with AI
@@ -96,12 +96,12 @@ Install the Codex skill and operate every CLI and API feature with AI
 | `--json` | Machine-readable output; live commands emit NDJSON |
 | `--ci` | Disable interactive workflows for CI/CD |
 | `--profile <name>` | Use a profile for this invocation without switching globally |
-| `--api-url <origin>` | Override the hosted or profile API origin |
+| `--api-url <origin>` | Override the API origin for approved development or staging use |
 | `--help` | Show command-specific syntax and flags |
 
 ## Configuration precedence
 
-`--api-url` has the highest priority, followed by `LAUNCHCTL_API_URL`, the active profile, and finally `https://launchctl.io`. Authentication can be supplied by `LAUNCHCTL_TOKEN` and `LAUNCHCTL_TEAM_ID` in CI.
+`--api-url` has the highest priority, followed by `LAUNCHCTL_API_URL`, the active profile, and finally `https://launchctl.io`. Normal users should leave the origin unset because launchctl is currently hosted-only. Authentication can be supplied by `LAUNCHCTL_TOKEN` and `LAUNCHCTL_TEAM_ID` in CI.
 
 ```bash
 LAUNCHCTL_TOKEN="$TOKEN" \

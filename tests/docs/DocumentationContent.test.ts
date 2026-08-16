@@ -91,4 +91,14 @@ describe("Docker and AI documentation", () => {
     expect(readDoc("cli/index")).toContain("## Live, automation, and AI");
     expect(readDoc("api/index")).toContain("## Container endpoints");
   });
+
+  it("describes launchctl as hosted-only", () => {
+    const automation = readDoc("cli/automation");
+    const index = readDoc("cli/index");
+
+    expect(automation).toContain("launchctl is currently a hosted service");
+    expect(automation).toContain("it is not a self-hosting interface");
+    expect(index).toContain("launchctl is currently hosted-only");
+    expect(index).not.toContain("project config, self-hosting");
+  });
 });

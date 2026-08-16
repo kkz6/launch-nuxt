@@ -3,6 +3,11 @@ title: Automation and API Access
 description: Profiles, project defaults, JSON output, CI credentials, and complete API coverage
 ---
 
+::callout{type="info"}
+launchctl is currently a hosted service. The CLI does not provide a self-hosted
+control plane or installation workflow.
+::
+
 ## Profiles
 
 Profiles keep API origin, token, team, user, and favorites together.
@@ -15,12 +20,8 @@ lctl switch production
 lctl --profile staging servers list
 ```
 
-Use one profile per hosted, staging, or self-hosted account.
-
-```bash
-lctl config set api_url https://launch.example.com
-lctl config show
-```
+Use profiles to separate launchctl accounts, teams, or explicitly assigned
+development and staging environments.
 
 ## Environment variables
 
@@ -28,7 +29,7 @@ lctl config show
 | --- | --- |
 | `LAUNCHCTL_TOKEN` | Personal API token |
 | `LAUNCHCTL_TEAM_ID` | Active team ID |
-| `LAUNCHCTL_API_URL` | Hosted or self-hosted API origin |
+| `LAUNCHCTL_API_URL` | Approved launchctl development or staging API origin |
 
 Flags override environment variables; environment variables override the active profile.
 
@@ -65,11 +66,15 @@ lctl api PUT /api/settings/notification-preferences --data @settings.json
 Raw `POST`, `PUT`, `PATCH`, and `DELETE` calls can change infrastructure. Prefer a high-level command when one exists and inspect the endpoint contract before automating a mutation.
 ::
 
-## Self-hosted endpoint
+## API origin override for development
+
+Normal users should leave the API origin unset and use the hosted launchctl
+service. The override exists for launchctl development, testing, and explicitly
+assigned staging environments; it is not a self-hosting interface.
 
 ```bash
-lctl --api-url https://launch.example.com whoami
-LAUNCHCTL_API_URL=https://launch.example.com lctl status
+lctl --api-url "$LAUNCHCTL_INTERNAL_API_URL" whoami
+LAUNCHCTL_API_URL="$LAUNCHCTL_INTERNAL_API_URL" lctl status
 ```
 
 The same origin is transformed to `wss://` for terminal and pub/sub connections. Origins ending in `/api` are normalized without duplicating the path.

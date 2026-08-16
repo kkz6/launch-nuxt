@@ -64,4 +64,4 @@ Delete affects the team key; detach only removes its association with one server
 2. Confirm the active account and team with `lctl whoami`.
 3. Inspect attached keys with `lctl ssh-keys server-list --server <server-id>`.
 4. Check firewall rules with `lctl firewall list --server <server-id>`.
-5. For self-hosting, verify both HTTP and WebSocket traffic reach the origin passed with `--api-url` or `LAUNCHCTL_API_URL`.
+5. If live progress fails, confirm the network permits HTTPS and secure WebSocket traffic to the hosted launchctl service.

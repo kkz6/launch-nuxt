@@ -80,4 +80,4 @@ lctl api GET /api/servers/<server-id>/backups
 lctl api GET /api/servers/<server-id>/docker/projects
 ```
 
-Use `lctl api --help` for request bodies and self-hosted origins.
+Use `lctl api --help` for request bodies and development-only API-origin overrides.
