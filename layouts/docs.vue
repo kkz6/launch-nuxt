@@ -395,12 +395,12 @@ const docsToc = inject<ComputedRef<Array<{ id: string; text: string }>>>('docsTo
               <h4 class="mb-4 flex items-center gap-2 font-docs-mono text-[10px] uppercase tracking-[0.16em] text-[hsl(var(--site-text-muted))]">
                 <span class="text-[hsl(var(--site-accent))]">#</span> On this page
               </h4>
-              <nav class="space-y-2.5 border-l border-[hsl(var(--site-border))] text-sm">
+              <nav class="space-y-2.5 text-sm">
                 <a
                   v-for="link in docsToc"
                   :key="link.id"
                   :href="`#${link.id}`"
-                  class="-ml-px block border-l border-transparent pl-3 text-[hsl(var(--site-text-muted))] transition-colors hover:border-[hsl(var(--site-accent))] hover:text-[hsl(var(--site-text))]"
+                  class="block pl-3 text-[hsl(var(--site-text-muted))] transition-colors hover:text-[hsl(var(--site-text))]"
                 >
                   {{ link.text }}
                 </a>

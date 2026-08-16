@@ -7,6 +7,9 @@ const root = process.cwd();
 const readDoc = (path: string) =>
   readFileSync(join(root, "content", "docs", `${path}.md`), "utf8");
 
+const readProjectFile = (path: string) =>
+  readFileSync(join(root, path), "utf8");
+
 const docTargetExists = (route: string): boolean => {
   const relative = route.replace(/^\/docs\/?/, "");
   const direct = join(root, "content", "docs", `${relative}.md`);
@@ -100,5 +103,14 @@ describe("Docker and AI documentation", () => {
     expect(automation).toContain("it is not a self-hosting interface");
     expect(index).toContain("launchctl is currently hosted-only");
     expect(index).not.toContain("project config, self-hosting");
+  });
+
+  it("keeps documentation menus free of decorative left borders", () => {
+    const navItems = readProjectFile("components/docs/NavItems.vue");
+    const docsLayout = readProjectFile("layouts/docs.vue");
+
+    expect(navItems).not.toContain("border-l");
+    expect(navItems).not.toContain("inset_2px_0");
+    expect(docsLayout).not.toContain("border-l");
   });
 });
