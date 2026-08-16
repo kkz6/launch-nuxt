@@ -1,4 +1,5 @@
 import type { ApiResponse } from "~/composables/useApi";
+import type { CertificateStatusResult } from "~/types";
 
 /**
  * Docker project — the grouping layer between a server and its workloads
@@ -683,9 +684,8 @@ export interface DockerHostVolume {
  * Traefik dynamic config files served from
  * /etc/launch/traefik/dynamic/. Launch's own plumbing
  * (traefik.yml static config, acme.json, certificates) is NOT
- * surfaced — this is a SaaS so the infrastructure layer belongs to
- * us, not the user. Compare with dokploy, which is self-hosted and
- * exposes the whole filesystem.
+ * surfaced — the infrastructure layer belongs to launchctl rather
+ * than the user and the platform does not expose its filesystem.
  */
 export interface DockerTraefikSnapshot {
   dynamic_files: Record<string, string>;
@@ -1376,6 +1376,30 @@ export const dockerService = {
       );
     },
 
+    checkDomainCertificate: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      domainId: string,
+    ) => {
+      const { get } = useApi();
+      return get<ApiResponse<CertificateStatusResult>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}/certificate`,
+      );
+    },
+
+    retryDomainCertificate: (
+      serverId: string,
+      projectId: string,
+      applicationId: string,
+      domainId: string,
+    ) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/docker/projects/${projectId}/applications/${applicationId}/domains/${domainId}/certificate/retry`,
+      );
+    },
+
     // redirects — backed by build_config.redirects, exposed per-row
     // so the Redirects subtab can plug into the same DataTable + dialog
     // shape the PHP-site SitesRedirects subtab uses.
@@ -2051,6 +2075,28 @@ export const dockerService = {
         const { get } = useApi();
         return get<ApiResponse<DockerDomainDnsValidation>>(
           `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}/validate-dns`,
+        );
+      },
+      checkCertificate: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        domainId: string,
+      ) => {
+        const { get } = useApi();
+        return get<ApiResponse<CertificateStatusResult>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}/certificate`,
+        );
+      },
+      retryCertificate: (
+        serverId: string,
+        projectId: string,
+        composeId: string,
+        domainId: string,
+      ) => {
+        const { post } = useApi();
+        return post<ApiResponse<null>>(
+          `/servers/${serverId}/docker/projects/${projectId}/composes/${composeId}/domains/${domainId}/certificate/retry`,
         );
       },
     },

@@ -93,12 +93,18 @@ Force all traffic to HTTPS:
 All HTTP requests redirect to HTTPS.
 
 ## Certificate Status
-View certificate information:
+The SSL settings page checks the public HTTPS endpoint, so the status reflects
+the certificate a browser actually receives rather than only the saved Caddy
+configuration. It shows:
 
 - Issued to (domain)
 - Issued by (authority)
 - Valid from/to dates
 - Days until expiry
+
+If the status is **Not issued**, **Invalid**, **Expired**, or **Unreachable**,
+fix DNS or firewall access first and select **Retry certificate**. launchctl
+reapplies the site's Caddy configuration and verifies the public endpoint again.
 
 ## Troubleshooting
 ### Certificate Not Issued
@@ -113,7 +119,7 @@ View certificate information:
 If automatic renewal failed:
 
 1. Go to **Site** → **SSL**
-2. Click **Renew Certificate**
+2. Click **Retry certificate**
 3. Check for errors
 
 ### Mixed Content Warnings

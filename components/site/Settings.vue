@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { serverService } from '~/services/serverService'
 import type { Site } from '~/types'
 import {
   phpVersionKey,
@@ -158,6 +159,16 @@ const currentSourceControl = computed(() => {
     provider: sourceControlData.value.provider,
   }
 })
+
+const canRetryCertificate = computed(() =>
+  ['auto', 'custom'].includes(props.site.tls_setting),
+)
+
+const checkCertificate = () =>
+  serverService.sites.checkCertificate(props.serverId, props.site.id)
+
+const retryCertificate = () =>
+  serverService.sites.retryCertificate(props.serverId, props.site.id)
 
 const isPhpUpdatePending = computed(() => Boolean(pendingPhpVersion.value))
 
@@ -519,6 +530,10 @@ onBeforeUnmount(pausePhpUpdatePolling)
             Configure SSL/TLS certificate settings for your site
           </p>
         </div>
+        <SharedCertificateStatus
+          :check="checkCertificate"
+          :retry="canRetryCertificate ? retryCertificate : undefined"
+        />
         <SiteUpdateSsl
           :server-id="serverId"
           :site="site"

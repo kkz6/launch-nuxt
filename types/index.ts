@@ -269,6 +269,29 @@ export interface Site extends InstallationStatus {
   latest_deployment?: Deployment;
 }
 
+export type CertificateStatus =
+  | "valid"
+  | "not_issued"
+  | "expired"
+  | "invalid"
+  | "unreachable";
+
+export interface CertificateStatusResult {
+  host: string;
+  status: CertificateStatus;
+  valid: boolean;
+  message: string;
+  issuer?: string;
+  subject?: string;
+  serial_number?: string;
+  resolved_ip?: string;
+  dns_names?: string[];
+  not_before?: string;
+  expires_at?: string;
+  days_remaining?: number;
+  checked_at: string;
+}
+
 export interface Deployment {
   id: string;
   site_id: string;

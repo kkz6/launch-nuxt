@@ -92,6 +92,22 @@ const validateDns = async (d: DockerDomain) => {
   }
 };
 
+const checkCertificate = (d: DockerDomain) =>
+  dockerService.applications.checkDomainCertificate(
+    props.application.server_id,
+    props.application.project_id,
+    props.application.id,
+    d.id,
+  );
+
+const retryCertificate = (d: DockerDomain) =>
+  dockerService.applications.retryDomainCertificate(
+    props.application.server_id,
+    props.application.project_id,
+    props.application.id,
+    d.id,
+  );
+
 const removeDomain = async (d: DockerDomain) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
@@ -198,7 +214,7 @@ onMounted(fetchDomains);
             <th class="px-4 py-3">HTTPS</th>
             <th class="px-4 py-3">Cert</th>
             <th class="px-4 py-3">DNS</th>
-            <th class="px-4 py-3"></th>
+            <th class="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
@@ -271,9 +287,14 @@ onMounted(fetchDomains);
             </td>
 
             <td class="px-4 py-3 text-xs text-muted-foreground">
-              <span v-if="d.https" class="font-mono">
-                {{ d.certificate_provider }}
-              </span>
+              <div v-if="d.https" class="space-y-1.5">
+                <span class="font-mono">{{ d.certificate_provider }}</span>
+                <SharedCertificateStatus
+                  compact
+                  :check="() => checkCertificate(d)"
+                  :retry="() => retryCertificate(d)"
+                />
+              </div>
               <span v-else>—</span>
             </td>
 

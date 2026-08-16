@@ -15,6 +15,7 @@ import type {
   LoadBalancerBackend,
   UpstreamHealthResponse,
   CheckDomainResponse,
+  CertificateStatusResult,
 } from "~/types";
 import type { ApiResponse } from "~/composables/useApi";
 
@@ -167,6 +168,18 @@ export const serverService = {
     list: (serverId: string) => {
       const { get } = useApi();
       return get<ApiResponse<Site[]>>(`/servers/${serverId}/sites`);
+    },
+    checkCertificate: (serverId: string, siteId: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<CertificateStatusResult>>(
+        `/servers/${serverId}/sites/${siteId}/certificate`,
+      );
+    },
+    retryCertificate: (serverId: string, siteId: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<null>>(
+        `/servers/${serverId}/sites/${siteId}/certificate/retry`,
+      );
     },
   },
 

@@ -72,6 +72,8 @@ Add a hostname after its DNS points to the Docker server. Traefik routes the dom
 - A container-port override.
 - Let's Encrypt or a stored certificate.
 - DNS validation against the server's public IP.
+- Live certificate verification against the public TLS endpoint, with a retry
+  action that reapplies the workload's Traefik configuration after DNS is fixed.
 
 ### Volumes, redirects, and schedules
 
