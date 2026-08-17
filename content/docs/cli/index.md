@@ -10,17 +10,22 @@ description: Operate launchctl from a fast, resilient terminal interface
 ### Homebrew
 
 ```bash
-brew tap kkz6/tap
-brew install lctl
+brew install kkz6/tap/lctl
 ```
 
-### Go
+The fully qualified formula grants trust only to `lctl`. If Homebrew reports
+that a previously added tap is untrusted, trust the formula and retry:
 
 ```bash
-go install github.com/kkz6/launchctl@latest
+brew trust --formula kkz6/tap/lctl
+brew install kkz6/tap/lctl
 ```
 
-Release archives for macOS and Linux on AMD64 and ARM64 are also published from the [CLI repository](https://github.com/kkz6/launchctl-cli/releases).
+### Source checkout
+
+Repository contributors with source access can run `go build -o lctl .`. The
+source repository is private, so its Go module is not a public installation
+channel. Published binaries support macOS and Linux on AMD64 and ARM64.
 
 Verify the install:
 
@@ -28,6 +33,34 @@ Verify the install:
 lctl version
 lctl completion zsh > "${fpath[1]}/_lctl"
 ```
+
+## Update lctl
+
+Check without changing the installation, or install the latest stable release:
+
+```bash
+lctl update --check
+lctl update
+```
+
+For scripts, `lctl update --check --json` reports the current and latest
+versions plus `update_available`. Homebrew installations delegate to
+`brew upgrade kkz6/tap/lctl`; direct installations verify the downloaded
+archive and staged binary before an atomic replacement. `lctl upgrade` is an
+alias, and `lctl update --force` reinstalls the latest release.
+
+The interactive header can show `Update available: vX.Y.Z`. It reads a local
+cache immediately and refreshes it in a detached process, so launch does not
+wait on the network. Successful checks run at most once every 24 hours and
+failed checks retry after one hour. Disable only these passive checks and
+notices with:
+
+```bash
+export LAUNCHCTL_NO_UPDATE_CHECK=1
+```
+
+Explicit update commands remain available. If the CLI manages your
+`operate-launchctl` skill, run `lctl ai update` after updating the binary.
 
 ## Authenticate
 
@@ -91,13 +124,13 @@ Install the Codex skill and operate every CLI and API feature with AI
 
 ## Global flags
 
-| Flag | Purpose |
-| --- | --- |
-| `--json` | Machine-readable output; live commands emit NDJSON |
-| `--ci` | Disable interactive workflows for CI/CD |
-| `--profile <name>` | Use a profile for this invocation without switching globally |
+| Flag                 | Purpose                                                         |
+| -------------------- | --------------------------------------------------------------- |
+| `--json`             | Machine-readable output; live commands emit NDJSON              |
+| `--ci`               | Disable interactive workflows for CI/CD                         |
+| `--profile <name>`   | Use a profile for this invocation without switching globally    |
 | `--api-url <origin>` | Override the API origin for approved development or staging use |
-| `--help` | Show command-specific syntax and flags |
+| `--help`             | Show command-specific syntax and flags                          |
 
 ## Configuration precedence
 

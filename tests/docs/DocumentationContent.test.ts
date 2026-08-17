@@ -40,6 +40,8 @@ describe("Docker and AI documentation", () => {
     const content = readDoc("cli/ai-skill");
     expect(content).toContain("lctl ai install");
     expect(content).toContain("codex plugin marketplace add");
+    expect(content).toContain("--ref v0.2.3");
+    expect(content).not.toContain("--ref v0.2.2");
     expect(content).toContain("docker.application.*");
     expect(content).toContain("queued HTTP response");
   });
@@ -103,6 +105,19 @@ describe("Docker and AI documentation", () => {
     expect(automation).toContain("it is not a self-hosting interface");
     expect(index).toContain("launchctl is currently hosted-only");
     expect(index).not.toContain("project config, self-hosting");
+  });
+
+  it("documents trusted installation and CLI self-updates", () => {
+    const index = readDoc("cli/index");
+    const automation = readDoc("cli/automation");
+
+    expect(index).toContain("brew install kkz6/tap/lctl");
+    expect(index).toContain("brew trust --formula kkz6/tap/lctl");
+    expect(index).toContain("lctl update --check");
+    expect(index).toContain("lctl update --force");
+    expect(index).toContain("LAUNCHCTL_NO_UPDATE_CHECK=1");
+    expect(index).not.toContain("go install github.com/kkz6/launchctl@latest");
+    expect(automation).toContain("LAUNCHCTL_NO_UPDATE_CHECK");
   });
 
   it("keeps documentation menus free of decorative left borders", () => {

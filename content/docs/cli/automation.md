@@ -25,13 +25,18 @@ development and staging environments.
 
 ## Environment variables
 
-| Variable | Purpose |
-| --- | --- |
-| `LAUNCHCTL_TOKEN` | Personal API token |
-| `LAUNCHCTL_TEAM_ID` | Active team ID |
-| `LAUNCHCTL_API_URL` | Approved launchctl development or staging API origin |
+| Variable                    | Purpose                                              |
+| --------------------------- | ---------------------------------------------------- |
+| `LAUNCHCTL_TOKEN`           | Personal API token                                   |
+| `LAUNCHCTL_TEAM_ID`         | Active team ID                                       |
+| `LAUNCHCTL_API_URL`         | Approved launchctl development or staging API origin |
+| `LAUNCHCTL_NO_UPDATE_CHECK` | Disable passive CLI update checks and notices        |
 
 Flags override environment variables; environment variables override the active profile.
+
+`LAUNCHCTL_NO_UPDATE_CHECK` affects only the detached check used by the
+interactive header. Explicit `lctl update` and `lctl update --check` commands
+continue to work in local terminals and CI.
 
 ## JSON and CI
 

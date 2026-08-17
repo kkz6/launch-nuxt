@@ -41,7 +41,7 @@ All four commands support the global `--json` flag. Use `--codex-home <path>` wh
 The plugin is versioned with the CLI release:
 
 ```bash
-codex plugin marketplace add kkz6/launchctl-cli --ref v0.2.2
+codex plugin marketplace add kkz6/launchctl-cli --ref v0.2.3
 codex plugin add launchctl@launchctl
 ```
 
