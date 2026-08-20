@@ -751,7 +751,7 @@ const actions = computed(() => [
           </template>
 
           <template #cell-schedule="{ row }">
-            <SharedCronSchedule :expression="row.cron_expression" />
+            <SharedCronSchedule :expression="row.cron_expression" time-zone="UTC" />
           </template>
 
           <template #cell-status="{ row }">

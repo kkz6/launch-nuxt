@@ -181,6 +181,16 @@ describe("server backup activity", () => {
     wrapper.unmount();
   });
 
+  it("labels automatic backup schedules as UTC", async () => {
+    const wrapper = mountComponent();
+    await flushPromises();
+
+    const schedule = wrapper.get("shared-cron-schedule-stub");
+    expect(schedule.attributes("expression")).toBe("0 3 * * *");
+    expect(schedule.attributes("time-zone")).toBe("UTC");
+    wrapper.unmount();
+  });
+
   it("surfaces current fetch failures", async () => {
     mocks.api.mockRejectedValueOnce(new Error("down"));
     const wrapper = mountComponent();
