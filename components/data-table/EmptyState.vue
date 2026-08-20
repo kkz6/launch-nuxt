@@ -2,6 +2,8 @@
 import { Button } from "~/components/ui/button";
 import type { EmptyStateDef } from "~/types/data-table";
 
+const { t } = useI18n();
+
 defineProps<{
   config?: EmptyStateDef | null;
 }>();
@@ -26,7 +28,7 @@ defineProps<{
       </svg>
     </div>
     <h3 class="text-lg font-semibold">
-      {{ config?.title ?? "No results found" }}
+      {{ config?.title ?? t("data.noResults") }}
     </h3>
     <p v-if="config?.message" class="mt-1 text-sm text-muted-foreground">
       {{ config.message }}

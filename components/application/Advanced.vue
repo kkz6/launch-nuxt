@@ -11,6 +11,7 @@ interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   updated: [];
   deleted: [];
@@ -173,7 +174,7 @@ watch(
 const saveName = async () => {
   const newName = nameForm.value.trim();
   if (!newName) {
-    toast.error("Name is required");
+    toast.error(t("workload.validation.nameRequired"));
     return;
   }
   if (newName === props.application.name) return;
@@ -185,11 +186,13 @@ const saveName = async () => {
       props.application.id,
       { name: newName },
     );
-    toast.success("Application renamed");
+    toast.success(t("workload.application.advanced.renamed"));
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to rename application");
+    toast.error(
+      e.data?.message || t("workload.application.advanced.renameFailed"),
+    );
   } finally {
     nameSaving.value = false;
   }
@@ -210,13 +213,15 @@ const saveBuild = async () => {
     );
     toast.success(
       isGhaApp.value
-        ? "Build settings saved — re-sync the workflow to apply"
-        : "Build settings saved — applies on next deploy",
+        ? t("workload.application.advanced.buildSavedResync")
+        : t("workload.application.advanced.buildSavedNextDeploy"),
     );
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update build settings");
+    toast.error(
+      e.data?.message || t("workload.application.advanced.buildSaveFailed"),
+    );
   } finally {
     buildSaving.value = false;
   }
@@ -230,11 +235,11 @@ const resyncBuildWorkflow = async () => {
       props.application.project_id,
       props.application.id,
     );
-    toast.success("Workflow re-sync queued");
+    toast.success(t("workload.githubActions.resyncQueued"));
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to queue workflow re-sync");
+    toast.error(e.data?.message || t("workload.githubActions.resyncFailed"));
   } finally {
     buildResyncing.value = false;
   }
@@ -256,11 +261,11 @@ const saveRuntime = async () => {
         healthcheck_command: healthcheckCommand.value.trim(),
       },
     );
-    toast.success("Container runtime saved — applies on next deploy");
+    toast.success(t("workload.runtime.saved"));
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update container runtime");
+    toast.error(e.data?.message || t("workload.runtime.saveFailed"));
   } finally {
     runtimeSaving.value = false;
   }
@@ -273,7 +278,7 @@ const savePorts = async () => {
     .filter((line) => line.length > 0);
   for (const p of ports) {
     if (!isValidPortMapping(p)) {
-      toast.error(`"${p}" doesn't look like host:container`);
+      toast.error(t("workload.ports.invalidMapping", { mapping: p }));
       return;
     }
   }
@@ -281,7 +286,7 @@ const savePorts = async () => {
     internalPort.value !== undefined &&
     (internalPort.value < 1 || internalPort.value > 65535)
   ) {
-    toast.error("Port must be between 1 and 65535");
+    toast.error(t("workload.validation.portRange"));
     return;
   }
   portsSaving.value = true;
@@ -297,11 +302,11 @@ const savePorts = async () => {
           : {}),
       },
     );
-    toast.success("Ports saved — applies on next deploy");
+    toast.success(t("workload.ports.saved"));
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update ports");
+    toast.error(e.data?.message || t("workload.ports.saveFailed"));
   } finally {
     portsSaving.value = false;
   }
@@ -311,7 +316,7 @@ const saveSecurity = async () => {
   const u = security.username.trim();
   const p = security.password;
   if ((u && !p) || (!u && p)) {
-    toast.error("Both username and password are required to enable basic auth");
+    toast.error(t("workload.security.credentialsRequired"));
     return;
   }
   securitySaving.value = true;
@@ -323,14 +328,12 @@ const saveSecurity = async () => {
       { security: { username: u, password: p } },
     );
     toast.success(
-      u && p
-        ? "Basic auth enabled — applies on next deploy"
-        : "Basic auth cleared — applies on next deploy",
+      u && p ? t("workload.security.enabled") : t("workload.security.cleared"),
     );
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update security");
+    toast.error(e.data?.message || t("workload.security.saveFailed"));
   } finally {
     securitySaving.value = false;
   }
@@ -383,10 +386,10 @@ const saveTraefikConfig = async () => {
     traefikContentOnDisk.value = res.data.content;
     traefikFilename.value = res.data.filename;
     traefikEditing.value = false;
-    toast.success("Traefik config saved — Traefik picks it up automatically.");
+    toast.success(t("workload.traefik.saved"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to save Traefik config");
+    toast.error(e.data?.message || t("workload.traefik.saveFailed"));
   } finally {
     traefikSaving.value = false;
   }
@@ -397,18 +400,22 @@ onMounted(fetchTraefikConfig);
 const deleteApplication = async () => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Delete Application",
+    title: t("workload.application.delete.title"),
     description:
       props.application.status === "running"
-        ? `"${props.application.name}" is currently running. Deleting it will stop and remove the container.`
-        : `Are you sure you want to delete "${props.application.name}"? This action cannot be undone.`,
-    confirmText: "Delete Application",
-    cancelText: "Cancel",
+        ? t("workload.application.delete.runningDescription", {
+            name: props.application.name,
+          })
+        : t("workload.application.delete.advancedDescription", {
+            name: props.application.name,
+          }),
+    confirmText: t("workload.application.delete.title"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
-    helpText: "Type the application name to confirm deletion:",
+    helpText: t("workload.application.delete.confirmDeletionHelp"),
     inputVerificationText: props.application.name,
     checkbox: {
-      label: "Also delete attached named volumes (data will be lost)",
+      label: t("workload.application.delete.volumesLabel"),
       checked: false,
     },
   });
@@ -425,13 +432,13 @@ const deleteApplication = async () => {
     );
     toast.success(
       removeVolumes
-        ? "Application + named volumes deletion queued"
-        : "Application deletion queued (volumes preserved)",
+        ? t("workload.application.delete.queuedWithVolumes")
+        : t("workload.application.delete.queuedPreserved"),
     );
     emit("deleted");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Unable to delete application");
+    toast.error(e.data?.message || t("workload.application.delete.unable"));
   } finally {
     deleteLoading.value = false;
   }
@@ -445,20 +452,24 @@ const deleteApplication = async () => {
     <div v-show="activeSection === 'general'" class="space-y-6">
       <div class="space-y-4">
         <div>
-          <h3 class="text-lg font-medium">General</h3>
-          <p class="text-sm text-muted-foreground">Rename the application.</p>
+          <h3 class="text-lg font-medium">
+            {{ t("workload.application.advanced.general") }}
+          </h3>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.application.advanced.renameDescription") }}
+          </p>
         </div>
 
         <div class="space-y-2">
-          <Label for="app-name">Name</Label>
+          <Label for="app-name">{{ t("workload.fields.name") }}</Label>
           <Input
             id="app-name"
             v-model="nameForm"
-            placeholder="e.g. api, web, worker"
+            :placeholder="t('workload.application.create.namePlaceholder')"
             autocomplete="off"
           />
           <p class="text-sm text-muted-foreground">
-            Used in the container name and the deploy log.
+            {{ t("workload.application.advanced.nameHelp") }}
           </p>
         </div>
 
@@ -468,7 +479,7 @@ const deleteApplication = async () => {
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Save Changes
+          {{ t("workload.actions.saveChanges") }}
         </Button>
       </div>
 
@@ -476,9 +487,11 @@ const deleteApplication = async () => {
         <Separator />
         <div class="space-y-4">
           <div>
-            <h3 class="text-lg font-medium">Build</h3>
+            <h3 class="text-lg font-medium">
+              {{ t("workload.fields.build") }}
+            </h3>
             <p class="text-sm text-muted-foreground">
-              How Launch builds the image from your repository.
+              {{ t("workload.application.advanced.buildDescription") }}
             </p>
           </div>
 
@@ -492,8 +505,7 @@ const deleteApplication = async () => {
                 class="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400"
               />
               <span class="text-amber-800 dark:text-amber-200">
-                Your GitHub Actions workflow is out of date. Re-sync it to
-                commit the updated build config to your repository.
+                {{ t("workload.application.advanced.workflowOutdated") }}
               </span>
             </div>
             <Button
@@ -508,19 +520,19 @@ const deleteApplication = async () => {
                 name="lucide:loader-2"
                 class="mr-2 h-4 w-4 animate-spin"
               />
-              Re-sync workflow
+              {{ t("workload.githubActions.resync") }}
             </Button>
           </div>
 
           <div class="space-y-2">
-            <Label for="app-builder">Builder</Label>
+            <Label for="app-builder">{{ t("workload.fields.builder") }}</Label>
             <Select v-model="builderType">
               <SelectTrigger id="app-builder">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="auto">
-                  Auto-detect (Dockerfile, else Nixpacks)
+                  {{ t("workload.application.create.autoDetectBuilder") }}
                 </SelectItem>
                 <SelectItem value="nixpacks">Nixpacks</SelectItem>
                 <SelectItem value="dockerfile">Dockerfile</SelectItem>
@@ -529,22 +541,24 @@ const deleteApplication = async () => {
           </div>
 
           <div v-if="builderType === 'dockerfile'" class="space-y-2">
-            <Label for="app-dockerfile">Dockerfile location</Label>
+            <Label for="app-dockerfile">{{
+              t("workload.application.advanced.dockerfileLocation")
+            }}</Label>
             <Input
               id="app-dockerfile"
               v-model="dockerfilePath"
-              placeholder="e.g. docker/Dockerfile — blank uses ./Dockerfile"
+              :placeholder="
+                t('workload.application.advanced.dockerfilePlaceholder')
+              "
               autocomplete="off"
             />
             <p class="text-sm text-muted-foreground">
-              Path to the Dockerfile within the repository.
+              {{ t("workload.application.advanced.dockerfileHelp") }}
             </p>
           </div>
 
           <p v-if="isGhaApp" class="text-sm text-muted-foreground">
-            This app builds on GitHub Actions. Saving marks the committed
-            workflow out of date — re-sync it to push the change to your repo.
-            Server builds apply on the next deploy.
+            {{ t("workload.application.advanced.githubActionsSaveHelp") }}
           </p>
 
           <Button :disabled="buildSaving" @click="saveBuild">
@@ -553,7 +567,7 @@ const deleteApplication = async () => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Save Build Settings
+            {{ t("workload.application.advanced.saveBuild") }}
           </Button>
         </div>
       </template>
@@ -574,10 +588,11 @@ const deleteApplication = async () => {
     <div v-show="activeSection === 'runtime'" class="space-y-6">
       <div class="space-y-4">
         <div>
-          <h3 class="text-lg font-medium">Container Runtime</h3>
+          <h3 class="text-lg font-medium">
+            {{ t("workload.runtime.title") }}
+          </h3>
           <p class="text-sm text-muted-foreground">
-            Resource caps + reservations, restart policy, and the container
-            HEALTHCHECK. Applied on the next deploy.
+            {{ t("workload.runtime.description") }}
           </p>
         </div>
 
@@ -585,58 +600,78 @@ const deleteApplication = async () => {
           <div
             class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
-            Resources
+            {{ t("workload.runtime.resources") }}
           </div>
           <div class="grid gap-4 sm:grid-cols-2">
             <div class="space-y-2">
-              <Label for="app-memory-limit">Memory Limit</Label>
+              <Label for="app-memory-limit">{{
+                t("workload.runtime.memoryLimit")
+              }}</Label>
               <Input
                 id="app-memory-limit"
                 v-model="memoryLimit"
-                placeholder="e.g. 512m, 1g"
+                :placeholder="
+                  t('workload.database.advanced.memoryLimitPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-sm text-muted-foreground">
-                Hard ceiling (<code>-m</code>). Empty = unlimited.
+                {{ t("workload.runtime.memoryLimitBefore") }}
+                <code>-m</code>{{ t("workload.runtime.memoryLimitAfter") }}
               </p>
             </div>
 
             <div class="space-y-2">
-              <Label for="app-memory-reservation">Memory Reservation</Label>
+              <Label for="app-memory-reservation">{{
+                t("workload.runtime.memoryReservation")
+              }}</Label>
               <Input
                 id="app-memory-reservation"
                 v-model="memoryReservation"
-                placeholder="e.g. 256m"
+                :placeholder="
+                  t('workload.database.advanced.memoryReservationPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-sm text-muted-foreground">
-                Soft floor (<code>--memory-reservation</code>).
+                {{ t("workload.runtime.memoryReservationBefore") }}
+                <code>--memory-reservation</code
+                >{{ t("workload.punctuation.period") }}
               </p>
             </div>
 
             <div class="space-y-2">
-              <Label for="app-cpu-limit">CPU Limit</Label>
+              <Label for="app-cpu-limit">{{
+                t("workload.runtime.cpuLimit")
+              }}</Label>
               <Input
                 id="app-cpu-limit"
                 v-model="cpuLimit"
-                placeholder="e.g. 0.5, 2"
+                :placeholder="
+                  t('workload.database.advanced.cpuLimitPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-sm text-muted-foreground">
-                CPUs (<code>--cpus</code>). Empty = unlimited.
+                {{ t("workload.runtime.cpuLimitBefore") }}
+                <code>--cpus</code>{{ t("workload.runtime.cpuLimitAfter") }}
               </p>
             </div>
 
             <div class="space-y-2">
-              <Label for="app-cpu-reservation">CPU Reservation</Label>
+              <Label for="app-cpu-reservation">{{
+                t("workload.runtime.cpuReservation")
+              }}</Label>
               <Input
                 id="app-cpu-reservation"
                 v-model="cpuReservation"
-                placeholder="e.g. 1024"
+                :placeholder="
+                  t('workload.database.advanced.cpuReservationPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-sm text-muted-foreground">
-                CPU shares (1024 = baseline).
+                {{ t("workload.runtime.cpuReservationHelp") }}
               </p>
             </div>
           </div>
@@ -646,7 +681,7 @@ const deleteApplication = async () => {
           <div
             class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
-            Restart Policy
+            {{ t("workload.runtime.restartPolicy") }}
           </div>
           <div class="space-y-2">
             <Select v-model="restartPolicy">
@@ -655,16 +690,21 @@ const deleteApplication = async () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unless-stopped">
-                  Unless stopped (default)
+                  {{ t("workload.runtime.unlessStopped") }}
                 </SelectItem>
-                <SelectItem value="always">Always</SelectItem>
-                <SelectItem value="on-failure">On failure</SelectItem>
-                <SelectItem value="no">No</SelectItem>
+                <SelectItem value="always">{{
+                  t("workload.runtime.always")
+                }}</SelectItem>
+                <SelectItem value="on-failure">{{
+                  t("workload.runtime.onFailure")
+                }}</SelectItem>
+                <SelectItem value="no">{{
+                  t("workload.runtime.no")
+                }}</SelectItem>
               </SelectContent>
             </Select>
             <p class="text-sm text-muted-foreground">
-              Whether the container restarts after the docker daemon (or host)
-              reboots.
+              {{ t("workload.runtime.restartHelp") }}
             </p>
           </div>
         </div>
@@ -673,7 +713,7 @@ const deleteApplication = async () => {
           <div
             class="text-xs font-medium uppercase tracking-wide text-muted-foreground"
           >
-            Healthcheck
+            {{ t("workload.runtime.healthcheck") }}
           </div>
           <div class="space-y-2">
             <Input
@@ -684,8 +724,7 @@ const deleteApplication = async () => {
               autocomplete="off"
             />
             <p class="text-sm text-muted-foreground">
-              Single command run inside the container by docker's HEALTHCHECK.
-              Leave blank to skip.
+              {{ t("workload.runtime.healthcheckHelp") }}
             </p>
           </div>
         </div>
@@ -696,7 +735,7 @@ const deleteApplication = async () => {
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Save Changes
+          {{ t("workload.actions.saveChanges") }}
         </Button>
       </div>
 
@@ -704,16 +743,19 @@ const deleteApplication = async () => {
 
       <div class="space-y-4">
         <div>
-          <h3 class="text-lg font-medium">Security</h3>
+          <h3 class="text-lg font-medium">
+            {{ t("workload.security.title") }}
+          </h3>
           <p class="text-sm text-muted-foreground">
-            HTTP basic-auth in front of the app via a Traefik basicauth
-            middleware. Clear both fields to disable.
+            {{ t("workload.security.description") }}
           </p>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
           <div class="space-y-2">
-            <Label for="app-security-user">Username</Label>
+            <Label for="app-security-user">{{
+              t("workload.fields.username")
+            }}</Label>
             <Input
               id="app-security-user"
               v-model="security.username"
@@ -722,7 +764,9 @@ const deleteApplication = async () => {
             />
           </div>
           <div class="space-y-2">
-            <Label for="app-security-pass">Password</Label>
+            <Label for="app-security-pass">{{
+              t("workload.fields.password")
+            }}</Label>
             <div class="relative">
               <Input
                 id="app-security-pass"
@@ -736,7 +780,9 @@ const deleteApplication = async () => {
                 type="button"
                 class="absolute right-0 top-0 grid h-10 w-10 place-items-center text-muted-foreground hover:text-foreground"
                 :title="
-                  securityRevealPassword ? 'Hide password' : 'Show password'
+                  securityRevealPassword
+                    ? t('workload.security.hidePassword')
+                    : t('workload.security.showPassword')
                 "
                 @click="securityRevealPassword = !securityRevealPassword"
               >
@@ -751,8 +797,7 @@ const deleteApplication = async () => {
           </div>
         </div>
         <p class="text-sm text-muted-foreground">
-          Password is hashed by Traefik (htpasswd) at deploy time and stored in
-          the application's build_config.
+          {{ t("workload.security.passwordHelp") }}
         </p>
 
         <Button :disabled="securitySaving" @click="saveSecurity">
@@ -761,7 +806,7 @@ const deleteApplication = async () => {
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Save Changes
+          {{ t("workload.actions.saveChanges") }}
         </Button>
       </div>
 
@@ -769,16 +814,18 @@ const deleteApplication = async () => {
 
       <div class="space-y-4">
         <div>
-          <h3 class="text-lg font-medium">Ports</h3>
+          <h3 class="text-lg font-medium">{{ t("workload.ports.title") }}</h3>
           <p class="text-sm text-muted-foreground">
-            Extra <code>host:container</code> mappings, one per line. For HTTP
-            apps prefer the Domains tab — Traefik handles TLS + routing. These
-            are for non-HTTP services that need a raw host port.
+            {{ t("workload.ports.descriptionBefore") }}
+            <code>host:container</code>
+            {{ t("workload.ports.descriptionAfter") }}
           </p>
         </div>
 
         <div class="space-y-2">
-          <Label for="app-internal-port">Container port</Label>
+          <Label for="app-internal-port">{{
+            t("workload.domains.containerPort")
+          }}</Label>
           <Input
             id="app-internal-port"
             v-model.number="internalPort"
@@ -789,13 +836,14 @@ const deleteApplication = async () => {
             placeholder="80"
           />
           <p class="text-sm text-muted-foreground">
-            The port your app listens on inside the container. Domains and
-            health checks route to this. Applies on the next deploy.
+            {{ t("workload.ports.containerPortHelp") }}
           </p>
         </div>
 
         <div class="space-y-2">
-          <Label for="app-extra-ports">Extra ports</Label>
+          <Label for="app-extra-ports">{{
+            t("workload.ports.extraPorts")
+          }}</Label>
           <Textarea
             id="app-extra-ports"
             v-model="extraPortsRaw"
@@ -804,7 +852,8 @@ const deleteApplication = async () => {
             placeholder="8080:80&#10;5432:5432/tcp"
           />
           <p class="text-sm text-muted-foreground">
-            Each entry is appended to <code>docker run -p</code>.
+            {{ t("workload.ports.entryBefore") }}
+            <code>docker run -p</code>{{ t("workload.punctuation.period") }}
           </p>
         </div>
 
@@ -814,7 +863,7 @@ const deleteApplication = async () => {
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Save Changes
+          {{ t("workload.actions.saveChanges") }}
         </Button>
       </div>
     </div>
@@ -823,9 +872,7 @@ const deleteApplication = async () => {
       <div>
         <h3 class="text-lg font-medium">Traefik</h3>
         <p class="text-sm text-muted-foreground">
-          Modify the traefik config, in rare cases you may need to add specific
-          config, be careful because modifying incorrectly can break traefik and
-          your application.
+          {{ t("workload.traefik.description") }}
           <span
             v-if="traefikFilename"
             class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono text-xs"
@@ -852,8 +899,7 @@ const deleteApplication = async () => {
             class="flex h-32 flex-col items-center justify-center rounded-md border border-dashed text-center text-xs text-muted-foreground"
           >
             <Icon name="lucide:route-off" class="mb-2 h-5 w-5" />
-            No Traefik config on this server yet. Attach a domain on the Domains
-            tab and deploy — or hit Modify to write the file yourself.
+            {{ t("workload.traefik.applicationEmpty") }}
           </div>
         </div>
         <div v-else class="relative">
@@ -864,7 +910,7 @@ const deleteApplication = async () => {
             @click="beginModifyTraefik"
           >
             <Icon name="lucide:pencil" class="mr-2 h-3.5 w-3.5" />
-            Modify
+            {{ t("workload.traefik.modify") }}
           </Button>
           <SharedCodeEditor
             v-model="traefikContent"
@@ -883,7 +929,7 @@ const deleteApplication = async () => {
           :disabled="traefikSaving"
           @click="cancelModifyTraefik"
         >
-          Cancel
+          {{ t("workload.actions.cancel") }}
         </Button>
         <Button
           :disabled="traefikSaving || !traefikDirty"
@@ -894,17 +940,18 @@ const deleteApplication = async () => {
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Save
+          {{ t("workload.actions.save") }}
         </Button>
       </div>
     </div>
 
     <div v-if="canDelete" v-show="activeSection === 'danger'" class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+        <h3 class="text-lg font-medium text-destructive">
+          {{ t("workload.danger.title") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Permanently delete this application. The container is stopped and
-          removed; volumes (if any) stay on disk. This action cannot be undone.
+          {{ t("workload.application.advanced.dangerDescription") }}
         </p>
       </div>
 
@@ -919,7 +966,7 @@ const deleteApplication = async () => {
           class="mr-2 h-4 w-4 animate-spin"
         />
         <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
-        Delete Application
+        {{ t("workload.application.delete.title") }}
       </Button>
     </div>
   </div>

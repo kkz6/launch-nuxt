@@ -5,6 +5,7 @@ import { platformService } from "~/services/platformService";
 import { usePlatformUpdateEvents } from "~/composables/useChannelEvents";
 
 const { user } = useAuth();
+const { t } = useI18n();
 const updates = ref<PlatformUpdate[]>([]);
 
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
@@ -26,6 +27,12 @@ const severityConfig = {
 
 const pendingCount = (update: PlatformUpdate) => {
   return update.status_counts?.pending ?? 0;
+};
+
+const localizedUpdateTitle = (update: PlatformUpdate) => {
+  const key = `common.platformUpdate.updates.${update.key}.title`;
+  const translated = t(key);
+  return translated === key ? update.title : translated;
 };
 
 const fetchUpdates = async () => {
@@ -70,12 +77,25 @@ onMounted(() => {
       <div class="flex items-start gap-2.5 sm:items-center">
         <component
           :is="severityConfig[update.severity].icon"
-          :class="['mt-0.5 h-4 w-4 shrink-0 sm:mt-0', severityConfig[update.severity].accent]"
+          :class="[
+            'mt-0.5 h-4 w-4 shrink-0 sm:mt-0',
+            severityConfig[update.severity].accent,
+          ]"
         />
         <div class="min-w-0 flex-1 sm:flex sm:items-center sm:gap-2">
-          <span class="block break-words font-medium text-white">{{ update.title }}</span>
+          <span class="block break-words font-medium text-white">{{
+            localizedUpdateTitle(update)
+          }}</span>
           <span v-if="pendingCount(update) > 0" class="text-xs text-zinc-400">
-            — {{ pendingCount(update) }} server{{ pendingCount(update) !== 1 ? "s" : "" }} pending
+            —
+            {{
+              t(
+                pendingCount(update) === 1
+                  ? "common.platformUpdate.pendingOne"
+                  : "common.platformUpdate.pendingMany",
+                { count: pendingCount(update) },
+              )
+            }}
           </span>
         </div>
       </div>
@@ -84,11 +104,11 @@ onMounted(() => {
           :to="`/platform/updates/${update.id}`"
           class="text-xs font-medium text-zinc-300 underline underline-offset-2 hover:text-white"
         >
-          View Details
+          {{ t("common.platformUpdate.viewDetails") }}
         </NuxtLink>
         <button
           class="rounded p-0.5 text-zinc-500 hover:text-zinc-300"
-          aria-label="Dismiss notification"
+          :aria-label="t('common.platformUpdate.dismiss')"
           @click="dismiss(update)"
         >
           <X class="h-3.5 w-3.5" />

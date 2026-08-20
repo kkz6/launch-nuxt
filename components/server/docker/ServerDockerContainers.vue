@@ -15,6 +15,7 @@ interface Props {
   serverId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const rows = ref<DockerHostContainer[]>([]);
 const isLoading = ref(true);
@@ -39,7 +40,7 @@ const fetchRows = async () => {
     rows.value = res.data;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to list containers");
+    toast.error(e.data?.message || t("server.docker.containers.loadFailed"));
   } finally {
     isLoading.value = false;
     refreshing.value = false;
@@ -89,10 +90,11 @@ onMounted(fetchRows);
   <div>
     <div class="mb-6 flex items-center justify-between gap-4">
       <div>
-        <h2 class="text-2xl font-semibold">Containers</h2>
+        <h2 class="text-2xl font-semibold">
+          {{ t("server.docker.containers.title") }}
+        </h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Workloads running on this docker host. Launch's own services
-          (Traefik, etc.) are hidden by default.
+          {{ t("server.docker.containers.description") }}
         </p>
       </div>
       <div class="flex items-center gap-3">
@@ -101,20 +103,23 @@ onMounted(fetchRows);
           class="flex items-center gap-2 text-xs text-muted-foreground"
         >
           <Switch v-model="showSystem" />
-          Show system ({{ systemCount }})
+          {{ t("server.docker.containers.showSystem", { count: systemCount }) }}
         </label>
         <Button variant="outline" :disabled="refreshing" @click="fetchRows">
           <Icon
             :name="refreshing ? 'lucide:loader-2' : 'lucide:refresh-cw'"
             :class="['mr-2 h-4 w-4', refreshing && 'animate-spin']"
           />
-          Refresh
+          {{ t("server.common.refresh") }}
         </Button>
       </div>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <div
@@ -122,25 +127,31 @@ onMounted(fetchRows);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:container" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No containers</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("server.docker.containers.empty") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
         {{
           systemCount > 0 && !showSystem
-            ? `Only system containers are running. Toggle "Show system" above to see them, or deploy an application to populate this view.`
-            : "Once you deploy an application or compose stack, the resulting containers will appear here."
+            ? t("server.docker.containers.onlySystem")
+            : t("server.docker.containers.emptyDescription")
         }}
       </p>
     </div>
 
     <div v-else class="overflow-hidden rounded-lg border">
       <table class="w-full text-sm">
-        <thead class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead
+          class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground"
+        >
           <tr>
-            <th class="px-4 py-3">Name</th>
-            <th class="px-4 py-3">Image</th>
-            <th class="px-4 py-3">State</th>
-            <th class="px-4 py-3">Ports</th>
-            <th class="px-4 py-3">Created</th>
+            <th class="px-4 py-3">{{ t("server.common.name") }}</th>
+            <th class="px-4 py-3">{{ t("server.docker.containers.image") }}</th>
+            <th class="px-4 py-3">{{ t("server.docker.containers.state") }}</th>
+            <th class="px-4 py-3">{{ t("server.docker.containers.ports") }}</th>
+            <th class="px-4 py-3">
+              {{ t("server.docker.containers.created") }}
+            </th>
             <!-- Right-aligned action column for the inspect button. -->
             <th class="w-px px-4 py-3"></th>
           </tr>
@@ -153,9 +164,9 @@ onMounted(fetchRows);
                 <span
                   v-if="c.system"
                   class="rounded-full bg-zinc-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-700 dark:text-zinc-300"
-                  title="Installed and managed by Launch"
+                  :title="t('server.docker.containers.systemHelp')"
                 >
-                  system
+                  {{ t("server.docker.containers.system") }}
                 </span>
               </div>
               <p class="text-[10px] text-muted-foreground">{{ c.ID }}</p>
@@ -182,34 +193,47 @@ onMounted(fetchRows);
                   </TooltipTrigger>
                   <TooltipContent side="right" class="max-w-sm">
                     <div class="space-y-1.5 text-sm">
-                      <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-                        <span class="text-muted-foreground">Status</span>
+                      <div
+                        class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs"
+                      >
+                        <span class="text-muted-foreground">{{
+                          t("server.common.status")
+                        }}</span>
                         <span :class="stateTextColor(c.State)">
                           {{ c.State }}
                         </span>
                         <template v-if="c.Status">
-                          <span class="text-muted-foreground">Uptime</span>
+                          <span class="text-muted-foreground">{{
+                            t("server.metrics.uptime")
+                          }}</span>
                           <span>{{ c.Status }}</span>
                         </template>
-                        <span class="text-muted-foreground">Image</span>
+                        <span class="text-muted-foreground">{{
+                          t("server.docker.containers.image")
+                        }}</span>
                         <span class="break-all font-mono text-[11px]">
                           {{ c.Image }}
                         </span>
-                        <span class="text-muted-foreground">Container ID</span>
+                        <span class="text-muted-foreground">{{
+                          t("server.docker.containers.containerId")
+                        }}</span>
                         <span class="font-mono text-[11px]">{{ c.ID }}</span>
                       </div>
                       <div
                         v-if="c.CreatedAt"
                         class="border-t pt-1.5 text-xs text-muted-foreground"
                       >
-                        Created: <SharedDateTooltip :date="c.CreatedAt" class="inline" />
+                        {{ t("server.docker.containers.created") }}:
+                        <SharedDateTooltip :date="c.CreatedAt" class="inline" />
                       </div>
                     </div>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </td>
-            <td class="px-4 py-3 align-top font-mono text-xs text-muted-foreground">
+            <td
+              class="px-4 py-3 align-top font-mono text-xs text-muted-foreground"
+            >
               <template v-if="c.Ports">
                 <!--
                   docker ps returns ports as a single comma-separated
@@ -218,7 +242,9 @@ onMounted(fetchRows);
                   much easier to scan than one wrapped paragraph.
                 -->
                 <div
-                  v-for="(p, i) in c.Ports.split(',').map((s) => s.trim()).filter(Boolean)"
+                  v-for="(p, i) in c.Ports.split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean)"
                   :key="i"
                   class="whitespace-nowrap"
                 >
@@ -253,7 +279,7 @@ onMounted(fetchRows);
                 variant="ghost"
                 size="icon"
                 class="h-7 w-7"
-                title="Inspect container"
+                :title="t('server.docker.containers.inspect')"
                 @click="openStatus(c)"
               >
                 <Icon name="lucide:info" class="h-4 w-4" />

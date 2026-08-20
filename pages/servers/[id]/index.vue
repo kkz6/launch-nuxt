@@ -1,5 +1,8 @@
 <script setup lang="ts">
-import { useSiteEvents, useDeploymentEvents } from "~/composables/useChannelEvents";
+import {
+  useSiteEvents,
+  useDeploymentEvents,
+} from "~/composables/useChannelEvents";
 import type { Server, Site } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -10,6 +13,7 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const serverId = computed(() => route.params.id as string);
 
 const server = ref<Server | null>(null);
@@ -21,15 +25,16 @@ const isSitesLoading = ref(true);
 // upstreams; docker servers expose Projects/Applications instead. The
 // site-event refetch logic below short-circuits when sites aren't relevant.
 const hasSitesTab = computed(
-  () => server.value?.type !== 'loadbalancer' && server.value?.type !== 'docker',
+  () =>
+    server.value?.type !== "loadbalancer" && server.value?.type !== "docker",
 );
 
 // Shared terminal state with navbar
-const isTerminalOpen = useState('serverTerminalOpen', () => false);
+const isTerminalOpen = useState("serverTerminalOpen", () => false);
 
 // Get current team for WebSocket channel
 const { user } = useAuth();
-const teamId = computed(() => user.value?.current_team_id?.toString() || '');
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
 // Debounced silent refetch for WebSocket events
 let sitesFetchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -51,7 +56,7 @@ useSiteEvents(teamId, (data) => {
 // Subscribe to real-time deployment events
 useDeploymentEvents(teamId, (data) => {
   if (!hasSitesTab.value) return;
-  const siteExists = sites.value.some(site => site.id === data.site_id);
+  const siteExists = sites.value.some((site) => site.id === data.site_id);
   const eventServerId = data.site?.server_id;
   if (siteExists || eventServerId === serverId.value) {
     debouncedFetchSites();
@@ -59,7 +64,7 @@ useDeploymentEvents(teamId, (data) => {
 });
 
 // Watch for refresh trigger from navbar (e.g., after site creation)
-const sitesRefreshKey = useState('sitesRefreshKey', () => 0);
+const sitesRefreshKey = useState("sitesRefreshKey", () => 0);
 watch(sitesRefreshKey, () => {
   if (hasSitesTab.value) {
     fetchSites();
@@ -72,7 +77,15 @@ watch(sitesRefreshKey, () => {
 // Accepted Advanced sub-tabs across all server types. Per-type filtering
 // (e.g. only docker shows 'traefik', only PHP shows 'backups'/'packages')
 // happens in Navbar.advancedSubTabs — this list is the union.
-const validSubTabs = ["general", "backups", "ssh-keys", "packages", "services", "traefik", "maintenance"];
+const validSubTabs = [
+  "general",
+  "backups",
+  "ssh-keys",
+  "packages",
+  "services",
+  "traefik",
+  "maintenance",
+];
 
 const allValidTabs = computed(() =>
   getServerTypeRules(server.value?.type).tabs.map((t) => t.value),
@@ -107,11 +120,14 @@ watch(activeTab, (newTab) => {
 });
 
 // Watch for tab changes from URL (navbar navigation).
-watch(() => route.query.tab, (newTab) => {
-  if (newTab && allValidTabs.value.includes(newTab as string)) {
-    activeTab.value = newTab as string;
-  }
-});
+watch(
+  () => route.query.tab,
+  (newTab) => {
+    if (newTab && allValidTabs.value.includes(newTab as string)) {
+      activeTab.value = newTab as string;
+    }
+  },
+);
 
 // Once we know the server type, snap to that type's default tab if the
 // current activeTab isn't valid for it (e.g. user landed on /?tab=sites
@@ -143,7 +159,9 @@ onMounted(async () => {
     const cached = consumeCachedServer(serverId.value);
     if (cached) {
       server.value = cached;
-      useHead({ title: server.value.name || "Server" });
+      useHead(() => ({
+        title: server.value?.name || t("server.detail.fallbackTitle"),
+      }));
 
       if (!route.query.tab) {
         activeTab.value = defaultTab.value;
@@ -154,12 +172,20 @@ onMounted(async () => {
       // Fetch fresh data and sites in parallel in background. Only PHP-type
       // servers have sites — load-balancers route via upstreams, docker
       // servers don't have "sites" at all (they have projects).
-      const hasSites = server.value.type !== 'loadbalancer' && server.value.type !== 'docker';
+      const hasSites =
+        server.value.type !== "loadbalancer" && server.value.type !== "docker";
       const promises: Promise<void>[] = [
-        serverService.get(serverId.value).then(res => { server.value = res.data; }),
+        serverService.get(serverId.value).then((res) => {
+          server.value = res.data;
+        }),
       ];
       if (hasSites) {
-        promises.push(serverService.sites.list(serverId.value).then(res => { sites.value = res.data; isSitesLoading.value = false; }));
+        promises.push(
+          serverService.sites.list(serverId.value).then((res) => {
+            sites.value = res.data;
+            isSitesLoading.value = false;
+          }),
+        );
       } else {
         isSitesLoading.value = false;
       }
@@ -168,7 +194,9 @@ onMounted(async () => {
       // Direct navigation - no cache, fetch everything
       const serverData = await serverService.get(serverId.value);
       server.value = serverData.data;
-      useHead({ title: server.value?.name || "Server" });
+      useHead(() => ({
+        title: server.value?.name || t("server.detail.fallbackTitle"),
+      }));
 
       if (!route.query.tab) {
         activeTab.value = defaultTab.value;
@@ -177,7 +205,9 @@ onMounted(async () => {
       isLoading.value = false;
 
       // See comment above on which server types have "sites".
-      const hasSites = server.value?.type !== 'loadbalancer' && server.value?.type !== 'docker';
+      const hasSites =
+        server.value?.type !== "loadbalancer" &&
+        server.value?.type !== "docker";
       if (hasSites) {
         const sitesData = await serverService.sites.list(serverId.value);
         sites.value = sitesData.data;
@@ -201,7 +231,12 @@ onMounted(async () => {
   <div v-else-if="server" class="pb-10">
     <!-- Tab Content -->
     <div v-if="activeTab === 'sites'">
-      <ServerShowSites :sites="sites" :server="server" :is-loading="isSitesLoading" @deleted="fetchSites" />
+      <ServerShowSites
+        :sites="sites"
+        :server="server"
+        :is-loading="isSitesLoading"
+        @deleted="fetchSites"
+      />
     </div>
 
     <div v-else-if="activeTab === 'upstreams'">

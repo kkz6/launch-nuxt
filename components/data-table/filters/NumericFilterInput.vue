@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Input } from "~/components/ui/input";
+const { t } = useI18n();
 defineProps<{ value: string }>();
 const emit = defineEmits<{ update: [value: string] }>();
 </script>
@@ -7,7 +8,7 @@ const emit = defineEmits<{ update: [value: string] }>();
   <Input
     type="number"
     :model-value="value"
-    placeholder="Enter number..."
+    :placeholder="t('data.enterNumber')"
     @update:model-value="emit('update', String($event))"
   />
 </template>

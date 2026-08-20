@@ -1,11 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import {
-  computed,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CertificateStatus from "../../components/shared/CertificateStatus.vue";
 import type { CertificateStatusResult } from "../../types";
@@ -14,11 +8,34 @@ const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 
 vi.mock("vue-sonner", () => ({ toast }));
 
+const translate = (key: string, params: Record<string, unknown> = {}) => {
+  const messages: Record<string, string> = {
+    "common.certificate.status.valid": "Valid",
+    "common.certificate.status.notIssued": "Not issued",
+    "common.certificate.status.invalid": "Invalid",
+    "common.certificate.daysRemaining": `${String(params.count ?? 0)} days remaining`,
+    "common.certificate.retryCertificate": "Retry certificate",
+    "common.certificate.diagnosis.hostnameMismatch.title":
+      "Hostname does not match",
+    "common.certificate.diagnosis.hostnameMismatch.guidance":
+      "The proxy is serving a certificate for another hostname. Confirm DNS points to this server, then retry issuance.",
+    "common.certificate.diagnosis.valid.title": "Certificate is active",
+    "common.certificate.diagnosis.valid.guidance":
+      "Public clients are receiving a trusted certificate for this hostname.",
+    "common.certificate.diagnosis.notServed.title":
+      "No certificate is being served",
+    "common.certificate.diagnosis.notServed.guidance":
+      "Confirm the domain reaches this server on port 443, then retry certificate issuance.",
+  };
+  return messages[key] ?? key;
+};
+
 const status = (
   overrides: Partial<CertificateStatusResult> = {},
 ): CertificateStatusResult => ({
   host: "app.example.com",
   status: "valid",
+  reason: "valid",
   valid: true,
   message: "A valid certificate is being served for app.example.com.",
   issuer: "Let's Encrypt",
@@ -67,6 +84,7 @@ describe("CertificateStatus", () => {
     vi.stubGlobal("onBeforeUnmount", onBeforeUnmount);
     vi.stubGlobal("onMounted", onMounted);
     vi.stubGlobal("ref", ref);
+    vi.stubGlobal("useI18n", () => ({ locale: ref("en"), t: translate }));
     vi.stubGlobal("watch", watch);
     toast.success.mockReset();
     toast.error.mockReset();
@@ -92,6 +110,7 @@ describe("CertificateStatus", () => {
   it("offers retry for a missing certificate and verifies again", async () => {
     const missing = status({
       status: "not_issued",
+      reason: "no_certificate",
       valid: false,
       message: "No TLS certificate could be retrieved.",
       issuer: undefined,
@@ -124,8 +143,10 @@ describe("CertificateStatus", () => {
     const check = vi.fn().mockResolvedValue({
       data: status({
         status: "invalid",
+        reason: "hostname_mismatch",
         valid: false,
-        message: "The server is not presenting a certificate for this hostname.",
+        message:
+          "The server is not presenting a certificate for this hostname.",
       }),
     });
     const wrapper = mountStatus(check, undefined, true);

@@ -15,14 +15,23 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { locale, t } = useI18n();
 const normalizedExpression = computed(() => props.expression?.trim() || "");
 const description = computed(() =>
-  describeCronExpression(normalizedExpression.value),
+  describeCronExpression(normalizedExpression.value, locale.value),
 );
-const accessibleLabel = computed(() => {
-  const timeZone = props.timeZone ? ` Times use ${props.timeZone}.` : "";
-  return `${normalizedExpression.value}: ${description.value}.${timeZone}`;
-});
+const accessibleLabel = computed(() =>
+  props.timeZone
+    ? t("common.cron.accessibleWithTimeZone", {
+        expression: normalizedExpression.value,
+        description: description.value,
+        timeZone: props.timeZone,
+      })
+    : t("common.cron.accessible", {
+        expression: normalizedExpression.value,
+        description: description.value,
+      }),
+);
 </script>
 
 <template>
@@ -43,7 +52,7 @@ const accessibleLabel = computed(() => {
       <TooltipContent side="top" class="max-w-xs">
         <p>{{ description }}</p>
         <p v-if="timeZone" class="text-xs text-muted-foreground">
-          Times use {{ timeZone }}.
+          {{ t("common.cron.timesUse", { timeZone }) }}
         </p>
       </TooltipContent>
     </Tooltip>

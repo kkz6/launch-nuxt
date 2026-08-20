@@ -8,6 +8,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const projects = ref<DockerProject[]>([]);
 const isLoading = ref(true);
@@ -18,7 +19,7 @@ const fetchProjects = async (silent = false) => {
     const res = await dockerService.projects.list(props.server.id);
     projects.value = res.data;
   } catch {
-    if (!silent) toast.error("Failed to load projects");
+    if (!silent) toast.error(t("server.docker.projects.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -68,9 +69,11 @@ onMounted(fetchProjects);
       Empty state below points the user at the navbar action.
     -->
 
-
     <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <!--
@@ -84,9 +87,9 @@ onMounted(fetchProjects);
     >
       <Icon name="lucide:folder-tree" class="h-16 w-16 text-muted-foreground" />
       <div class="text-center">
-        <p class="font-medium">No projects yet</p>
+        <p class="font-medium">{{ t("server.docker.projects.empty") }}</p>
         <p class="text-sm text-muted-foreground">
-          Click on New Project to get started
+          {{ t("server.docker.projects.emptyDescription") }}
         </p>
       </div>
     </div>
@@ -147,17 +150,28 @@ onMounted(fetchProjects);
             </div>
           </div>
 
-          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+          <div
+            class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm"
+          >
             <div class="flex items-center gap-4 text-muted-foreground">
-              <span class="flex items-center gap-1.5" title="Applications">
+              <span
+                class="flex items-center gap-1.5"
+                :title="t('server.docker.projects.applications')"
+              >
                 <Icon name="lucide:box" class="h-3.5 w-3.5" />
                 {{ project.applications_count }}
               </span>
-              <span class="flex items-center gap-1.5" title="Compose stacks">
+              <span
+                class="flex items-center gap-1.5"
+                :title="t('server.docker.projects.composeStacks')"
+              >
                 <Icon name="lucide:layers" class="h-3.5 w-3.5" />
                 {{ project.composes_count }}
               </span>
-              <span class="flex items-center gap-1.5" title="Databases">
+              <span
+                class="flex items-center gap-1.5"
+                :title="t('server.docker.projects.databases')"
+              >
                 <Icon name="lucide:database" class="h-3.5 w-3.5" />
                 {{ project.databases_count }}
               </span>

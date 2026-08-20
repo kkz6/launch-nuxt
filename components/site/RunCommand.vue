@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
-import * as z from 'zod'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import { useForm } from "vee-validate";
+import { toTypedSchema } from "@vee-validate/zod";
+import * as z from "zod";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -12,90 +12,108 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '~/components/ui/dialog'
+} from "~/components/ui/dialog";
 import {
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
-} from '~/components/ui/form'
-import { Input } from '~/components/ui/input'
+} from "~/components/ui/form";
+import { Input } from "~/components/ui/input";
 
 interface Props {
-  serverId: string
-  siteId: string
+  serverId: string;
+  siteId: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
-  executed: []
-}>()
+  executed: [];
+}>();
 
-const isOpen = ref(false)
-const isLoading = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const isOpen = ref(false);
+const isLoading = ref(false);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
-const commandSchema = toTypedSchema(
-  z.object({
-    command: z.string().min(1, 'Command is required').max(255),
-  })
-)
+const commandSchema = computed(() =>
+  toTypedSchema(
+    z.object({
+      command: z
+        .string()
+        .min(1, t("site.runCommand.required"))
+        .max(
+          255,
+          t("site.validation.maxCharacters", {
+            field: t("site.runCommand.command"),
+            max: 255,
+          }),
+        ),
+    }),
+  ),
+);
 
 const { handleSubmit, resetForm, setFieldError } = useForm({
   validationSchema: commandSchema,
   validateOnMount: false,
   initialValues: {
-    command: '',
+    command: "",
   },
-})
+});
 
 const handleClose = (open = false) => {
-  isOpen.value = open
+  isOpen.value = open;
   if (!open) {
-    resetForm()
+    resetForm();
   }
-}
+};
 
 const onSubmit = handleSubmit(async (values) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Run Command',
-    description: `Are you sure you want to execute: ${values.command}?`,
-    confirmText: 'Run',
-    cancelText: 'Cancel',
-  })
+    title: t("site.runCommand.confirmTitle"),
+    description: t("site.runCommand.confirmDescription", {
+      command: values.command,
+    }),
+    confirmText: t("site.runCommand.run"),
+    cancelText: t("site.common.cancel"),
+  });
 
   if (!result.ok) {
-    toast.info('Cancelled')
-    return
+    toast.info(t("site.common.cancelled"));
+    return;
   }
 
-  isLoading.value = true
+  isLoading.value = true;
 
   try {
     await $api(`/servers/${props.serverId}/sites/${props.siteId}/commands`, {
-      method: 'POST',
+      method: "POST",
       body: values,
-    })
-    toast.success('Command execution started')
-    handleClose(false)
-    emit('executed')
+    });
+    toast.success(t("site.runCommand.started"));
+    handleClose(false);
+    emit("executed");
   } catch (error: unknown) {
-    const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
+    const err = error as {
+      data?: { errors?: Record<string, string[]>; message?: string };
+    };
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        setFieldError(field as keyof typeof values, messages[0])
+        setFieldError(field as keyof typeof values, messages[0]);
       }
     } else {
-      toast.error(err.data?.message || 'Failed to run command')
+      toast.error(err.data?.message || t("site.runCommand.failed"));
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-})
+});
 </script>
 
 <template>
@@ -103,22 +121,22 @@ const onSubmit = handleSubmit(async (values) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
-        Run Command
+        {{ t("site.runCommand.button") }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
       <DialogHeader>
-        <DialogTitle>Run SSH Command</DialogTitle>
+        <DialogTitle>{{ t("site.runCommand.dialogTitle") }}</DialogTitle>
         <DialogDescription>
-          Execute an SSH command on this site. The command will run in the site's directory.
+          {{ t("site.runCommand.dialogDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="command">
           <FormItem>
-            <FormLabel>Command</FormLabel>
+            <FormLabel>{{ t("site.runCommand.command") }}</FormLabel>
             <FormControl>
               <div class="relative">
                 <Input
@@ -126,7 +144,9 @@ const onSubmit = handleSubmit(async (values) => {
                   placeholder="php artisan migrate --force"
                   v-bind="componentField"
                 />
-                <div class="pointer-events-none absolute inset-y-0 start-0 flex items-center justify-center ps-3 text-muted-foreground/80">
+                <div
+                  class="pointer-events-none absolute inset-y-0 start-0 flex items-center justify-center ps-3 text-muted-foreground/80"
+                >
                   <Icon name="lucide:terminal" class="h-4 w-4" />
                 </div>
               </div>
@@ -136,10 +156,16 @@ const onSubmit = handleSubmit(async (values) => {
         </FormField>
 
         <DialogFooter>
-          <Button variant="outline" type="button" @click="handleClose(false)">Cancel</Button>
+          <Button variant="outline" type="button" @click="handleClose(false)">
+            {{ t("site.common.cancel") }}
+          </Button>
           <Button type="submit" :disabled="isLoading">
-            <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            Run Command
+            <Icon
+              v-if="isLoading"
+              name="lucide:loader-2"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            {{ t("site.runCommand.button") }}
           </Button>
         </DialogFooter>
       </form>

@@ -11,6 +11,7 @@ interface Props {
   container: DockerHostContainer | null;
 }
 const props = defineProps<Props>();
+const { t, locale } = useI18n();
 
 // Controlled open state — same v-model:open contract the other docker
 // dialogs use.
@@ -32,7 +33,7 @@ const fetchInspect = async () => {
   // matches the backend's containerIDPattern.
   const id = props.container.ID;
   if (!id) {
-    error.value = "Container ID missing";
+    error.value = t("server.docker.inspect.idMissing");
     return;
   }
   if (lastFetchedID.value === id && inspect.value) return;
@@ -45,19 +46,16 @@ const fetchInspect = async () => {
     lastFetchedID.value = id;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    error.value = e.data?.message || "Failed to inspect container";
+    error.value = e.data?.message || t("server.docker.inspect.failed");
     toast.error(error.value);
   } finally {
     isLoading.value = false;
   }
 };
 
-watch(
-  [open, () => props.container?.ID],
-  ([isOpen]) => {
-    if (isOpen) void fetchInspect();
-  },
-);
+watch([open, () => props.container?.ID], ([isOpen]) => {
+  if (isOpen) void fetchInspect();
+});
 
 // --- format helpers -------------------------------------------------------
 
@@ -86,7 +84,9 @@ const formatTime = (iso?: string): string => {
   // years ago".
   if (iso.startsWith("0001-01-01")) return "—";
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString(
+      locale.value === "ja" ? "ja-JP" : "en-US",
+    );
   } catch {
     return iso;
   }
@@ -99,13 +99,22 @@ const formatUptime = (startedAt?: string): string => {
     const ms = Date.now() - start;
     if (ms < 0) return "—";
     const sec = Math.floor(ms / 1000);
-    if (sec < 60) return `${sec}s`;
+    if (sec < 60)
+      return t("server.docker.inspect.durationSeconds", { seconds: sec });
     const min = Math.floor(sec / 60);
-    if (min < 60) return `${min}m ${sec % 60}s`;
+    if (min < 60)
+      return t("server.docker.inspect.durationMinutes", {
+        minutes: min,
+        seconds: sec % 60,
+      });
     const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr}h ${min % 60}m`;
+    if (hr < 24)
+      return t("server.docker.inspect.durationHours", {
+        hours: hr,
+        minutes: min % 60,
+      });
     const days = Math.floor(hr / 24);
-    return `${days}d ${hr % 24}h`;
+    return t("server.docker.inspect.durationDays", { days, hours: hr % 24 });
   } catch {
     return "—";
   }
@@ -142,6 +151,17 @@ const healthColor = (status?: string): string => {
   }
 };
 
+const localizedDockerValue = (
+  group: "state" | "health" | "mountType",
+  value?: string,
+): string => {
+  if (!value) return "—";
+  const normalizedValue = value.toLowerCase().replaceAll("-", "_");
+  const key = `server.docker.inspect.values.${group}.${normalizedValue}`;
+  const translated = t(key);
+  return translated === key ? value : translated;
+};
+
 // --- Command rendering ----------------------------------------------------
 //
 // docker's "command" isn't a single field. We render:
@@ -160,7 +180,6 @@ const execStr = computed(() => {
   if (!inspect.value?.path) return "";
   return joinShellArgs([inspect.value.path, ...(inspect.value.args ?? [])]);
 });
-
 </script>
 
 <template>
@@ -169,19 +188,24 @@ const execStr = computed(() => {
       <DialogHeader>
         <DialogTitle class="flex items-center gap-3">
           <span class="font-mono text-base">
-            {{ inspect?.name || container?.Names || "Container" }}
+            {{
+              inspect?.name ||
+              container?.Names ||
+              t("server.docker.inspect.container")
+            }}
           </span>
           <span
             v-if="inspect"
             class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
             :class="stateColor(inspect.state.status)"
           >
-            {{ inspect.state.status }}
+            {{ localizedDockerValue("state", inspect.state.status) }}
           </span>
         </DialogTitle>
         <DialogDescription>
-          Output of <code>docker inspect</code> for this container —
-          state, health, mounts, networks, and resource limits.
+          {{ t("server.docker.inspect.descriptionPrefix") }}
+          <code>docker inspect</code>
+          {{ t("server.docker.inspect.descriptionSuffix") }}
         </DialogDescription>
       </DialogHeader>
 
@@ -202,28 +226,47 @@ const execStr = computed(() => {
       <div v-else-if="inspect" class="space-y-6 text-sm">
         <!-- State -->
         <section>
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            State
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {{ t("server.docker.inspect.state") }}
           </h3>
           <dl class="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
             <div>
-              <dt class="text-xs text-muted-foreground">Status</dt>
-              <dd class="font-medium capitalize">{{ inspect.state.status }}</dd>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.common.status") }}
+              </dt>
+              <dd class="font-medium capitalize">
+                {{ localizedDockerValue("state", inspect.state.status) }}
+              </dd>
             </div>
             <div>
-              <dt class="text-xs text-muted-foreground">Uptime</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.metrics.uptime") }}
+              </dt>
               <dd>{{ formatUptime(inspect.state.started_at) }}</dd>
             </div>
             <div>
-              <dt class="text-xs text-muted-foreground">Started at</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.startedAt") }}
+              </dt>
               <dd>{{ formatTime(inspect.state.started_at) }}</dd>
             </div>
-            <div v-if="inspect.state.finished_at && !inspect.state.finished_at.startsWith('0001-01-01')">
-              <dt class="text-xs text-muted-foreground">Finished at</dt>
+            <div
+              v-if="
+                inspect.state.finished_at &&
+                !inspect.state.finished_at.startsWith('0001-01-01')
+              "
+            >
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.finishedAt") }}
+              </dt>
               <dd>{{ formatTime(inspect.state.finished_at) }}</dd>
             </div>
             <div>
-              <dt class="text-xs text-muted-foreground">Restart count</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.restartCount") }}
+              </dt>
               <dd
                 :class="
                   inspect.restart_count > 3
@@ -235,16 +278,20 @@ const execStr = computed(() => {
                 <span
                   v-if="inspect.restart_count > 3"
                   class="ml-1 text-xs text-muted-foreground"
-                  >(possible crashloop)</span
+                  >{{ t("server.docker.inspect.possibleCrashloop") }}</span
                 >
               </dd>
             </div>
             <div v-if="inspect.state.pid">
-              <dt class="text-xs text-muted-foreground">Host PID</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.hostPid") }}
+              </dt>
               <dd class="font-mono text-xs">{{ inspect.state.pid }}</dd>
             </div>
             <div v-if="!inspect.state.running">
-              <dt class="text-xs text-muted-foreground">Exit code</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.exitCode") }}
+              </dt>
               <dd
                 :class="
                   inspect.state.exit_code !== 0
@@ -253,13 +300,17 @@ const execStr = computed(() => {
                 "
               >
                 {{ inspect.state.exit_code }}
-                <span v-if="inspect.state.oom_killed" class="ml-1 text-xs text-muted-foreground"
-                  >(OOM killed)</span
+                <span
+                  v-if="inspect.state.oom_killed"
+                  class="ml-1 text-xs text-muted-foreground"
+                  >{{ t("server.docker.inspect.oomKilled") }}</span
                 >
               </dd>
             </div>
             <div v-if="inspect.state.error" class="sm:col-span-2">
-              <dt class="text-xs text-muted-foreground">Error</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.common.errorOccurred") }}
+              </dt>
               <dd class="font-mono text-xs text-rose-700 dark:text-rose-400">
                 {{ inspect.state.error }}
               </dd>
@@ -269,56 +320,86 @@ const execStr = computed(() => {
 
         <!-- Health -->
         <section v-if="inspect.health">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Health
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {{ t("server.docker.inspect.health") }}
           </h3>
           <div class="mt-2 flex items-center gap-3">
             <span
               class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
               :class="healthColor(inspect.health.status)"
             >
-              {{ inspect.health.status }}
+              {{ localizedDockerValue("health", inspect.health.status) }}
             </span>
             <span class="text-xs text-muted-foreground">
-              Failing streak: {{ inspect.health.failing_streak }}
+              {{
+                t("server.docker.inspect.failingStreak", {
+                  count: inspect.health.failing_streak,
+                })
+              }}
             </span>
           </div>
           <div v-if="inspect.health.log?.length" class="mt-3 space-y-2">
-            <p class="text-[10px] uppercase tracking-wide text-muted-foreground">
-              Recent checks
+            <p
+              class="text-[10px] uppercase tracking-wide text-muted-foreground"
+            >
+              {{ t("server.docker.inspect.recentChecks") }}
             </p>
             <div
               v-for="(entry, i) in inspect.health.log"
               :key="i"
               class="rounded-md border bg-muted/30 px-3 py-2 text-xs"
             >
-              <div class="flex justify-between text-[10px] text-muted-foreground">
+              <div
+                class="flex justify-between text-[10px] text-muted-foreground"
+              >
                 <span>{{ formatTime(entry.end) }}</span>
-                <span :class="entry.exit_code === 0 ? '' : 'text-rose-700 dark:text-rose-400'">
-                  exit {{ entry.exit_code }}
+                <span
+                  :class="
+                    entry.exit_code === 0
+                      ? ''
+                      : 'text-rose-700 dark:text-rose-400'
+                  "
+                >
+                  {{
+                    t("server.docker.inspect.exitCodeValue", {
+                      code: entry.exit_code,
+                    })
+                  }}
                 </span>
               </div>
-              <pre class="mt-1 whitespace-pre-wrap break-words font-mono text-[11px]">{{ entry.output || "(no output)" }}</pre>
+              <pre
+                class="mt-1 whitespace-pre-wrap break-words font-mono text-[11px]"
+                >{{ entry.output || t("server.docker.inspect.noOutput") }}</pre>
             </div>
           </div>
         </section>
 
         <!-- Image -->
         <section>
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Image
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {{ t("server.docker.containers.image") }}
           </h3>
           <dl class="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2">
             <div>
-              <dt class="text-xs text-muted-foreground">Reference</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.reference") }}
+              </dt>
               <dd class="break-all font-mono text-xs">{{ inspect.image }}</dd>
             </div>
             <div v-if="inspect.platform">
-              <dt class="text-xs text-muted-foreground">Platform</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.platform") }}
+              </dt>
               <dd>{{ inspect.platform }}</dd>
             </div>
             <div class="sm:col-span-2">
-              <dt class="text-xs text-muted-foreground">Image ID</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.imageId") }}
+              </dt>
               <dd class="break-all font-mono text-[10px] text-muted-foreground">
                 {{ inspect.image_id }}
               </dd>
@@ -336,13 +417,18 @@ const execStr = computed(() => {
           runtime line is much longer than the Dockerfile CMD.
         -->
         <section>
-          <h3 class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Command
+          <h3
+            class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {{ t("server.docker.inspect.command") }}
           </h3>
 
           <div v-if="entrypointStr" class="space-y-1">
             <p class="text-[11px] text-muted-foreground">
-              Entrypoint <span class="opacity-60">(from image)</span>
+              Entrypoint
+              <span class="opacity-60">{{
+                t("server.docker.inspect.fromImage")
+              }}</span>
             </p>
             <SharedCodeEditor
               :model-value="entrypointStr"
@@ -355,7 +441,10 @@ const execStr = computed(() => {
 
           <div v-if="cmdStr" class="mt-3 space-y-1">
             <p class="text-[11px] text-muted-foreground">
-              CMD <span class="opacity-60">(image default or override)</span>
+              CMD
+              <span class="opacity-60">{{
+                t("server.docker.inspect.imageDefault")
+              }}</span>
             </p>
             <SharedCodeEditor
               :model-value="cmdStr"
@@ -371,7 +460,10 @@ const execStr = computed(() => {
             class="mt-3 space-y-1"
           >
             <p class="text-[11px] text-muted-foreground">
-              Runtime exec <span class="opacity-60">(what docker actually ran)</span>
+              Runtime exec
+              <span class="opacity-60">{{
+                t("server.docker.inspect.runtimeExecuted")
+              }}</span>
             </p>
             <SharedCodeEditor
               :model-value="execStr"
@@ -386,52 +478,81 @@ const execStr = computed(() => {
             v-if="!entrypointStr && !cmdStr && !execStr"
             class="text-xs text-muted-foreground"
           >
-            No command captured. The image's ENTRYPOINT/CMD may be
-            empty or inherited from a parent layer.
+            {{ t("server.docker.inspect.noCommand") }}
           </p>
         </section>
 
         <!-- Resources -->
         <section>
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Resources
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {{ t("server.docker.inspect.resources") }}
           </h3>
           <dl class="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-3">
             <div>
-              <dt class="text-xs text-muted-foreground">Memory limit</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.memoryLimit") }}
+              </dt>
               <dd>{{ formatBytes(inspect.resources.memory_limit_bytes) }}</dd>
             </div>
             <div>
-              <dt class="text-xs text-muted-foreground">CPU limit</dt>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.cpuLimit") }}
+              </dt>
               <dd>{{ formatCPUs(inspect.resources.nano_cpus) }}</dd>
             </div>
             <div>
-              <dt class="text-xs text-muted-foreground">Restart policy</dt>
-              <dd class="capitalize">{{ inspect.restart_policy || "no" }}</dd>
+              <dt class="text-xs text-muted-foreground">
+                {{ t("server.docker.inspect.restartPolicy") }}
+              </dt>
+              <dd class="capitalize">
+                {{ inspect.restart_policy || t("server.common.no") }}
+              </dd>
             </div>
           </dl>
         </section>
 
         <!-- Mounts -->
         <section v-if="inspect.mounts?.length">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Mounts ({{ inspect.mounts.length }})
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {{
+              t("server.docker.inspect.mounts", {
+                count: inspect.mounts.length,
+              })
+            }}
           </h3>
           <div class="mt-2 overflow-hidden rounded-md border">
             <table class="w-full text-xs">
-              <thead class="bg-muted/50 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+              <thead
+                class="bg-muted/50 text-left text-[10px] uppercase tracking-wide text-muted-foreground"
+              >
                 <tr>
-                  <th class="px-3 py-2">Type</th>
-                  <th class="px-3 py-2">Source</th>
-                  <th class="px-3 py-2">Destination</th>
-                  <th class="px-3 py-2">Mode</th>
+                  <th class="px-3 py-2">
+                    {{ t("server.docker.inspect.type") }}
+                  </th>
+                  <th class="px-3 py-2">
+                    {{ t("server.docker.inspect.source") }}
+                  </th>
+                  <th class="px-3 py-2">
+                    {{ t("server.docker.inspect.destination") }}
+                  </th>
+                  <th class="px-3 py-2">
+                    {{ t("server.docker.inspect.mode") }}
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(m, i) in inspect.mounts" :key="i" class="border-t">
-                  <td class="px-3 py-2 capitalize">{{ m.type }}</td>
+                  <td class="px-3 py-2 capitalize">
+                    {{ localizedDockerValue("mountType", m.type) }}
+                  </td>
                   <td class="break-all px-3 py-2 font-mono">{{ m.source }}</td>
-                  <td class="break-all px-3 py-2 font-mono">{{ m.destination }}</td>
+                  <td class="break-all px-3 py-2 font-mono">
+                    {{ m.destination }}
+                  </td>
                   <td class="px-3 py-2 text-muted-foreground">
                     {{ m.read_only ? "ro" : "rw" }}
                   </td>
@@ -443,20 +564,36 @@ const execStr = computed(() => {
 
         <!-- Networks -->
         <section v-if="inspect.networks?.length">
-          <h3 class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Networks ({{ inspect.networks.length }})
+          <h3
+            class="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+          >
+            {{
+              t("server.docker.inspect.networks", {
+                count: inspect.networks.length,
+              })
+            }}
           </h3>
           <div class="mt-2 overflow-hidden rounded-md border">
             <table class="w-full text-xs">
-              <thead class="bg-muted/50 text-left text-[10px] uppercase tracking-wide text-muted-foreground">
+              <thead
+                class="bg-muted/50 text-left text-[10px] uppercase tracking-wide text-muted-foreground"
+              >
                 <tr>
-                  <th class="px-3 py-2">Network</th>
-                  <th class="px-3 py-2">IP address</th>
+                  <th class="px-3 py-2">
+                    {{ t("server.docker.inspect.network") }}
+                  </th>
+                  <th class="px-3 py-2">
+                    {{ t("server.docker.inspect.ipAddress") }}
+                  </th>
                   <th class="px-3 py-2">MAC</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="n in inspect.networks" :key="n.name" class="border-t">
+                <tr
+                  v-for="n in inspect.networks"
+                  :key="n.name"
+                  class="border-t"
+                >
                   <td class="px-3 py-2 font-mono">{{ n.name }}</td>
                   <td class="px-3 py-2 font-mono">{{ n.ip_address || "—" }}</td>
                   <td class="px-3 py-2 font-mono text-muted-foreground">

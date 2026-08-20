@@ -21,6 +21,7 @@ interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{ created: [] }>();
 
 const open = defineModel<boolean>("open", { default: false });
@@ -48,48 +49,49 @@ const resetForm = () => {
   form.content = "";
 };
 
-const typeOptions: {
-  value: FormType;
-  label: string;
-  icon: string;
-  blurb: string;
-}[] = [
+const typeOptions = computed<
+  {
+    value: FormType;
+    label: string;
+    icon: string;
+    blurb: string;
+  }[]
+>(() => [
   {
     value: "bind",
-    label: "Bind Mount",
+    label: t("workload.volumes.bindMount"),
     icon: "lucide:link-2",
-    blurb: "Map a host directory into the container.",
+    blurb: t("workload.volumes.bindDescription"),
   },
   {
     value: "volume",
-    label: "Volume Mount",
+    label: t("workload.volumes.volumeMount"),
     icon: "lucide:database",
-    blurb: "Docker-named volume — survives container replacement.",
+    blurb: t("workload.volumes.volumeDescription"),
   },
   {
     value: "file",
-    label: "File Mount",
+    label: t("workload.volumes.fileMount"),
     icon: "lucide:file-text",
-    blurb:
-      "Write a config file on the host, bind-mount it into the container.",
+    blurb: t("workload.volumes.fileDescription"),
   },
-];
+]);
 
 const submit = async () => {
   if (!form.name.trim()) {
-    toast.error("Name is required");
+    toast.error(t("workload.validation.nameRequired"));
     return;
   }
   if (!form.mount_path.trim()) {
-    toast.error("Mount path is required");
+    toast.error(t("workload.volumes.mountPathRequired"));
     return;
   }
   if (form.type === "bind" && !form.host_path.trim()) {
-    toast.error("Bind mounts need a host path");
+    toast.error(t("workload.volumes.hostPathRequired"));
     return;
   }
   if (form.type === "file" && !form.file_path.trim()) {
-    toast.error("File mounts need a file path (the on-host filename)");
+    toast.error(t("workload.volumes.filePathRequired"));
     return;
   }
 
@@ -113,13 +115,13 @@ const submit = async () => {
       props.application.id,
       payload,
     );
-    toast.success("Mount added");
+    toast.success(t("workload.volumes.added"));
     emit("created");
     open.value = false;
     resetForm();
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to add mount");
+    toast.error(e.data?.message || t("workload.volumes.addFailed"));
   } finally {
     isSaving.value = false;
   }
@@ -135,15 +137,14 @@ watch(open, (isOpen) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Mount
+        {{ t("workload.volumes.add") }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-3xl">
       <DialogHeader>
-        <DialogTitle>Volumes / Mounts</DialogTitle>
+        <DialogTitle>{{ t("workload.volumes.title") }}</DialogTitle>
         <DialogDescription>
-          Three flavours — pick the one that matches what you're
-          mounting. Changes apply on the next deploy.
+          {{ t("workload.volumes.createDescription") }}
         </DialogDescription>
       </DialogHeader>
 
@@ -151,25 +152,27 @@ watch(open, (isOpen) => {
         <!-- 3-up mount-kind picker, same pattern as dokploy's
              AddVolumes RadioGroup. -->
         <div class="space-y-2">
-          <Label>Select the mount type</Label>
+          <Label>{{ t("workload.volumes.selectType") }}</Label>
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
-              v-for="t in typeOptions"
-              :key="t.value"
+              v-for="mountOption in typeOptions"
+              :key="mountOption.value"
               type="button"
               class="flex flex-col items-start gap-1 rounded-md border-2 px-3 py-3 text-left transition"
               :class="
-                form.type === t.value
+                form.type === mountOption.value
                   ? 'border-primary bg-primary/5 text-foreground'
                   : 'border-muted text-muted-foreground hover:border-foreground/40'
               "
-              @click="form.type = t.value"
+              @click="form.type = mountOption.value"
             >
               <div class="flex items-center gap-2 text-sm font-medium">
-                <Icon :name="t.icon" class="h-4 w-4" />
-                {{ t.label }}
+                <Icon :name="mountOption.icon" class="h-4 w-4" />
+                {{ mountOption.label }}
               </div>
-              <p class="text-xs text-muted-foreground">{{ t.blurb }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ mountOption.blurb }}
+              </p>
             </button>
           </div>
         </div>
@@ -183,14 +186,13 @@ watch(open, (isOpen) => {
             name="lucide:alert-triangle"
             class="-mt-0.5 mr-1 inline-block h-3.5 w-3.5"
           />
-          Make sure the host path is a valid path that exists on the
-          docker server.
+          {{ t("workload.volumes.bindWarning") }}
         </div>
 
         <!-- Always-shown fields. -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-1">
-            <Label for="vol-dialog-name">Name</Label>
+            <Label for="vol-dialog-name">{{ t("workload.fields.name") }}</Label>
             <Input
               id="vol-dialog-name"
               v-model="form.name"
@@ -199,13 +201,17 @@ watch(open, (isOpen) => {
             />
             <p class="text-xs text-muted-foreground">
               <template v-if="form.type === 'volume'">
-                Docker named-volume identifier.
+                {{ t("workload.volumes.volumeNameHelp") }}
               </template>
-              <template v-else>Friendly label for this mount.</template>
+              <template v-else>{{
+                t("workload.volumes.friendlyNameHelp")
+              }}</template>
             </p>
           </div>
           <div class="space-y-1">
-            <Label for="vol-dialog-mount">Mount path (in the container)</Label>
+            <Label for="vol-dialog-mount">{{
+              t("workload.volumes.mountPathContainer")
+            }}</Label>
             <Input
               id="vol-dialog-mount"
               v-model="form.mount_path"
@@ -217,7 +223,9 @@ watch(open, (isOpen) => {
 
         <!-- Bind-only: host path. -->
         <div v-if="form.type === 'bind'" class="space-y-1">
-          <Label for="vol-dialog-host">Host path</Label>
+          <Label for="vol-dialog-host">{{
+            t("workload.fields.hostPath")
+          }}</Label>
           <Input
             id="vol-dialog-host"
             v-model="form.host_path"
@@ -225,15 +233,16 @@ watch(open, (isOpen) => {
             autocomplete="off"
           />
           <p class="text-xs text-muted-foreground">
-            Absolute path on the docker server. Must exist and be
-            readable by the container's user.
+            {{ t("workload.volumes.hostPathHelp") }}
           </p>
         </div>
 
         <!-- File-only: content + file path. -->
         <template v-if="form.type === 'file'">
           <div class="space-y-1">
-            <Label for="vol-dialog-content">Content</Label>
+            <Label for="vol-dialog-content">{{
+              t("workload.fields.content")
+            }}</Label>
             <SharedCodeEditor
               v-model="form.content"
               language="properties"
@@ -242,12 +251,13 @@ watch(open, (isOpen) => {
               placeholder="NODE_ENV=production&#10;PORT=3000"
             />
             <p class="text-xs text-muted-foreground">
-              File body written to the host before the container
-              starts.
+              {{ t("workload.volumes.contentHelp") }}
             </p>
           </div>
           <div class="space-y-1">
-            <Label for="vol-dialog-file-path">File path (on the host)</Label>
+            <Label for="vol-dialog-file-path">{{
+              t("workload.volumes.filePathHost")
+            }}</Label>
             <Input
               id="vol-dialog-file-path"
               v-model="form.file_path"
@@ -255,15 +265,14 @@ watch(open, (isOpen) => {
               autocomplete="off"
             />
             <p class="text-xs text-muted-foreground">
-              Filename written under the application's deploy
-              directory. Bind-mounted at the mount path above.
+              {{ t("workload.volumes.applicationFilePathHelp") }}
             </p>
           </div>
         </template>
 
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="isSaving">
             <Icon
@@ -271,7 +280,7 @@ watch(open, (isOpen) => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Add Mount
+            {{ t("workload.volumes.add") }}
           </Button>
         </DialogFooter>
       </form>

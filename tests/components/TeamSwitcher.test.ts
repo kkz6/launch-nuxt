@@ -38,6 +38,20 @@ const teams = [
 const teamState = ref<Array<(typeof teams)[number]>>([]);
 const teamLoading = ref(true);
 
+const translate = (key: string, params: Record<string, unknown> = {}) => {
+  const messages: Record<string, string> = {
+    "common.teams.personal": "Personal",
+    "common.teams.owned": "Owned",
+    "common.teams.joined": "Joined",
+    "common.teams.new": "New team",
+    "common.teams.loadFailed": "Failed to load teams",
+    "common.teams.switchFailed": "Failed to switch team",
+    "common.teams.defaultName": "team",
+    "common.teams.switched": `Switched to ${String(params.team ?? "")}`,
+  };
+  return messages[key] ?? key;
+};
+
 const loadTeams = vi.fn(async () => {
   try {
     const response = await mocks.api("/teams");
@@ -96,6 +110,7 @@ describe("team switcher", () => {
       setCurrentTeamId: mocks.setCurrentTeamId,
     }));
     vi.stubGlobal("useAuth", () => ({ user, fetchUser: mocks.fetchUser }));
+    vi.stubGlobal("useI18n", () => ({ t: translate }));
     vi.stubGlobal("useWebSocket", () => ({ reconnect: mocks.reconnect }));
     vi.stubGlobal("useTeams", () => ({
       teams: teamState,

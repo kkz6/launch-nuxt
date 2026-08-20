@@ -1,0 +1,271 @@
+{
+  "common": {
+    "language": "Language",
+    "languageAutomatic": "Automatic",
+    "english": "English",
+    "japanese": "日本語",
+    "settings": "Settings",
+    "adminPanel": "Admin Panel",
+    "backToApp": "Back to App",
+    "theme": "Theme",
+    "themeLight": "Use light theme",
+    "themeDark": "Use dark theme",
+    "themeSystem": "Use system theme",
+    "signOut": "Sign Out",
+    "subscriptionInactive": "Your subscription is inactive",
+    "subscribeNow": "Subscribe now",
+    "localeUpdated": "Language preference updated",
+    "localeUpdateFailed": "Could not update your language preference",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "copy": "Copy",
+    "download": "Download",
+    "typeToConfirm": "Type to confirm...",
+    "impersonation": {
+      "viewingAs": "Viewing as {name} (read-only)",
+      "exit": "Exit"
+    },
+    "ui": {
+      "more": "More",
+      "close": "Close",
+      "morePages": "More pages",
+      "previous": "Previous",
+      "next": "Next",
+      "first": "First",
+      "last": "Last",
+      "breadcrumb": "Breadcrumb",
+      "carousel": "Carousel",
+      "slide": "Slide",
+      "previousSlide": "Previous slide",
+      "nextSlide": "Next slide"
+    },
+    "logs": "Logs",
+    "viewLogs": "View logs",
+    "noLogs": "No logs available",
+    "loadLogsFailed": "Failed to load logs",
+    "siteLogsFor": "Site logs for {name}",
+    "serverLogsFor": "Server logs for {name}",
+    "teams": {
+      "new": "New team",
+      "loadFailed": "Failed to load teams",
+      "switchFailed": "Failed to switch team",
+      "switched": "Switched to {team}",
+      "defaultName": "team",
+      "personal": "Personal",
+      "owned": "Owned",
+      "joined": "Joined"
+    },
+    "platformUpdate": {
+      "updates": {
+        "rename_username_captain": {
+          "title": "Rename Default Username to Captain",
+          "description": "The default UNIX username on provisioned servers is being renamed from `launcher` to `captain`. This update renames the system user, moves the home directory, and updates all related configuration files (Caddyfile, systemd services, crontab) on your servers.\n\nThis is a safe, idempotent operation — if a server already has the `captain` user, it will be skipped automatically."
+        }
+      },
+      "pendingOne": "{count} server pending",
+      "pendingMany": "{count} servers pending",
+      "viewDetails": "View details",
+      "dismiss": "Dismiss notification"
+    },
+    "activeActions": {
+      "title": "Active actions",
+      "noneRunning": "No actions are running.",
+      "dismiss": "Dismiss {action}",
+      "taskOutput": "Task output",
+      "liveOutput": "Live output",
+      "finalOutput": "Final output",
+      "outputContext": "{phase} {kind} output",
+      "phaseLive": "Live",
+      "phaseFinal": "Final",
+      "runningFor": "Running for {duration}",
+      "complete": "{kind} complete",
+      "taskLabel": "Server task",
+      "backupFailureDescription": "The backup failed. Open its logs for details.",
+      "seconds": "{count}s",
+      "minutes": "{count}m",
+      "status": {
+        "triggered": "Queued",
+        "pending": "Queued",
+        "installing": "Deploying",
+        "building": "Building",
+        "deploying": "Deploying",
+        "running": "Running",
+        "finished": "Completed",
+        "completed": "Completed",
+        "success": "Completed",
+        "failed": "Failed",
+        "timeout": "Timed out",
+        "cancelled": "Cancelled"
+      },
+      "kind": {
+        "deployment": "Deployment",
+        "server_backup": "Server backup",
+        "database_backup": "Database backup",
+        "command": "Command",
+        "task": "Task"
+      },
+      "target": {
+        "server": "Server",
+        "site": "Site",
+        "application": "Application",
+        "compose": "Compose",
+        "database": "Database"
+      }
+    },
+    "certificate": {
+      "status": {
+        "retryQueued": "Retry queued",
+        "checking": "Checking",
+        "valid": "Valid",
+        "expired": "Expired",
+        "invalid": "Invalid",
+        "notIssued": "Not issued",
+        "unreachable": "Unreachable",
+        "verify": "Verify"
+      },
+      "diagnosis": {
+        "retry": {
+          "title": "Provisioning retry queued",
+          "guidance": "The proxy configuration is being reapplied. Verification will run again shortly."
+        },
+        "checking": {
+          "title": "Checking the public endpoint",
+          "guidance": "Resolving DNS and inspecting the certificate served on port 443."
+        },
+        "valid": {
+          "title": "Certificate is active",
+          "guidance": "Public clients are receiving a trusted certificate for this hostname."
+        },
+        "expired": {
+          "title": "Certificate has expired",
+          "guidance": "Retry automatic issuance or replace the certificate before serving traffic."
+        },
+        "hostnameMismatch": {
+          "title": "Hostname does not match",
+          "guidance": "The proxy is serving a certificate for another hostname. Confirm DNS points to this server, then retry issuance."
+        },
+        "untrusted": {
+          "title": "Certificate is not trusted",
+          "guidance": "Replace the custom certificate or retry automatic issuance after DNS is correct."
+        },
+        "notActive": {
+          "title": "Certificate is not active yet",
+          "guidance": "Check the server clock or install a certificate whose validity period has started."
+        },
+        "invalid": {
+          "title": "Certificate validation failed",
+          "guidance": "Check DNS, the configured hostname, and the certificate selected by the proxy before retrying."
+        },
+        "dns": {
+          "title": "DNS is not resolving",
+          "guidance": "Create or correct the public A or AAAA record, wait for propagation, then retry issuance."
+        },
+        "notServed": {
+          "title": "No certificate is being served",
+          "guidance": "Confirm the domain reaches this server on port 443, then retry certificate issuance."
+        },
+        "unreachable": {
+          "title": "HTTPS endpoint is unreachable",
+          "guidance": "Check public DNS and ensure ports 80 and 443 reach the proxy before retrying."
+        },
+        "unverified": {
+          "title": "Certificate not verified",
+          "guidance": "Run verification to inspect the certificate public clients receive."
+        }
+      },
+      "daysRemaining": "{count} days remaining",
+      "verificationFailed": "Certificate verification failed.",
+      "retryToast": "Certificate retry queued",
+      "retryDescription": "The proxy configuration is being reapplied.",
+      "retryFailed": "Failed to retry certificate provisioning",
+      "checkingPublic": "Checking the certificate served to public clients...",
+      "whatToCheck": "What to check",
+      "issuer": "Issuer",
+      "expires": "Expires",
+      "resolvedIp": "Resolved IP",
+      "checked": "Checked",
+      "verifyAgain": "Verify again",
+      "retry": "Retry",
+      "retryCertificate": "Retry certificate",
+      "certificateStatus": "Certificate status"
+    },
+    "loading": "Loading...",
+    "loadBalancer": "Load Balancer",
+    "customServer": "Custom Server",
+    "genericPhp": "Generic PHP",
+    "deploymentQueued": "Deployment queued",
+    "rebuildQueued": "Rebuild queued",
+    "actionQueued": "{action} queued",
+    "actionFailed": "Failed to {action}",
+    "navigation": {
+      "overview": "Overview",
+      "users": "Users",
+      "invitations": "Invitations",
+      "servers": "Servers",
+      "failures": "Failures",
+      "observability": "Observability",
+      "dashboard": "Dashboard",
+      "domains": "Domains",
+      "scripts": "Scripts",
+      "onboarding": "Onboarding",
+      "sites": "Sites",
+      "metrics": "Metrics",
+      "databases": "Databases",
+      "networks": "Networks",
+      "daemons": "Daemons",
+      "schedulers": "Schedulers",
+      "advanced": "Advanced",
+      "upstreams": "Upstreams",
+      "projects": "Projects",
+      "containers": "Containers",
+      "general": "General",
+      "backups": "Backups",
+      "sshKeys": "SSH Keys",
+      "packages": "Packages",
+      "services": "Services",
+      "traefik": "Traefik",
+      "maintenance": "Maintenance",
+      "deployments": "Deployments",
+      "files": "Files",
+      "queues": "Queues",
+      "redirects": "Redirects",
+      "commands": "Commands",
+      "settings": "Settings",
+      "records": "Records",
+      "environment": "Environment",
+      "logs": "Logs",
+      "volumes": "Volumes",
+      "githubActions": "GitHub Actions",
+      "runtime": "Runtime",
+      "dangerZone": "Danger zone",
+      "database": "Database",
+      "application": "Application",
+      "composeStack": "Compose stack",
+      "applications": "Applications",
+      "compose": "Compose"
+    },
+    "cron": {
+      "timesUse": "Times use {timeZone}.",
+      "accessible": "{expression}: {description}.",
+      "accessibleWithTimeZone": "{expression}: {description}. Times use {timeZone}."
+    },
+    "actions": {
+      "provision": "Provision",
+      "terminal": "Terminal",
+      "environment": "Environment",
+      "newApplication": "New Application",
+      "newComposeStack": "New Compose Stack",
+      "newDatabase": "New Database",
+      "actions": "Actions",
+      "start": "Start",
+      "stop": "Stop",
+      "restart": "Restart",
+      "connectionInfo": "Connection info",
+      "deploy": "Deploy",
+      "reload": "Reload",
+      "rebuild": "Rebuild",
+      "viewLogs": "View logs",
+      "viewYaml": "View YAML"
+    }
+  }
+}

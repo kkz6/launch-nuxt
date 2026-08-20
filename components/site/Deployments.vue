@@ -12,6 +12,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   "update:site": [site: Site];
 }>();
@@ -104,14 +105,14 @@ const statusColors: Record<string, string> = {
   failed: "bg-red-500",
 };
 
-const statusLabels: Record<string, string> = {
-  pending: "Pending",
-  installing: "Deploying",
-  running: "Running",
-  finished: "Finished",
-  completed: "Completed",
-  failed: "Failed",
-};
+const statusLabels = computed<Record<string, string>>(() => ({
+  pending: t("site.status.pending"),
+  installing: t("site.status.deploying"),
+  running: t("site.status.running"),
+  finished: t("site.status.finished"),
+  completed: t("site.status.completed"),
+  failed: t("site.status.failed"),
+}));
 
 const inProgressStatuses = new Set(["pending", "installing", "running"]);
 const isInProgress = (status: string) => inProgressStatuses.has(status);
@@ -143,7 +144,7 @@ const fetchDeployments = async () => {
     );
     deployments.value = data.data;
   } catch {
-    toast.error("Failed to load deployments");
+    toast.error(t("site.deployments.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -153,11 +154,10 @@ const handleRollback = async (deployment: Deployment) => {
   if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: "Rollback to this deployment?",
-    description:
-      "This will switch the current release to the selected deployment. The site will immediately serve the code from this previous release.",
-    confirmText: "Confirm Rollback",
-    cancelText: "Cancel",
+    title: t("site.deployments.rollbackTitle"),
+    description: t("site.deployments.rollbackDescription"),
+    confirmText: t("site.deployments.confirmRollback"),
+    cancelText: t("site.common.cancel"),
   });
 
   if (!result.ok) return;
@@ -170,10 +170,10 @@ const handleRollback = async (deployment: Deployment) => {
         method: "POST",
       },
     );
-    toast.success("Rollback initiated");
+    toast.success(t("site.deployments.rollbackStarted"));
     await fetchDeployments();
   } catch {
-    toast.error("Failed to initiate rollback");
+    toast.error(t("site.deployments.rollbackFailed"));
   } finally {
     rollingBackId.value = null;
   }
@@ -196,11 +196,10 @@ const handleRegenerateToken = async () => {
   if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: "Regenerate deploy token?",
-    description:
-      "This will invalidate the current webhook URL. Any CI/CD pipelines using the old URL will stop working.",
-    confirmText: "Regenerate",
-    cancelText: "Cancel",
+    title: t("site.deployments.regenerateTitle"),
+    description: t("site.deployments.regenerateDescription"),
+    confirmText: t("site.deployments.regenerate"),
+    cancelText: t("site.common.cancel"),
   });
 
   if (!result.ok) return;
@@ -214,9 +213,9 @@ const handleRegenerateToken = async () => {
       },
     );
     emit("update:site", data.data);
-    toast.success("Deploy token regenerated");
+    toast.success(t("site.deployments.tokenRegenerated"));
   } catch {
-    toast.error("Failed to regenerate deploy token");
+    toast.error(t("site.deployments.tokenRegenerateFailed"));
   } finally {
     isRegenerating.value = false;
   }
@@ -225,7 +224,7 @@ const handleRegenerateToken = async () => {
 const copyToClipboard = (text: string) => {
   if (typeof window !== "undefined") {
     window.navigator.clipboard.writeText(text);
-    toast.success("Copied!");
+    toast.success(t("site.common.copied"));
   }
 };
 
@@ -238,9 +237,9 @@ onMounted(fetchDeployments);
 
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 class="text-lg font-semibold">Deployments</h3>
+        <h3 class="text-lg font-semibold">{{ t("site.deployments.title") }}</h3>
         <p class="text-sm text-muted-foreground">
-          View deployment history for this site
+          {{ t("site.deployments.description") }}
         </p>
       </div>
     </div>
@@ -255,8 +254,7 @@ onMounted(fetchDeployments);
     <template v-else>
       <div class="mb-4 rounded-lg border bg-card p-4">
         <p class="mb-2 text-sm text-muted-foreground">
-          Use this webhook URL in your git provider to enable automatic
-          deployments:
+          {{ t("site.deployments.webhookDescription") }}
         </p>
         <div class="flex flex-row flex-wrap items-center gap-2">
           <code
@@ -267,6 +265,7 @@ onMounted(fetchDeployments);
           <Button
             variant="ghost"
             size="sm"
+            :title="t('site.common.copy')"
             @click="copyToClipboard(deployWebhookUrl)"
           >
             <Icon name="lucide:copy" class="block size-4" />
@@ -274,6 +273,7 @@ onMounted(fetchDeployments);
           <Button
             variant="ghost"
             size="sm"
+            :title="t('site.deployments.regenerate')"
             :disabled="isRegenerating"
             @click="handleRegenerateToken"
           >
@@ -292,7 +292,9 @@ onMounted(fetchDeployments);
         class="flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-card py-12"
       >
         <Icon name="lucide:rocket" class="h-8 w-8 text-muted-foreground" />
-        <span class="text-base text-muted-foreground">No deployments yet</span>
+        <span class="text-base text-muted-foreground">{{
+          t("site.deployments.empty")
+        }}</span>
       </div>
 
       <div v-else class="rounded-lg border bg-card">
@@ -311,7 +313,7 @@ onMounted(fetchDeployments);
                 class="gap-1 border-amber-600 text-amber-600"
               >
                 <Icon name="lucide:history" class="block size-3" />
-                Rollback
+                {{ t("site.deployments.rollback") }}
               </Badge>
               {{ statusLabels[deployment.status] || deployment.status }}
               <span
@@ -326,7 +328,7 @@ onMounted(fetchDeployments);
                 {{
                   deployment.user?.name ||
                   deployment.commit_data?.name ||
-                  "Unknown"
+                  t("site.common.unknown")
                 }}
               </span>
               <span
@@ -341,7 +343,7 @@ onMounted(fetchDeployments);
               v-if="deployment.commit_data?.rollback_to"
               class="text-sm text-muted-foreground"
             >
-              Rolled back to previous release
+              {{ t("site.deployments.rolledBack") }}
             </span>
             <span
               v-else-if="deployment.commit_data?.message"
@@ -374,7 +376,7 @@ onMounted(fetchDeployments);
                   name="lucide:rotate-ccw"
                   class="mr-1 block size-4"
                 />
-                Rollback
+                {{ t("site.deployments.rollback") }}
               </Button>
               <SiteDeploymentLogs
                 v-if="deployment.task_id"

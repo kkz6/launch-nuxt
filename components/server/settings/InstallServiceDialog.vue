@@ -1,183 +1,203 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '~/components/ui/dialog'
+} from "~/components/ui/dialog";
 
 interface Version {
-  software: string
-  label: string
-  version: string
-  installed: boolean
-  status?: string
+  software: string;
+  label: string;
+  version: string;
+  installed: boolean;
+  status?: string;
 }
 
 interface ServiceGroup {
-  group: string
-  label: string
-  type: string
-  image_path: string
-  installed: boolean
-  status?: string
-  versions: Version[]
-  has_start: boolean
-  has_stop: boolean
-  has_restart: boolean
-  has_remove: boolean
-  has_status: boolean
+  group: string;
+  label: string;
+  type: string;
+  image_path: string;
+  installed: boolean;
+  status?: string;
+  versions: Version[];
+  has_start: boolean;
+  has_stop: boolean;
+  has_restart: boolean;
+  has_remove: boolean;
+  has_status: boolean;
 }
 
 interface Props {
-  serverId: string
+  serverId: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
-  'installed': []
-}>()
+  installed: [];
+}>();
 
-const open = defineModel<boolean>('open', { required: true })
+const open = defineModel<boolean>("open", { required: true });
 
-const serviceGroups = ref<ServiceGroup[]>([])
-const isLoading = ref(true)
-const selectedGroup = ref<string | null>(null)
-const selectedVersion = ref<string | null>(null)
-const isInstalling = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const serviceGroups = ref<ServiceGroup[]>([]);
+const isLoading = ref(true);
+const selectedGroup = ref<string | null>(null);
+const selectedVersion = ref<string | null>(null);
+const isInstalling = ref(false);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchAvailableServices = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
-    const response = await $api<ServiceGroup[] | { data: ServiceGroup[] }>(`/servers/${props.serverId}/services/create`)
+    const response = await $api<ServiceGroup[] | { data: ServiceGroup[] }>(
+      `/servers/${props.serverId}/services/create`,
+    );
     // Handle both array and { data: array } response formats
-    serviceGroups.value = Array.isArray(response) ? response : (response.data || [])
+    serviceGroups.value = Array.isArray(response)
+      ? response
+      : response.data || [];
   } catch {
-    toast.error('Failed to load available services')
+    toast.error(t("server.settings.installService.loadFailed"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 watch(open, (isOpen) => {
   if (isOpen) {
-    fetchAvailableServices()
-    selectedGroup.value = null
-    selectedVersion.value = null
+    fetchAvailableServices();
+    selectedGroup.value = null;
+    selectedVersion.value = null;
   }
-})
+});
 
 const handleCloseDialog = () => {
-  open.value = false
-  selectedGroup.value = null
-  selectedVersion.value = null
-}
+  open.value = false;
+  selectedGroup.value = null;
+  selectedVersion.value = null;
+};
 
 const handleServiceSelect = (group: string) => {
-  selectedGroup.value = group
-  selectedVersion.value = null
+  selectedGroup.value = group;
+  selectedVersion.value = null;
 
-  const service = serviceGroups.value.find(s => s.group === group)
+  const service = serviceGroups.value.find((s) => s.group === group);
   if (service?.versions) {
-    const versions = getAvailableVersionsForService(group)
+    const versions = getAvailableVersionsForService(group);
     if (versions.length === 1) {
-      selectedVersion.value = versions[0].software
+      selectedVersion.value = versions[0].software;
     }
   }
-}
+};
 
 const getAvailableVersionsForService = (group: string): Version[] => {
-  const service = serviceGroups.value.find(s => s.group === group)
-  if (!service?.versions) return []
+  const service = serviceGroups.value.find((s) => s.group === group);
+  if (!service?.versions) return [];
 
-  return service.versions.filter(version => !version.installed)
-}
+  return service.versions.filter((version) => !version.installed);
+};
 
 const handleInstall = async () => {
-  if (!selectedGroup.value || !selectedVersion.value) return
+  if (!selectedGroup.value || !selectedVersion.value) return;
 
-  const service = serviceGroups.value.find(s => s.group === selectedGroup.value)
-  const version = service?.versions.find(v => v.software === selectedVersion.value)
+  const service = serviceGroups.value.find(
+    (s) => s.group === selectedGroup.value,
+  );
+  const version = service?.versions.find(
+    (v) => v.software === selectedVersion.value,
+  );
 
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Install Service',
-    description: `Are you sure you want to install ${version?.label || service?.label || selectedGroup.value}?`,
-    confirmText: 'Install',
-    cancelText: 'Cancel',
-  })
+    title: t("server.settings.installService.title"),
+    description: t("server.settings.installService.confirm", {
+      name: version?.label || service?.label || selectedGroup.value,
+    }),
+    confirmText: t("server.settings.installService.install"),
+    cancelText: t("server.common.cancel"),
+  });
 
-  if (!result.ok) return
+  if (!result.ok) return;
 
-  isInstalling.value = true
+  isInstalling.value = true;
 
   try {
     await $api(`/servers/${props.serverId}/services`, {
-      method: 'POST',
+      method: "POST",
       body: { software: selectedVersion.value },
-    })
-    toast.success('Service installation initiated')
-    emit('installed')
-    handleCloseDialog()
+    });
+    toast.success(t("server.settings.installService.started"));
+    emit("installed");
+    handleCloseDialog();
   } catch {
-    toast.error('Failed to install service')
+    toast.error(t("server.settings.installService.failed"));
   } finally {
-    isInstalling.value = false
+    isInstalling.value = false;
   }
-}
+};
 
 const availableVersions = computed(() => {
-  if (!selectedGroup.value) return []
-  return getAvailableVersionsForService(selectedGroup.value)
-})
+  if (!selectedGroup.value) return [];
+  return getAvailableVersionsForService(selectedGroup.value);
+});
 
 const getServiceImagePath = (type: string, apiPath?: string) => {
   const imageMap: Record<string, string> = {
-    php: '/images/services/php.svg',
-    mysql: '/images/services/mysql.svg',
-    postgresql: '/images/services/postgresql.svg',
-    webserver: '/images/services/webserver.svg',
-    process_manager: '/images/services/process_manager.svg',
-    memory_database: '/images/services/memory_database.svg',
-    package_manager: '/images/services/package_manager.svg',
-    bun: '/images/services/bun.svg',
-    node: '/images/services/node.svg',
-    launch_agent: '/images/services/launch_agent.svg',
-  }
+    php: "/images/services/php.svg",
+    mysql: "/images/services/mysql.svg",
+    postgresql: "/images/services/postgresql.svg",
+    webserver: "/images/services/webserver.svg",
+    process_manager: "/images/services/process_manager.svg",
+    memory_database: "/images/services/memory_database.svg",
+    package_manager: "/images/services/package_manager.svg",
+    bun: "/images/services/bun.svg",
+    node: "/images/services/node.svg",
+    launch_agent: "/images/services/launch_agent.svg",
+  };
 
   // First check if we have a local mapping for this type
   if (imageMap[type]) {
-    return imageMap[type]
+    return imageMap[type];
   }
 
   // Transform API path from /images/software/ to /images/services/
   if (apiPath) {
-    return apiPath.replace('/images/software/', '/images/services/')
+    return apiPath.replace("/images/software/", "/images/services/");
   }
 
-  return '/images/services/package_manager.svg'
-}
+  return "/images/services/package_manager.svg";
+};
 </script>
 
 <template>
   <SharedConfirmationDialog ref="confirmationDialog" />
   <Dialog v-model:open="open">
-    <DialogContent class="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[480px]">
+    <DialogContent
+      class="flex max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[480px]"
+    >
       <DialogHeader class="border-b px-6 pb-4 pt-6">
-        <DialogTitle>Install Service</DialogTitle>
+        <DialogTitle>{{
+          t("server.settings.installService.title")
+        }}</DialogTitle>
         <DialogDescription>
-          Select a service to install on your server
+          {{ t("server.settings.installService.description") }}
         </DialogDescription>
       </DialogHeader>
 
       <div v-if="isLoading" class="flex items-center justify-center py-12">
-        <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+        <Icon
+          name="lucide:loader-2"
+          class="h-6 w-6 animate-spin text-muted-foreground"
+        />
       </div>
 
       <template v-else>
@@ -188,7 +208,9 @@ const getServiceImagePath = (type: string, apiPath?: string) => {
               v-for="service in serviceGroups"
               :key="service.group"
               type="button"
-              :disabled="getAvailableVersionsForService(service.group).length === 0"
+              :disabled="
+                getAvailableVersionsForService(service.group).length === 0
+              "
               :class="[
                 'flex w-full items-center gap-4 px-6 py-4 text-left transition-colors',
                 getAvailableVersionsForService(service.group).length === 0
@@ -197,37 +219,58 @@ const getServiceImagePath = (type: string, apiPath?: string) => {
                     ? 'bg-primary/5'
                     : 'hover:bg-muted/50',
               ]"
-              @click="getAvailableVersionsForService(service.group).length > 0 && handleServiceSelect(service.group)"
+              @click="
+                getAvailableVersionsForService(service.group).length > 0 &&
+                handleServiceSelect(service.group)
+              "
             >
-              <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted">
+              <div
+                class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-muted"
+              >
                 <img
                   :src="getServiceImagePath(service.type, service.image_path)"
                   :alt="service.label"
                   class="h-6 w-6 object-contain"
-                  @error="($event.target as HTMLImageElement).style.display = 'none'"
-                >
+                  @error="
+                    ($event.target as HTMLImageElement).style.display = 'none'
+                  "
+                />
               </div>
               <div class="min-w-0 flex-1">
                 <div class="font-medium">{{ service.label }}</div>
                 <div class="text-sm text-muted-foreground">
                   {{
                     getAvailableVersionsForService(service.group).length === 0
-                      ? 'All versions installed'
-                      : `${getAvailableVersionsForService(service.group).length} version${getAvailableVersionsForService(service.group).length !== 1 ? 's' : ''} available`
+                      ? t("server.settings.installService.allInstalled")
+                      : t("server.settings.installService.availableVersions", {
+                          count: getAvailableVersionsForService(service.group)
+                            .length,
+                        })
                   }}
                 </div>
               </div>
               <Icon
-                v-if="selectedGroup === service.group && getAvailableVersionsForService(service.group).length > 0"
+                v-if="
+                  selectedGroup === service.group &&
+                  getAvailableVersionsForService(service.group).length > 0
+                "
                 name="lucide:check-circle-2"
                 class="h-5 w-5 flex-shrink-0 text-primary"
               />
             </button>
           </div>
 
-          <div v-if="serviceGroups.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
-            <Icon name="lucide:package" class="mb-3 h-8 w-8 text-muted-foreground" />
-            <p class="text-muted-foreground">No services available to install</p>
+          <div
+            v-if="serviceGroups.length === 0"
+            class="flex flex-col items-center justify-center py-12 text-center"
+          >
+            <Icon
+              name="lucide:package"
+              class="mb-3 h-8 w-8 text-muted-foreground"
+            />
+            <p class="text-muted-foreground">
+              {{ t("server.settings.installService.empty") }}
+            </p>
           </div>
         </div>
 
@@ -240,9 +283,14 @@ const getServiceImagePath = (type: string, apiPath?: string) => {
           leave-from-class="opacity-100 max-h-60"
           leave-to-class="opacity-0 max-h-0"
         >
-          <div v-if="selectedGroup && availableVersions.length > 0" class="border-t bg-muted/30">
+          <div
+            v-if="selectedGroup && availableVersions.length > 0"
+            class="border-t bg-muted/30"
+          >
             <div class="px-6 py-4">
-              <label class="mb-3 block text-sm font-medium">Select Version</label>
+              <label class="mb-3 block text-sm font-medium">{{
+                t("server.settings.installService.selectVersion")
+              }}</label>
               <div class="flex flex-wrap gap-2">
                 <button
                   v-for="version in availableVersions"
@@ -265,12 +313,29 @@ const getServiceImagePath = (type: string, apiPath?: string) => {
 
         <!-- Footer -->
         <div class="flex items-center justify-end gap-3 border-t px-6 py-4">
-          <Button type="button" variant="outline" :disabled="isInstalling" @click="handleCloseDialog">
-            Cancel
+          <Button
+            type="button"
+            variant="outline"
+            :disabled="isInstalling"
+            @click="handleCloseDialog"
+          >
+            {{ t("server.common.cancel") }}
           </Button>
-          <Button type="button" :disabled="!selectedGroup || !selectedVersion || isInstalling" @click="handleInstall">
-            <Icon v-if="isInstalling" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            {{ isInstalling ? 'Installing...' : 'Install Service' }}
+          <Button
+            type="button"
+            :disabled="!selectedGroup || !selectedVersion || isInstalling"
+            @click="handleInstall"
+          >
+            <Icon
+              v-if="isInstalling"
+              name="lucide:loader-2"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            {{
+              isInstalling
+                ? t("server.settings.installService.installing")
+                : t("server.settings.installService.title")
+            }}
           </Button>
         </div>
       </template>

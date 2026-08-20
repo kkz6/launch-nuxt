@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -8,99 +8,123 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
+} from "~/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '~/components/ui/sheet'
-import type { LogInfo } from '~/types'
+} from "~/components/ui/sheet";
+import type { LogInfo } from "~/types";
+import { useStableMetadataLabels } from "~/composables/useStableMetadataLabels";
+
+const { t } = useI18n();
+const { getLogName } = useStableMetadataLabels();
 
 interface Props {
-  serverId: string
-  type?: 'server' | 'site'
-  siteId?: string
+  serverId: string;
+  type?: "server" | "site";
+  siteId?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  type: 'server',
-})
+  type: "server",
+});
 
-const logs = ref<LogInfo[]>([])
-const isLoading = ref(false)
-const isSheetOpen = ref(false)
-const selectedLog = ref<LogInfo | null>(null)
-const isDropdownOpen = ref(false)
+const logs = ref<LogInfo[]>([]);
+const isLoading = ref(false);
+const isSheetOpen = ref(false);
+const selectedLog = ref<LogInfo | null>(null);
+const isDropdownOpen = ref(false);
 
 const fetchLogs = async () => {
-  if (logs.value.length > 0) return
+  if (logs.value.length > 0) return;
 
-  isLoading.value = true
+  isLoading.value = true;
   try {
-    const endpoint = props.type === 'site'
-      ? `/servers/${props.serverId}/sites/${props.siteId}/logs`
-      : `/servers/${props.serverId}/logs`
-    const data = await $api<{ data: LogInfo[] }>(endpoint)
-    logs.value = data.data
+    const endpoint =
+      props.type === "site"
+        ? `/servers/${props.serverId}/sites/${props.siteId}/logs`
+        : `/servers/${props.serverId}/logs`;
+    const data = await $api<{ data: LogInfo[] }>(endpoint);
+    logs.value = data.data;
   } catch {
-    toast.error('Failed to load logs')
+    toast.error(t("common.loadLogsFailed"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const openLog = (log: LogInfo) => {
-  selectedLog.value = log
-  isSheetOpen.value = true
-  isDropdownOpen.value = false
-}
+  selectedLog.value = log;
+  isSheetOpen.value = true;
+  isDropdownOpen.value = false;
+};
 
 const entityId = computed(() => {
-  return props.type === 'site' ? (props.siteId || '') : props.serverId
-})
+  return props.type === "site" ? props.siteId || "" : props.serverId;
+});
+
+const selectedLogName = computed(() =>
+  selectedLog.value ? getLogName(selectedLog.value) : t("common.logs"),
+);
 </script>
 
 <template>
   <div>
-    <DropdownMenu v-model:open="isDropdownOpen" @update:open="(open) => open && fetchLogs()">
+    <DropdownMenu
+      v-model:open="isDropdownOpen"
+      @update:open="(open) => open && fetchLogs()"
+    >
       <DropdownMenuTrigger as-child>
         <Button variant="outline" size="sm">
           <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
-          Logs
+          {{ t("common.logs") }}
           <Icon name="lucide:chevron-down" class="ml-1 h-3 w-3" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" class="w-56">
-        <DropdownMenuLabel>View Logs</DropdownMenuLabel>
+        <DropdownMenuLabel>{{ t("common.viewLogs") }}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <div v-if="isLoading" class="flex items-center justify-center py-4">
-          <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin text-muted-foreground" />
+          <Icon
+            name="lucide:loader-2"
+            class="h-4 w-4 animate-spin text-muted-foreground"
+          />
         </div>
         <template v-else-if="logs.length > 0">
           <DropdownMenuItem
             v-for="log in logs"
-            :key="log.software"
+            :key="log.file_type || log.software || log.show_route"
             class="cursor-pointer"
             @click="openLog(log)"
           >
             <Icon name="lucide:file-text" class="mr-2 h-4 w-4" />
-            {{ log.name }}
+            {{ getLogName(log) }}
           </DropdownMenuItem>
         </template>
         <div v-else class="px-2 py-4 text-center text-sm text-muted-foreground">
-          No logs available
+          {{ t("common.noLogs") }}
         </div>
       </DropdownMenuContent>
     </DropdownMenu>
 
     <Sheet v-model:open="isSheetOpen">
-      <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col">
+      <SheetContent
+        class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-5xl flex flex-col"
+      >
         <SheetHeader>
-          <SheetTitle>{{ selectedLog?.name || 'Logs' }}</SheetTitle>
+          <SheetTitle>{{ selectedLogName }}</SheetTitle>
           <SheetDescription>
-            {{ type === 'site' ? 'Site' : 'Server' }} logs for {{ selectedLog?.name }}
+            {{
+              t(
+                type === "site" ? "common.siteLogsFor" : "common.serverLogsFor",
+                {
+                  name: selectedLogName,
+                },
+              )
+            }}
           </SheetDescription>
         </SheetHeader>
         <div class="mt-4 flex-1 min-h-0 flex flex-col">

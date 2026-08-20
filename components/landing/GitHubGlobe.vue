@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import createGlobe, { type COBEOptions } from 'cobe'
+import createGlobe, { type COBEOptions } from "cobe";
 
 interface Props {
-  className?: string
+  className?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  className: '',
-})
+  className: "",
+});
 
 const GLOBE_CONFIG: COBEOptions = {
   width: 800,
@@ -37,75 +37,82 @@ const GLOBE_CONFIG: COBEOptions = {
     { location: [-33.8688, 151.2093], size: 0.06 }, // Sydney
     { location: [19.076, 72.8777], size: 0.06 }, // Mumbai
   ],
-}
+};
 
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-const phiRef = ref(0)
-const widthRef = ref(0)
-const pointerInteracting = ref<number | null>(null)
-const pointerInteractionMovement = ref(0)
-const r = ref(0)
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+const phiRef = ref(0);
+const widthRef = ref(0);
+const pointerInteracting = ref<number | null>(null);
+const pointerInteractionMovement = ref(0);
+const r = ref(0);
 
 const updatePointerInteraction = (value: number | null) => {
-  pointerInteracting.value = value
+  pointerInteracting.value = value;
   if (canvasRef.value) {
-    canvasRef.value.style.cursor = value ? 'grabbing' : 'grab'
+    canvasRef.value.style.cursor = value ? "grabbing" : "grab";
   }
-}
+};
 
 const updateMovement = (clientX: number) => {
   if (pointerInteracting.value !== null) {
-    const delta = clientX - pointerInteracting.value
-    pointerInteractionMovement.value = delta
-    r.value = delta / 200
+    const delta = clientX - pointerInteracting.value;
+    pointerInteractionMovement.value = delta;
+    r.value = delta / 200;
   }
-}
+};
 
 onMounted(() => {
-  if (!canvasRef.value) return
+  if (!canvasRef.value) return;
 
   const onResize = () => {
     if (canvasRef.value) {
-      widthRef.value = canvasRef.value.offsetWidth
+      widthRef.value = canvasRef.value.offsetWidth;
     }
-  }
+  };
 
   const onRender = (state: Record<string, unknown>) => {
-    if (!pointerInteracting.value) phiRef.value += 0.005
-    state.phi = phiRef.value + r.value
-    state.width = widthRef.value * 2
-    state.height = widthRef.value * 2
-  }
+    if (!pointerInteracting.value) phiRef.value += 0.005;
+    state.phi = phiRef.value + r.value;
+    state.width = widthRef.value * 2;
+    state.height = widthRef.value * 2;
+  };
 
-  window.addEventListener('resize', onResize)
-  onResize()
+  window.addEventListener("resize", onResize);
+  onResize();
 
   const globe = createGlobe(canvasRef.value, {
     ...GLOBE_CONFIG,
     width: widthRef.value * 2,
     height: widthRef.value * 2,
     onRender,
-  })
+  });
 
   setTimeout(() => {
     if (canvasRef.value) {
-      canvasRef.value.style.opacity = '1'
+      canvasRef.value.style.opacity = "1";
     }
-  })
+  });
 
   onUnmounted(() => {
-    globe.destroy()
-    window.removeEventListener('resize', onResize)
-  })
-})
+    globe.destroy();
+    window.removeEventListener("resize", onResize);
+  });
+});
 </script>
 
 <template>
-  <div :class="['absolute inset-0 mx-auto aspect-[1/1] w-full max-w-[600px]', props.className]">
+  <div
+    :class="[
+      'absolute inset-0 mx-auto aspect-[1/1] w-full max-w-[600px]',
+      props.className,
+    ]"
+  >
     <canvas
       ref="canvasRef"
       class="size-full opacity-0 transition-opacity duration-500 [contain:layout_paint_size]"
-      @pointerdown="(e) => updatePointerInteraction(e.clientX - pointerInteractionMovement)"
+      @pointerdown="
+        (e) => updatePointerInteraction(e.clientX - pointerInteractionMovement)
+      "
       @pointerup="() => updatePointerInteraction(null)"
       @pointerout="() => updatePointerInteraction(null)"
       @mousemove="(e) => updateMovement(e.clientX)"

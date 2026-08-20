@@ -2,6 +2,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { computed, onMounted, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TeamsTab from "../../components/settings/TeamsTab.vue";
+import { createI18nStub } from "../helpers/i18n";
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
@@ -161,6 +162,7 @@ describe("team settings", () => {
     vi.stubGlobal("onMounted", onMounted);
     vi.stubGlobal("ref", ref);
     vi.stubGlobal("useAuth", () => ({ user, fetchUser: mocks.fetchUser }));
+    vi.stubGlobal("useI18n", createI18nStub);
     vi.stubGlobal("useApi", () => ({
       setCurrentTeamId: mocks.setCurrentTeamId,
     }));

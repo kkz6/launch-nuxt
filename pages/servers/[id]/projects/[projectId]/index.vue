@@ -17,6 +17,7 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const serverId = computed(() => route.params.id as string);
 const projectId = computed(() => route.params.projectId as string);
 
@@ -35,7 +36,9 @@ type TabId = (typeof VALID_TABS)[number];
 
 const initialTab = (): TabId => {
   const q = route.query.tab as string;
-  return (VALID_TABS as readonly string[]).includes(q) ? (q as TabId) : "overview";
+  return (VALID_TABS as readonly string[]).includes(q)
+    ? (q as TabId)
+    : "overview";
 };
 const activeTab = ref<TabId>(initialTab());
 
@@ -46,7 +49,10 @@ watch(activeTab, (newTab) => {
 watch(
   () => route.query.tab,
   (newTab) => {
-    if (newTab && (VALID_TABS as readonly string[]).includes(newTab as string)) {
+    if (
+      newTab &&
+      (VALID_TABS as readonly string[]).includes(newTab as string)
+    ) {
       activeTab.value = newTab as TabId;
     }
   },
@@ -60,9 +66,11 @@ const fetchData = async () => {
     ]);
     server.value = s.data;
     project.value = p.data;
-    useHead({ title: project.value.name || "Project" });
+    useHead(() => ({
+      title: project.value?.name || t("server.project.fallbackTitle"),
+    }));
   } catch {
-    toast.error("Project not found");
+    toast.error(t("server.project.notFound"));
     navigateTo(`/servers/${serverId.value}`);
     return;
   } finally {
@@ -133,14 +141,14 @@ const dockerProjectEnvOpen = useState<boolean>(
       <DialogContent class="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle class="text-base">
-            Project Environment
+            {{ t("server.project.environmentTitle") }}
           </DialogTitle>
           <DialogDescription class="text-xs">
-            Shared env vars any workload under this project can
-            reference. Container env values use the
-            <code class="rounded bg-muted px-1 py-0.5 text-[11px]"
-                  v-pre>${{project.KEY}}</code>
-            syntax to pull from here. Resolved at deploy / run time.
+            {{ t("server.project.environmentDescriptionBefore") }}
+            <code class="rounded bg-muted px-1 py-0.5 text-[11px]" v-pre
+              >${{ project.KEY }}</code
+            >
+            {{ t("server.project.environmentDescriptionAfter") }}
           </DialogDescription>
         </DialogHeader>
         <ProjectEnvironment

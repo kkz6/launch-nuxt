@@ -1,30 +1,45 @@
 <script setup lang="ts">
-const footerLinks = {
+const { t, locale } = useI18n();
+
+const footerLinks = computed(() => ({
   product: [
-    { label: 'Features', href: '/#features' },
-    { label: 'Pricing', href: '/pricing' },
-    { label: 'Changelog', href: '#' },
+    { label: t("public.footer.features"), href: "/#features" },
+    { label: t("public.navigation.pricing"), href: "/pricing" },
+    { label: t("public.footer.changelog"), href: "#" },
   ],
   support: [
-    { label: 'Documentation', href: '/docs' },
-    { label: 'Support Center', href: '/support' },
-    { label: 'Status', href: '#' },
-    { label: 'Report Vulnerability', href: 'https://forum.gigcodes.com/', external: true },
+    { label: t("public.footer.documentation"), href: "/docs" },
+    { label: t("public.footer.supportCenter"), href: "/support" },
+    { label: t("public.footer.status"), href: "#" },
+    {
+      label: t("public.footer.reportVulnerability"),
+      href: "https://forum.gigcodes.com/",
+      external: true,
+    },
   ],
   legal: [
-    { label: 'Privacy Policy', href: '/legal/privacy' },
-    { label: 'Terms of Service', href: '/legal/terms' },
-    { label: 'Refund Policy', href: '/legal/refund' },
+    { label: t("public.footer.privacy"), href: "/legal/privacy" },
+    { label: t("public.footer.terms"), href: "/legal/terms" },
+    { label: t("public.footer.refund"), href: "/legal/refund" },
   ],
-}
+}));
 
 const socialLinks = [
-  { label: 'Twitter', href: 'https://x.com/gigcodes', icon: 'lucide:twitter' },
-  { label: 'GitHub', href: 'https://github.com/gigcodes', icon: 'lucide:github' },
-  { label: 'Discord', href: '#', icon: 'simple-icons:discord' },
-]
+  { label: "Twitter", href: "https://x.com/gigcodes", icon: "lucide:twitter" },
+  {
+    label: "GitHub",
+    href: "https://github.com/gigcodes",
+    icon: "lucide:github",
+  },
+  { label: "Discord", href: "#", icon: "simple-icons:discord" },
+];
 
-const currentYear = new Date().getFullYear()
+const currentYear = new Date().getFullYear();
+const formattedYear = computed(() =>
+  new Intl.NumberFormat(locale.value === "ja" ? "ja-JP" : "en-US", {
+    useGrouping: false,
+  }).format(currentYear),
+);
 </script>
 
 <template>
@@ -37,7 +52,7 @@ const currentYear = new Date().getFullYear()
             <span class="text-xl font-bold text-foreground">launchctl</span>
           </NuxtLink>
           <p class="mb-6 max-w-xs text-sm text-muted-foreground">
-            Deploy and manage your servers with ease. No DevOps expertise required.
+            {{ t("public.footer.description") }}
           </p>
           <div class="flex items-center gap-2">
             <a
@@ -56,7 +71,9 @@ const currentYear = new Date().getFullYear()
 
         <!-- Product -->
         <div>
-          <h4 class="mb-4 text-sm font-semibold text-foreground">Product</h4>
+          <h4 class="mb-4 text-sm font-semibold text-foreground">
+            {{ t("public.footer.product") }}
+          </h4>
           <ul class="space-y-3">
             <li v-for="link in footerLinks.product" :key="link.label">
               <NuxtLink
@@ -71,7 +88,9 @@ const currentYear = new Date().getFullYear()
 
         <!-- Support -->
         <div>
-          <h4 class="mb-4 text-sm font-semibold text-foreground">Support</h4>
+          <h4 class="mb-4 text-sm font-semibold text-foreground">
+            {{ t("public.footer.support") }}
+          </h4>
           <ul class="space-y-3">
             <li v-for="link in footerLinks.support" :key="link.label">
               <a
@@ -96,7 +115,9 @@ const currentYear = new Date().getFullYear()
 
         <!-- Legal -->
         <div>
-          <h4 class="mb-4 text-sm font-semibold text-foreground">Legal</h4>
+          <h4 class="mb-4 text-sm font-semibold text-foreground">
+            {{ t("public.footer.legal") }}
+          </h4>
           <ul class="space-y-3">
             <li v-for="link in footerLinks.legal" :key="link.label">
               <NuxtLink
@@ -111,16 +132,22 @@ const currentYear = new Date().getFullYear()
       </div>
 
       <!-- Bottom bar -->
-      <div class="mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 md:flex-row">
+      <div
+        class="mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 md:flex-row"
+      >
         <p class="text-sm text-muted-foreground">
-          &copy; {{ currentYear }} Gigcodes. All rights reserved.
+          {{ t("public.footer.copyright", { year: formattedYear }) }}
         </p>
         <div class="flex items-center gap-2 text-sm text-muted-foreground">
           <span class="relative flex h-2 w-2">
-            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            <span
+              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"
+            />
+            <span
+              class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"
+            />
           </span>
-          All systems operational
+          {{ t("public.footer.operational") }}
         </div>
       </div>
     </div>

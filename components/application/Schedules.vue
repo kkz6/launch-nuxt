@@ -18,6 +18,14 @@ interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
+
+const columns = computed(() => [
+  { key: "frequency", label: t("workload.schedules.frequency"), width: "25%" },
+  { key: "command", label: t("workload.schedules.command"), width: "35%" },
+  { key: "last_run_at", label: t("workload.schedules.lastRun"), width: "20%" },
+  { key: "last_status", label: t("workload.fields.status"), width: "20%" },
+]);
 
 // Mirrors components/server/ShowSchedulers.vue (PHP-site cron jobs):
 // SharedDataTable + Create/Edit dialog reused for both modes via a
@@ -49,9 +57,9 @@ useDockerApplicationEvents(teamId, (data) => {
   fetchSchedules();
 });
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchSchedules = async () => {
   isLoading.value = true;
@@ -63,7 +71,7 @@ const fetchSchedules = async () => {
     );
     schedules.value = res.data;
   } catch {
-    toast.error("Failed to load schedulers");
+    toast.error(t("workload.schedules.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -92,17 +100,16 @@ const viewLogs = (s: DockerSchedule) => {
 const deleteSchedule = async (s: DockerSchedule) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Delete Scheduler",
-    description:
-      "This action cannot be undone. This will permanently delete the scheduled task.",
-    confirmText: "Delete",
-    cancelText: "Cancel",
+    title: t("workload.schedules.deleteTitle"),
+    description: t("workload.schedules.deleteDescription"),
+    confirmText: t("workload.actions.delete"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
-    helpText: "Type the command to confirm deletion:",
+    helpText: t("workload.schedules.deleteHelp"),
     inputVerificationText: s.command,
   });
   if (!result.ok) {
-    toast.info("Cancelled");
+    toast.info(t("workload.actions.cancelled"));
     return;
   }
   try {
@@ -113,10 +120,10 @@ const deleteSchedule = async (s: DockerSchedule) => {
       s.id,
     );
     schedules.value = schedules.value.filter((x) => x.id !== s.id);
-    toast.success("Scheduler deleted");
+    toast.success(t("workload.schedules.deleted"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete scheduler");
+    toast.error(e.data?.message || t("workload.schedules.deleteFailed"));
   }
 };
 
@@ -151,9 +158,11 @@ onMounted(fetchSchedules);
 
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 class="text-lg font-semibold">Schedulers</h3>
+        <h3 class="text-lg font-semibold">
+          {{ t("workload.schedules.title") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Cron-style commands that run inside the application's container.
+          {{ t("workload.schedules.description") }}
         </p>
       </div>
       <ApplicationCreateSchedule
@@ -173,14 +182,9 @@ onMounted(fetchSchedules);
     <template v-else>
       <SharedDataTable
         :data="schedules"
-        :columns="[
-          { key: 'frequency', label: 'Frequency', width: '25%' },
-          { key: 'command', label: 'Command', width: '35%' },
-          { key: 'last_run_at', label: 'Last run', width: '20%' },
-          { key: 'last_status', label: 'Status', width: '20%' },
-        ]"
-        empty-title="No scheduled tasks found"
-        empty-description="Add a recurring command to run inside the container"
+        :columns="columns"
+        :empty-title="t('workload.schedules.emptyTitle')"
+        :empty-description="t('workload.schedules.emptyDescription')"
         empty-icon="lucide:clock"
       >
         <template #empty>
@@ -217,7 +221,7 @@ onMounted(fetchSchedules);
                   : 'bg-muted text-muted-foreground'
             "
           >
-            {{ row.last_status }}
+            {{ t(`workload.status.${row.last_status}`, row.last_status) }}
           </span>
           <span v-else class="text-muted-foreground">—</span>
         </template>
@@ -226,7 +230,7 @@ onMounted(fetchSchedules);
           <Button
             variant="ghost"
             size="icon"
-            title="View latest run logs"
+            :title="t('workload.schedules.viewLatestLogs')"
             @click="viewLogs(item)"
           >
             <Icon name="lucide:scroll-text" class="h-4 w-4" />
@@ -234,7 +238,7 @@ onMounted(fetchSchedules);
           <Button
             variant="ghost"
             size="icon"
-            title="Edit"
+            :title="t('workload.actions.edit')"
             @click="editSchedule(item)"
           >
             <Icon name="lucide:pencil" class="h-4 w-4" />
@@ -242,7 +246,7 @@ onMounted(fetchSchedules);
           <Button
             variant="ghost"
             size="icon"
-            title="Delete"
+            :title="t('workload.actions.delete')"
             class="hover:bg-destructive/90 hover:text-white"
             @click="deleteSchedule(item)"
           >
@@ -265,7 +269,7 @@ onMounted(fetchSchedules);
         class="flex h-[85vh] flex-col overflow-hidden sm:max-w-7xl"
       >
         <DialogHeader class="shrink-0">
-          <DialogTitle>Scheduler logs</DialogTitle>
+          <DialogTitle>{{ t("workload.schedules.logsTitle") }}</DialogTitle>
           <DialogDescription class="font-mono text-xs">
             {{ selectedScheduleForLogs?.command }}
           </DialogDescription>
@@ -291,17 +295,12 @@ onMounted(fetchSchedules);
             v-else
             class="flex flex-1 flex-col items-center justify-center gap-3 rounded-md border border-dashed bg-card py-12"
           >
-            <Icon
-              name="lucide:clock"
-              class="h-8 w-8 text-muted-foreground"
-            />
+            <Icon name="lucide:clock" class="h-8 w-8 text-muted-foreground" />
             <span class="text-base text-muted-foreground">
-              No runs yet
+              {{ t("workload.schedules.noRuns") }}
             </span>
             <p class="max-w-md px-4 text-center text-xs text-muted-foreground">
-              Logs appear here after the first tick. The poller checks
-              every minute and dispatches when the cron expression
-              matches.
+              {{ t("workload.schedules.noRunsDescription") }}
             </p>
           </div>
         </div>

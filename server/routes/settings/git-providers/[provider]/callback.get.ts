@@ -29,10 +29,16 @@ export default defineEventHandler(async (event) => {
   // — otherwise the callback 401s and the installation is never recorded.
   const authToken = getCookie(event, "auth_token");
   const teamId = getCookie(event, "current_team_id");
+  const localeCookie = getCookie(event, "locale");
+  const acceptLanguage =
+    localeCookie === "en" || localeCookie === "ja"
+      ? localeCookie
+      : getHeader(event, "accept-language");
 
   try {
     await $fetch(target, {
       headers: {
+        ...(acceptLanguage ? { "Accept-Language": acceptLanguage } : {}),
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         ...(teamId ? { "X-Team-ID": teamId } : {}),
       },

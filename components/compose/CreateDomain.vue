@@ -47,6 +47,7 @@ interface Props {
   domain?: DockerDomain;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   created: [];
   updated: [];
@@ -173,11 +174,12 @@ const sixHexHash = () => {
   return out;
 };
 const generateWildcardHost = () => {
-  const slugComposeName = (props.compose.name || "stack")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40) || "stack";
+  const slugComposeName =
+    (props.compose.name || "stack")
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 40) || "stack";
   const hash = sixHexHash();
   const ip = sharedServerIp.value || "";
   const slugIp = ip ? `-${ip.replaceAll(".", "-").replaceAll(":", "-")}` : "";
@@ -190,15 +192,15 @@ const onSubmit = async () => {
   errors.value = {};
   const trimmedHost = host.value.trim().toLowerCase();
   if (!trimmedHost) {
-    errors.value.host = "Host is required";
+    errors.value.host = t("workload.domains.hostRequired");
     return;
   }
   if (!serviceName.value.trim()) {
-    errors.value.service_name = "Service is required";
+    errors.value.service_name = t("workload.domains.serviceRequired");
     return;
   }
   if (!containerPort.value || containerPort.value <= 0) {
-    errors.value.container_port = "Container port is required";
+    errors.value.container_port = t("workload.domains.containerPortRequired");
     return;
   }
 
@@ -220,7 +222,7 @@ const onSubmit = async () => {
           service_name: serviceName.value.trim(),
         },
       );
-      toast.success("Domain updated");
+      toast.success(t("workload.domains.updated"));
       emit("updated");
     } else {
       await dockerService.composes.domains.create(
@@ -243,14 +245,14 @@ const onSubmit = async () => {
             domainVerification.value?.connected_domain_id || null,
         },
       );
-      toast.success("Domain added — Traefik is updating");
+      toast.success(t("workload.domains.added"));
       emit("created");
     }
     open.value = false;
     resetForm();
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to save domain");
+    toast.error(e.data?.message || t("workload.domains.saveFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -269,17 +271,22 @@ watch(open, (isOpen) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        {{ domain ? "Edit Domain" : "Add Domain" }}
+        {{
+          domain ? t("workload.domains.editTitle") : t("workload.domains.add")
+        }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>{{ domain ? "Edit Domain" : "Domain" }}</DialogTitle>
+        <DialogTitle>{{
+          domain
+            ? t("workload.domains.editTitle")
+            : t("workload.domains.domain")
+        }}</DialogTitle>
         <DialogDescription>
-          Attach a public hostname to a service in this stack. Make
-          sure the target service joins the
-          <code class="font-mono text-xs">launch-network</code> in your
-          YAML so Traefik can reach it.
+          {{ t("workload.domains.addComposeBeforeNetwork") }}
+          <code class="font-mono text-xs">launch-network</code>
+          {{ t("workload.domains.addComposeAfterNetwork") }}
         </DialogDescription>
       </DialogHeader>
 
@@ -288,7 +295,7 @@ watch(open, (isOpen) => {
              disables the input — host is immutable on update because
              renaming would orphan the cert. -->
         <div class="space-y-2">
-          <Label for="cdomain-host">Host</Label>
+          <Label for="cdomain-host">{{ t("workload.fields.host") }}</Label>
           <div class="relative flex gap-2">
             <div class="relative flex-1">
               <Input
@@ -313,7 +320,7 @@ watch(open, (isOpen) => {
               type="button"
               variant="outline"
               size="icon"
-              title="Generate a wildcard-DNS hostname pointing at this server (sslip.io)"
+              :title="t('workload.domains.generateWildcard')"
               @click="generateWildcardHost"
             >
               <Icon name="lucide:shuffle" class="h-4 w-4" />
@@ -332,8 +339,7 @@ watch(open, (isOpen) => {
               class="h-4 w-4 text-sky-600 dark:text-sky-400"
             />
             <span class="text-sm text-sky-700 dark:text-sky-300">
-              Wildcard DNS hostname — already routable, no provider
-              setup required.
+              {{ t("workload.domains.wildcardReady") }}
             </span>
           </div>
         </div>
@@ -344,20 +350,15 @@ watch(open, (isOpen) => {
              deployed yet (services list comes back empty). -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-2">
-            <Label for="cdomain-service">Service</Label>
-            <Select
-              v-if="availableServices.length > 0"
-              v-model="serviceName"
-            >
+            <Label for="cdomain-service">{{
+              t("workload.fields.service")
+            }}</Label>
+            <Select v-if="availableServices.length > 0" v-model="serviceName">
               <SelectTrigger id="cdomain-service">
-                <SelectValue placeholder="Pick a service" />
+                <SelectValue :placeholder="t('workload.domains.pickService')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem
-                  v-for="s in availableServices"
-                  :key="s"
-                  :value="s"
-                >
+                <SelectItem v-for="s in availableServices" :key="s" :value="s">
                   {{ s }}
                 </SelectItem>
               </SelectContent>
@@ -370,13 +371,16 @@ watch(open, (isOpen) => {
               autocomplete="off"
             />
             <p class="text-[11px] text-muted-foreground">
-              <template v-if="isLoadingServices">Loading…</template>
+              <template v-if="isLoadingServices">{{
+                t("workload.actions.loading")
+              }}</template>
               <template v-else-if="availableServices.length === 0">
-                Stack not deployed yet — type the YAML service name.
+                {{ t("workload.domains.stackNotDeployed") }}
               </template>
               <template v-else>
-                Must match a <code class="font-mono">services:</code>
-                key in your compose YAML.
+                {{ t("workload.domains.serviceMatchBefore") }}
+                <code class="font-mono">services:</code>
+                {{ t("workload.domains.serviceMatchAfter") }}
               </template>
             </p>
             <p v-if="errors.service_name" class="text-sm text-destructive">
@@ -385,7 +389,9 @@ watch(open, (isOpen) => {
           </div>
 
           <div class="space-y-2">
-            <Label for="cdomain-port">Container Port</Label>
+            <Label for="cdomain-port">{{
+              t("workload.domains.containerPort")
+            }}</Label>
             <Input
               id="cdomain-port"
               v-model.number="containerPort"
@@ -396,8 +402,7 @@ watch(open, (isOpen) => {
               autocomplete="off"
             />
             <p class="text-[11px] text-muted-foreground">
-              The port the service listens on inside the container.
-              Not the host port — Traefik handles 80/443 itself.
+              {{ t("workload.domains.composePortHelp") }}
             </p>
             <p v-if="errors.container_port" class="text-sm text-destructive">
               {{ errors.container_port }}
@@ -409,7 +414,9 @@ watch(open, (isOpen) => {
              application dialog. -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-2">
-            <Label for="cdomain-path">External Path</Label>
+            <Label for="cdomain-path">{{
+              t("workload.domains.externalPath")
+            }}</Label>
             <Input
               id="cdomain-path"
               v-model="path"
@@ -417,11 +424,13 @@ watch(open, (isOpen) => {
               autocomplete="off"
             />
             <p class="text-[11px] text-muted-foreground">
-              Optional. Traefik only routes requests under this prefix.
+              {{ t("workload.domains.externalPathHelp") }}
             </p>
           </div>
           <div class="space-y-2">
-            <Label for="cdomain-internal-path">Internal Path</Label>
+            <Label for="cdomain-internal-path">{{
+              t("workload.domains.internalPath")
+            }}</Label>
             <Input
               id="cdomain-internal-path"
               v-model="internalPath"
@@ -429,27 +438,35 @@ watch(open, (isOpen) => {
               autocomplete="off"
             />
             <p class="text-[11px] text-muted-foreground">
-              Path the service expects internally. Defaults to "/".
+              {{ t("workload.domains.composeInternalPathHelp") }}
             </p>
           </div>
         </div>
 
         <!-- HTTPS + strip-path toggles. -->
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div class="flex items-start justify-between gap-3 rounded-md border p-3">
+          <div
+            class="flex items-start justify-between gap-3 rounded-md border p-3"
+          >
             <div class="space-y-0.5">
-              <Label class="text-sm font-medium">HTTPS</Label>
+              <Label class="text-sm font-medium">
+                {{ t("workload.domains.https") }}
+              </Label>
               <p class="text-[11px] text-muted-foreground">
-                Issue + serve a Let's Encrypt certificate.
+                {{ t("workload.domains.composeHttpsHelp") }}
               </p>
             </div>
             <Switch v-model="https" />
           </div>
-          <div class="flex items-start justify-between gap-3 rounded-md border p-3">
+          <div
+            class="flex items-start justify-between gap-3 rounded-md border p-3"
+          >
             <div class="space-y-0.5">
-              <Label class="text-sm font-medium">Strip Path</Label>
+              <Label class="text-sm font-medium">{{
+                t("workload.domains.stripPath")
+              }}</Label>
               <p class="text-[11px] text-muted-foreground">
-                Strip External Path before forwarding.
+                {{ t("workload.domains.stripComposeHelp") }}
               </p>
             </div>
             <Switch v-model="stripPath" />
@@ -458,7 +475,7 @@ watch(open, (isOpen) => {
 
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="isLoading">
             <Icon
@@ -466,7 +483,11 @@ watch(open, (isOpen) => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            {{ domain ? "Save Changes" : "Add Domain" }}
+            {{
+              domain
+                ? t("workload.actions.saveChanges")
+                : t("workload.domains.add")
+            }}
           </Button>
         </DialogFooter>
       </form>

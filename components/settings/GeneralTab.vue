@@ -1,140 +1,160 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 
-const { user, setUser, fetchUser } = useAuth()
+const { user, setUser, fetchUser } = useAuth();
+const { t } = useI18n();
 
 // Profile form state
-const isLoading = ref(false)
-const name = ref(user.value?.name || '')
-const email = ref(user.value?.email || '')
-const profileErrors = ref<{ name?: string; email?: string }>({})
+const isLoading = ref(false);
+const name = ref(user.value?.name || "");
+const email = ref(user.value?.email || "");
+const profileErrors = ref<{ name?: string; email?: string }>({});
 
 // Password form state
-const isPasswordLoading = ref(false)
-const currentPassword = ref('')
-const password = ref('')
-const passwordConfirmation = ref('')
-const passwordErrors = ref<{ current_password?: string; password?: string; password_confirmation?: string }>({})
+const isPasswordLoading = ref(false);
+const currentPassword = ref("");
+const password = ref("");
+const passwordConfirmation = ref("");
+const passwordErrors = ref<{
+  current_password?: string;
+  password?: string;
+  password_confirmation?: string;
+}>({});
 
 watch(
   user,
   (newUser) => {
     if (newUser) {
-      name.value = newUser.name
-      email.value = newUser.email
+      name.value = newUser.name;
+      email.value = newUser.email;
     }
   },
-  { immediate: true }
-)
+  { immediate: true },
+);
 
 const validateProfile = (): boolean => {
-  profileErrors.value = {}
+  profileErrors.value = {};
   if (!name.value.trim() || name.value.length < 2) {
-    profileErrors.value.name = 'Name must be at least 2 characters'
+    profileErrors.value.name = t("settings.general.nameMin");
   }
-  if (!email.value.trim() || !email.value.includes('@')) {
-    profileErrors.value.email = 'Please enter a valid email address'
+  if (!email.value.trim() || !email.value.includes("@")) {
+    profileErrors.value.email = t("settings.general.emailInvalid");
   }
-  return Object.keys(profileErrors.value).length === 0
-}
+  return Object.keys(profileErrors.value).length === 0;
+};
 
 const validatePassword = (): boolean => {
-  passwordErrors.value = {}
+  passwordErrors.value = {};
   if (!currentPassword.value) {
-    passwordErrors.value.current_password = 'Current password is required'
+    passwordErrors.value.current_password = t(
+      "settings.general.currentPasswordRequired",
+    );
   }
   if (!password.value || password.value.length < 8) {
-    passwordErrors.value.password = 'Password must be at least 8 characters'
+    passwordErrors.value.password = t("settings.general.passwordMin");
   }
   if (password.value !== passwordConfirmation.value) {
-    passwordErrors.value.password_confirmation = "Passwords don't match"
+    passwordErrors.value.password_confirmation = t(
+      "settings.general.passwordMismatch",
+    );
   }
-  return Object.keys(passwordErrors.value).length === 0
-}
+  return Object.keys(passwordErrors.value).length === 0;
+};
 
 const onProfileSubmit = async () => {
-  if (!validateProfile()) return
+  if (!validateProfile()) return;
 
-  isLoading.value = true
+  isLoading.value = true;
   try {
-    const response = await $api<{ data: { user: import('~/types').User } }>(
-      '/user/profile',
+    const response = await $api<{ data: { user: import("~/types").User } }>(
+      "/user/profile",
       {
-        method: 'PUT',
+        method: "PUT",
         body: { name: name.value, email: email.value },
-      }
-    )
-    setUser(response.data.user)
-    toast.success('Profile updated successfully')
+      },
+    );
+    setUser(response.data.user);
+    toast.success(t("settings.general.profileUpdated"));
   } catch (error: unknown) {
-    const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
+    const err = error as {
+      data?: { errors?: Record<string, string[]>; message?: string };
+    };
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        profileErrors.value[field as keyof typeof profileErrors.value] = messages[0]
+        profileErrors.value[field as keyof typeof profileErrors.value] =
+          messages[0];
       }
     } else {
-      toast.error(err.data?.message || 'Failed to update profile')
+      toast.error(
+        err.data?.message || t("settings.general.profileUpdateFailed"),
+      );
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const onPasswordSubmit = async () => {
-  if (!validatePassword()) return
+  if (!validatePassword()) return;
 
-  isPasswordLoading.value = true
+  isPasswordLoading.value = true;
   try {
-    await $api('/user/password', {
-      method: 'PUT',
+    await $api("/user/password", {
+      method: "PUT",
       body: {
         current_password: currentPassword.value,
         password: password.value,
         password_confirmation: passwordConfirmation.value,
       },
-    })
-    toast.success('Password updated successfully')
-    currentPassword.value = ''
-    password.value = ''
-    passwordConfirmation.value = ''
+    });
+    toast.success(t("settings.general.passwordUpdated"));
+    currentPassword.value = "";
+    password.value = "";
+    passwordConfirmation.value = "";
   } catch (error: unknown) {
-    const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
+    const err = error as {
+      data?: { errors?: Record<string, string[]>; message?: string };
+    };
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        passwordErrors.value[field as keyof typeof passwordErrors.value] = messages[0]
+        passwordErrors.value[field as keyof typeof passwordErrors.value] =
+          messages[0];
       }
     } else {
-      toast.error(err.data?.message || 'Failed to update password')
+      toast.error(
+        err.data?.message || t("settings.general.passwordUpdateFailed"),
+      );
     }
   } finally {
-    isPasswordLoading.value = false
+    isPasswordLoading.value = false;
   }
-}
+};
 
 // Onboarding reset
-const isOnboardingLoading = ref(false)
-const router = useRouter()
-const { close: closeSettings } = useSettingsSheet()
+const isOnboardingLoading = ref(false);
+const router = useRouter();
+const { close: closeSettings } = useSettingsSheet();
 
 const resetOnboarding = async () => {
-  isOnboardingLoading.value = true
+  isOnboardingLoading.value = true;
   try {
-    await $api('/auth/reset-onboarding', { method: 'POST' })
-    await fetchUser()
-    toast.success('Onboarding has been reset')
-    closeSettings()
-    router.push('/onboarding')
+    await $api("/auth/reset-onboarding", { method: "POST" });
+    await fetchUser();
+    toast.success(t("settings.general.onboardingReset"));
+    closeSettings();
+    router.push("/onboarding");
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to reset onboarding')
+    const err = error as { data?: { message?: string } };
+    toast.error(
+      err.data?.message || t("settings.general.onboardingResetFailed"),
+    );
   } finally {
-    isOnboardingLoading.value = false
+    isOnboardingLoading.value = false;
   }
-}
-
+};
 </script>
 
 <template>
@@ -143,7 +163,9 @@ const resetOnboarding = async () => {
     <div class="px-6 pb-6">
       <form class="space-y-4" @submit.prevent="onProfileSubmit">
         <div class="space-y-1.5">
-          <Label for="name" class="text-xs font-medium text-muted-foreground">Name</Label>
+          <Label for="name" class="text-xs font-medium text-muted-foreground">{{
+            t("settings.general.name")
+          }}</Label>
           <Input
             id="name"
             v-model="name"
@@ -156,7 +178,11 @@ const resetOnboarding = async () => {
         </div>
 
         <div class="space-y-1.5">
-          <Label for="email" class="text-xs font-medium text-muted-foreground">Email</Label>
+          <Label
+            for="email"
+            class="text-xs font-medium text-muted-foreground"
+            >{{ t("settings.general.email") }}</Label
+          >
           <Input
             id="email"
             v-model="email"
@@ -174,17 +200,23 @@ const resetOnboarding = async () => {
             name="lucide:loader-2"
             class="mr-2 block size-4 animate-spin"
           />
-          Save Changes
+          {{ t("settings.general.saveChanges") }}
         </Button>
       </form>
     </div>
 
     <!-- Password Section -->
     <div class="px-6 py-6">
-      <h3 class="mb-4 text-base font-semibold">Update Password</h3>
+      <h3 class="mb-4 text-base font-semibold">
+        {{ t("settings.general.passwordTitle") }}
+      </h3>
       <form class="space-y-4" @submit.prevent="onPasswordSubmit">
         <div class="space-y-1.5">
-          <Label for="current_password" class="text-xs font-medium text-muted-foreground">Current Password</Label>
+          <Label
+            for="current_password"
+            class="text-xs font-medium text-muted-foreground"
+            >{{ t("settings.general.currentPassword") }}</Label
+          >
           <Input
             id="current_password"
             v-model="currentPassword"
@@ -192,13 +224,20 @@ const resetOnboarding = async () => {
             class="sm:w-72"
             :class="{ 'border-destructive': passwordErrors.current_password }"
           />
-          <p v-if="passwordErrors.current_password" class="text-sm text-destructive">
+          <p
+            v-if="passwordErrors.current_password"
+            class="text-sm text-destructive"
+          >
             {{ passwordErrors.current_password }}
           </p>
         </div>
 
         <div class="space-y-1.5">
-          <Label for="password" class="text-xs font-medium text-muted-foreground">New Password</Label>
+          <Label
+            for="password"
+            class="text-xs font-medium text-muted-foreground"
+            >{{ t("settings.general.newPassword") }}</Label
+          >
           <Input
             id="password"
             v-model="password"
@@ -212,15 +251,24 @@ const resetOnboarding = async () => {
         </div>
 
         <div class="space-y-1.5">
-          <Label for="password_confirmation" class="text-xs font-medium text-muted-foreground">Confirm Password</Label>
+          <Label
+            for="password_confirmation"
+            class="text-xs font-medium text-muted-foreground"
+            >{{ t("settings.general.confirmPassword") }}</Label
+          >
           <Input
             id="password_confirmation"
             v-model="passwordConfirmation"
             type="password"
             class="sm:w-72"
-            :class="{ 'border-destructive': passwordErrors.password_confirmation }"
+            :class="{
+              'border-destructive': passwordErrors.password_confirmation,
+            }"
           />
-          <p v-if="passwordErrors.password_confirmation" class="text-sm text-destructive">
+          <p
+            v-if="passwordErrors.password_confirmation"
+            class="text-sm text-destructive"
+          >
             {{ passwordErrors.password_confirmation }}
           </p>
         </div>
@@ -231,16 +279,18 @@ const resetOnboarding = async () => {
             name="lucide:loader-2"
             class="mr-2 block size-4 animate-spin"
           />
-          Update Password
+          {{ t("settings.general.updatePassword") }}
         </Button>
       </form>
     </div>
 
     <!-- Onboarding Section -->
     <div v-if="user?.onboarded" class="px-6 py-6">
-      <h3 class="mb-2 text-base font-semibold">Onboarding</h3>
+      <h3 class="mb-2 text-base font-semibold">
+        {{ t("settings.general.onboardingTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        You have completed the onboarding process. If you'd like to go through it again, you can reset it below.
+        {{ t("settings.general.onboardingDescription") }}
       </p>
       <Button
         variant="outline"
@@ -254,7 +304,7 @@ const resetOnboarding = async () => {
           class="mr-2 block size-4 animate-spin"
         />
         <Icon v-else name="lucide:refresh-cw" class="mr-2 size-4" />
-        Reset Onboarding
+        {{ t("settings.general.resetOnboarding") }}
       </Button>
     </div>
   </div>

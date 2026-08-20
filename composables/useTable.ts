@@ -1,4 +1,4 @@
-import { computed, onMounted, reactive, toRefs } from "vue";
+import { computed, onMounted, reactive, toRefs, watch } from "vue";
 import { useDebounceFn } from "@vueuse/core";
 import type {
   TableMeta,
@@ -49,6 +49,7 @@ export function useTable<T = any>(
   }) as TableState<T>;
   const isEmpty = computed(() => !state.isLoading && state.data.length === 0);
   const api = useApi();
+  const { effectiveLocale } = useLocalePreference();
 
   function initFromUrl() {
     if (!options.syncUrl || typeof window === "undefined") return;
@@ -200,6 +201,12 @@ export function useTable<T = any>(
   onMounted(() => {
     initFromUrl();
     fetchData();
+  });
+
+  // Table headers, filters, empty states, and action confirmations are
+  // supplied by the API, so refresh their metadata after a locale switch.
+  watch(effectiveLocale, (nextLocale, previousLocale) => {
+    if (nextLocale !== previousLocale && state.hasLoaded) void fetchData();
   });
 
   return {

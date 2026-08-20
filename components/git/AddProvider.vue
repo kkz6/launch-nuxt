@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button } from '~/components/ui/button'
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,32 +7,33 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '~/components/ui/dialog'
+} from "~/components/ui/dialog";
 
 interface Provider {
-  key: string
-  name: string
-  icon: string
-  className: string
-  enabled: boolean
+  key: string;
+  name: string;
+  icon: string;
+  className: string;
+  enabled: boolean;
 }
 
 interface Props {
-  providers: Provider[]
+  providers: Provider[];
 }
 
-defineProps<Props>()
+defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
-  install: [provider: string]
-}>()
+  install: [provider: string];
+}>();
 
-const isOpen = ref(false)
+const isOpen = ref(false);
 
 const handleInstall = (provider: string) => {
-  emit('install', provider)
-  isOpen.value = false
-}
+  emit("install", provider);
+  isOpen.value = false;
+};
 </script>
 
 <template>
@@ -40,14 +41,14 @@ const handleInstall = (provider: string) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Provider
+        {{ t("shared.gitProvider.add") }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>Select Provider</DialogTitle>
+        <DialogTitle>{{ t("shared.gitProvider.select") }}</DialogTitle>
         <DialogDescription>
-          Choose a Git provider to connect your repositories
+          {{ t("shared.gitProvider.description") }}
         </DialogDescription>
       </DialogHeader>
       <div class="mt-6 space-y-3">
@@ -62,7 +63,9 @@ const handleInstall = (provider: string) => {
           @click="handleInstall(provider.key)"
         >
           <Icon :name="provider.icon" class="h-5 w-5" />
-          Continue with {{ provider.name }}
+          {{
+            t("shared.gitProvider.continueWith", { provider: provider.name })
+          }}
         </Button>
       </div>
     </DialogContent>

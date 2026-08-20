@@ -1,37 +1,35 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import {
-  dockerService,
-  type DockerCompose,
-} from "~/services/dockerService";
+import { dockerService, type DockerCompose } from "~/services/dockerService";
 
 interface Props {
   serverId: string;
   projectId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const composes = ref<DockerCompose[]>([]);
 const isLoading = ref(true);
 
 // Shared with the navbar "+ New Compose Stack" button — see
 // components/layout/Navbar.vue.
-const createOpen = useState<boolean>(
-  "dockerCreateComposeOpen",
-  () => false,
-);
+const createOpen = useState<boolean>("dockerCreateComposeOpen", () => false);
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchComposes = async () => {
   isLoading.value = true;
   try {
-    const res = await dockerService.composes.list(props.serverId, props.projectId);
+    const res = await dockerService.composes.list(
+      props.serverId,
+      props.projectId,
+    );
     composes.value = res.data;
   } catch {
-    toast.error("Failed to load compose stacks");
+    toast.error(t("workload.project.composes.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -45,22 +43,22 @@ const onCreated = (c: DockerCompose) => {
 const deleteCompose = async (c: DockerCompose) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Delete Compose Stack",
-    description: `Remove "${c.name}"? The running containers won't be torn down automatically yet — bring them down on the server first.`,
-    confirmText: "Delete",
-    cancelText: "Cancel",
+    title: t("workload.compose.delete.title"),
+    description: t("workload.compose.delete.listDescription", { name: c.name }),
+    confirmText: t("workload.actions.delete"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
     inputVerificationText: c.name,
-    helpText: "Type the stack name to confirm:",
+    helpText: t("workload.compose.delete.confirmHelp"),
   });
   if (!result.ok) return;
   try {
     await dockerService.composes.delete(props.serverId, props.projectId, c.id);
     composes.value = composes.value.filter((x) => x.id !== c.id);
-    toast.success("Compose stack deleted");
+    toast.success(t("workload.compose.delete.success"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete compose stack");
+    toast.error(e.data?.message || t("workload.compose.delete.failed"));
   }
 };
 
@@ -88,7 +86,7 @@ const sourceSummary = (c: DockerCompose): string => {
     if (repo && branch) return `${repo} @ ${branch}`;
     return repo ?? "git";
   }
-  return "Inline YAML";
+  return t("workload.sources.inlineYaml");
 };
 
 // Static fallback for compose rows that don't have a successful
@@ -98,10 +96,12 @@ const sourceSummary = (c: DockerCompose): string => {
 // components/project/Applications.vue#lastDeployFallback.
 const lastDeployFallback = (c: DockerCompose): string | null => {
   if (c.last_deployed_at) return null;
-  if (c.status === "building") return "Deploying…";
-  if (c.status === "failed") return "Last deploy failed";
-  return "Never deployed";
+  if (c.status === "building") return t("workload.status.deploying");
+  if (c.status === "failed") return t("workload.status.lastDeployFailed");
+  return t("workload.status.neverDeployed");
 };
+
+const statusLabel = (status: string) => t(`workload.status.${status}`, status);
 
 // WS so status badges + names stay live across renames and deploys.
 // The backend's composeBroadcast helper guarantees every event
@@ -125,16 +125,21 @@ onMounted(fetchComposes);
       the project navbar next to Terminal.
     -->
     <div class="mb-6">
-      <h2 class="text-xl font-semibold">Compose</h2>
+      <h2 class="text-xl font-semibold">
+        {{ t("workload.project.composes.title") }}
+      </h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Multi-container stacks deployed with <code>docker compose up</code>.
-        Use these for apps that need a database alongside, sidecars, or
-        anything beyond a single container.
+        {{ t("workload.project.composes.descriptionBefore") }}
+        <code>docker compose up</code>{{ t("workload.punctuation.period") }}
+        {{ t("workload.project.composes.descriptionAfter") }}
       </p>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <div
@@ -142,14 +147,17 @@ onMounted(fetchComposes);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:layers" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No compose stacks yet</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("workload.project.composes.emptyTitle") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Define a <code>docker-compose.yml</code> file (git repo or pasted
-        inline) and deploy it here.
+        {{ t("workload.project.composes.emptyBefore") }}
+        <code>docker-compose.yml</code>
+        {{ t("workload.project.composes.emptyAfter") }}
       </p>
       <Button class="mt-6" @click="createOpen = true">
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        New Compose Stack
+        {{ t("workload.project.composes.new") }}
       </Button>
     </div>
 
@@ -184,7 +192,7 @@ onMounted(fetchComposes);
                 <span
                   v-if="c.build_location === 'github_actions'"
                   class="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                  title="Builds run in GitHub Actions"
+                  :title="t('workload.githubActions.buildsRunThere')"
                 >
                   <Icon name="simple-icons:github" class="h-3 w-3" />
                   GHA
@@ -204,16 +212,20 @@ onMounted(fetchComposes);
             </Button>
           </div>
 
-          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+          <div
+            class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm"
+          >
             <span
               class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
               :class="statusColor(c.status)"
             >
-              {{ c.status }}
+              {{ statusLabel(c.status) }}
             </span>
             <span class="text-xs text-muted-foreground">
               <template v-if="c.last_deployed_at">
-                Deployed&nbsp;<SharedDateTooltip :date="c.last_deployed_at" />
+                {{ t("workload.status.deployed") }}&nbsp;<SharedDateTooltip
+                  :date="c.last_deployed_at"
+                />
               </template>
               <template v-else>
                 {{ lastDeployFallback(c) }}

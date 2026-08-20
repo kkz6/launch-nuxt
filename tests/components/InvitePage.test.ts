@@ -52,6 +52,20 @@ const mountPage = () =>
     },
   });
 
+const translate = (key: string, params: Record<string, unknown> = {}) => {
+  const messages: Record<string, string> = {
+    "auth.invitation.teamCode": `Team code: ${String(params.code ?? "")}`,
+    "auth.invitation.existingDescription": `Join ${String(params.team ?? "")}`,
+    "auth.invitation.newDescription": `Join ${String(params.team ?? "")}`,
+    "auth.invitation.defaultTeam": "the team",
+    "auth.register.created": "Account created successfully",
+    "auth.errors.invalidInvitation": "Invalid or expired invitation",
+    "auth.errors.genericShort": "An error occurred",
+    "auth.errors.generic": "An error occurred. Please try again.",
+  };
+  return messages[key] ?? key;
+};
+
 describe("team invitation page", () => {
   beforeEach(() => {
     mocks.api.mockReset().mockImplementation((url: string) => {
@@ -88,6 +102,7 @@ describe("team invitation page", () => {
     vi.stubGlobal("useApi", () => ({ setTokens: mocks.setTokens }));
     vi.stubGlobal("useAuth", () => ({ setUser: mocks.setUser }));
     vi.stubGlobal("useHead", vi.fn());
+    vi.stubGlobal("useI18n", () => ({ t: translate }));
     vi.stubGlobal("useRoute", () => ({ params: { token: "invite" } }));
   });
 
@@ -117,6 +132,26 @@ describe("team invitation page", () => {
     });
     expect(mocks.setTokens).toHaveBeenCalledWith("access", "refresh");
     expect(mocks.setUser).toHaveBeenCalled();
+    expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("waits for the invited user's locale before navigating", async () => {
+    let finishLocaleSync!: () => void;
+    mocks.setUser.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        finishLocaleSync = resolve;
+      }),
+    );
+    const wrapper = mountPage();
+    await flushPromises();
+    setSetupRef(wrapper, "password", "correct-password");
+
+    const submission = setupState(wrapper).handleSubmit();
+    await flushPromises();
+    expect(mocks.navigateTo).not.toHaveBeenCalledWith("/dashboard");
+
+    finishLocaleSync();
+    await submission;
     expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
   });
 

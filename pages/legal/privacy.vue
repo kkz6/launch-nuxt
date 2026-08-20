@@ -1,133 +1,130 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'site' })
+definePageMeta({ layout: "site" });
 
-useHead({ title: 'Privacy Policy' })
+const { t, locale } = useI18n();
+const updated = computed(() =>
+  new Intl.DateTimeFormat(locale.value === "ja" ? "ja-JP" : "en-US", {
+    dateStyle: "long",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(2026, 5, 11))),
+);
+
+useHead({ title: () => t("public.legal.privacy.title") });
 useSeoMeta({
-  description:
-    'How launchctl (Gigcodes) collects, uses and protects your data. Your apps and data run on infrastructure you own.',
-})
+  description: () => t("public.legal.privacy.metaDescription"),
+});
 </script>
 
 <template>
   <LegalDoc
-    title="Privacy Policy"
-    updated="11 June 2026"
-    intro="This policy explains what data launchctl collects, why, and the choices you have. launchctl is operated by Gigcodes (&ldquo;we&rdquo;, &ldquo;us&rdquo;)."
+    :title="t('public.legal.privacy.title')"
+    :updated="updated"
+    :intro="t('public.legal.privacy.intro')"
   >
-    <h2>1. Who we are</h2>
+    <h2>{{ t("public.legal.privacy.sections.who.heading") }}</h2>
     <p>
-      launchctl is a server-management and deployment platform operated by
-      Gigcodes. We help you provision servers on your own cloud accounts and
-      deploy and operate applications on them. This policy covers the launchctl
-      website, dashboard and API.
+      {{ t("public.legal.privacy.sections.who.body") }}
     </p>
 
-    <h2>2. Information we collect</h2>
+    <h2>{{ t("public.legal.privacy.sections.collect.heading") }}</h2>
     <ul>
       <li>
-        <strong>Account information</strong> — your name, email address and a
-        securely hashed password when you sign up, plus team membership details.
+        <strong>{{
+          t("public.legal.privacy.sections.collect.accountLabel")
+        }}</strong
+        >{{ t("public.legal.privacy.sections.collect.accountBody") }}
       </li>
       <li>
-        <strong>Billing information</strong> — subscriptions are processed by our
-        payment provider, Polar. We receive your plan, subscription status and
-        invoices, but <strong>we never see or store full card numbers</strong>.
+        <strong>{{
+          t("public.legal.privacy.sections.collect.billingLabel")
+        }}</strong
+        >{{ t("public.legal.privacy.sections.collect.billingBody") }}
       </li>
       <li>
-        <strong>Infrastructure credentials</strong> — cloud-provider API tokens,
-        SSH keys and connection details you add so we can provision and operate
-        your servers. These are encrypted and used only to run the features you
-        enable.
+        <strong>{{
+          t("public.legal.privacy.sections.collect.credentialsLabel")
+        }}</strong
+        >{{ t("public.legal.privacy.sections.collect.credentialsBody") }}
       </li>
       <li>
-        <strong>Usage &amp; diagnostic data</strong> — logs, IP address, browser
-        type and actions taken in the product, used to operate the service and
-        debug issues.
+        <strong>{{
+          t("public.legal.privacy.sections.collect.usageLabel")
+        }}</strong
+        >{{ t("public.legal.privacy.sections.collect.usageBody") }}
       </li>
       <li>
-        <strong>Communications</strong> — messages you send us via support or the
-        contact form.
+        <strong>{{
+          t("public.legal.privacy.sections.collect.communicationsLabel")
+        }}</strong
+        >{{ t("public.legal.privacy.sections.collect.communicationsBody") }}
       </li>
     </ul>
 
-    <h2>3. How we use your information</h2>
+    <h2>{{ t("public.legal.privacy.sections.use.heading") }}</h2>
     <ul>
-      <li>To provide, operate and secure the launchctl platform.</li>
-      <li>To process subscriptions, billing and refunds.</li>
-      <li>To provide support and respond to your requests.</li>
-      <li>To monitor reliability, prevent abuse and improve the product.</li>
-      <li>To meet legal and regulatory obligations.</li>
+      <li>{{ t("public.legal.privacy.sections.use.platform") }}</li>
+      <li>{{ t("public.legal.privacy.sections.use.billing") }}</li>
+      <li>{{ t("public.legal.privacy.sections.use.support") }}</li>
+      <li>{{ t("public.legal.privacy.sections.use.reliability") }}</li>
+      <li>{{ t("public.legal.privacy.sections.use.legal") }}</li>
     </ul>
-    <p>We do not sell your personal data, and we never have.</p>
+    <p>{{ t("public.legal.privacy.sections.use.noSale") }}</p>
 
-    <h2>4. Your apps and data stay yours</h2>
+    <h2>{{ t("public.legal.privacy.sections.ownership.heading") }}</h2>
     <p>
-      The applications, databases and content you deploy run on servers in
-      <strong>your own cloud accounts</strong>. We access your infrastructure
-      only to perform the actions you ask of us — provisioning, deploying,
-      streaming logs, running backups and similar. That data is yours, not ours.
+      {{ t("public.legal.privacy.sections.ownership.body") }}
     </p>
 
-    <h2>5. Who we share it with</h2>
-    <p>We share data only with the providers needed to run the service:</p>
+    <h2>{{ t("public.legal.privacy.sections.share.heading") }}</h2>
+    <p>{{ t("public.legal.privacy.sections.share.intro") }}</p>
     <ul>
-      <li><strong>Polar</strong> — subscription billing and payments.</li>
       <li>
-        <strong>Cloud providers you connect</strong> (e.g. DigitalOcean, Hetzner,
-        AWS, Linode, Vultr) and <strong>GitHub</strong> for CI/CD, acting on your
-        instructions.
+        <strong>Polar</strong
+        >{{ t("public.legal.privacy.sections.share.polar") }}
       </li>
       <li>
-        <strong>Infrastructure and email providers</strong> we use to host
-        launchctl and send transactional email.
+        {{ t("public.legal.privacy.sections.share.connectedProviders") }}
       </li>
       <li>
-        <strong>Authorities</strong>, where required by law or to protect our
-        rights and users.
+        {{ t("public.legal.privacy.sections.share.infrastructure") }}
+      </li>
+      <li>
+        {{ t("public.legal.privacy.sections.share.authorities") }}
       </li>
     </ul>
 
-    <h2>6. Data retention</h2>
+    <h2>{{ t("public.legal.privacy.sections.retention.heading") }}</h2>
     <p>
-      We keep your information for as long as your account is active. When you
-      close your account or ask us to delete your data, we remove it within a
-      reasonable period, except where we must retain certain records (for
-      example, invoices) to meet legal obligations.
+      {{ t("public.legal.privacy.sections.retention.body") }}
     </p>
 
-    <h2>7. Security</h2>
+    <h2>{{ t("public.legal.privacy.sections.security.heading") }}</h2>
     <p>
-      We protect data in transit with TLS and encrypt sensitive secrets such as
-      cloud tokens and SSH keys at rest. Access is restricted to what's needed to
-      operate the service. No system is perfectly secure, but we work hard to
-      keep yours safe.
+      {{ t("public.legal.privacy.sections.security.body") }}
     </p>
 
-    <h2>8. Your rights</h2>
+    <h2>{{ t("public.legal.privacy.sections.rights.heading") }}</h2>
     <p>
-      You can access, correct, export or delete your personal data at any time —
-      from your account settings or by emailing us. We'll respond within a
-      reasonable timeframe.
+      {{ t("public.legal.privacy.sections.rights.body") }}
     </p>
 
-    <h2>9. Cookies</h2>
+    <h2>{{ t("public.legal.privacy.sections.cookies.heading") }}</h2>
     <p>
-      We use essential cookies to keep you signed in and to remember preferences
-      such as light/dark mode. We don't use them to track you across other sites.
+      {{ t("public.legal.privacy.sections.cookies.body") }}
     </p>
 
-    <h2>10. Changes to this policy</h2>
+    <h2>{{ t("public.legal.privacy.sections.changes.heading") }}</h2>
     <p>
-      We may update this policy from time to time. We'll revise the &ldquo;last
-      updated&rdquo; date above and, for material changes, notify you in the
-      product or by email.
+      {{ t("public.legal.privacy.sections.changes.body") }}
     </p>
 
-    <h2>11. Contact</h2>
+    <h2>{{ t("public.legal.privacy.sections.contact.heading") }}</h2>
     <p>
-      Questions about your privacy? Email
-      <a href="mailto:support@launchctl.io">support@launchctl.io</a> or use our
-      <NuxtLink to="/support">contact form</NuxtLink>.
+      {{ t("public.legal.privacy.sections.contact.beforeEmail") }}
+      <a href="mailto:support@launchctl.io">support@launchctl.io</a>
+      {{ t("public.legal.privacy.sections.contact.between") }}
+      <NuxtLink to="/support">{{ t("public.legal.contactForm") }}</NuxtLink
+      >.
     </p>
   </LegalDoc>
 </template>

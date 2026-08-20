@@ -1,19 +1,19 @@
 <script setup lang="ts">
-import AOS from 'aos'
-import 'aos/dist/aos.css'
+import AOS from "aos";
+import "aos/dist/aos.css";
 
 onMounted(() => {
-  const element = document.querySelector('html')
+  const element = document.querySelector("html");
   if (element) {
-    element.classList.remove('overflow-hidden')
+    element.classList.remove("overflow-hidden");
   }
   AOS.init({
     once: true,
-    disable: 'phone',
+    disable: "phone",
     duration: 700,
-    easing: 'ease-out-cubic',
-  })
-})
+    easing: "ease-out-cubic",
+  });
+});
 </script>
 
 <template>

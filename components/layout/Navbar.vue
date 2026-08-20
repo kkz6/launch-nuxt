@@ -14,17 +14,28 @@ import {
 } from "lucide-vue-next";
 import { useDeploymentEvents } from "~/composables/useChannelEvents";
 import type { Deployment } from "~/types";
+import type { LocalePreference } from "~/types/locale";
+import { isLocalePreference } from "~/utils/locale";
 import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 
-const { user, logout } = useAuth();
+const { t } = useI18n();
+const navLabel = (key: string) => t(`common.navigation.${key}`);
+const actionLabel = (key: string) => t(`common.actions.${key}`);
+const { user, logout, updateLocale } = useAuth();
+const { localePreference, setLocalePreference } = useLocalePreference();
 // Role gating — hide create/mutate actions for read-only members.
 const { canEdit, canDelete } = useCan();
 const { open: openSettingsSheet } = useSettingsSheet();
@@ -45,24 +56,47 @@ const adminCrumbs = computed(() =>
     ? adminBreadcrumbState.value.crumbs
     : [],
 );
-const adminTabs = [
-  { label: "Overview", to: "/admin/overview", icon: "lucide:bar-chart-3" },
+interface AdminTab {
+  label: string;
+  to: string;
+  icon: string;
+  match?: (path: string) => boolean;
+}
+
+const adminTabs = computed<AdminTab[]>(() => [
   {
-    label: "Users",
+    label: navLabel("overview"),
+    to: "/admin/overview",
+    icon: "lucide:bar-chart-3",
+  },
+  {
+    label: navLabel("users"),
     to: "/admin",
     icon: "lucide:users",
     match: (p: string) => p === "/admin" || p.startsWith("/admin/users"),
   },
-  { label: "Invitations", to: "/admin/invitations", icon: "lucide:mail" },
-  { label: "Servers", to: "/admin/servers", icon: "lucide:server" },
-  { label: "Failures", to: "/admin/failures", icon: "lucide:triangle-alert" },
   {
-    label: "Observability",
+    label: navLabel("invitations"),
+    to: "/admin/invitations",
+    icon: "lucide:mail",
+  },
+  {
+    label: navLabel("servers"),
+    to: "/admin/servers",
+    icon: "lucide:server",
+  },
+  {
+    label: navLabel("failures"),
+    to: "/admin/failures",
+    icon: "lucide:triangle-alert",
+  },
+  {
+    label: navLabel("observability"),
     to: "/admin/observability",
     icon: "lucide:activity",
   },
-];
-const isAdminTabActive = (tab: (typeof adminTabs)[number]): boolean =>
+]);
+const isAdminTabActive = (tab: AdminTab): boolean =>
   tab.match ? tab.match(route.path) : route.path.startsWith(tab.to);
 
 // Check if current team is subscribed
@@ -71,27 +105,32 @@ const isSubscribed = computed(
 );
 
 // Global navigation tabs
-const globalTabsBase = [
+const globalTabsBase = computed(() => [
   {
     value: "dashboard",
-    label: "Dashboard",
+    label: navLabel("dashboard"),
     route: "/dashboard",
     icon: "lucide:layout-dashboard",
   },
   {
     value: "servers",
-    label: "Servers",
+    label: navLabel("servers"),
     route: "/servers",
     icon: "lucide:server",
   },
-  { value: "domains", label: "Domains", route: "/dns", icon: "lucide:globe" },
+  {
+    value: "domains",
+    label: navLabel("domains"),
+    route: "/dns",
+    icon: "lucide:globe",
+  },
   {
     value: "scripts",
-    label: "Scripts",
+    label: navLabel("scripts"),
     route: "/scripts",
     icon: "lucide:scroll-text",
   },
-];
+]);
 
 // Track if component is mounted (client-side)
 const isMounted = ref(false);
@@ -102,7 +141,7 @@ onMounted(() => {
 const globalTabs = computed(() => {
   // On server-side, always return base tabs to avoid hydration mismatch
   if (!isMounted.value) {
-    return globalTabsBase;
+    return globalTabsBase.value;
   }
 
   // If not subscribed, only show dashboard
@@ -110,7 +149,7 @@ const globalTabs = computed(() => {
     return [
       {
         value: "dashboard",
-        label: "Dashboard",
+        label: navLabel("dashboard"),
         route: "/dashboard",
         icon: "lucide:layout-dashboard",
       },
@@ -121,14 +160,14 @@ const globalTabs = computed(() => {
     return [
       {
         value: "onboarding",
-        label: "Onboarding",
+        label: navLabel("onboarding"),
         route: "/onboarding",
         icon: "lucide:rocket",
       },
-      ...globalTabsBase,
+      ...globalTabsBase.value,
     ];
   }
-  return globalTabsBase;
+  return globalTabsBase.value;
 });
 
 // Tab indicator animation
@@ -349,8 +388,11 @@ const isLoadBalancerServer = computed(
 );
 const isDockerServer = computed(() => serverType.value === "docker");
 
-const serverDetailTabs = computed(
-  () => getServerTypeRules(serverType.value).tabs,
+const serverDetailTabs = computed(() =>
+  getServerTypeRules(serverType.value).tabs.map((tab) => ({
+    ...tab,
+    label: navLabel(tab.value),
+  })),
 );
 
 // Advanced sub-tabs (second level) - filtered by server type.
@@ -363,7 +405,7 @@ const advancedSubTabs = computed(() => {
   const tabs = [
     {
       value: "general",
-      label: "General",
+      label: navLabel("general"),
       query: "general",
       icon: "lucide:info",
     },
@@ -371,28 +413,28 @@ const advancedSubTabs = computed(() => {
   if (isHostManaged) {
     tabs.push({
       value: "backups",
-      label: "Backups",
+      label: navLabel("backups"),
       query: "backups",
       icon: "lucide:hard-drive",
     });
   }
   tabs.push({
     value: "ssh-keys",
-    label: "SSH Keys",
+    label: navLabel("sshKeys"),
     query: "ssh-keys",
     icon: "lucide:key",
   });
   if (isHostManaged) {
     tabs.push({
       value: "packages",
-      label: "Packages",
+      label: navLabel("packages"),
       query: "packages",
       icon: "lucide:package",
     });
   }
   tabs.push({
     value: "services",
-    label: "Services",
+    label: navLabel("services"),
     query: "services",
     icon: "lucide:cog",
   });
@@ -402,7 +444,7 @@ const advancedSubTabs = computed(() => {
   if (isDockerServer.value) {
     tabs.push({
       value: "traefik",
-      label: "Traefik",
+      label: navLabel("traefik"),
       query: "traefik",
       icon: "simple-icons:traefikproxy",
     });
@@ -412,7 +454,7 @@ const advancedSubTabs = computed(() => {
     // means new compose deletes don't strand containers anymore.
     tabs.push({
       value: "maintenance",
-      label: "Maintenance",
+      label: navLabel("maintenance"),
       query: "maintenance",
       icon: "lucide:wrench",
     });
@@ -421,56 +463,56 @@ const advancedSubTabs = computed(() => {
 });
 
 // Site detail tabs (base - filtered based on site type)
-const allSiteDetailTabs = [
+const allSiteDetailTabs = computed(() => [
   {
     value: "general",
-    label: "Overview",
+    label: navLabel("overview"),
     query: "general",
     icon: "lucide:layout-dashboard",
   },
   {
     value: "deployments",
-    label: "Deployments",
+    label: navLabel("deployments"),
     query: "deployments",
     icon: "lucide:git-branch",
   },
   {
     value: "files",
-    label: "Files",
+    label: navLabel("files"),
     query: "files",
     icon: "lucide:folder-open",
   },
   {
     value: "queues",
-    label: "Queues",
+    label: navLabel("queues"),
     query: "queues",
     icon: "lucide:list-todo",
   },
   {
     value: "redirects",
-    label: "Redirects",
+    label: navLabel("redirects"),
     query: "redirects",
     icon: "lucide:corner-up-right",
   },
   {
     value: "commands",
-    label: "Commands",
+    label: navLabel("commands"),
     query: "commands",
     icon: "lucide:terminal-square",
   },
   {
     value: "settings",
-    label: "Settings",
+    label: navLabel("settings"),
     query: "settings",
     icon: "lucide:settings",
   },
-];
+]);
 
 // DNS domain detail tabs
-const dnsDetailTabs = [
-  { value: "records", label: "Records", path: "" },
-  { value: "settings", label: "Settings", path: "/settings" },
-];
+const dnsDetailTabs = computed(() => [
+  { value: "records", label: navLabel("records"), path: "" },
+  { value: "settings", label: navLabel("settings"), path: "/settings" },
+]);
 
 // Check if we're on a server detail page
 const isServerDetailPage = computed(() => {
@@ -518,11 +560,11 @@ const workloadId = computed(() => {
 const workloadKindLabel = computed(() => {
   switch (workloadKind.value) {
     case "database":
-      return "Database";
+      return navLabel("database");
     case "application":
-      return "Application";
+      return navLabel("application");
     case "compose":
-      return "Compose stack";
+      return navLabel("composeStack");
     default:
       return "";
   }
@@ -651,61 +693,76 @@ const workloadParentTab = computed(() => {
 // keep them in the same relative order whenever a tab is added so
 // the three detail pages don't drift again.
 
-const databaseSubTabs = [
-  { value: "general", label: "General", query: "general", icon: "lucide:info" },
+const databaseSubTabs = computed(() => [
+  {
+    value: "general",
+    label: navLabel("general"),
+    query: "general",
+    icon: "lucide:info",
+  },
   {
     value: "environment",
-    label: "Environment",
+    label: navLabel("environment"),
     query: "environment",
     icon: "lucide:key",
   },
   {
     value: "backups",
-    label: "Backups",
+    label: navLabel("backups"),
     query: "backups",
     icon: "lucide:hard-drive",
   },
-  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
+  {
+    value: "logs",
+    label: navLabel("logs"),
+    query: "logs",
+    icon: "lucide:scroll",
+  },
   {
     value: "advanced",
-    label: "Advanced",
+    label: navLabel("advanced"),
     query: "advanced",
     icon: "lucide:sliders-horizontal",
   },
-];
+]);
 // `gha` only renders when this specific workload is build_location=
 // github_actions. See workloadSubTabs below for the conditional —
 // keeping the canonical order here means the filter doesn't have to
 // reorder when it adds the tab in.
-const applicationSubTabs = [
-  { value: "general", label: "Overview", query: "general", icon: "lucide:layout-dashboard" },
+const applicationSubTabs = computed(() => [
+  {
+    value: "general",
+    label: navLabel("overview"),
+    query: "general",
+    icon: "lucide:layout-dashboard",
+  },
   {
     value: "deployments",
-    label: "Deployments",
+    label: navLabel("deployments"),
     query: "deployments",
     icon: "lucide:git-branch",
   },
   {
     value: "environment",
-    label: "Environment",
+    label: navLabel("environment"),
     query: "environment",
     icon: "lucide:key",
   },
   {
     value: "domains",
-    label: "Domains",
+    label: navLabel("domains"),
     query: "domains",
     icon: "lucide:globe",
   },
   {
     value: "redirects",
-    label: "Redirects",
+    label: navLabel("redirects"),
     query: "redirects",
     icon: "lucide:corner-up-right",
   },
   {
     value: "schedules",
-    label: "Schedulers",
+    label: navLabel("schedulers"),
     query: "schedules",
     icon: "lucide:clock",
   },
@@ -714,11 +771,11 @@ const applicationSubTabs = [
   // ?subtab=logs route still renders the log viewer.
   {
     value: "advanced",
-    label: "Advanced",
+    label: navLabel("advanced"),
     query: "advanced",
     icon: "lucide:sliders-horizontal",
   },
-];
+]);
 // Compose subtabs mirror the application tabs where they make sense
 // at the stack level. Skipped:
 //   - Domains / Redirects → per-service config, lives in the YAML
@@ -734,46 +791,56 @@ const applicationSubTabs = [
 // Already in the canonical order (see top-of-file comment). Compose
 // skips Redirects (per-service / lives in YAML), Schedules (per-
 // container, needs a service selector) and Backups (database only).
-const composeSubTabs = [
-  { value: "general", label: "General", query: "general", icon: "lucide:info" },
+const composeSubTabs = computed(() => [
+  {
+    value: "general",
+    label: navLabel("general"),
+    query: "general",
+    icon: "lucide:info",
+  },
   {
     value: "deployments",
-    label: "Deployments",
+    label: navLabel("deployments"),
     query: "deployments",
     icon: "lucide:git-branch",
   },
   {
     value: "environment",
-    label: "Environment",
+    label: navLabel("environment"),
     query: "environment",
     icon: "lucide:key",
   },
   {
     value: "domains",
-    label: "Domains",
+    label: navLabel("domains"),
     query: "domains",
     icon: "lucide:globe",
   },
   {
     value: "volumes",
-    label: "Volumes",
+    label: navLabel("volumes"),
     query: "volumes",
     icon: "lucide:hard-drive",
   },
   {
     value: "gha",
-    label: "GitHub Actions",
+    label: navLabel("githubActions"),
     query: "gha",
     icon: "simple-icons:github",
   },
-  { value: "logs", label: "Logs", query: "logs", icon: "lucide:scroll" },
+  {
+    value: "logs",
+    label: navLabel("logs"),
+    query: "logs",
+    icon: "lucide:scroll",
+  },
   {
     value: "advanced",
-    label: "Advanced",
+    label: navLabel("advanced"),
     query: "advanced",
     icon: "lucide:sliders-horizontal",
   },
-];
+]);
 const workloadSubTabs = computed(() => {
   switch (workloadKind.value) {
     case "database":
@@ -781,19 +848,19 @@ const workloadSubTabs = computed(() => {
       // in-memory store, the dump tools simply don't exist for it.
       // Hide the tab so we don't dangle a non-functional surface.
       if (workloadEngine.value === "redis") {
-        return databaseSubTabs.filter((t) => t.value !== "backups");
+        return databaseSubTabs.value.filter((t) => t.value !== "backups");
       }
-      return databaseSubTabs;
+      return databaseSubTabs.value;
     case "application":
       // GitHub Actions settings moved into the Advanced tab (shown
       // there only for github_actions builds), so there's no longer a
       // GHA subtab to conditionally hide here.
-      return applicationSubTabs;
+      return applicationSubTabs.value;
     case "compose":
       if (workloadBuildLocation.value !== "github_actions") {
-        return composeSubTabs.filter((t) => t.value !== "gha");
+        return composeSubTabs.value.filter((t) => t.value !== "gha");
       }
-      return composeSubTabs;
+      return composeSubTabs.value;
     default:
       return [];
   }
@@ -813,26 +880,34 @@ const workloadActiveSubtab = computed(
 // components/application/Advanced.vue and its GHA/Danger gating.
 const applicationAdvancedSubTabs = computed(() => {
   const tabs = [
-    { value: "general", label: "General", icon: "lucide:tag" },
-    { value: "runtime", label: "Runtime", icon: "lucide:sliders-horizontal" },
-    { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
+    { value: "general", label: navLabel("general"), icon: "lucide:tag" },
+    {
+      value: "runtime",
+      label: navLabel("runtime"),
+      icon: "lucide:sliders-horizontal",
+    },
+    {
+      value: "volumes",
+      label: navLabel("volumes"),
+      icon: "lucide:hard-drive",
+    },
   ];
   if (workloadBuildLocation.value === "github_actions") {
     tabs.push({
       value: "build",
-      label: "GitHub Actions",
+      label: navLabel("githubActions"),
       icon: "simple-icons:github",
     });
   }
   tabs.push({
     value: "proxy",
-    label: "Traefik",
+    label: navLabel("traefik"),
     icon: "simple-icons:traefikproxy",
   });
   if (canDelete.value) {
     tabs.push({
       value: "danger",
-      label: "Danger zone",
+      label: navLabel("dangerZone"),
       icon: "lucide:alert-triangle",
     });
   }
@@ -899,7 +974,11 @@ const runApplicationAction = async (
         workloadId.value,
       );
       toast.success(
-        action === "rebuild" ? "Rebuild queued" : "Deployment queued",
+        t(
+          action === "rebuild"
+            ? "common.rebuildQueued"
+            : "common.deploymentQueued",
+        ),
       );
     } else {
       await dockerService.applications.lifecycle(
@@ -908,13 +987,15 @@ const runApplicationAction = async (
         workloadId.value,
         action,
       );
-      const label = { reload: "Reload", stop: "Stop", start: "Start" }[action];
-      toast.success(`${label} queued`);
+      toast.success(t("common.actionQueued", { action: actionLabel(action) }));
     }
     workloadActionRefreshKey.value++;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || `Failed to ${action}`);
+    toast.error(
+      e.data?.message ||
+        t("common.actionFailed", { action: actionLabel(action) }),
+    );
   } finally {
     workloadActionInFlight.value = null;
   }
@@ -945,11 +1026,14 @@ const runDatabaseLifecycle = async (action: "start" | "stop" | "restart") => {
       workloadId.value,
       action,
     );
-    toast.success(`${action[0].toUpperCase()}${action.slice(1)} queued`);
+    toast.success(t("common.actionQueued", { action: actionLabel(action) }));
     workloadActionRefreshKey.value++;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || `Failed to ${action}`);
+    toast.error(
+      e.data?.message ||
+        t("common.actionFailed", { action: actionLabel(action) }),
+    );
   } finally {
     workloadActionInFlight.value = null;
   }
@@ -1031,34 +1115,34 @@ const workloadExternalPort = ref<number | null>(null);
 // Null when the field isn't applicable (databases) or hasn't loaded.
 const workloadBuildLocation = ref<string | null>(null);
 
-const projectDetailTabs = [
+const projectDetailTabs = computed(() => [
   {
     value: "overview",
-    label: "Overview",
+    label: navLabel("overview"),
     query: "overview",
     icon: "lucide:layout-dashboard",
   },
   {
     value: "applications",
-    label: "Applications",
+    label: navLabel("applications"),
     query: "applications",
     icon: "lucide:box",
   },
   {
     value: "compose",
-    label: "Compose",
+    label: navLabel("compose"),
     query: "compose",
     icon: "lucide:layers",
   },
   {
     value: "databases",
-    label: "Databases",
+    label: navLabel("databases"),
     query: "databases",
     icon: "lucide:database",
   },
   {
     value: "settings",
-    label: "Settings",
+    label: navLabel("settings"),
     query: "settings",
     icon: "lucide:settings",
   },
@@ -1068,7 +1152,7 @@ const projectDetailTabs = [
   // area that opens a Dialog. Keeping it out of the tab strip means
   // the user can update shared env from any tab without losing
   // their place.
-];
+]);
 
 const showProjectTabs = computed(() => {
   if (!isSubscribed.value) return false;
@@ -1117,40 +1201,40 @@ const domainAddress = ref<string | null>(null);
 const domainProvider = ref<string | null>(null);
 const domainProviderLabel = ref<string | null>(null);
 
-const providerLabels: Record<string, string> = {
+const providerLabels = computed<Record<string, string>>(() => ({
   digitalocean: "DigitalOcean",
   hetzner: "Hetzner",
   linode: "Linode",
   vultr: "Vultr",
   aws: "AWS",
-  custom_server: "Custom Server",
-};
+  custom_server: t("common.customServer"),
+}));
 
-const siteTypeLabels: Record<string, string> = {
+const siteTypeLabels = computed<Record<string, string>>(() => ({
   laravel: "Laravel",
   wordpress: "WordPress",
-  generic: "Generic PHP",
+  generic: t("common.genericPhp"),
   phpmyadmin: "phpMyAdmin",
-};
+}));
 
 // Computed site tabs based on site type
 const siteDetailTabs = computed(() => {
-  if (!siteType.value) return allSiteDetailTabs;
+  if (!siteType.value) return allSiteDetailTabs.value;
   if (siteType.value === "wordpress") {
-    return allSiteDetailTabs.filter(
+    return allSiteDetailTabs.value.filter(
       (t) => !["deployments", "queues"].includes(t.value),
     );
   }
   if (siteType.value === "phpmyadmin") {
-    return allSiteDetailTabs.filter(
+    return allSiteDetailTabs.value.filter(
       (t) =>
         !["deployments", "queues", "redirects", "commands"].includes(t.value),
     );
   }
   if (siteType.value === "generic") {
-    return allSiteDetailTabs.filter((t) => !["queues"].includes(t.value));
+    return allSiteDetailTabs.value.filter((t) => !["queues"].includes(t.value));
   }
-  return allSiteDetailTabs;
+  return allSiteDetailTabs.value;
 });
 
 const { getCachedServer, getCachedSite } = useNavbarCache();
@@ -1630,6 +1714,37 @@ const setColorMode = (mode: "light" | "dark" | "system") => {
   }
 };
 
+let localePreferenceChangeQueue: Promise<void> = Promise.resolve();
+let latestLocalePreferenceChange = 0;
+
+const handleLocalePreferenceChange = (value: unknown): Promise<void> => {
+  if (!isLocalePreference(value)) return Promise.resolve();
+
+  const changeId = ++latestLocalePreferenceChange;
+  const runChange = async () => {
+    const previousPreference: LocalePreference = localePreference.value;
+    try {
+      // Serialize the local switch and the persisted mutation. This ensures a
+      // slower, earlier request (or its rollback) can never finish after and
+      // overwrite a newer selection.
+      await setLocalePreference(value);
+      await updateLocale(value);
+      if (changeId === latestLocalePreferenceChange) {
+        toast.success(t("common.localeUpdated"));
+      }
+    } catch {
+      await setLocalePreference(previousPreference).catch(() => undefined);
+      if (changeId === latestLocalePreferenceChange) {
+        toast.error(t("common.localeUpdateFailed"));
+      }
+    }
+  };
+
+  const queuedChange = localePreferenceChangeQueue.then(runChange, runChange);
+  localePreferenceChangeQueue = queuedChange.catch(() => undefined);
+  return queuedChange;
+};
+
 const isOpen = ref(false);
 
 const openSettings = () => {
@@ -1676,12 +1791,12 @@ const navigateTo = (path: string) => {
         <span
           class="block text-muted-foreground transition-transform duration-300 ease-out group-hover:-translate-y-full"
         >
-          Your subscription is inactive
+          {{ t("common.subscriptionInactive") }}
         </span>
         <span
           class="absolute inset-x-0 top-full flex items-center gap-1 font-medium text-primary transition-transform duration-300 ease-out group-hover:-translate-y-full"
         >
-          Subscribe now
+          {{ t("common.subscribeNow") }}
           <Icon name="lucide:arrow-right" class="h-3.5 w-3.5" />
         </span>
       </div>
@@ -1725,7 +1840,7 @@ const navigateTo = (path: string) => {
                 @click="openSettings"
               >
                 <Settings class="h-3.5 w-3.5 text-muted-foreground" />
-                <span>Settings</span>
+                <span>{{ t("common.settings") }}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 v-if="isStaff"
@@ -1739,19 +1854,50 @@ const navigateTo = (path: string) => {
                 />
                 <Shield v-else class="h-3.5 w-3.5 text-muted-foreground" />
                 <span>{{
-                  showAdminContext ? "Back to App" : "Admin Panel"
+                  showAdminContext
+                    ? t("common.backToApp")
+                    : t("common.adminPanel")
                 }}</span>
               </DropdownMenuItem>
+
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger
+                  class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm"
+                >
+                  <Globe class="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>{{ t("common.language") }}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent class="w-40">
+                  <DropdownMenuRadioGroup
+                    :model-value="localePreference"
+                    @update:model-value="handleLocalePreferenceChange"
+                  >
+                    <DropdownMenuRadioItem data-test="locale-auto" value="auto">
+                      {{ t("common.languageAutomatic") }}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem data-test="locale-en" value="en">
+                      {{ t("common.english") }}
+                    </DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem data-test="locale-ja" value="ja">
+                      {{ t("common.japanese") }}
+                    </DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Theme Switcher -->
               <div class="flex items-center justify-between px-2 py-1.5">
-                <span class="text-sm text-muted-foreground">Theme</span>
+                <span class="text-sm text-muted-foreground">{{
+                  t("common.theme")
+                }}</span>
                 <div
                   class="flex items-center gap-0.5 rounded-md border bg-muted/50 p-0.5"
                 >
                   <button
                     type="button"
+                    :aria-label="t('common.themeLight')"
+                    :title="t('common.themeLight')"
                     class="rounded p-1 transition-colors"
                     :class="
                       colorMode.preference === 'light'
@@ -1764,6 +1910,8 @@ const navigateTo = (path: string) => {
                   </button>
                   <button
                     type="button"
+                    :aria-label="t('common.themeDark')"
+                    :title="t('common.themeDark')"
                     class="rounded p-1 transition-colors"
                     :class="
                       colorMode.preference === 'dark'
@@ -1776,6 +1924,8 @@ const navigateTo = (path: string) => {
                   </button>
                   <button
                     type="button"
+                    :aria-label="t('common.themeSystem')"
+                    :title="t('common.themeSystem')"
                     class="rounded p-1 transition-colors"
                     :class="
                       colorMode.preference === 'system'
@@ -1795,7 +1945,7 @@ const navigateTo = (path: string) => {
                 @click="handleLogout"
               >
                 <LogOut class="h-3.5 w-3.5" />
-                <span>Sign Out</span>
+                <span>{{ t("common.signOut") }}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -1914,7 +2064,7 @@ const navigateTo = (path: string) => {
             class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <Server class="h-4 w-4" />
-            Servers
+            {{ navLabel("servers") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <template v-if="isServerDataLoaded">
@@ -1932,7 +2082,7 @@ const navigateTo = (path: string) => {
                 v-if="isLoadBalancerServer"
                 class="rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
               >
-                Load Balancer
+                {{ t("common.loadBalancer") }}
               </span>
               <span
                 v-if="serverProvider"
@@ -1958,7 +2108,7 @@ const navigateTo = (path: string) => {
             @click="showProvisionDialog = true"
           >
             <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
-            Provision
+            {{ actionLabel("provision") }}
           </Button>
           <Button
             v-if="serverConnected"
@@ -1967,7 +2117,7 @@ const navigateTo = (path: string) => {
             @click="openTerminal"
           >
             <Terminal class="mr-2 h-4 w-4" />
-            Terminal
+            {{ actionLabel("terminal") }}
           </Button>
           <ServerAddSite
             v-if="
@@ -2043,7 +2193,7 @@ const navigateTo = (path: string) => {
             class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <Server class="h-4 w-4" />
-            Servers
+            {{ navLabel("servers") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <NuxtLink
@@ -2054,13 +2204,13 @@ const navigateTo = (path: string) => {
               class="h-2 w-2 rounded-full"
               :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
             />
-            {{ serverName || "Loading..." }}
+            {{ serverName || t("common.loading") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
             <Globe class="h-4 w-4 text-muted-foreground" />
             <span class="text-sm font-medium">{{
-              siteAddress || "Loading..."
+              siteAddress || t("common.loading")
             }}</span>
             <span
               v-if="siteType"
@@ -2093,7 +2243,7 @@ const navigateTo = (path: string) => {
             @click="openTerminal"
           >
             <Terminal class="mr-2 h-4 w-4" />
-            Terminal
+            {{ actionLabel("terminal") }}
           </Button>
           <SiteDeployApplication
             v-if="
@@ -2156,7 +2306,7 @@ const navigateTo = (path: string) => {
             class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <Server class="h-4 w-4" />
-            Servers
+            {{ navLabel("servers") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <NuxtLink
@@ -2167,7 +2317,7 @@ const navigateTo = (path: string) => {
               class="h-2 w-2 rounded-full"
               :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
             />
-            {{ serverName || "Loading..." }}
+            {{ serverName || t("common.loading") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
@@ -2176,7 +2326,7 @@ const navigateTo = (path: string) => {
               class="h-4 w-4 text-muted-foreground"
             />
             <span class="text-sm font-medium">
-              {{ projectName || "Loading..." }}
+              {{ projectName || t("common.loading") }}
             </span>
           </div>
         </div>
@@ -2208,7 +2358,7 @@ const navigateTo = (path: string) => {
           -->
           <Button variant="outline" size="sm" @click="openProjectEnv">
             <Icon name="lucide:key" class="mr-2 h-4 w-4" />
-            Environment
+            {{ actionLabel("environment") }}
           </Button>
 
           <!--
@@ -2225,7 +2375,7 @@ const navigateTo = (path: string) => {
             @click="openCreateApplication"
           >
             <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-            New Application
+            {{ actionLabel("newApplication") }}
           </Button>
           <Button
             v-else-if="canEdit && isProjectTabActive('compose')"
@@ -2233,7 +2383,7 @@ const navigateTo = (path: string) => {
             @click="openCreateCompose"
           >
             <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-            New Compose Stack
+            {{ actionLabel("newComposeStack") }}
           </Button>
           <Button
             v-else-if="canEdit && isProjectTabActive('databases')"
@@ -2241,7 +2391,7 @@ const navigateTo = (path: string) => {
             @click="openCreateDatabase"
           >
             <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-            New Database
+            {{ actionLabel("newDatabase") }}
           </Button>
         </div>
       </div>
@@ -2299,7 +2449,7 @@ const navigateTo = (path: string) => {
             class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <Server class="h-4 w-4" />
-            Servers
+            {{ navLabel("servers") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <NuxtLink
@@ -2310,7 +2460,7 @@ const navigateTo = (path: string) => {
               class="h-2 w-2 rounded-full"
               :class="serverConnected ? 'bg-emerald-500' : 'bg-red-500'"
             />
-            {{ serverName || "Loading..." }}
+            {{ serverName || t("common.loading") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <NuxtLink
@@ -2318,7 +2468,7 @@ const navigateTo = (path: string) => {
             class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <Icon name="lucide:folder-tree" class="h-4 w-4" />
-            {{ projectName || "Loading..." }}
+            {{ projectName || t("common.loading") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <!--
@@ -2346,7 +2496,7 @@ const navigateTo = (path: string) => {
               :class="workloadKindIconColor"
             />
             <span class="truncate text-sm font-medium text-foreground">
-              {{ workloadName || "Loading..." }}
+              {{ workloadName || t("common.loading") }}
             </span>
           </div>
         </div>
@@ -2364,14 +2514,14 @@ const navigateTo = (path: string) => {
             <DropdownMenuTrigger as-child>
               <Button variant="outline" size="sm">
                 <Icon name="lucide:settings-2" class="mr-2 h-4 w-4" />
-                Actions
+                {{ actionLabel("actions") }}
                 <Icon name="lucide:chevron-down" class="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="w-44">
               <DropdownMenuItem v-if="serverConnected" @select="openTerminal">
                 <Terminal class="mr-2 h-4 w-4" />
-                Terminal
+                {{ actionLabel("terminal") }}
               </DropdownMenuItem>
 
               <template v-if="workloadKind === 'database'">
@@ -2392,7 +2542,7 @@ const navigateTo = (path: string) => {
                       workloadActionInFlight === 'start' && 'animate-spin',
                     ]"
                   />
-                  Start
+                  {{ actionLabel("start") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="workloadStatus === 'running'"
@@ -2410,7 +2560,7 @@ const navigateTo = (path: string) => {
                       workloadActionInFlight === 'stop' && 'animate-spin',
                     ]"
                   />
-                  Stop
+                  {{ actionLabel("stop") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   :disabled="workloadActionInFlight !== null"
@@ -2427,7 +2577,7 @@ const navigateTo = (path: string) => {
                       workloadActionInFlight === 'restart' && 'animate-spin',
                     ]"
                   />
-                  Restart
+                  {{ actionLabel("restart") }}
                 </DropdownMenuItem>
                 <!--
                   Connection info — opens the credentials dialog the
@@ -2438,7 +2588,7 @@ const navigateTo = (path: string) => {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem @select="openDatabaseConnectionDialog">
                   <Icon name="lucide:link" class="mr-2 h-4 w-4" />
-                  Connection info
+                  {{ actionLabel("connectionInfo") }}
                 </DropdownMenuItem>
               </template>
 
@@ -2470,7 +2620,7 @@ const navigateTo = (path: string) => {
                       workloadActionInFlight === 'deploy' && 'animate-spin',
                     ]"
                   />
-                  Deploy
+                  {{ actionLabel("deploy") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="workloadStatus === 'running'"
@@ -2488,14 +2638,14 @@ const navigateTo = (path: string) => {
                       workloadActionInFlight === 'restart' && 'animate-spin',
                     ]"
                   />
-                  Reload
+                  {{ actionLabel("reload") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   :disabled="workloadActionInFlight !== null"
                   @select="runApplicationAction('rebuild')"
                 >
                   <Icon name="lucide:hammer" class="mr-2 h-4 w-4" />
-                  Rebuild
+                  {{ actionLabel("rebuild") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="workloadStatus && workloadStatus !== 'running'"
@@ -2513,7 +2663,7 @@ const navigateTo = (path: string) => {
                       workloadActionInFlight === 'start' && 'animate-spin',
                     ]"
                   />
-                  Start
+                  {{ actionLabel("start") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   v-if="workloadStatus === 'running'"
@@ -2531,14 +2681,14 @@ const navigateTo = (path: string) => {
                       workloadActionInFlight === 'stop' && 'animate-spin',
                     ]"
                   />
-                  Stop
+                  {{ actionLabel("stop") }}
                 </DropdownMenuItem>
 
                 <!-- Logs moved here from the tab strip. -->
                 <DropdownMenuSeparator />
                 <DropdownMenuItem @select="viewWorkloadLogs">
                   <Icon name="lucide:scroll" class="mr-2 h-4 w-4" />
-                  View logs
+                  {{ actionLabel("viewLogs") }}
                 </DropdownMenuItem>
               </template>
 
@@ -2556,7 +2706,7 @@ const navigateTo = (path: string) => {
                 <DropdownMenuSeparator v-if="serverConnected" />
                 <DropdownMenuItem @select="openComposeYamlDialog">
                   <Icon name="lucide:file-code" class="mr-2 h-4 w-4" />
-                  View YAML
+                  {{ actionLabel("viewYaml") }}
                 </DropdownMenuItem>
               </template>
             </DropdownMenuContent>
@@ -2608,12 +2758,12 @@ const navigateTo = (path: string) => {
             class="flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
           >
             <Globe class="h-4 w-4" />
-            Domains
+            {{ navLabel("domains") }}
           </NuxtLink>
           <span class="text-muted-foreground">/</span>
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{
-              domainAddress || "Loading..."
+              domainAddress || t("common.loading")
             }}</span>
             <span
               v-if="domainProviderLabel"

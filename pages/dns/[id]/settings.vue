@@ -18,9 +18,17 @@ interface Domain {
 
 const route = useRoute();
 const domainId = computed(() => route.params.id as string);
+const { t } = useI18n();
 
 const domain = ref<Domain | null>(null);
 const isLoading = ref(true);
+
+useHead({
+  title: () =>
+    t("operations.dns.settings.pageTitle", {
+      domain: domain.value?.address || t("operations.dns.common.domain"),
+    }),
+});
 
 const fetchDomainData = async () => {
   try {
@@ -30,9 +38,8 @@ const fetchDomainData = async () => {
       };
     }>(`/dns/domains/${domainId.value}`);
     domain.value = response.data.domain;
-    useHead({ title: `Settings - ${domain.value?.address || "Domain"}` });
   } catch {
-    toast.error("Failed to load domain data");
+    toast.error(t("operations.dns.settings.loadError"));
     navigateTo("/dns");
   } finally {
     isLoading.value = false;

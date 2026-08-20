@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
 import type { Site } from "~/types";
 
 definePageMeta({
@@ -7,9 +8,11 @@ definePageMeta({
   middleware: "auth",
 });
 
-useHead({
-  title: "Sites",
-});
+const { locale, t } = useI18n();
+
+useHead(() => ({
+  title: t("site.index.pageTitle"),
+}));
 
 const sites = ref<Site[]>([]);
 const isLoading = ref(true);
@@ -21,7 +24,8 @@ const getSiteTypeIcon = (type: string): string => {
   if (t.includes("nuxt")) return "simple-icons:nuxtdotjs";
   if (t.includes("next")) return "simple-icons:nextdotjs";
   if (t.includes("node")) return "simple-icons:nodedotjs";
-  if (t.includes("python") || t.includes("django")) return "simple-icons:python";
+  if (t.includes("python") || t.includes("django"))
+    return "simple-icons:python";
   if (t.includes("ruby") || t.includes("rails")) return "simple-icons:ruby";
   return "simple-icons:php";
 };
@@ -30,7 +34,7 @@ const getSiteTypeLabel = (type: string): string => {
   const types: Record<string, string> = {
     laravel: "Laravel",
     wordpress: "WordPress",
-    generic: "Generic PHP",
+    generic: t("site.types.genericPhp"),
     nuxt: "Nuxt",
     nextjs: "Next.js",
     nodejs: "Node.js",
@@ -54,18 +58,18 @@ const getStatusColor = (site: Site): string => {
 
 const getStatusLabel = (site: Site): { text: string; loading: boolean } => {
   if (site.installation_failed_at) {
-    return { text: "Installation failed", loading: false };
+    return { text: t("site.status.installationFailed"), loading: false };
   }
   if (site.uninstallation_failed_at) {
-    return { text: "Uninstallation failed", loading: false };
+    return { text: t("site.status.uninstallationFailed"), loading: false };
   }
   if (site.uninstallation_requested_at) {
-    return { text: "Uninstalling", loading: true };
+    return { text: t("site.status.uninstalling"), loading: true };
   }
   if (site.installed_at) {
-    return { text: "Installed", loading: false };
+    return { text: t("site.status.installed"), loading: false };
   }
-  return { text: "Installing", loading: true };
+  return { text: t("site.status.installing"), loading: true };
 };
 
 const isAccessible = (site: Site) => {
@@ -77,7 +81,10 @@ const { cacheSite } = useNavbarCache();
 
 const formatDate = (date: string): string => {
   try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
+    return formatDistanceToNow(new Date(date), {
+      addSuffix: true,
+      locale: locale.value === "ja" ? ja : enUS,
+    });
   } catch {
     return "";
   }
@@ -110,8 +117,10 @@ onMounted(async () => {
     >
       <Icon name="lucide:globe" class="h-16 w-16 text-muted-foreground" />
       <div class="text-center">
-        <p class="font-medium">No sites yet</p>
-        <p class="text-sm text-muted-foreground">Get started by creating your first site</p>
+        <p class="font-medium">{{ t("site.index.emptyTitle") }}</p>
+        <p class="text-sm text-muted-foreground">
+          {{ t("site.index.emptyDescription") }}
+        </p>
       </div>
     </div>
 
@@ -119,7 +128,11 @@ onMounted(async () => {
       <NuxtLink
         v-for="site in sites"
         :key="site.id"
-        :to="isAccessible(site) ? `/servers/${site.server_id}/sites/${site.id}` : '#'"
+        :to="
+          isAccessible(site)
+            ? `/servers/${site.server_id}/sites/${site.id}`
+            : '#'
+        "
         class="group"
         :class="{ 'pointer-events-none': !isAccessible(site) }"
         @click="cacheSite(site)"
@@ -131,7 +144,9 @@ onMounted(async () => {
           }"
         >
           <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted"
+            >
               <Icon
                 :name="getSiteTypeIcon(site.type)"
                 class="h-5 w-5 text-muted-foreground"
@@ -161,7 +176,9 @@ onMounted(async () => {
               <span
                 :class="[
                   getStatusLabel(site).loading ? 'text-muted-foreground' : '',
-                  site.installation_failed_at || site.uninstallation_failed_at ? 'text-destructive' : ''
+                  site.installation_failed_at || site.uninstallation_failed_at
+                    ? 'text-destructive'
+                    : '',
                 ]"
               >
                 {{ getStatusLabel(site).text }}

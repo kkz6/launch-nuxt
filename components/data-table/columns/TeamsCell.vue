@@ -14,6 +14,7 @@ import type { BadgeVariants } from "~/components/ui/badge";
 import type { AdminTeam } from "~/types";
 
 defineProps<{ value: AdminTeam[] | null | undefined }>();
+const { t } = useI18n();
 
 interface SubBadge {
   variant: BadgeVariants["variant"];
@@ -23,32 +24,34 @@ interface SubBadge {
 const subscriptionBadge = (team: AdminTeam): SubBadge => {
   const sub = team.subscription;
   if (!sub || !sub.status) {
-    return { variant: "blank", label: "free" };
+    return { variant: "blank", label: t("data.subscription.free") };
   }
 
   switch (sub.status) {
     case "active":
-      return { variant: "green", label: "active" };
+      return { variant: "green", label: t("data.subscription.active") };
     case "on_trial": {
-      let label = "trial";
+      let label = t("data.subscription.trial");
       if (sub.trial_ends_at) {
         const days = differenceInCalendarDays(
           new Date(sub.trial_ends_at),
           new Date(),
         );
         if (days >= 0) {
-          label = `trial · ${days}d left`;
+          label = t("data.subscription.trialDaysLeft", { days });
         }
       }
       return { variant: "blue", label };
     }
     case "past_due":
+      return { variant: "orange", label: t("data.subscription.pastDue") };
     case "unpaid":
-      return { variant: "orange", label: sub.status.replace("_", " ") };
+      return { variant: "orange", label: t("data.subscription.unpaid") };
     case "cancelled":
     case "canceled":
+      return { variant: "blank", label: t("data.subscription.cancelled") };
     case "expired":
-      return { variant: "blank", label: sub.status };
+      return { variant: "blank", label: t("data.subscription.expired") };
     default:
       return { variant: "secondary", label: sub.status };
   }

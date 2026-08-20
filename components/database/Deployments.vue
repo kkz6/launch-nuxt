@@ -11,6 +11,8 @@ interface Props {
   database: DockerDatabase;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
+const { effectiveLocale } = useLocalePreference();
 
 // Lifecycle-history rows. Same polymorphic table the application +
 // compose Deployments tabs read from — target_type=database. action
@@ -30,7 +32,7 @@ const fetchDeployments = async (silent = false) => {
     );
     deployments.value = res.data;
   } catch {
-    if (!silent) toast.error("Failed to load deployment history");
+    if (!silent) toast.error(t("workload.database.deployments.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -46,13 +48,22 @@ const lifecycle = async (action: DockerDatabaseLifecycleAction) => {
       props.database.id,
       action,
     );
-    toast.success(`${cap(action)} queued`);
+    toast.success(
+      t("workload.database.deployments.queued", {
+        action: actionLabel(action),
+      }),
+    );
     // Refetch immediately so the pending row appears; the WS will
     // then flip its status as the worker runs.
     void fetchDeployments(true);
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || `Failed to ${action}`);
+    toast.error(
+      e.data?.message ||
+        t("workload.database.deployments.actionFailed", {
+          action: actionLabel(action),
+        }),
+    );
   } finally {
     lifecycleInFlight.value = null;
   }
@@ -78,8 +89,8 @@ const statusBadge = (status: string): string => {
 };
 
 const actionLabel = (a?: string | null): string => {
-  if (!a) return "Deploy";
-  return cap(a);
+  if (!a) return t("workload.deployments.action.deploy");
+  return t(`workload.deployments.action.${a}`, cap(a));
 };
 
 const actionIcon = (a?: string | null): string => {
@@ -102,7 +113,10 @@ const actionIcon = (a?: string | null): string => {
 const formatDate = (iso?: string | null): string => {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleString();
+    return new Intl.DateTimeFormat(effectiveLocale.value, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(iso));
   } catch {
     return "—";
   }
@@ -114,8 +128,14 @@ const duration = (d: DockerDeployment): string => {
   const end = d.finished_at ? new Date(d.finished_at).getTime() : Date.now();
   const ms = Math.max(0, end - start);
   const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
-  return `${Math.floor(s / 60)}m ${s % 60}s`;
+  const unit = (value: number, name: "minute" | "second") =>
+    new Intl.NumberFormat(effectiveLocale.value, {
+      style: "unit",
+      unit: name,
+      unitDisplay: "short",
+    }).format(value);
+  if (s < 60) return unit(s, "second");
+  return `${unit(Math.floor(s / 60), "minute")} ${unit(s % 60, "second")}`;
 };
 
 const expanded = ref<Set<string>>(new Set());
@@ -135,7 +155,7 @@ const logTaskId = ref<string>("");
 const logActionLabel = ref<string>("");
 const openLogs = (d: DockerDeployment) => {
   if (!d.task_id) {
-    toast.error("Logs aren't available for this row yet");
+    toast.error(t("workload.database.deployments.logsUnavailable"));
     return;
   }
   logTaskId.value = d.task_id;
@@ -183,11 +203,11 @@ onMounted(fetchDeployments);
   <div>
     <div class="mb-6 flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold">Deployments</h2>
+        <h2 class="text-xl font-semibold">
+          {{ t("workload.deployments.title") }}
+        </h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Every lifecycle action (create, start, restart, stop) records
-          a row here. Click <span class="font-medium">View logs</span>
-          to see the SSH output for that run.
+          {{ t("workload.database.deployments.description") }}
         </p>
       </div>
       <div class="flex items-center gap-2">
@@ -198,7 +218,7 @@ onMounted(fetchDeployments);
           @click="lifecycle('start')"
         >
           <Icon name="lucide:play" class="mr-2 h-4 w-4" />
-          Start
+          {{ t("workload.deployments.action.start") }}
         </Button>
         <Button
           v-if="database.status === 'running'"
@@ -207,7 +227,7 @@ onMounted(fetchDeployments);
           @click="lifecycle('stop')"
         >
           <Icon name="lucide:square" class="mr-2 h-4 w-4" />
-          Stop
+          {{ t("workload.deployments.action.stop") }}
         </Button>
         <Button
           :disabled="lifecycleInFlight !== null"
@@ -219,7 +239,7 @@ onMounted(fetchDeployments);
             class="mr-2 h-4 w-4 animate-spin"
           />
           <Icon v-else name="lucide:rotate-cw" class="mr-2 h-4 w-4" />
-          Restart
+          {{ t("workload.deployments.action.restart") }}
         </Button>
       </div>
     </div>
@@ -236,10 +256,11 @@ onMounted(fetchDeployments);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:history" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No deployment history yet</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("workload.database.deployments.emptyTitle") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Restart the database to capture a fresh entry — every action
-        from here on records a row with full SSH logs.
+        {{ t("workload.database.deployments.emptyDescription") }}
       </p>
     </div>
 
@@ -249,11 +270,19 @@ onMounted(fetchDeployments);
           class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground"
         >
           <tr>
-            <th class="px-4 py-3">Action</th>
-            <th class="px-4 py-3">Status</th>
-            <th class="px-4 py-3">Started</th>
-            <th class="px-4 py-3">Duration</th>
-            <th class="px-4 py-3 text-right">Logs</th>
+            <th class="px-4 py-3">
+              {{ t("workload.database.deployments.action") }}
+            </th>
+            <th class="px-4 py-3">{{ t("workload.fields.status") }}</th>
+            <th class="px-4 py-3">
+              {{ t("workload.database.deployments.started") }}
+            </th>
+            <th class="px-4 py-3">
+              {{ t("workload.database.deployments.duration") }}
+            </th>
+            <th class="px-4 py-3 text-right">
+              {{ t("workload.database.deployments.logs") }}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -273,7 +302,7 @@ onMounted(fetchDeployments);
                   class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
                   :class="statusBadge(d.status)"
                 >
-                  {{ d.status }}
+                  {{ t(`workload.status.${d.status}`, d.status) }}
                 </span>
               </td>
               <td class="px-4 py-3 text-muted-foreground">
@@ -291,7 +320,7 @@ onMounted(fetchDeployments);
                     @click="openLogs(d)"
                   >
                     <Icon name="lucide:scroll-text" class="mr-1.5 h-4 w-4" />
-                    View logs
+                    {{ t("workload.deployments.viewLogs") }}
                   </Button>
                   <Button
                     v-if="d.error"
@@ -318,7 +347,8 @@ onMounted(fetchDeployments);
               <td colspan="5" class="px-4 py-3">
                 <pre
                   class="max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-muted/30 p-3 font-mono text-xs"
-                >{{ d.error }}</pre>
+                  >{{ d.error }}</pre
+                >
               </td>
             </tr>
           </template>
@@ -336,10 +366,15 @@ onMounted(fetchDeployments);
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none"
       >
         <SheetHeader class="shrink-0">
-          <SheetTitle>{{ logActionLabel }} logs</SheetTitle>
+          <SheetTitle>
+            {{
+              t("workload.database.deployments.logTitle", {
+                action: logActionLabel,
+              })
+            }}
+          </SheetTitle>
           <SheetDescription>
-            Live SSH output from the worker. Container logs (post-start)
-            are on the Logs tab.
+            {{ t("workload.database.deployments.logDescription") }}
           </SheetDescription>
         </SheetHeader>
         <div class="mt-4 flex flex-col flex-1 min-h-0">

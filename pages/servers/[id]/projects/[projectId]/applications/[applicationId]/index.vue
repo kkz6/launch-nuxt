@@ -13,6 +13,7 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 
 const serverId = computed(() => route.params.id as string);
 const projectId = computed(() => route.params.projectId as string);
@@ -28,22 +29,32 @@ const isLoading = ref(true);
 // declared in the canonical list so navbar / order stays consistent,
 // but filtered out of the rendered subtab strip by `visibleSubtabs`
 // below for server-side builds. (Show: SUBTABS, Render: visibleSubtabs.)
-const SUBTABS = [
-  { value: "general", label: "Overview", icon: "lucide:layout-dashboard" },
-  { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
-  { value: "environment", label: "Environment", icon: "lucide:key" },
-  { value: "domains", label: "Domains", icon: "lucide:globe" },
-  { value: "redirects", label: "Redirects", icon: "lucide:corner-up-right" },
-  { value: "schedules", label: "Schedules", icon: "lucide:clock" },
-  { value: "logs", label: "Logs", icon: "lucide:scroll" },
-  { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
+const SUBTAB_DEFINITIONS = [
+  { value: "general", labelKey: "overview", icon: "lucide:layout-dashboard" },
+  { value: "deployments", labelKey: "deployments", icon: "lucide:git-branch" },
+  { value: "environment", labelKey: "environment", icon: "lucide:key" },
+  { value: "domains", labelKey: "domains", icon: "lucide:globe" },
+  { value: "redirects", labelKey: "redirects", icon: "lucide:corner-up-right" },
+  { value: "schedules", labelKey: "schedules", icon: "lucide:clock" },
+  { value: "logs", labelKey: "logs", icon: "lucide:scroll" },
+  {
+    value: "advanced",
+    labelKey: "advanced",
+    icon: "lucide:sliders-horizontal",
+  },
 ] as const;
-type SubTabId = (typeof SUBTABS)[number]["value"];
+type SubTabId = (typeof SUBTAB_DEFINITIONS)[number]["value"];
+const SUBTABS = computed(() =>
+  SUBTAB_DEFINITIONS.map(({ labelKey, ...subtab }) => ({
+    ...subtab,
+    label: t(`server.workloadTabs.${labelKey}`),
+  })),
+);
 
 // Read straight from the URL — navbar subtab links are the source of
 // truth. Setting via `setSubTab` updates the URL; everything else
 // follows from the computed reading route.query.subtab.
-const validIds = SUBTABS.map((s) => s.value);
+const validIds = SUBTAB_DEFINITIONS.map((s) => s.value);
 const subTab = computed<SubTabId>(() => {
   const q = route.query.subtab as string | undefined;
   return q && (validIds as readonly string[]).includes(q)
@@ -67,10 +78,10 @@ const quickDeploy = async () => {
       app.value.id,
     );
     setSubTab("deployments");
-    toast.success("Deployment started");
+    toast.success(t("server.workload.deploymentStarted"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to start deployment");
+    toast.error(e.data?.message || t("server.workload.deploymentStartFailed"));
   } finally {
     isDeploying.value = false;
   }
@@ -89,7 +100,7 @@ const fetchApp = async () => {
     app.value = res.data;
     useHead({ title: app.value.name });
   } catch {
-    toast.error("Application not found");
+    toast.error(t("server.workload.applicationNotFound"));
     navigateTo(
       `/servers/${serverId.value}/projects/${projectId.value}?tab=applications`,
     );
@@ -133,7 +144,7 @@ const READY_SUBTABS: Record<string, boolean> = {
 // panel moved into the Advanced tab (shown there only for
 // github_actions builds) and build-time secrets moved to the
 // Environment tab — so there's no longer a GHA-only subtab to hide.
-const visibleSubtabs = computed(() => SUBTABS);
+const visibleSubtabs = computed(() => SUBTABS.value);
 // Expose to a child <Navbar> or layout in future; for now the local
 // SUBTABS array drives the strip via the layout's slot.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -204,10 +215,7 @@ useDockerApplicationEvents(teamId, (data, event) => {
       :application="app"
     />
 
-    <ApplicationDomains
-      v-else-if="subTab === 'domains'"
-      :application="app"
-    />
+    <ApplicationDomains v-else-if="subTab === 'domains'" :application="app" />
 
     <ApplicationRedirects
       v-else-if="subTab === 'redirects'"
@@ -228,7 +236,11 @@ useDockerApplicationEvents(teamId, (data, event) => {
       v-else-if="subTab === 'advanced'"
       :application="app"
       @updated="fetchApp"
-      @deleted="navigateTo(`/servers/${serverId}/projects/${projectId}?tab=applications`)"
+      @deleted="
+        navigateTo(
+          `/servers/${serverId}/projects/${projectId}?tab=applications`,
+        )
+      "
     />
 
     <ApplicationLogs v-else-if="subTab === 'logs'" :application="app" />
@@ -236,7 +248,7 @@ useDockerApplicationEvents(teamId, (data, event) => {
     <ServerDockerComingSoon
       v-else-if="!READY_SUBTABS[subTab]"
       :title="SUBTABS.find((s) => s.value === subTab)?.label ?? subTab"
-      description="This tab will be wired up in a later phase. See the design doc for the full plan."
+      :description="t('server.workload.applicationComingSoon')"
       :icon="SUBTABS.find((s) => s.value === subTab)?.icon ?? 'lucide:hammer'"
     />
 

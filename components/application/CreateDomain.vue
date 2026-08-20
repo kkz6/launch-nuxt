@@ -33,6 +33,7 @@ interface Props {
   domain?: DockerDomain;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   created: [];
@@ -195,11 +196,11 @@ const onSubmit = async () => {
   errors.value = {};
   const trimmedHost = host.value.trim().toLowerCase();
   if (!trimmedHost) {
-    errors.value.host = "Host is required";
+    errors.value.host = t("workload.domains.hostRequired");
     return;
   }
   if (!containerPort.value || containerPort.value <= 0) {
-    errors.value.container_port = "Container port is required";
+    errors.value.container_port = t("workload.domains.containerPortRequired");
     return;
   }
 
@@ -224,7 +225,7 @@ const onSubmit = async () => {
               : "",
         },
       );
-      toast.success("Domain updated");
+      toast.success(t("workload.domains.updated"));
       emit("updated");
     } else {
       await dockerService.applications.createDomain(
@@ -250,14 +251,14 @@ const onSubmit = async () => {
             domainVerification.value?.connected_domain_id || null,
         },
       );
-      toast.success("Domain added — Traefik is updating");
+      toast.success(t("workload.domains.added"));
       emit("created");
     }
     open.value = false;
     resetForm();
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to save domain");
+    toast.error(e.data?.message || t("workload.domains.saveFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -273,24 +274,32 @@ watch(open, (isOpen) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        {{ domain ? "Edit Domain" : "Add Domain" }}
+        {{
+          domain ? t("workload.domains.editTitle") : t("workload.domains.add")
+        }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>{{ domain ? "Edit Domain" : "Domain" }}</DialogTitle>
+        <DialogTitle>
+          {{
+            domain
+              ? t("workload.domains.editTitle")
+              : t("workload.domains.domain")
+          }}
+        </DialogTitle>
         <DialogDescription>
           {{
             domain
-              ? "In this section you can edit a domain."
-              : "Attach a public hostname to this application. Traefik handles routing and the TLS certificate."
+              ? t("workload.domains.editDescription")
+              : t("workload.domains.addApplicationDescription")
           }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="grid gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
-          <Label for="domain-host">Host</Label>
+          <Label for="domain-host">{{ t("workload.fields.host") }}</Label>
           <div class="relative flex gap-2">
             <div class="relative flex-1">
               <Input
@@ -315,7 +324,7 @@ watch(open, (isOpen) => {
               type="button"
               variant="outline"
               size="icon"
-              title="Generate a wildcard-DNS hostname pointing at this server (sslip.io)"
+              :title="t('workload.domains.generateWildcard')"
               @click="generateWildcardHost"
             >
               <Icon name="lucide:shuffle" class="h-4 w-4" />
@@ -334,8 +343,7 @@ watch(open, (isOpen) => {
               class="h-4 w-4 text-sky-600 dark:text-sky-400"
             />
             <span class="text-sm text-sky-700 dark:text-sky-300">
-              Wildcard DNS hostname — already routable, no provider setup
-              required.
+              {{ t("workload.domains.wildcardReady") }}
             </span>
           </div>
 
@@ -353,7 +361,7 @@ watch(open, (isOpen) => {
                   class="h-4 w-4 text-emerald-600 dark:text-emerald-400"
                 />
                 <span class="text-sm text-emerald-700 dark:text-emerald-300">
-                  Domain connected via
+                  {{ t("workload.domains.connectedVia") }}
                   <strong>{{ domainVerification.base_domain }}</strong>
                 </span>
               </div>
@@ -362,7 +370,7 @@ watch(open, (isOpen) => {
                   for="create_dns"
                   class="text-sm text-emerald-700 dark:text-emerald-300"
                 >
-                  Create A record
+                  {{ t("workload.domains.createARecord") }}
                 </Label>
                 <Switch id="create_dns" v-model="createDnsRecord" />
               </div>
@@ -376,16 +384,16 @@ watch(open, (isOpen) => {
                 class="h-4 w-4 text-amber-600 dark:text-amber-400"
               />
               <span class="text-sm text-amber-700 dark:text-amber-300">
-                Domain not connected. Add
-                <strong>{{ domainVerification.base_domain }}</strong> to your
-                DNS providers to auto-create records.
+                {{ t("workload.domains.notConnectedBefore") }}
+                <strong>{{ domainVerification.base_domain }}</strong>
+                {{ t("workload.domains.notConnectedAfter") }}
               </span>
             </div>
           </div>
         </div>
 
         <div class="space-y-2">
-          <Label for="domain-path">Path</Label>
+          <Label for="domain-path">{{ t("workload.fields.path") }}</Label>
           <Input
             id="domain-path"
             v-model="path"
@@ -395,10 +403,11 @@ watch(open, (isOpen) => {
         </div>
 
         <div class="space-y-2">
-          <Label for="domain-internal-path">Internal Path</Label>
+          <Label for="domain-internal-path">{{
+            t("workload.domains.internalPath")
+          }}</Label>
           <p class="text-xs text-muted-foreground">
-            The path where your application expects to receive requests
-            internally (defaults to "/")
+            {{ t("workload.domains.internalPathHelp") }}
           </p>
           <Input
             id="domain-internal-path"
@@ -412,20 +421,22 @@ watch(open, (isOpen) => {
           class="flex items-start justify-between gap-4 rounded-lg border p-3"
         >
           <div class="space-y-0.5">
-            <Label class="text-sm font-medium">Strip Path</Label>
+            <Label class="text-sm font-medium">{{
+              t("workload.domains.stripPath")
+            }}</Label>
             <p class="text-xs text-muted-foreground">
-              Remove the external path from the request before forwarding to the
-              application
+              {{ t("workload.domains.stripApplicationHelp") }}
             </p>
           </div>
           <Switch v-model="stripPath" class="mt-0.5 shrink-0" />
         </div>
 
         <div class="space-y-2">
-          <Label for="domain-container-port">Container Port</Label>
+          <Label for="domain-container-port">{{
+            t("workload.domains.containerPort")
+          }}</Label>
           <p class="text-xs text-muted-foreground">
-            The port where your application is running inside the container
-            (e.g., 3000 for Node.js, 80 for Nginx, 8080 for Java)
+            {{ t("workload.domains.containerPortHelp") }}
           </p>
           <Input
             id="domain-container-port"
@@ -445,29 +456,37 @@ watch(open, (isOpen) => {
           class="flex items-start justify-between gap-4 rounded-lg border p-3"
         >
           <div class="space-y-0.5">
-            <Label class="text-sm font-medium">HTTPS</Label>
+            <Label class="text-sm font-medium">
+              {{ t("workload.domains.https") }}
+            </Label>
             <p class="text-xs text-muted-foreground">
-              Automatically provision SSL Certificate.
+              {{ t("workload.domains.httpsHelp") }}
             </p>
           </div>
           <Switch v-model="https" class="mt-0.5 shrink-0" />
         </div>
 
         <div v-if="https" class="space-y-2">
-          <Label for="domain-cert-provider">Certificate Provider</Label>
+          <Label for="domain-cert-provider">{{
+            t("workload.domains.certificateProvider")
+          }}</Label>
           <Select v-model="certificateProvider">
             <SelectTrigger id="domain-cert-provider">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="letsencrypt">Let's Encrypt (auto)</SelectItem>
-              <SelectItem value="stored">Use a stored certificate</SelectItem>
+              <SelectItem value="letsencrypt">{{
+                t("workload.domains.letsEncryptAuto")
+              }}</SelectItem>
+              <SelectItem value="stored">{{
+                t("workload.domains.useStoredCertificate")
+              }}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div v-if="https && certificateProvider === 'stored'" class="space-y-2">
-          <Label>Stored certificate</Label>
+          <Label>{{ t("workload.domains.storedCertificate") }}</Label>
           <SharedCertificatePicker v-model="storedCertificateId" />
           <p
             v-if="errors.stored_certificate_id"
@@ -479,7 +498,7 @@ watch(open, (isOpen) => {
 
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="isLoading">
             <Icon
@@ -487,7 +506,9 @@ watch(open, (isOpen) => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            {{ domain ? "Update" : "Add Domain" }}
+            {{
+              domain ? t("workload.actions.update") : t("workload.domains.add")
+            }}
           </Button>
         </DialogFooter>
       </form>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { CloudUpload } from 'lucide-vue-next'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import { CloudUpload } from "lucide-vue-next";
+import { Button } from "~/components/ui/button";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,65 +12,69 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from '~/components/ui/alert-dialog'
+} from "~/components/ui/alert-dialog";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from '~/components/ui/tooltip'
-import type { Deployment } from '~/types'
+} from "~/components/ui/tooltip";
+import type { Deployment } from "~/types";
 
 interface Props {
-  serverId: string
-  siteId: string
-  isDeploying?: boolean
-  asIcon?: boolean
+  serverId: string;
+  siteId: string;
+  isDeploying?: boolean;
+  asIcon?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   asIcon: false,
   isDeploying: false,
-})
+});
+const { t } = useI18n();
 
 // `deployed` carries the freshly-created deployment so parents can update
 // site.latest_deployment optimistically rather than waiting for the
 // WebSocket broadcast → debounced refetch (≈500ms of stale UI otherwise).
 const emit = defineEmits<{
-  deployed: [deployment: Deployment]
-}>()
+  deployed: [deployment: Deployment];
+}>();
 
-const isOpen = ref(false)
-const isLoading = ref(props.isDeploying)
+const isOpen = ref(false);
+const isLoading = ref(props.isDeploying);
 
 // Watch for external isDeploying changes
-watch(() => props.isDeploying, (val) => {
-  isLoading.value = val
-})
+watch(
+  () => props.isDeploying,
+  (val) => {
+    isLoading.value = val;
+  },
+);
 
 const deploy = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
     const res = await $api<{ data: Deployment }>(
       `/servers/${props.serverId}/sites/${props.siteId}/deploy`,
-      { method: 'POST' },
-    )
-    toast.info('Deployment started')
-    emit('deployed', res.data)
-    isOpen.value = false
+      { method: "POST" },
+    );
+    toast.info(t("site.deploy.started"));
+    emit("deployed", res.data);
+    isOpen.value = false;
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to deploy')
-    isLoading.value = false
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("site.deploy.failed"));
+    isLoading.value = false;
   }
-}
+};
 
 const modifierKey = computed(() => {
   if (import.meta.client) {
-    return navigator.platform.includes('Mac') ? 'Cmd' : 'Ctrl'
+    return navigator.platform.includes("Mac") ? "Cmd" : "Ctrl";
   }
-  return 'Ctrl'
-})
+  return "Ctrl";
+});
 </script>
 
 <template>
@@ -85,17 +89,23 @@ const modifierKey = computed(() => {
                 :disabled="isLoading"
                 variant="ghost"
                 size="icon"
-                aria-label="Deploy application"
+                :aria-label="t('site.deploy.applicationAria')"
               >
-                <Icon v-if="isLoading" name="lucide:loader-2" class="h-4 w-4 animate-spin" />
+                <Icon
+                  v-if="isLoading"
+                  name="lucide:loader-2"
+                  class="h-4 w-4 animate-spin"
+                />
                 <CloudUpload v-else class="h-4 w-4" />
               </Button>
             </AlertDialogTrigger>
           </TooltipTrigger>
           <TooltipContent>
             <div class="flex items-center gap-2">
-              <span>Deploy</span>
-              <kbd class="rounded border border-border bg-muted px-1.5 py-0.5 text-xs">
+              <span>{{ t("site.common.deploy") }}</span>
+              <kbd
+                class="rounded border border-border bg-muted px-1.5 py-0.5 text-xs"
+              >
                 {{ modifierKey }}+Shift+D
               </kbd>
             </div>
@@ -105,24 +115,31 @@ const modifierKey = computed(() => {
     </template>
     <template v-else>
       <AlertDialogTrigger as-child>
-        <Button :disabled="isLoading" aria-label="Deploy application">
-          <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          {{ isLoading ? 'Deploying...' : 'Deploy' }}
+        <Button
+          :disabled="isLoading"
+          :aria-label="t('site.deploy.applicationAria')"
+        >
+          <Icon
+            v-if="isLoading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          {{ isLoading ? t("site.deploy.deploying") : t("site.common.deploy") }}
         </Button>
       </AlertDialogTrigger>
     </template>
 
     <AlertDialogContent>
       <AlertDialogHeader>
-        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+        <AlertDialogTitle>{{ t("site.deploy.confirmTitle") }}</AlertDialogTitle>
         <AlertDialogDescription>
-          This will deploy the application
+          {{ t("site.deploy.confirmDescription") }}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogCancel>{{ t("site.common.cancel") }}</AlertDialogCancel>
         <AlertDialogAction @click="deploy">
-          Confirm
+          {{ t("site.common.confirm") }}
         </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>

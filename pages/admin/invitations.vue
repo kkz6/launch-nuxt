@@ -29,14 +29,20 @@ definePageMeta({
   middleware: ["auth", "staff"],
 });
 
+const { locale, t } = useI18n();
+
 useHead({
-  title: "Admin — Invitations",
+  title: () => t("admin.invitations.pageTitle"),
 });
 
-setBreadcrumbs([
-  { label: "Admin", to: "/admin/overview" },
-  { label: "Invitations" },
-]);
+const applyBreadcrumb = (): void => {
+  setBreadcrumbs([
+    { label: t("admin.common.admin"), to: "/admin/overview" },
+    { label: t("admin.common.invitations") },
+  ]);
+};
+applyBreadcrumb();
+watch(locale, applyBreadcrumb);
 
 const { user } = useAuth();
 const isSuperAdmin = computed(() => user.value?.staff_role === "super_admin");
@@ -66,14 +72,17 @@ const loadPlans = async () => {
     const res = await adminService.plans();
     plans.value = res.data ?? [];
   } catch {
-    toast.error("Failed to load plans");
+    toast.error(t("admin.invitations.loadPlansFailed"));
   } finally {
     plansLoading.value = false;
   }
 };
 
 const formatPrice = (cents: number): string =>
-  `$${(cents / 100).toFixed(2)}/mo`;
+  `${(cents / 100).toLocaleString(locale.value, {
+    style: "currency",
+    currency: "USD",
+  })}${t("admin.invitations.perMonth")}`;
 
 const openInvite = () => {
   inviteEmail.value = "";
@@ -85,15 +94,15 @@ const openInvite = () => {
 
 const submitInvite = async () => {
   if (!inviteEmail.value.trim()) {
-    toast.error("Email is required");
+    toast.error(t("admin.invitations.emailRequired"));
     return;
   }
   if (!invitePlanId.value) {
-    toast.error("Plan is required");
+    toast.error(t("admin.invitations.planRequired"));
     return;
   }
   if (!inviteTrialEndsAt.value) {
-    toast.error("Trial end date is required");
+    toast.error(t("admin.invitations.trialEndRequired"));
     return;
   }
   inviting.value = true;
@@ -103,12 +112,14 @@ const submitInvite = async () => {
       plan_id: invitePlanId.value,
       trial_ends_at: new Date(inviteTrialEndsAt.value).toISOString(),
     });
-    toast.success(`Invitation sent to ${inviteEmail.value.trim()}`);
+    toast.success(
+      t("admin.invitations.sent", { email: inviteEmail.value.trim() }),
+    );
     inviteOpen.value = false;
     table.value?.refresh();
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || "Failed to create invitation");
+    toast.error(err.data?.message || t("admin.invitations.createFailed"));
   } finally {
     inviting.value = false;
   }
@@ -118,10 +129,12 @@ const submitInvite = async () => {
 <template>
   <div class="space-y-6 pb-10">
     <div class="flex items-center justify-between gap-4">
-      <p class="text-sm text-muted-foreground">Pending platform invitations.</p>
+      <p class="text-sm text-muted-foreground">
+        {{ t("admin.invitations.description") }}
+      </p>
       <Button v-if="isSuperAdmin" size="sm" @click="openInvite">
         <Icon name="lucide:user-plus" class="h-4 w-4" />
-        Invite user
+        {{ t("admin.invitations.inviteUser") }}
       </Button>
     </div>
 
@@ -135,14 +148,14 @@ const submitInvite = async () => {
     <Dialog v-model:open="inviteOpen">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Invite user</DialogTitle>
+          <DialogTitle>{{ t("admin.invitations.inviteUser") }}</DialogTitle>
           <DialogDescription>
-            Send a platform invitation with a trial period.
+            {{ t("admin.invitations.dialogDescription") }}
           </DialogDescription>
         </DialogHeader>
         <div class="space-y-4 py-2">
           <div class="space-y-2">
-            <Label for="invite-email">Email</Label>
+            <Label for="invite-email">{{ t("admin.invitations.email") }}</Label>
             <Input
               id="invite-email"
               v-model="inviteEmail"
@@ -151,12 +164,14 @@ const submitInvite = async () => {
             />
           </div>
           <div class="space-y-2">
-            <Label for="invite-plan">Plan</Label>
+            <Label for="invite-plan">{{ t("admin.invitations.plan") }}</Label>
             <Select v-model="invitePlanId">
               <SelectTrigger id="invite-plan" class="w-full">
                 <SelectValue
                   :placeholder="
-                    plansLoading ? 'Loading plans…' : 'Select a plan'
+                    plansLoading
+                      ? t('admin.invitations.loadingPlans')
+                      : t('admin.invitations.selectPlan')
                   "
                 />
               </SelectTrigger>
@@ -171,12 +186,13 @@ const submitInvite = async () => {
               </SelectContent>
             </Select>
             <p class="text-xs text-muted-foreground">
-              The customer provides their name and password when they accept the
-              invite.
+              {{ t("admin.invitations.acceptHint") }}
             </p>
           </div>
           <div class="space-y-2">
-            <Label for="invite-trial">Trial end date</Label>
+            <Label for="invite-trial">
+              {{ t("admin.invitations.trialEndDate") }}
+            </Label>
             <Input id="invite-trial" v-model="inviteTrialEndsAt" type="date" />
           </div>
         </div>
@@ -186,7 +202,7 @@ const submitInvite = async () => {
             :disabled="inviting"
             @click="inviteOpen = false"
           >
-            Cancel
+            {{ t("admin.common.cancel") }}
           </Button>
           <Button :disabled="inviting" @click="submitInvite">
             <Icon
@@ -194,7 +210,7 @@ const submitInvite = async () => {
               name="lucide:loader-2"
               class="h-4 w-4 animate-spin"
             />
-            Send invitation
+            {{ t("admin.invitations.send") }}
           </Button>
         </DialogFooter>
       </DialogContent>

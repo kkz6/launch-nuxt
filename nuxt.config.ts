@@ -13,7 +13,53 @@ export default defineNuxtConfig({
     "@nuxt/icon",
     "motion-v/nuxt",
     "@nuxt/content",
+    "@nuxtjs/i18n",
   ],
+
+  i18n: {
+    strategy: "no_prefix",
+    defaultLocale: "en",
+    langDir: "locales",
+    detectBrowserLanguage: false,
+    locales: [
+      {
+        code: "en",
+        language: "en-US",
+        name: "English",
+        files: [
+          "en/common.json",
+          "en/auth.json",
+          "en/settings.json",
+          "en/server.json",
+          "en/site.json",
+          "en/admin.json",
+          "en/public.json",
+          "en/data.json",
+          "en/shared.json",
+          "en/workload.json",
+          "en/operations.json",
+        ],
+      },
+      {
+        code: "ja",
+        language: "ja-JP",
+        name: "日本語",
+        files: [
+          "ja/common.json",
+          "ja/auth.json",
+          "ja/settings.json",
+          "ja/server.json",
+          "ja/site.json",
+          "ja/admin.json",
+          "ja/public.json",
+          "ja/data.json",
+          "ja/shared.json",
+          "ja/workload.json",
+          "ja/operations.json",
+        ],
+      },
+    ],
+  },
 
   css: ["~/assets/css/main.css"],
 

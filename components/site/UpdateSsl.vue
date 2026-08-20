@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
-import * as z from 'zod'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import { useForm } from "vee-validate";
+import { toTypedSchema } from "@vee-validate/zod";
+import * as z from "zod";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '~/components/ui/dialog'
+} from "~/components/ui/dialog";
 import {
   FormControl,
   FormDescription,
@@ -18,154 +18,177 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from '~/components/ui/form'
-import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group'
-import { Textarea } from '~/components/ui/textarea'
-import type { Site } from '~/types'
+} from "~/components/ui/form";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
+import { Textarea } from "~/components/ui/textarea";
+import type { Site } from "~/types";
 
 interface Props {
-  serverId: string
-  site: Site
-  tlsOptions: Record<string, string>
+  serverId: string;
+  site: Site;
+  tlsOptions: Record<string, string>;
 }
 
-const props = defineProps<Props>()
+interface ActiveCertificate {
+  stored_certificate_id?: string | null;
+  private_key?: string;
+  certificate?: string;
+}
+
+interface SiteWithActiveCertificate extends Site {
+  activeCertificate?: ActiveCertificate;
+}
+
+const props = defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
-  updated: []
-}>()
+  updated: [];
+}>();
 
-const isOpen = ref(false)
-const isLoading = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const isOpen = ref(false);
+const isLoading = ref(false);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 // `stored` is a client-only label; the backend treats it as `custom`
 // with a stored_certificate_id. We submit `stored` and let the SSL
 // service coerce, so the UI can distinguish on round-trip if needed.
-const sslSchema = toTypedSchema(
-  z.object({
-    tls_setting: z.string(),
-    private_key: z.string().optional(),
-    certificate: z.string().optional(),
-    stored_certificate_id: z.string().optional().nullable(),
-  }).refine(
-    (data) => {
-      if (data.tls_setting === 'custom') {
-        return !!data.private_key || !!data.certificate
-      }
-      if (data.tls_setting === 'stored') {
-        return !!data.stored_certificate_id
-      }
-      return true
-    },
-    {
-      message: 'Pick a stored certificate (or paste one under Custom)',
-      path: ['stored_certificate_id'],
-    }
-  )
-)
+const sslSchema = computed(() =>
+  toTypedSchema(
+    z
+      .object({
+        tls_setting: z.string(),
+        private_key: z.string().optional(),
+        certificate: z.string().optional(),
+        stored_certificate_id: z.string().optional().nullable(),
+      })
+      .refine(
+        (data) => {
+          if (data.tls_setting === "custom") {
+            return !!data.private_key || !!data.certificate;
+          }
+          if (data.tls_setting === "stored") {
+            return !!data.stored_certificate_id;
+          }
+          return true;
+        },
+        {
+          message: t("site.ssl.storedRequired"),
+          path: ["stored_certificate_id"],
+        },
+      ),
+  ),
+);
 
 // Pre-pick the stored cert if the site's active certificate was
 // sourced from one — the FK rides on activeCertificate.stored_certificate_id.
-const initialStoredCertId
-  = (props.site as any).activeCertificate?.stored_certificate_id || null
+const activeCertificate = (props.site as SiteWithActiveCertificate)
+  .activeCertificate;
+const initialStoredCertId = activeCertificate?.stored_certificate_id || null;
 
 const initialTlsSetting = initialStoredCertId
-  ? 'stored'
-  : (props.site.tls_setting || 'auto')
+  ? "stored"
+  : props.site.tls_setting || "auto";
 
-const { handleSubmit, values, setFieldError, resetForm, setFieldValue } = useForm({
-  validationSchema: sslSchema,
-  validateOnMount: false,
-  initialValues: {
-    tls_setting: initialTlsSetting,
-    private_key: (props.site as any).activeCertificate?.private_key || '',
-    certificate: (props.site as any).activeCertificate?.certificate || '',
-    stored_certificate_id: initialStoredCertId,
-  },
-})
+const { handleSubmit, values, setFieldError, resetForm, setFieldValue } =
+  useForm({
+    validationSchema: sslSchema,
+    validateOnMount: false,
+    initialValues: {
+      tls_setting: initialTlsSetting,
+      private_key: activeCertificate?.private_key || "",
+      certificate: activeCertificate?.certificate || "",
+      stored_certificate_id: initialStoredCertId,
+    },
+  });
 
-const tlsLabels: Record<string, { label: string; description: string }> = {
+const tlsLabels = computed<
+  Record<string, { label: string; description: string }>
+>(() => ({
   auto: {
-    label: 'Automatic (Let\'s Encrypt)',
-    description: 'Automatically obtain and renew SSL certificates from Let\'s Encrypt',
+    label: t("site.ssl.automatic"),
+    description: t("site.ssl.automaticDescription"),
   },
   off: {
-    label: 'Disabled',
-    description: 'No SSL/TLS encryption. Site will only be accessible via HTTP',
+    label: t("site.ssl.disabled"),
+    description: t("site.ssl.disabledDescription"),
   },
   stored: {
-    label: 'Use a stored certificate',
-    description: 'Pick from your team\'s SSL Certificate library',
+    label: t("site.ssl.stored"),
+    description: t("site.ssl.storedDescription"),
   },
   custom: {
-    label: 'Custom certificate (paste once)',
-    description: 'Use your own SSL certificate and private key',
+    label: t("site.ssl.custom"),
+    description: t("site.ssl.customDescription"),
   },
-}
+}));
 
 const handleClose = (open = false) => {
-  isOpen.value = open
+  isOpen.value = open;
   if (!open) {
-    resetForm()
+    resetForm();
   }
-}
+};
 
 const onSubmit = handleSubmit(async (formValues) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Update SSL Settings',
-    description: 'Are you sure you want to update SSL settings? This may trigger a certificate reload.',
-    confirmText: 'Update',
-    cancelText: 'Cancel',
-  })
+    title: t("site.ssl.confirmTitle"),
+    description: t("site.ssl.confirmDescription"),
+    confirmText: t("site.common.update"),
+    cancelText: t("site.common.cancel"),
+  });
 
   if (!result.ok) {
-    toast.info('Cancelled')
-    return
+    toast.info(t("site.common.cancelled"));
+    return;
   }
 
-  isLoading.value = true
+  isLoading.value = true;
 
   try {
     await $api(`/servers/${props.serverId}/sites/${props.site.id}/ssl`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: formValues,
-    })
-    toast.success('SSL settings updated')
-    handleClose(false)
-    emit('updated')
+    });
+    toast.success(t("site.ssl.updated"));
+    handleClose(false);
+    emit("updated");
   } catch (error: unknown) {
-    const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
+    const err = error as {
+      data?: { errors?: Record<string, string[]>; message?: string };
+    };
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        setFieldError(field as keyof typeof formValues, messages[0])
+        setFieldError(field as keyof typeof formValues, messages[0]);
       }
     } else {
-      toast.error(err.data?.message || 'Failed to update SSL settings')
+      toast.error(err.data?.message || t("site.ssl.updateFailed"));
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-})
+});
 </script>
 
 <template>
   <Dialog v-model:open="isOpen" @update:open="handleClose">
     <DialogTrigger as-child>
-      <Button>Update SSL</Button>
+      <Button>{{ t("site.ssl.update") }}</Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-2xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
       <DialogHeader>
-        <DialogTitle>SSL Certificate Settings</DialogTitle>
+        <DialogTitle>{{ t("site.ssl.title") }}</DialogTitle>
       </DialogHeader>
 
       <form class="space-y-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="tls_setting">
           <FormItem class="space-y-3">
-            <FormLabel>Certificate Settings</FormLabel>
+            <FormLabel>{{ t("site.ssl.certificateSettings") }}</FormLabel>
             <FormControl>
               <RadioGroup
                 v-bind="componentField"
@@ -197,11 +220,13 @@ const onSubmit = handleSubmit(async (formValues) => {
         <template v-if="values.tls_setting === 'stored'">
           <FormField name="stored_certificate_id">
             <FormItem>
-              <FormLabel>Stored certificate</FormLabel>
+              <FormLabel>{{ t("site.ssl.storedCertificate") }}</FormLabel>
               <FormControl>
                 <SharedCertificatePicker
                   :model-value="values.stored_certificate_id"
-                  @update:model-value="(v) => setFieldValue('stored_certificate_id', v)"
+                  @update:model-value="
+                    (v) => setFieldValue('stored_certificate_id', v)
+                  "
                 />
               </FormControl>
               <FormMessage />
@@ -212,7 +237,7 @@ const onSubmit = handleSubmit(async (formValues) => {
         <template v-if="values.tls_setting === 'custom'">
           <FormField v-slot="{ componentField }" name="private_key">
             <FormItem>
-              <FormLabel>Private Key</FormLabel>
+              <FormLabel>{{ t("site.ssl.privateKey") }}</FormLabel>
               <FormControl>
                 <Textarea
                   class="h-36 font-mono text-sm"
@@ -226,7 +251,7 @@ const onSubmit = handleSubmit(async (formValues) => {
 
           <FormField v-slot="{ componentField }" name="certificate">
             <FormItem>
-              <FormLabel>Certificate</FormLabel>
+              <FormLabel>{{ t("site.ssl.certificate") }}</FormLabel>
               <FormControl>
                 <Textarea
                   class="h-36 font-mono text-sm"
@@ -240,8 +265,12 @@ const onSubmit = handleSubmit(async (formValues) => {
         </template>
 
         <Button type="submit" :disabled="isLoading">
-          <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          Update SSL
+          <Icon
+            v-if="isLoading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          {{ t("site.ssl.update") }}
         </Button>
       </form>
     </DialogContent>

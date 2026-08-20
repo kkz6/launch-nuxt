@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ApplicationSchedules from "../../components/application/Schedules.vue";
 import ShowSchedulers from "../../components/server/ShowSchedulers.vue";
+import { createI18nStub } from "../helpers/i18n";
 
 const mocks = vi.hoisted(() => ({
   listSchedules: vi.fn(),
@@ -58,6 +59,7 @@ beforeEach(() => {
   vi.stubGlobal("useAuth", () => ({
     user: ref({ current_team_id: "team-1" }),
   }));
+  vi.stubGlobal("useI18n", createI18nStub);
   vi.stubGlobal("useDockerApplicationEvents", vi.fn());
   vi.stubGlobal("useServerModelEvents", vi.fn());
 });

@@ -5,20 +5,35 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
 } from "~/components/ui/dropdown-menu";
+import type { Team } from "~/types";
 import { duplicateTeamNames, teamQualifier } from "~/utils/teams";
 
 const { user, fetchUser } = useAuth();
+const { t } = useI18n();
 const { setCurrentTeamId } = useApi();
 const { refreshActiveTeam } = useActiveTeamRefresh();
 const { teams, loading, loadTeams } = useTeams();
 const createOpen = ref(false);
 const repeatedNames = computed(() => duplicateTeamNames(teams.value));
 
+const localizedTeamQualifier = (team: Team) => {
+  const [qualifier, suffix] = teamQualifier(
+    team,
+    String(user.value?.id || ""),
+    repeatedNames.value,
+  ).split(" · ");
+  const qualifierKey = qualifier.toLowerCase();
+  const label = ["personal", "owned", "joined"].includes(qualifierKey)
+    ? t(`common.teams.${qualifierKey}`)
+    : qualifier;
+  return suffix ? `${label} · ${suffix}` : label;
+};
+
 const fetchTeams = async () => {
   try {
     await loadTeams();
   } catch {
-    toast.error("Failed to load teams");
+    toast.error(t("common.teams.loadFailed"));
   }
 };
 
@@ -31,9 +46,13 @@ const switchTeam = async (teamId: string) => {
     await fetchUser();
     refreshActiveTeam();
     await navigateTo("/dashboard");
-    toast.success(`Switched to ${team?.name || "team"}`);
+    toast.success(
+      t("common.teams.switched", {
+        team: team?.name || t("common.teams.defaultName"),
+      }),
+    );
   } catch {
-    toast.error("Failed to switch team");
+    toast.error(t("common.teams.switchFailed"));
   }
 };
 
@@ -58,7 +77,7 @@ void fetchTeams();
         <span class="min-w-0 flex-1">
           <span class="block truncate">{{ team.name }}</span>
           <span class="block truncate text-[11px] text-muted-foreground">
-            {{ teamQualifier(team, String(user?.id || ""), repeatedNames) }}
+            {{ localizedTeamQualifier(team) }}
           </span>
         </span>
         <Check
@@ -71,7 +90,7 @@ void fetchTeams();
         @click="createOpen = true"
       >
         <Plus class="h-3.5 w-3.5" />
-        <span>New team</span>
+        <span>{{ t("common.teams.new") }}</span>
       </DropdownMenuItem>
     </DropdownMenuGroup>
     <SettingsCreateTeam v-model:open="createOpen" @created="loadTeams(true)" />

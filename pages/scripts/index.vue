@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
@@ -9,12 +8,13 @@ definePageMeta({
   middleware: "auth",
 });
 
-useHead({ title: "Scripts" });
+const { t } = useI18n();
+useHead({ title: () => t("operations.scripts.list.pageTitle") });
 
 interface Script {
   id: string;
   name: string;
-  run_as: 'root' | 'local';
+  run_as: "root" | "local";
   content: string;
   user_id: string;
   team_id: string | null;
@@ -28,10 +28,12 @@ const selectedScript = ref<Script | null>(null);
 const isEditDialogOpen = ref(false);
 const isRunDialogOpen = ref(false);
 const isHistoryDialogOpen = ref(false);
-const confirmationDialog = ref<InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null>(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 // Watch for refresh trigger from navbar
-const scriptsRefreshKey = useState('scriptsRefreshKey', () => 0);
+const scriptsRefreshKey = useState("scriptsRefreshKey", () => 0);
 watch(scriptsRefreshKey, () => {
   fetchScripts();
 });
@@ -41,17 +43,9 @@ const fetchScripts = async () => {
     const response = await $api<{ data: Script[] }>("/scripts");
     scripts.value = response.data;
   } catch {
-    toast.error("Failed to load scripts");
+    toast.error(t("operations.scripts.list.loadError"));
   } finally {
     isLoading.value = false;
-  }
-};
-
-const formatDate = (date: string): string => {
-  try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
-  } catch {
-    return "";
   }
 };
 
@@ -98,10 +92,12 @@ const deleteScript = async (script: Script) => {
   if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: "Delete Script",
-    description: `Are you sure you want to delete "${script.name}"? This action cannot be undone.`,
-    confirmText: "Delete",
-    cancelText: "Cancel",
+    title: t("operations.scripts.list.deleteConfirmationTitle"),
+    description: t("operations.scripts.list.deleteDescription", {
+      name: script.name,
+    }),
+    confirmText: t("operations.scripts.common.delete"),
+    cancelText: t("operations.scripts.common.cancel"),
     destructive: true,
   });
 
@@ -109,9 +105,9 @@ const deleteScript = async (script: Script) => {
     try {
       await $api(`/scripts/${script.id}`, { method: "DELETE" });
       scripts.value = scripts.value.filter((s) => s.id !== script.id);
-      toast.success("Script deleted");
+      toast.success(t("operations.scripts.list.deleted"));
     } catch {
-      toast.error("Failed to delete script");
+      toast.error(t("operations.scripts.list.deleteError"));
     }
   }
 };
@@ -159,8 +155,10 @@ onMounted(fetchScripts);
     >
       <Icon name="lucide:scroll-text" class="h-16 w-16 text-muted-foreground" />
       <div class="text-center">
-        <p class="font-medium">No scripts created yet</p>
-        <p class="text-sm text-muted-foreground">Create a script to run common tasks across your servers</p>
+        <p class="font-medium">{{ t("operations.scripts.list.emptyTitle") }}</p>
+        <p class="text-sm text-muted-foreground">
+          {{ t("operations.scripts.list.emptyDescription") }}
+        </p>
       </div>
     </div>
 
@@ -172,7 +170,9 @@ onMounted(fetchScripts);
       >
         <div class="flex items-start justify-between gap-3">
           <div class="flex items-start gap-3">
-            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted"
+            >
               <Icon
                 name="lucide:terminal"
                 class="h-5 w-5 text-muted-foreground"
@@ -182,11 +182,14 @@ onMounted(fetchScripts);
               <h3 class="font-semibold truncate">{{ script.name }}</h3>
             </div>
           </div>
-          <div class="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          <div
+            class="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100"
+          >
             <Button
               variant="ghost"
               size="icon"
-              title="Run Script"
+              :title="t('operations.scripts.list.runTitle')"
+              :aria-label="t('operations.scripts.list.runTitle')"
               @click.stop="runScript(script)"
             >
               <Icon name="lucide:play" class="h-4 w-4" />
@@ -194,7 +197,8 @@ onMounted(fetchScripts);
             <Button
               variant="ghost"
               size="icon"
-              title="History"
+              :title="t('operations.scripts.list.historyTitle')"
+              :aria-label="t('operations.scripts.list.historyTitle')"
               @click.stop="viewHistory(script)"
             >
               <Icon name="lucide:history" class="h-4 w-4" />
@@ -202,7 +206,8 @@ onMounted(fetchScripts);
             <Button
               variant="ghost"
               size="icon"
-              title="Edit"
+              :title="t('operations.scripts.list.editTitle')"
+              :aria-label="t('operations.scripts.list.editTitle')"
               @click.stop="editScript(script)"
             >
               <Icon name="lucide:pencil" class="h-4 w-4" />
@@ -210,7 +215,8 @@ onMounted(fetchScripts);
             <Button
               variant="ghost"
               size="icon"
-              title="Delete"
+              :title="t('operations.scripts.list.deleteTitle')"
+              :aria-label="t('operations.scripts.list.deleteTitle')"
               class="hover:bg-destructive/90 hover:text-white"
               @click.stop="deleteScript(script)"
             >
@@ -221,11 +227,13 @@ onMounted(fetchScripts);
 
         <div class="mt-4 flex items-center justify-between text-sm">
           <Badge variant="outline" class="text-xs">
-            {{ script.run_as === 'root' ? 'Root' : 'Captain' }}
+            {{
+              script.run_as === "root"
+                ? t("operations.scripts.common.root")
+                : t("operations.scripts.common.captain")
+            }}
           </Badge>
-          <span class="text-muted-foreground">
-            {{ formatDate(script.created_at) }}
-          </span>
+          <SharedDateTooltip :date="script.created_at" />
         </div>
       </div>
     </div>

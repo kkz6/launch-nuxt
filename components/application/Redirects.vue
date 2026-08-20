@@ -12,6 +12,7 @@ interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Per-app redirect list. The CreateRedirect dialog handles both
 // create AND edit (same shape the PHP site uses) — selectedRedirect
@@ -20,18 +21,23 @@ const redirects = ref<DockerApplicationRedirect[]>([]);
 const isLoading = ref(true);
 const selectedRedirect = ref<DockerApplicationRedirect | null>(null);
 const isEditDialogOpen = ref(false);
-const confirmationDialog = ref<
-  InstanceType<
-    typeof import("~/components/shared/ConfirmationDialog.vue").default
-  > | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
-const redirectTypeLabels: Record<number, string> = {
-  301: "Permanent (301)",
-  302: "Temporary (302)",
-  307: "Temporary (307)",
-  308: "Permanent (308)",
-};
+const redirectTypeLabels = computed<Record<number, string>>(() => ({
+  301: t("workload.redirects.permanent", { code: 301 }),
+  302: t("workload.redirects.temporary", { code: 302 }),
+  307: t("workload.redirects.temporary", { code: 307 }),
+  308: t("workload.redirects.permanent", { code: 308 }),
+}));
+
+const columns = computed(() => [
+  { key: "from", label: t("workload.redirects.from"), width: "30%" },
+  { key: "to", label: t("workload.redirects.to"), width: "35%" },
+  { key: "type", label: t("workload.fields.type"), width: "15%" },
+  { key: "created_at", label: t("workload.fields.created"), width: "20%" },
+]);
 
 const redirectTypeVariants: Record<
   number,
@@ -52,7 +58,7 @@ const fetchRedirects = async () => {
     );
     redirects.value = res.data;
   } catch {
-    toast.error("Failed to load redirects");
+    toast.error(t("workload.redirects.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -77,10 +83,12 @@ const deleteRedirect = async (redirect: DockerApplicationRedirect) => {
   if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: "Delete Redirect",
-    description: `Are you sure you want to delete the redirect from "${redirect.from}"?`,
-    confirmText: "Delete",
-    cancelText: "Cancel",
+    title: t("workload.redirects.deleteTitle"),
+    description: t("workload.redirects.deleteDescription", {
+      from: redirect.from,
+    }),
+    confirmText: t("workload.actions.delete"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
   });
 
@@ -93,9 +101,9 @@ const deleteRedirect = async (redirect: DockerApplicationRedirect) => {
       redirect.id,
     );
     redirects.value = redirects.value.filter((r) => r.id !== redirect.id);
-    toast.success("Redirect deleted");
+    toast.success(t("workload.redirects.deleted"));
   } catch {
-    toast.error("Failed to delete redirect");
+    toast.error(t("workload.redirects.deleteFailed"));
   }
 };
 
@@ -120,9 +128,11 @@ onMounted(fetchRedirects);
 
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 class="text-lg font-semibold">Redirects</h3>
+        <h3 class="text-lg font-semibold">
+          {{ t("workload.redirects.title") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Manage URL redirects for this application
+          {{ t("workload.redirects.description") }}
         </p>
       </div>
       <ApplicationCreateRedirect
@@ -142,14 +152,9 @@ onMounted(fetchRedirects);
     <template v-else>
       <SharedDataTable
         :data="redirects"
-        :columns="[
-          { key: 'from', label: 'From', width: '30%' },
-          { key: 'to', label: 'To', width: '35%' },
-          { key: 'type', label: 'Type', width: '15%' },
-          { key: 'created_at', label: 'Created', width: '20%' },
-        ]"
-        empty-title="No redirects found"
-        empty-description="Create a redirect to forward URLs to a new location"
+        :columns="columns"
+        :empty-title="t('workload.redirects.emptyTitle')"
+        :empty-description="t('workload.redirects.emptyDescription')"
         empty-icon="lucide:corner-up-right"
       >
         <template #cell-from="{ row }">
@@ -177,7 +182,7 @@ onMounted(fetchRedirects);
           <Button
             variant="ghost"
             size="icon"
-            title="Edit"
+            :title="t('workload.actions.edit')"
             @click="editRedirect(item)"
           >
             <Icon name="lucide:pencil" class="h-4 w-4" />
@@ -185,7 +190,7 @@ onMounted(fetchRedirects);
           <Button
             variant="ghost"
             size="icon"
-            title="Delete"
+            :title="t('workload.actions.delete')"
             class="hover:bg-destructive/90 hover:text-white"
             @click="deleteRedirect(item)"
           >

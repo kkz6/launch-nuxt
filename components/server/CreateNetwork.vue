@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import * as z from 'zod'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import * as z from "zod";
+import { Button } from "~/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,190 +9,216 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from '~/components/ui/dialog'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
-import { RadioGroup, RadioGroupItem } from '~/components/ui/radio-group'
-import type { FirewallRule } from '~/types'
+} from "~/components/ui/dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "~/components/ui/radio-group";
+import type { FirewallRule } from "~/types";
 
 interface Props {
-  serverId: string
-  firewallRule?: FirewallRule | null
+  serverId: string;
+  firewallRule?: FirewallRule | null;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
-  created: []
-  updated: []
-}>()
+  created: [];
+  updated: [];
+}>();
 
-const isOpen = ref(false)
-const isLoading = ref(false)
-const errors = ref<Record<string, string>>({})
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const isOpen = ref(false);
+const isLoading = ref(false);
+const errors = ref<Record<string, string>>({});
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
-const actions: Record<string, string> = {
-  allow: 'Allow',
-  deny: 'Deny',
-}
+const actions = computed<Record<string, string>>(() => ({
+  allow: t("server.networkRule.allow"),
+  deny: t("server.networkRule.deny"),
+}));
 
 // Form values
-const name = ref('')
-const action = ref<'allow' | 'deny'>('allow')
-const port = ref('')
-const fromIpv4 = ref('')
+const name = ref("");
+const action = ref<"allow" | "deny">("allow");
+const port = ref("");
+const fromIpv4 = ref("");
 
-const isEditMode = computed(() => !!props.firewallRule)
+const isEditMode = computed(() => !!props.firewallRule);
 
 const isSSHRule = computed(() => {
-  if (!props.firewallRule) return false
-  return props.firewallRule.name.toLowerCase() === 'ssh' || props.firewallRule.port === '22'
-})
+  if (!props.firewallRule) return false;
+  return (
+    props.firewallRule.name.toLowerCase() === "ssh" ||
+    props.firewallRule.port === "22"
+  );
+});
 
 const hasPortChanged = computed(() => {
-  if (!props.firewallRule) return false
-  return port.value.trim() !== props.firewallRule.port
-})
+  if (!props.firewallRule) return false;
+  return port.value.trim() !== props.firewallRule.port;
+});
 
 const hasRuleChanged = computed(() => {
-  if (!props.firewallRule) return false
+  if (!props.firewallRule) return false;
   return (
     port.value.trim() !== props.firewallRule.port ||
     action.value !== props.firewallRule.action ||
     (fromIpv4.value.trim() || null) !== (props.firewallRule.from_ipv4 || null)
-  )
-})
+  );
+});
 
-const schema = z.object({
-  name: z.string().min(1, 'Name is required').max(255),
-  action: z.enum(['allow', 'deny']),
-  port: z.string().min(1, 'Port is required'),
-  from_ipv4: z.string().optional(),
-})
+const getSchema = () =>
+  z.object({
+    name: z.string().min(1, t("server.networkRule.nameRequired")).max(255),
+    action: z.enum(["allow", "deny"]),
+    port: z.string().min(1, t("server.networkRule.portRequired")),
+    from_ipv4: z.string().optional(),
+  });
 
 const canSubmit = computed(() => {
-  return name.value.trim().length > 0 && port.value.trim().length > 0 && !isLoading.value
-})
+  return (
+    name.value.trim().length > 0 &&
+    port.value.trim().length > 0 &&
+    !isLoading.value
+  );
+});
 
 const resetForm = () => {
-  name.value = props.firewallRule?.name || ''
-  action.value = (props.firewallRule?.action as 'allow' | 'deny') || 'allow'
-  port.value = props.firewallRule?.port || ''
-  fromIpv4.value = props.firewallRule?.from_ipv4 || ''
-  errors.value = {}
-}
+  name.value = props.firewallRule?.name || "";
+  action.value = (props.firewallRule?.action as "allow" | "deny") || "allow";
+  port.value = props.firewallRule?.port || "";
+  fromIpv4.value = props.firewallRule?.from_ipv4 || "";
+  errors.value = {};
+};
 
 const validate = () => {
-  const result = schema.safeParse({
+  const result = getSchema().safeParse({
     name: name.value.trim(),
     action: action.value,
     port: port.value.trim(),
     from_ipv4: fromIpv4.value.trim() || undefined,
-  })
+  });
   if (!result.success) {
-    const fieldErrors = result.error.flatten().fieldErrors
+    const fieldErrors = result.error.flatten().fieldErrors;
     errors.value = {
-      name: fieldErrors.name?.[0] || '',
-      port: fieldErrors.port?.[0] || '',
-    }
-    return null
+      name: fieldErrors.name?.[0] || "",
+      port: fieldErrors.port?.[0] || "",
+    };
+    return null;
   }
-  errors.value = {}
-  return result.data
-}
+  errors.value = {};
+  return result.data;
+};
 
 const updateServerSSHPort = async (newPort: string) => {
   try {
     await $api(`/servers/${props.serverId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: { ssh_port: parseInt(newPort, 10) },
-    })
+    });
   } catch {
-    toast.error('Failed to update server SSH port. Please update it manually in server settings.')
+    toast.error(t("server.networkRule.sshPortUpdateFailed"));
   }
-}
+};
 
 const onSubmit = async () => {
-  const data = validate()
-  if (!data) return
+  const data = validate();
+  if (!data) return;
 
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   // Build confirmation message
   let description = isEditMode.value
-    ? 'Are you sure you want to update this firewall rule?'
-    : 'Are you sure you want to create this firewall rule?'
+    ? t("server.networkRule.updateConfirm")
+    : t("server.networkRule.createConfirm");
 
   if (isEditMode.value && isSSHRule.value && hasPortChanged.value) {
-    description = `You are changing the SSH port from ${props.firewallRule!.port} to ${port.value.trim()}. The server's SSH connection port will also be updated. Make sure the server's SSH daemon is already configured to listen on port ${port.value.trim()} before proceeding.`
+    description = t("server.networkRule.sshPortConfirm", {
+      oldPort: props.firewallRule!.port,
+      newPort: port.value.trim(),
+    });
   }
 
   const result = await confirmationDialog.value.show({
-    title: isEditMode.value ? 'Update Network Rule' : 'Create Network Rule',
+    title: isEditMode.value
+      ? t("server.networkRule.updateTitle")
+      : t("server.networkRule.createTitle"),
     description,
-    confirmText: isEditMode.value ? 'Update' : 'Create',
-    cancelText: 'Cancel',
+    confirmText: isEditMode.value
+      ? t("server.common.update")
+      : t("server.common.create"),
+    cancelText: t("server.common.cancel"),
     destructive: isEditMode.value && isSSHRule.value && hasPortChanged.value,
-  })
+  });
 
-  if (!result.ok) return
+  if (!result.ok) return;
 
-  isLoading.value = true
+  isLoading.value = true;
   try {
     if (isEditMode.value && props.firewallRule) {
       if (hasRuleChanged.value) {
         // Port, action, or IP changed — create new rule first, then delete old
         await $api(`/servers/${props.serverId}/firewall-rules`, {
-          method: 'POST',
+          method: "POST",
           body: data,
-        })
-        await $api(`/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`, {
-          method: 'DELETE',
-        })
+        });
+        await $api(
+          `/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`,
+          {
+            method: "DELETE",
+          },
+        );
 
         // Update server SSH port if this is the SSH rule and port changed
         if (isSSHRule.value && hasPortChanged.value) {
-          await updateServerSSHPort(data.port)
+          await updateServerSSHPort(data.port);
         }
       } else {
         // Only name changed — server route is registered as PUT
         // (UpdateNested), not PATCH; sending PATCH used to come back
         // 405 Method Not Allowed and the UI toasted a generic
         // "Failed to update firewall rule".
-        await $api(`/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`, {
-          method: 'PUT',
-          body: { name: data.name },
-        })
+        await $api(
+          `/servers/${props.serverId}/firewall-rules/${props.firewallRule.id}`,
+          {
+            method: "PUT",
+            body: { name: data.name },
+          },
+        );
       }
-      toast.success('Firewall rule updated successfully')
-      emit('updated')
+      toast.success(t("server.networkRule.updated"));
+      emit("updated");
     } else {
       await $api(`/servers/${props.serverId}/firewall-rules`, {
-        method: 'POST',
+        method: "POST",
         body: data,
-      })
-      toast.success('Firewall rule created successfully')
-      emit('created')
+      });
+      toast.success(t("server.networkRule.created"));
+      emit("created");
     }
-    isOpen.value = false
-    resetForm()
+    isOpen.value = false;
+    resetForm();
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'An error occurred')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("server.common.errorOccurred"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 watch(isOpen, (open) => {
   if (open) {
-    resetForm()
+    resetForm();
   }
-})
+});
 
 defineExpose({
-  open: () => { isOpen.value = true },
-})
+  open: () => {
+    isOpen.value = true;
+  },
+});
 </script>
 
 <template>
@@ -201,14 +227,22 @@ defineExpose({
       <slot>
         <Button>
           <Icon name="lucide:network" class="mr-2 h-4 w-4" />
-          {{ firewallRule ? 'Edit Rule' : 'Add Firewall Rule' }}
+          {{
+            firewallRule
+              ? t("server.networkRule.edit")
+              : t("server.networkRule.add")
+          }}
         </Button>
       </slot>
     </DialogTrigger>
     <DialogContent class="sm:max-w-3xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
       <DialogHeader>
-        <DialogTitle>{{ firewallRule ? 'Update' : 'Create' }} Network Rule</DialogTitle>
+        <DialogTitle>{{
+          firewallRule
+            ? t("server.networkRule.updateTitle")
+            : t("server.networkRule.createTitle")
+        }}</DialogTitle>
       </DialogHeader>
 
       <!-- SSH port warning -->
@@ -219,56 +253,73 @@ defineExpose({
         <div class="flex items-start gap-2">
           <Icon name="lucide:triangle-alert" class="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            Changing the SSH port will also update the server's stored SSH port.
-            Ensure the server's SSH daemon is already listening on the new port before saving.
+            {{ t("server.networkRule.sshPortWarning") }}
           </p>
         </div>
       </div>
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
-          <Label for="name">Name</Label>
+          <Label for="name">{{ t("server.common.name") }}</Label>
           <Input
             id="name"
             v-model="name"
-            placeholder="Enter the name"
+            :placeholder="t('server.networkRule.namePlaceholder')"
           />
-          <p v-if="errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
+          <p v-if="errors.name" class="text-sm text-destructive">
+            {{ errors.name }}
+          </p>
         </div>
 
         <div class="space-y-2">
-          <Label>Action</Label>
+          <Label>{{ t("server.common.action") }}</Label>
           <RadioGroup v-model="action" class="flex gap-4">
-            <div v-for="(label, value) in actions" :key="value" class="flex items-center space-x-2">
+            <div
+              v-for="(label, value) in actions"
+              :key="value"
+              class="flex items-center space-x-2"
+            >
               <RadioGroupItem :id="`action-${value}`" :value="value" />
-              <Label :for="`action-${value}`" class="font-normal">{{ label }}</Label>
+              <Label :for="`action-${value}`" class="font-normal">{{
+                label
+              }}</Label>
             </div>
           </RadioGroup>
         </div>
 
         <div class="space-y-2">
-          <Label for="port">Port</Label>
+          <Label for="port">{{ t("server.networkRule.port") }}</Label>
           <Input
             id="port"
             v-model="port"
-            placeholder="e.g., 80 or 8080-8090"
+            :placeholder="t('server.networkRule.portPlaceholder')"
           />
-          <p v-if="errors.port" class="text-sm text-destructive">{{ errors.port }}</p>
+          <p v-if="errors.port" class="text-sm text-destructive">
+            {{ errors.port }}
+          </p>
         </div>
 
         <div class="space-y-2">
-          <Label for="from_ipv4">From IP (optional)</Label>
+          <Label for="from_ipv4">{{ t("server.networkRule.fromIp") }}</Label>
           <Input
             id="from_ipv4"
             v-model="fromIpv4"
-            placeholder="e.g., 192.168.1.0/24"
+            :placeholder="t('server.networkRule.fromIpPlaceholder')"
           />
         </div>
 
         <DialogFooter>
           <Button type="submit" :disabled="!canSubmit">
-            <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-            {{ firewallRule ? 'Update' : 'Create' }}
+            <Icon
+              v-if="isLoading"
+              name="lucide:loader-2"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            {{
+              firewallRule
+                ? t("server.common.update")
+                : t("server.common.create")
+            }}
           </Button>
         </DialogFooter>
       </form>

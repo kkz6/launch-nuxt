@@ -27,6 +27,7 @@ interface Props {
   projectId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   "update:open": [value: boolean];
   created: [c: DockerCompose];
@@ -136,15 +137,9 @@ const filteredRepositories = computed(() => {
   const q = repositorySearchTerm.value.toLowerCase();
   return repositories.value.filter(
     (r) =>
-      r.full_name.toLowerCase().includes(q) ||
-      r.name.toLowerCase().includes(q),
+      r.full_name.toLowerCase().includes(q) || r.name.toLowerCase().includes(q),
   );
 });
-
-// `selectedSourceControl` shown next to the picker (label + icon).
-const selectedSourceControl = computed(() =>
-  sourceControls.value.find((sc) => sc.id === sourceControlId.value) ?? null,
-);
 
 // ---- lifecycle ---------------------------------------------------------
 watch(isOpen, (open) => {
@@ -172,7 +167,7 @@ watch(isOpen, (open) => {
 const submit = async () => {
   const trimmedName = name.value.trim();
   if (!trimmedName) {
-    toast.error("Name is required");
+    toast.error(t("workload.validation.nameRequired"));
     return;
   }
 
@@ -198,17 +193,19 @@ const submit = async () => {
     }
     const branch = gitBranch.value.trim();
     if (!repoUrl || !branch) {
-      toast.error("Pick a repository and branch");
+      toast.error(t("workload.compose.create.repositoryAndBranchRequired"));
       return;
     }
     if (gitBuildLocation.value === "github_actions" && !sourceControlId.value) {
-      toast.error("GitHub Actions builds require a connected GitHub source control");
+      toast.error(t("workload.githubActions.connectedSourceRequired"));
       return;
     }
     payload.git = {
       repo: repoUrl,
       branch,
-      ...(sourceControlId.value ? { source_control_id: sourceControlId.value } : {}),
+      ...(sourceControlId.value
+        ? { source_control_id: sourceControlId.value }
+        : {}),
       ...(composeFilePath.value.trim()
         ? { compose_file_path: composeFilePath.value.trim() }
         : {}),
@@ -218,7 +215,7 @@ const submit = async () => {
     };
   } else {
     if (!rawYAML.value.trim()) {
-      toast.error("Paste a docker-compose YAML body");
+      toast.error(t("workload.compose.create.yamlRequired"));
       return;
     }
     payload.raw_yaml = { contents: rawYAML.value };
@@ -228,7 +225,9 @@ const submit = async () => {
   // the user picked at least one — sending an empty array would be
   // a no-op anyway, but omitting keeps the wire small.
   if (selectedRegistryCredentialIds.value.size > 0) {
-    payload.registry_credential_ids = Array.from(selectedRegistryCredentialIds.value);
+    payload.registry_credential_ids = Array.from(
+      selectedRegistryCredentialIds.value,
+    );
   }
 
   isSubmitting.value = true;
@@ -238,11 +237,11 @@ const submit = async () => {
       props.projectId,
       payload,
     );
-    toast.success("Compose stack created");
+    toast.success(t("workload.compose.create.success"));
     emit("created", res.data);
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to create compose stack");
+    toast.error(e.data?.message || t("workload.compose.create.failed"));
   } finally {
     isSubmitting.value = false;
   }
@@ -253,35 +252,43 @@ const submit = async () => {
   <Dialog v-model:open="isOpen">
     <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
       <DialogHeader>
-        <DialogTitle>New Compose Stack</DialogTitle>
+        <DialogTitle>{{ t("workload.compose.create.title") }}</DialogTitle>
         <DialogDescription>
-          Register a docker-compose stack. Source can be a git repo
-          (via a connected Git provider for private repos, or a public
-          URL) or a YAML body pasted inline. To route through Traefik,
-          declare <code>launch-network</code> as
-          <code>external: true</code> on services you want exposed.
+          {{ t("workload.compose.create.descriptionBeforeNetwork") }}
+          <code>launch-network</code>
+          {{ t("workload.compose.create.descriptionBetweenCode") }}
+          <code>external: true</code>
+          {{ t("workload.compose.create.descriptionAfterExternal") }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="space-y-4" @submit.prevent="submit">
         <div class="space-y-2">
-          <Label for="compose-name">Name</Label>
+          <Label for="compose-name">{{ t("workload.fields.name") }}</Label>
           <Input
             id="compose-name"
             v-model="name"
-            placeholder="e.g. monitoring, db-stack"
+            :placeholder="t('workload.compose.create.namePlaceholder')"
             autocomplete="off"
             required
           />
         </div>
 
         <div class="space-y-2">
-          <Label>Source</Label>
+          <Label>{{ t("workload.fields.source") }}</Label>
           <div class="grid grid-cols-2 gap-2">
             <button
               v-for="opt in [
-                { value: 'git' as const, label: 'Git repository', icon: 'lucide:git-branch' },
-                { value: 'raw_yaml' as const, label: 'Paste YAML', icon: 'lucide:file-code' },
+                {
+                  value: 'git' as const,
+                  labelKey: 'gitRepository',
+                  icon: 'lucide:git-branch',
+                },
+                {
+                  value: 'raw_yaml' as const,
+                  labelKey: 'pasteYaml',
+                  icon: 'lucide:file-code',
+                },
               ]"
               :key="opt.value"
               type="button"
@@ -294,7 +301,7 @@ const submit = async () => {
               @click="sourceType = opt.value"
             >
               <Icon :name="opt.icon" class="h-5 w-5" />
-              {{ opt.label }}
+              {{ t(`workload.sources.${opt.labelKey}`) }}
             </button>
           </div>
         </div>
@@ -310,30 +317,43 @@ const submit = async () => {
               name="lucide:triangle-alert"
               class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom"
             />
-            No Git provider connected. Paste a public repo URL below,
-            or connect GitHub / GitLab / Bitbucket in Settings &rarr;
-            Integrations to pick from a list.
+            {{ t("workload.git.noProviderConnected") }}
           </div>
 
           <div v-if="sourceControls.length > 0" class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-              <Label>Git provider</Label>
+              <Label>{{ t("workload.fields.gitProvider") }}</Label>
               <Select
                 :model-value="sourceControlId"
-                @update:model-value="(v) => handleSourceControlChange(v as string)"
+                @update:model-value="
+                  (v) => handleSourceControlChange(v as string)
+                "
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select git provider" />
+                  <SelectValue
+                    :placeholder="t('workload.git.selectProvider')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem v-for="sc in sourceControls" :key="sc.id" :value="sc.id">
+                  <SelectItem
+                    v-for="sc in sourceControls"
+                    :key="sc.id"
+                    :value="sc.id"
+                  >
                     <div class="flex items-center gap-2">
-                      <Icon :name="`simple-icons:${sc.provider}`" class="h-4 w-4" />
+                      <Icon
+                        :name="`simple-icons:${sc.provider}`"
+                        class="h-4 w-4"
+                      />
                       <span>
                         {{ sc.login }}
                         <span class="text-muted-foreground">
                           ({{ sc.repository_count }}
-                          {{ sc.repository_count === 1 ? 'repo' : 'repos' }})
+                          {{
+                            t("workload.git.repositoryCount", {
+                              count: sc.repository_count,
+                            })
+                          }})
                         </span>
                       </span>
                     </div>
@@ -343,25 +363,34 @@ const submit = async () => {
             </div>
 
             <div class="space-y-2">
-              <Label>Repository</Label>
+              <Label>{{ t("workload.fields.repository") }}</Label>
               <ComboboxRoot
                 v-model:search-term="repositorySearchTerm"
                 :model-value="selectedRepo"
                 :disabled="!sourceControlId || isLoadingRepositories"
                 :filter-function="(list: Repository[]) => list"
                 class="relative"
-                @update:model-value="(val: Repository | null) => val && handleRepoSelect(val)"
+                @update:model-value="
+                  (val: Repository | null) => val && handleRepoSelect(val)
+                "
               >
                 <ComboboxAnchor
                   class="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
                 >
                   <ComboboxInput
                     class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-                    :placeholder="isLoadingRepositories ? 'Loading...' : 'Search repository...'"
+                    :placeholder="
+                      isLoadingRepositories
+                        ? t('workload.actions.loading')
+                        : t('workload.git.searchRepository')
+                    "
                     :display-value="(repo: Repository) => repo?.name || ''"
                   />
                   <ComboboxTrigger class="flex items-center justify-center">
-                    <Icon name="lucide:chevron-down" class="h-4 w-4 opacity-50" />
+                    <Icon
+                      name="lucide:chevron-down"
+                      class="h-4 w-4 opacity-50"
+                    />
                   </ComboboxTrigger>
                 </ComboboxAnchor>
                 <ComboboxPortal>
@@ -370,8 +399,10 @@ const submit = async () => {
                     :side-offset="4"
                     class="z-[200] max-h-60 w-[--reka-combobox-trigger-width] overflow-hidden rounded-md border bg-popover shadow-md"
                   >
-                    <ComboboxEmpty class="py-6 text-center text-sm text-muted-foreground">
-                      No repository found.
+                    <ComboboxEmpty
+                      class="py-6 text-center text-sm text-muted-foreground"
+                    >
+                      {{ t("workload.git.noRepositoryFound") }}
                     </ComboboxEmpty>
                     <ComboboxGroup class="overflow-auto p-1">
                       <ComboboxItem
@@ -385,7 +416,9 @@ const submit = async () => {
                           <Icon name="lucide:check" class="h-4 w-4" />
                         </ComboboxItemIndicator>
                         <Icon
-                          :name="repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'"
+                          :name="
+                            repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'
+                          "
                           class="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
                         />
                         <span class="truncate">{{ repo.name }}</span>
@@ -400,7 +433,9 @@ const submit = async () => {
           <!-- Public URL fallback (always visible — quick path for
                public repos even when a provider is connected). -->
           <div v-if="!selectedRepo" class="space-y-2">
-            <Label for="compose-repo-url">Or paste a public repository URL</Label>
+            <Label for="compose-repo-url">{{
+              t("workload.git.pastePublicUrl")
+            }}</Label>
             <Input
               id="compose-repo-url"
               v-model="gitRepoFallback"
@@ -411,7 +446,9 @@ const submit = async () => {
 
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-              <Label for="compose-branch">Branch</Label>
+              <Label for="compose-branch">{{
+                t("workload.fields.branch")
+              }}</Label>
               <Input
                 id="compose-branch"
                 v-model="gitBranch"
@@ -420,7 +457,9 @@ const submit = async () => {
               />
             </div>
             <div class="space-y-2">
-              <Label for="compose-file">Compose file path</Label>
+              <Label for="compose-file">{{
+                t("workload.fields.composeFilePath")
+              }}</Label>
               <Input
                 id="compose-file"
                 v-model="composeFilePath"
@@ -428,7 +467,7 @@ const submit = async () => {
                 autocomplete="off"
               />
               <p class="text-xs text-muted-foreground">
-                Optional. Relative to the repository root.
+                {{ t("workload.compose.create.filePathHelp") }}
               </p>
             </div>
           </div>
@@ -442,7 +481,7 @@ const submit = async () => {
                still commits the workflow file but the matrix lands
                empty and the build job is skipped at run time. -->
           <div class="space-y-2 rounded-md border bg-muted/40 p-4">
-            <Label>Build location</Label>
+            <Label>{{ t("workload.fields.buildLocation") }}</Label>
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button
                 type="button"
@@ -456,11 +495,10 @@ const submit = async () => {
               >
                 <span class="flex items-center gap-2 text-sm font-medium">
                   <Icon name="lucide:server" class="h-4 w-4" />
-                  On the server
+                  {{ t("workload.application.create.onServer") }}
                 </span>
                 <span class="text-xs text-muted-foreground">
-                  Worker SSHes into the docker host and runs the compose
-                  build there. Default.
+                  {{ t("workload.compose.create.onServerDescription") }}
                 </span>
               </button>
               <button
@@ -475,11 +513,12 @@ const submit = async () => {
               >
                 <span class="flex items-center gap-2 text-sm font-medium">
                   <Icon name="simple-icons:github" class="h-4 w-4" />
-                  GitHub Actions
+                  {{ t("workload.githubActions.title") }}
                 </span>
                 <span class="text-xs text-muted-foreground">
-                  Matrix build per service with a <code>build:</code> in
-                  the compose file. Images push to GHCR.
+                  {{ t("workload.compose.create.githubActionsBeforeBuild") }}
+                  <code>build:</code>
+                  {{ t("workload.compose.create.githubActionsAfterBuild") }}
                 </span>
               </button>
             </div>
@@ -487,8 +526,11 @@ const submit = async () => {
               v-if="gitBuildLocation === 'github_actions' && !sourceControlId"
               class="text-xs text-amber-700 dark:text-amber-300"
             >
-              <Icon name="lucide:triangle-alert" class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom" />
-              Requires a connected GitHub source control above.
+              <Icon
+                name="lucide:triangle-alert"
+                class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom"
+              />
+              {{ t("workload.githubActions.connectedSourceRequired") }}
             </p>
 
             <!--
@@ -509,18 +551,18 @@ const submit = async () => {
             >
               <div class="mb-1 flex items-center gap-1.5 font-medium">
                 <Icon name="lucide:check-circle" class="h-3.5 w-3.5" />
-                Private GHCR packages work automatically
+                {{ t("workload.githubActions.privatePackagesTitle") }}
               </div>
               <p class="text-emerald-900/90 dark:text-emerald-200/90">
-                Each workflow run mints a short-lived
-                (<span class="font-mono">~1 hour</span>) GHCR pull
-                token scoped to this repository and includes it in
-                the deploy callback. One bearer covers every service
-                image since they share the same
-                <span class="font-mono">ghcr.io/&lt;owner&gt;/&lt;repo&gt;</span>
-                namespace. Keep your packages
-                <span class="font-mono">Private</span> — no PAT, no
-                visibility flip needed.
+                {{ t("workload.compose.create.privatePackagesBeforeDuration") }}
+                <span class="font-mono">~1 hour</span>
+                {{
+                  t("workload.compose.create.privatePackagesBeforeNamespace")
+                }}
+                <span class="font-mono"
+                  >ghcr.io/&lt;owner&gt;/&lt;repo&gt;</span
+                >
+                {{ t("workload.compose.create.privatePackagesAfterNamespace") }}
               </p>
             </div>
           </div>
@@ -536,8 +578,7 @@ const submit = async () => {
             placeholder="version: '3'&#10;services:&#10;  web:&#10;    image: nginx:1.27"
           />
           <p class="text-xs text-muted-foreground">
-            Stored as-is. Redeploy uses the same YAML — edit the stack
-            to change it. Cap is 128 KB.
+            {{ t("workload.compose.create.yamlHelp") }}
           </p>
         </div>
 
@@ -550,21 +591,25 @@ const submit = async () => {
         -->
         <div class="space-y-2 rounded-md border bg-muted/20 p-3">
           <div class="flex items-center justify-between">
-            <Label class="text-sm font-medium">Registry credentials</Label>
+            <Label class="text-sm font-medium">
+              {{ t("workload.fields.registryCredentials") }}
+            </Label>
             <span class="text-[11px] text-muted-foreground">
-              {{ selectedRegistryCredentialIds.size }} selected
+              {{
+                t("workload.compose.create.selectedCount", {
+                  count: selectedRegistryCredentialIds.size,
+                })
+              }}
             </span>
           </div>
           <p class="text-[11px] text-muted-foreground">
-            Pick the saved registry logins this stack needs. Manage
-            them in Settings → Connections.
+            {{ t("workload.compose.create.registryHelp") }}
           </p>
           <div
             v-if="registryCredentials.length === 0"
             class="rounded border border-dashed p-3 text-center text-[11px] text-muted-foreground"
           >
-            No saved registry credentials yet — all images in this
-            stack must be public.
+            {{ t("workload.compose.create.noRegistryCredentials") }}
           </div>
           <div v-else class="space-y-1">
             <button
@@ -592,7 +637,7 @@ const submit = async () => {
                   {{ c.name }}
                 </div>
                 <p class="ml-5 text-[11px] text-muted-foreground">
-                  {{ c.registry_url || 'Docker Hub' }} · {{ c.username }}
+                  {{ c.registry_url || "Docker Hub" }} · {{ c.username }}
                 </p>
               </div>
             </button>
@@ -606,7 +651,7 @@ const submit = async () => {
             :disabled="isSubmitting"
             @click="isOpen = false"
           >
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="isSubmitting">
             <Icon
@@ -614,7 +659,7 @@ const submit = async () => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Create Compose Stack
+            {{ t("workload.compose.create.submit") }}
           </Button>
         </DialogFooter>
       </form>

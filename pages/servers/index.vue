@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
 import { storeToRefs } from "pinia";
 import { toast } from "vue-sonner";
 import type { Server } from "~/types";
@@ -17,9 +18,9 @@ definePageMeta({
   middleware: "auth",
 });
 
-useHead({
-  title: "Servers",
-});
+const { t, locale } = useI18n();
+const dateFnsLocale = computed(() => (locale.value === "ja" ? ja : enUS));
+useHead(() => ({ title: t("server.list.title") }));
 
 // Pinia store owns: the servers list, the WS subscription, and event-
 // driven mutations. We just read from it. Compare with the old code
@@ -50,7 +51,7 @@ const openLogsDialog = (server: Server) => {
 // <component :is="'NuxtLink'"> dynamic-component pattern silently dropped
 // NuxtLink's navigation wiring, leaving cards visually clickable but inert.
 const onCardClick = (server: Server) => {
-  if (server.status !== 'running') return;
+  if (server.status !== "running") return;
   cacheServer(server);
   navigateTo(`/servers/${server.id}`);
 };
@@ -64,11 +65,11 @@ const handleServerDeleted = (serverId: string) => {
 const handleRetryProvision = async (server: Server) => {
   try {
     await serverService.retryProvision(server.id);
-    toast.success("Provisioning has been queued");
+    toast.success(t("server.list.provisionQueued"));
     await serversStore.fetchAll();
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || "Failed to retry provisioning");
+    toast.error(err.data?.message || t("server.list.retryProvisionFailed"));
   }
 };
 
@@ -80,11 +81,13 @@ const handleConnected = async () => {
 
 // Check if server needs pending actions UI
 const needsPendingActions = (server: Server): boolean => {
-  return ['new', 'starting', 'failed', 'awaiting_connection'].includes(server.status);
+  return ["new", "starting", "failed", "awaiting_connection"].includes(
+    server.status,
+  );
 };
 
 // Watch for refresh trigger (e.g., after team switch)
-const serversRefreshKey = useState('serversRefreshKey', () => 0);
+const serversRefreshKey = useState("serversRefreshKey", () => 0);
 watch(serversRefreshKey, () => {
   serversStore.fetchAll();
 });
@@ -96,7 +99,8 @@ const getProviderIcon = (provider: string): string => {
   if (name.includes("linode")) return "simple-icons:linode";
   if (name.includes("vultr")) return "simple-icons:vultr";
   if (name.includes("aws")) return "simple-icons:amazonwebservices";
-  if (name.includes("google") || name.includes("gcp")) return "simple-icons:googlecloud";
+  if (name.includes("google") || name.includes("gcp"))
+    return "simple-icons:googlecloud";
   if (name.includes("azure")) return "simple-icons:microsoftazure";
   return "lucide:server";
 };
@@ -145,50 +149,75 @@ const getStatusColor = (server: Server): string => {
 };
 
 const getStatusLabel = (server: Server): string => {
-  if (server.status_label) return server.status_label;
-  const labels: Record<string, string> = {
-    running: "Running",
-    provisioning: "Provisioning",
-    new: "Creating",
-    starting: "Starting",
-    failed: "Failed",
-    deleting: "Deleting",
-    unknown: "Unknown",
-    awaiting_connection: "Awaiting Connection",
+  const keys: Record<string, string> = {
+    running: "running",
+    provisioning: "provisioning",
+    new: "new",
+    starting: "starting",
+    failed: "failed",
+    deleting: "deleting",
+    unknown: "unknown",
+    awaiting_connection: "awaitingConnection",
   };
-  return labels[server.status] || server.status;
+  const key = keys[server.status];
+  return key
+    ? t(`server.list.statuses.${key}`)
+    : server.status_label || server.status;
+};
+
+const getTypeLabel = (server: Server): string => {
+  const supported = ["php", "database", "loadbalancer", "docker"];
+  return supported.includes(server.type)
+    ? t(`server.list.types.${server.type}`)
+    : server.type_label || server.type;
 };
 
 const formatDate = (date: string): string => {
   try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
+    return formatDistanceToNow(new Date(date), {
+      addSuffix: true,
+      locale: dateFnsLocale.value,
+    });
   } catch {
     return "";
   }
 };
 
+const formatWorkloadCount = (count: number): string =>
+  t(count === 1 ? "server.list.oneWorkload" : "server.list.manyWorkloads", {
+    count,
+  });
+
+const formatSiteCount = (count: number): string =>
+  t(count === 1 ? "server.list.oneSite" : "server.list.manySites", {
+    count,
+  });
+
 // Auto-close provision dialogs when the selected server's status changes.
 // Reads directly from the store's reactive list — no local state to keep
 // in sync.
 watch(servers, (newServers) => {
-  if (!selectedServer.value) return
+  if (!selectedServer.value) return;
 
-  const updated = newServers.find(s => s.id === selectedServer.value!.id)
-  if (!updated) return
+  const updated = newServers.find((s) => s.id === selectedServer.value!.id);
+  if (!updated) return;
 
   // Close provision command dialog once the server moves past the
   // pre-connect states. Cloud servers start in 'new' and flip when the
   // wait-for-connect job sees SSH; custom servers start in
   // 'awaiting_connection' and flip when the user clicks Try Connection.
-  if (showProvisionDialog.value && !['new', 'awaiting_connection'].includes(updated.status)) {
-    showProvisionDialog.value = false
+  if (
+    showProvisionDialog.value &&
+    !["new", "awaiting_connection"].includes(updated.status)
+  ) {
+    showProvisionDialog.value = false;
   }
 
   // Close logs sheet when provisioning completes
-  if (showLogsDialog.value && updated.status === 'running') {
-    showLogsDialog.value = false
+  if (showLogsDialog.value && updated.status === "running") {
+    showLogsDialog.value = false;
   }
-})
+});
 
 // Cache server data for Navbar when navigating to detail page
 const { cacheServer } = useNavbarCache();
@@ -219,7 +248,10 @@ onMounted(() => {
       the first successful fetch and stays true, so subsequent refetches
       (from WS reconcile, manual retry, etc.) behave the same as before.
     -->
-    <div v-if="isLoading || !hasFetched" class="flex items-center justify-center py-12">
+    <div
+      v-if="isLoading || !hasFetched"
+      class="flex items-center justify-center py-12"
+    >
       <Icon
         name="lucide:loader-2"
         class="h-8 w-8 animate-spin text-muted-foreground"
@@ -232,8 +264,10 @@ onMounted(() => {
     >
       <Icon name="lucide:server" class="h-16 w-16 text-muted-foreground" />
       <div class="text-center">
-        <p class="font-medium">No servers added yet</p>
-        <p class="text-sm text-muted-foreground">Click on Create Server to get started</p>
+        <p class="font-medium">{{ t("server.list.emptyTitle") }}</p>
+        <p class="text-sm text-muted-foreground">
+          {{ t("server.list.emptyDescription") }}
+        </p>
       </div>
     </div>
 
@@ -246,13 +280,16 @@ onMounted(() => {
         v-for="server in servers"
         :key="server.id"
         class="group block h-full"
-        :class="server.status === 'running' ? 'cursor-pointer' : 'pointer-events-none'"
+        :class="
+          server.status === 'running' ? 'cursor-pointer' : 'pointer-events-none'
+        "
         @click="onCardClick(server)"
       >
         <div
           class="relative flex h-full flex-col rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
           :class="{
-            'border-destructive/30 bg-destructive/5': server.status === 'failed',
+            'border-destructive/30 bg-destructive/5':
+              server.status === 'failed',
             'opacity-60': server.status === 'unknown',
           }"
         >
@@ -268,11 +305,16 @@ onMounted(() => {
             v-else-if="server.status === 'new' || server.status === 'starting'"
             class="pointer-events-none absolute inset-0 overflow-hidden rounded-lg"
           >
-            <div class="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-primary/10 to-transparent" />
+            <div
+              class="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-primary/10 to-transparent"
+            />
           </div>
 
           <!-- Info icon - top right -->
-          <TooltipProvider v-if="server.status === 'running'" :delay-duration="0">
+          <TooltipProvider
+            v-if="server.status === 'running'"
+            :delay-duration="0"
+          >
             <Tooltip>
               <TooltipTrigger as-child>
                 <button
@@ -287,11 +329,15 @@ onMounted(() => {
                 <div class="space-y-2 text-xs">
                   <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5">
                     <template v-if="server.type_label">
-                      <span class="text-muted-foreground">Type</span>
-                      <span>{{ server.type_label }}</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.type")
+                      }}</span>
+                      <span>{{ getTypeLabel(server) }}</span>
                     </template>
                     <template v-if="server.operating_system_label">
-                      <span class="text-muted-foreground">OS</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.operatingSystemShort")
+                      }}</span>
                       <span>{{ server.operating_system_label }}</span>
                     </template>
                     <!--
@@ -303,42 +349,89 @@ onMounted(() => {
                       so the tooltip doesn't bloat.
                     -->
                     <template v-if="server.detected_os_id">
-                      <span class="text-muted-foreground">Detected</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.detected")
+                      }}</span>
                       <span>
-                        {{ server.detected_os_id }}<template v-if="server.detected_os_version"> {{ server.detected_os_version }}</template><template v-if="server.detected_os_version_codename"> ({{ server.detected_os_version_codename }})</template><template v-if="server.detected_arch"> · {{ server.detected_arch }}</template><template v-if="server.detected_kernel"> · kernel {{ server.detected_kernel }}</template>
+                        {{ server.detected_os_id
+                        }}<template v-if="server.detected_os_version">
+                          {{ server.detected_os_version }}</template
+                        ><template v-if="server.detected_os_version_codename">
+                          ({{ server.detected_os_version_codename }})</template
+                        ><template v-if="server.detected_arch">
+                          · {{ server.detected_arch }}</template
+                        ><template v-if="server.detected_kernel">
+                          ·
+                          {{
+                            t("server.list.detectedKernel", {
+                              kernel: server.detected_kernel,
+                            })
+                          }}</template
+                        >
                       </span>
                     </template>
                     <template v-if="server.cpu_cores">
-                      <span class="text-muted-foreground">CPU</span>
-                      <span>{{ server.cpu_cores }} cores</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.cpu")
+                      }}</span>
+                      <span>{{
+                        t("server.list.cores", { count: server.cpu_cores })
+                      }}</span>
                     </template>
                     <template v-if="server.memory_in_mb">
-                      <span class="text-muted-foreground">Memory</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.memory")
+                      }}</span>
                       <span>{{ server.memory_in_mb }} MB</span>
                     </template>
                     <template v-if="server.storage_in_gb">
-                      <span class="text-muted-foreground">Storage</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.storage")
+                      }}</span>
                       <span>{{ server.storage_in_gb }} GB</span>
                     </template>
                     <template v-if="server.ssh_port">
-                      <span class="text-muted-foreground">SSH Port</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.sshPort")
+                      }}</span>
                       <span>{{ server.ssh_port }}</span>
                     </template>
                     <template v-if="server.username">
-                      <span class="text-muted-foreground">User</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.user")
+                      }}</span>
                       <span>{{ server.username }}</span>
                     </template>
-                    <span class="text-muted-foreground">Connected</span>
-                    <span :class="server.connected ? 'text-green-500' : 'text-red-500'">
-                      {{ server.connected ? 'Yes' : 'No' }}
+                    <span class="text-muted-foreground">{{
+                      t("server.list.connected")
+                    }}</span>
+                    <span
+                      :class="
+                        server.connected ? 'text-green-500' : 'text-red-500'
+                      "
+                    >
+                      {{
+                        server.connected
+                          ? t("server.common.yes")
+                          : t("server.common.no")
+                      }}
                     </span>
                     <template v-if="server.services_count">
-                      <span class="text-muted-foreground">Services</span>
+                      <span class="text-muted-foreground">{{
+                        t("server.list.services")
+                      }}</span>
                       <span>{{ server.services_count }}</span>
                     </template>
                   </div>
-                  <p v-if="server.provisioned_at" class="border-t pt-1.5 text-muted-foreground">
-                    Provisioned {{ formatDate(server.provisioned_at) }}
+                  <p
+                    v-if="server.provisioned_at"
+                    class="border-t pt-1.5 text-muted-foreground"
+                  >
+                    {{
+                      t("server.list.provisioned", {
+                        date: formatDate(server.provisioned_at),
+                      })
+                    }}
                   </p>
                 </div>
               </TooltipContent>
@@ -367,16 +460,21 @@ onMounted(() => {
                 <span>{{ server.provider_label || server.provider }}</span>
                 <template v-if="isNonDefaultType(server)">
                   <span class="mx-1">·</span>
-                  <span>{{ server.type_label || server.type }}</span>
+                  <span>{{ getTypeLabel(server) }}</span>
                 </template>
               </p>
-              <p v-if="server.public_ipv4" class="text-sm text-muted-foreground truncate">
+              <p
+                v-if="server.public_ipv4"
+                class="text-sm text-muted-foreground truncate"
+              >
                 {{ server.public_ipv4 }}
               </p>
             </div>
           </div>
 
-          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+          <div
+            class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm"
+          >
             <div class="flex items-center gap-4">
               <div
                 v-if="server.status === 'running'"
@@ -392,15 +490,13 @@ onMounted(() => {
                 <template v-if="server.type === 'docker'">
                   <Icon name="lucide:container" class="h-3.5 w-3.5" />
                   <span>
-                    {{ server.workloads_count ?? 0 }}
-                    {{ (server.workloads_count ?? 0) === 1 ? 'workload' : 'workloads' }}
+                    {{ formatWorkloadCount(server.workloads_count ?? 0) }}
                   </span>
                 </template>
                 <template v-else>
                   <Icon name="lucide:globe" class="h-3.5 w-3.5" />
                   <span>
-                    {{ server.sites_count ?? 0 }}
-                    {{ (server.sites_count ?? 0) === 1 ? 'site' : 'sites' }}
+                    {{ formatSiteCount(server.sites_count ?? 0) }}
                   </span>
                 </template>
               </div>
@@ -410,7 +506,10 @@ onMounted(() => {
                   class="flex items-center gap-2 text-muted-foreground"
                 >
                   <span class="flex items-center gap-1.5">
-                    <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
+                    <Icon
+                      name="lucide:loader-2"
+                      class="h-3.5 w-3.5 animate-spin"
+                    />
                     {{ getStatusLabel(server) }}
                   </span>
                   <button
@@ -419,14 +518,17 @@ onMounted(() => {
                     @click.prevent.stop="openLogsDialog(server)"
                   >
                     <Icon name="lucide:terminal" class="h-3 w-3" />
-                    Logs
+                    {{ t("server.list.logs") }}
                   </button>
                 </span>
                 <span
                   v-else-if="server.status === 'deleting'"
                   class="flex items-center gap-1.5 text-muted-foreground"
                 >
-                  <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
+                  <Icon
+                    name="lucide:loader-2"
+                    class="h-3.5 w-3.5 animate-spin"
+                  />
                   {{ getStatusLabel(server) }}
                 </span>
                 <ServerPendingActions

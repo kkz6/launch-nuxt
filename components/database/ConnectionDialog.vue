@@ -19,6 +19,7 @@ interface Props {
   database: DockerDatabase;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const open = defineModel<boolean>("open", { default: false });
 
@@ -75,7 +76,9 @@ const reveal = async () => {
     });
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to load credentials");
+    toast.error(
+      e.data?.message || t("workload.database.connection.loadFailed"),
+    );
   } finally {
     isRevealing.value = false;
   }
@@ -95,9 +98,9 @@ const copyValue = async (label: string, value: string) => {
   if (!value) return;
   try {
     await copy(value);
-    toast.success(`${label} copied`);
+    toast.success(t("workload.copy.success", { label }));
   } catch {
-    toast.error(`Couldn't copy ${label}`);
+    toast.error(t("workload.copy.failed", { label }));
   }
 };
 
@@ -248,7 +251,7 @@ const onExposeToggle = (next: boolean) => {
 
 const saveExpose = async () => {
   if (exposeEnabled.value && !exposePort.value) {
-    toast.error("Port is required to expose this database");
+    toast.error(t("workload.database.connection.portRequired"));
     return;
   }
   exposeSaving.value = true;
@@ -264,12 +267,14 @@ const saveExpose = async () => {
     );
     toast.success(
       exposeEnabled.value
-        ? "Database is being recreated with the external port"
-        : "Database is being recreated without an external port",
+        ? t("workload.database.connection.enablingExternal")
+        : t("workload.database.connection.disablingExternal"),
     );
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update expose setting");
+    toast.error(
+      e.data?.message || t("workload.database.connection.exposeFailed"),
+    );
     exposeEnabled.value = Boolean(props.database.external_port);
     exposePort.value = props.database.external_port ?? undefined;
   } finally {
@@ -322,7 +327,9 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
     el.style.overflow = "";
     try {
       anim.cancel();
-    } catch {}
+    } catch {
+      // The animation may already have been cancelled by the browser.
+    }
   };
   anim.addEventListener("finish", cleanup, { once: true });
   anim.addEventListener("cancel", cleanup, { once: true });
@@ -335,14 +342,14 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
   <Dialog v-model:open="open">
     <DialogContent class="dialog-smooth-resize sm:max-w-2xl">
       <DialogHeader>
-        <DialogTitle>Connection</DialogTitle>
+        <DialogTitle>{{ t("workload.database.connection.title") }}</DialogTitle>
         <DialogDescription>
-          Connect to <span class="font-mono">{{ database.name }}</span> ({{
-            engineInfo.label
-          }}). Sibling containers reach the database over
-          <code class="font-mono text-xs">launch-network</code> via its
-          container name; external clients use the server's public IP when the
-          database exposes an external port.
+          {{
+            t("workload.database.connection.description", {
+              name: database.name,
+              engine: engineInfo.label,
+            })
+          }}
         </DialogDescription>
       </DialogHeader>
 
@@ -359,7 +366,7 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
             @click="setConnectionMode('internal')"
           >
             <Icon name="lucide:network" class="mr-1.5 inline h-3.5 w-3.5" />
-            Internal
+            {{ t("workload.database.connection.internal") }}
           </button>
           <button
             type="button"
@@ -373,12 +380,12 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
             :title="
               hasExternal
                 ? undefined
-                : 'No external port — enable it from the Advanced tab'
+                : t('workload.database.connection.noExternalPort')
             "
             @click="hasExternal && setConnectionMode('external')"
           >
             <Icon name="lucide:globe" class="mr-1.5 inline h-3.5 w-3.5" />
-            External
+            {{ t("workload.database.connection.external") }}
           </button>
         </div>
 
@@ -387,7 +394,7 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
             <p
               class="text-[11px] font-medium uppercase tracking-wide text-muted-foreground"
             >
-              Connection URL
+              {{ t("workload.database.connection.url") }}
             </p>
             <div class="flex items-center gap-1">
               <button
@@ -406,7 +413,13 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
                   :name="showPassword ? 'lucide:eye-off' : 'lucide:eye'"
                   class="h-3.5 w-3.5"
                 />
-                {{ revealed ? (showPassword ? "Hide" : "Show") : "Reveal" }}
+                {{
+                  revealed
+                    ? showPassword
+                      ? t("workload.actions.hide")
+                      : t("workload.actions.show")
+                    : t("workload.actions.reveal")
+                }}
               </button>
               <button
                 type="button"
@@ -414,13 +427,20 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
                 :disabled="urlCopyDisabled"
                 :title="
                   urlCopyDisabled
-                    ? 'Reveal credentials before copying'
-                    : 'Copy connection URL'
+                    ? t('workload.database.connection.revealBeforeCopy')
+                    : t('workload.copy.value', {
+                        label: t('workload.database.connection.url'),
+                      })
                 "
-                @click="copyValue('Connection URL', copyableConnectionURL)"
+                @click="
+                  copyValue(
+                    t('workload.database.connection.url'),
+                    copyableConnectionURL,
+                  )
+                "
               >
                 <Icon name="lucide:copy" class="h-3.5 w-3.5" />
-                Copy
+                {{ t("workload.actions.copy") }}
               </button>
             </div>
           </div>
@@ -433,7 +453,11 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
         <div class="divide-y rounded-lg border bg-card text-sm">
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
             <span class="text-muted-foreground">
-              {{ connectionMode === "external" ? "External Host" : "Host" }}
+              {{
+                connectionMode === "external"
+                  ? t("workload.database.connection.externalHost")
+                  : t("workload.fields.host")
+              }}
             </span>
             <code
               class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
@@ -442,15 +466,19 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
               <button
                 type="button"
                 class="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Copy host"
-                @click="copyValue('Host', activeHost)"
+                :title="
+                  t('workload.copy.value', { label: t('workload.fields.host') })
+                "
+                @click="copyValue(t('workload.fields.host'), activeHost)"
               >
                 <Icon name="lucide:copy" class="h-3 w-3" />
               </button>
             </code>
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
-            <span class="text-muted-foreground">Port</span>
+            <span class="text-muted-foreground">{{
+              t("workload.fields.port")
+            }}</span>
             <code
               class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
             >
@@ -458,15 +486,21 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
               <button
                 type="button"
                 class="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Copy port"
-                @click="copyValue('Port', String(activePort))"
+                :title="
+                  t('workload.copy.value', { label: t('workload.fields.port') })
+                "
+                @click="
+                  copyValue(t('workload.fields.port'), String(activePort))
+                "
               >
                 <Icon name="lucide:copy" class="h-3 w-3" />
               </button>
             </code>
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
-            <span class="text-muted-foreground">Database</span>
+            <span class="text-muted-foreground">{{
+              t("workload.database.connection.database")
+            }}</span>
             <code
               class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
             >
@@ -474,15 +508,26 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
               <button
                 type="button"
                 class="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Copy database"
-                @click="copyValue('Database', databaseName)"
+                :title="
+                  t('workload.copy.value', {
+                    label: t('workload.database.connection.database'),
+                  })
+                "
+                @click="
+                  copyValue(
+                    t('workload.database.connection.database'),
+                    databaseName,
+                  )
+                "
               >
                 <Icon name="lucide:copy" class="h-3 w-3" />
               </button>
             </code>
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
-            <span class="text-muted-foreground">User</span>
+            <span class="text-muted-foreground">{{
+              t("workload.database.connection.user")
+            }}</span>
             <code
               class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
             >
@@ -490,15 +535,23 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
               <button
                 type="button"
                 class="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                title="Copy user"
-                @click="copyValue('User', username)"
+                :title="
+                  t('workload.copy.value', {
+                    label: t('workload.database.connection.user'),
+                  })
+                "
+                @click="
+                  copyValue(t('workload.database.connection.user'), username)
+                "
               >
                 <Icon name="lucide:copy" class="h-3 w-3" />
               </button>
             </code>
           </div>
           <div class="grid grid-cols-3 items-center gap-2 px-3 py-2">
-            <span class="text-muted-foreground">Password</span>
+            <span class="text-muted-foreground">{{
+              t("workload.fields.password")
+            }}</span>
             <code
               class="col-span-2 flex items-center justify-between gap-2 font-mono text-xs"
             >
@@ -507,8 +560,12 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
                 type="button"
                 class="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 :disabled="!rawPassword"
-                title="Copy password"
-                @click="copyValue('Password', rawPassword)"
+                :title="
+                  t('workload.copy.value', {
+                    label: t('workload.fields.password'),
+                  })
+                "
+                @click="copyValue(t('workload.fields.password'), rawPassword)"
               >
                 <Icon name="lucide:copy" class="h-3 w-3" />
               </button>
@@ -519,14 +576,11 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
         <p class="text-xs text-muted-foreground">
           <template v-if="connectionMode === 'internal'">
             <Icon name="lucide:info" class="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
-            Use this from another container running on
-            <code class="font-mono">launch-network</code> (an application in the
-            same project, a worker, etc.).
+            {{ t("workload.database.connection.internalHelp") }}
           </template>
           <template v-else>
             <Icon name="lucide:info" class="-mt-0.5 mr-1 inline h-3.5 w-3.5" />
-            Reachable from outside the docker server. Make sure the host
-            firewall allows the external port.
+            {{ t("workload.database.connection.externalHelp") }}
           </template>
         </p>
 
@@ -539,13 +593,11 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
                   class="h-4 w-4 text-muted-foreground"
                 />
                 <Label class="text-sm font-medium">
-                  Expose to the internet
+                  {{ t("workload.database.connection.exposeTitle") }}
                 </Label>
               </div>
               <p class="text-xs text-muted-foreground">
-                Publish the database on the host's public IP so clients outside
-                the docker network can connect. Toggling triggers a container
-                recreate.
+                {{ t("workload.database.connection.exposeDescription") }}
               </p>
             </div>
             <Switch
@@ -565,7 +617,7 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
                 for="db-expose-port"
                 class="text-[11px] uppercase tracking-wide text-muted-foreground"
               >
-                External Port
+                {{ t("workload.database.general.externalPort") }}
               </Label>
               <Input
                 id="db-expose-port"
@@ -573,7 +625,10 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
                 type="number"
                 class="h-8 text-sm"
                 :disabled="!exposeEnabled"
-                :placeholder="defaultExposePort?.toString() || 'e.g. 5432'"
+                :placeholder="
+                  defaultExposePort?.toString() ||
+                  t('workload.database.connection.portPlaceholder')
+                "
                 autocomplete="off"
               />
             </div>
@@ -587,7 +642,7 @@ async function withSmoothResize<T>(fn: () => T | Promise<T>): Promise<T> {
                 name="lucide:loader-2"
                 class="mr-1.5 h-3.5 w-3.5 animate-spin"
               />
-              Save
+              {{ t("workload.actions.save") }}
             </Button>
           </div>
         </div>

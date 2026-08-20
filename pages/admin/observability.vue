@@ -20,13 +20,19 @@ definePageMeta({
   middleware: ["auth", "staff"],
 });
 
-setBreadcrumbs([
-  { label: "Admin", to: "/admin/overview" },
-  { label: "Observability" },
-]);
+const { locale, t } = useI18n();
+
+const applyBreadcrumb = (): void => {
+  setBreadcrumbs([
+    { label: t("admin.common.admin"), to: "/admin/overview" },
+    { label: t("admin.common.observability") },
+  ]);
+};
+applyBreadcrumb();
+watch(locale, applyBreadcrumb);
 
 useHead({
-  title: "Admin — Observability",
+  title: () => t("admin.observability.pageTitle"),
 });
 
 const snapshot = ref<ObservabilitySnapshot | null>(null);
@@ -40,7 +46,7 @@ const fetchSnapshot = async () => {
     snapshot.value = response.data;
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || "Failed to load observability data");
+    toast.error(err.data?.message || t("admin.observability.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -80,7 +86,7 @@ const poolUsagePercent = computed(() => {
   return Math.round((in_use / max_open) * 100);
 });
 
-const poolStatus = computed(() => {
+const poolStatus = computed<"destructive" | "warning" | "default">(() => {
   const pct = poolUsagePercent.value;
   if (pct >= 90) return "destructive";
   if (pct >= 70) return "warning";
@@ -95,19 +101,29 @@ const memoryPercent = computed(() => {
 });
 
 const formatDuration = (ms: number): string => {
-  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`;
-  if (ms < 1000) return `${ms.toFixed(1)}ms`;
-  return `${(ms / 1000).toFixed(2)}s`;
+  if (ms < 1) return `${formatDecimal(ms * 1000, 0)}µs`;
+  if (ms < 1000) return `${formatDecimal(ms, 1)}ms`;
+  return `${formatDecimal(ms / 1000, 2)}s`;
 };
 
 const formatTimestamp = (ts: string): string => {
   try {
     const d = new Date(ts);
-    return d.toLocaleTimeString();
+    return d.toLocaleTimeString(locale.value);
   } catch {
     return ts;
   }
 };
+
+const formatNumber = (value: number): string =>
+  value.toLocaleString(locale.value);
+
+function formatDecimal(value: number, digits: number): string {
+  return value.toLocaleString(locale.value, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
+}
 </script>
 
 <template>
@@ -115,9 +131,11 @@ const formatTimestamp = (ts: string): string => {
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-lg font-semibold">Observability</h2>
+        <h2 class="text-lg font-semibold">
+          {{ t("admin.observability.title") }}
+        </h2>
         <p class="text-sm text-muted-foreground">
-          Runtime metrics, query analysis, and N+1 detection
+          {{ t("admin.observability.description") }}
         </p>
       </div>
       <div class="flex items-center gap-3">
@@ -127,13 +145,13 @@ const formatTimestamp = (ts: string): string => {
             type="checkbox"
             class="rounded border-input"
           />
-          Auto-refresh (5s)
+          {{ t("admin.observability.autoRefresh", { seconds: 5 }) }}
         </label>
         <button
           class="rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent"
           @click="fetchSnapshot"
         >
-          Refresh
+          {{ t("admin.observability.refresh") }}
         </button>
       </div>
     </div>
@@ -151,7 +169,7 @@ const formatTimestamp = (ts: string): string => {
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Uptime
+              {{ t("admin.observability.uptime") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -162,12 +180,12 @@ const formatTimestamp = (ts: string): string => {
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Goroutines
+              {{ t("admin.observability.goroutines") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-xl font-bold">
-              {{ snapshot.runtime.goroutines.toLocaleString() }}
+              {{ formatNumber(snapshot.runtime.goroutines) }}
             </p>
           </CardContent>
         </Card>
@@ -175,12 +193,12 @@ const formatTimestamp = (ts: string): string => {
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Heap Alloc
+              {{ t("admin.observability.heapAlloc") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-xl font-bold">
-              {{ snapshot.runtime.heap_alloc_mb.toFixed(1) }} MB
+              {{ formatDecimal(snapshot.runtime.heap_alloc_mb, 1) }} MB
             </p>
             <Progress :model-value="memoryPercent" class="mt-2 h-1.5" />
           </CardContent>
@@ -189,15 +207,19 @@ const formatTimestamp = (ts: string): string => {
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              GC Pauses
+              {{ t("admin.observability.gcPauses") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-xl font-bold">
-              {{ snapshot.runtime.last_gc_pause_ms.toFixed(2) }}ms
+              {{ formatDecimal(snapshot.runtime.last_gc_pause_ms, 2) }}ms
             </p>
             <p class="text-xs text-muted-foreground">
-              {{ snapshot.runtime.num_gc }} cycles
+              {{
+                t("admin.observability.cycles", {
+                  count: formatNumber(snapshot.runtime.num_gc),
+                })
+              }}
             </p>
           </CardContent>
         </Card>
@@ -205,7 +227,7 @@ const formatTimestamp = (ts: string): string => {
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Avg Query
+              {{ t("admin.observability.avgQuery") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -213,7 +235,11 @@ const formatTimestamp = (ts: string): string => {
               {{ formatDuration(snapshot.queries.avg_ms) }}
             </p>
             <p class="text-xs text-muted-foreground">
-              {{ snapshot.queries.total }} total
+              {{
+                t("admin.observability.total", {
+                  count: formatNumber(snapshot.queries.total),
+                })
+              }}
             </p>
           </CardContent>
         </Card>
@@ -223,9 +249,15 @@ const formatTimestamp = (ts: string): string => {
       <Card>
         <CardHeader>
           <div class="flex items-center justify-between">
-            <CardTitle class="text-base">DB Connection Pool</CardTitle>
-            <Badge :variant="poolStatus as 'default' | 'destructive'">
-              {{ poolUsagePercent }}% used
+            <CardTitle class="text-base">
+              {{ t("admin.observability.dbConnectionPool") }}
+            </CardTitle>
+            <Badge :variant="poolStatus">
+              {{
+                t("admin.observability.percentUsed", {
+                  percent: formatNumber(poolUsagePercent),
+                })
+              }}
             </Badge>
           </div>
         </CardHeader>
@@ -235,31 +267,49 @@ const formatTimestamp = (ts: string): string => {
             class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
           >
             <div>
-              <p class="text-sm text-muted-foreground">Max Open</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.maxOpen") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.db_pool.max_open }}
+                {{ formatNumber(snapshot.db_pool.max_open) }}
               </p>
             </div>
             <div>
-              <p class="text-sm text-muted-foreground">Open</p>
-              <p class="text-lg font-semibold">{{ snapshot.db_pool.open }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">In Use</p>
-              <p class="text-lg font-semibold">{{ snapshot.db_pool.in_use }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">Idle</p>
-              <p class="text-lg font-semibold">{{ snapshot.db_pool.idle }}</p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">Wait Count</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.open") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.db_pool.wait_count }}
+                {{ formatNumber(snapshot.db_pool.open) }}
               </p>
             </div>
             <div>
-              <p class="text-sm text-muted-foreground">Wait Duration</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.inUse") }}
+              </p>
+              <p class="text-lg font-semibold">
+                {{ formatNumber(snapshot.db_pool.in_use) }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.idle") }}
+              </p>
+              <p class="text-lg font-semibold">
+                {{ formatNumber(snapshot.db_pool.idle) }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.waitCount") }}
+              </p>
+              <p class="text-lg font-semibold">
+                {{ formatNumber(snapshot.db_pool.wait_count) }}
+              </p>
+            </div>
+            <div>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.waitDuration") }}
+              </p>
               <p class="text-lg font-semibold">
                 {{ snapshot.db_pool.wait_duration }}
               </p>
@@ -272,44 +322,58 @@ const formatTimestamp = (ts: string): string => {
       <!-- Runtime Details -->
       <Card>
         <CardHeader>
-          <CardTitle class="text-base">Go Runtime</CardTitle>
+          <CardTitle class="text-base">
+            {{ t("admin.observability.goRuntime") }}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
             <div>
-              <p class="text-sm text-muted-foreground">Heap In Use</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.heapInUse") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.runtime.heap_inuse_mb.toFixed(1) }} MB
+                {{ formatDecimal(snapshot.runtime.heap_inuse_mb, 1) }} MB
               </p>
             </div>
             <div>
-              <p class="text-sm text-muted-foreground">Heap Objects</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.heapObjects") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.runtime.heap_objects_k.toFixed(1) }}K
+                {{ formatDecimal(snapshot.runtime.heap_objects_k, 1) }}K
               </p>
             </div>
             <div>
-              <p class="text-sm text-muted-foreground">Stack In Use</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.stackInUse") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.runtime.stack_inuse_mb.toFixed(1) }} MB
+                {{ formatDecimal(snapshot.runtime.stack_inuse_mb, 1) }} MB
               </p>
             </div>
             <div>
-              <p class="text-sm text-muted-foreground">System Memory</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.systemMemory") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.runtime.sys_mem_mb.toFixed(1) }} MB
+                {{ formatDecimal(snapshot.runtime.sys_mem_mb, 1) }} MB
               </p>
             </div>
             <div>
-              <p class="text-sm text-muted-foreground">GC CPU %</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.gcCpu") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.runtime.gc_cpu_percent.toFixed(3) }}%
+                {{ formatDecimal(snapshot.runtime.gc_cpu_percent, 3) }}%
               </p>
             </div>
             <div>
-              <p class="text-sm text-muted-foreground">CPUs</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("admin.observability.cpus") }}
+              </p>
               <p class="text-lg font-semibold">
-                {{ snapshot.runtime.num_cpu }}
+                {{ formatNumber(snapshot.runtime.num_cpu) }}
               </p>
             </div>
           </div>
@@ -320,31 +384,31 @@ const formatTimestamp = (ts: string): string => {
       <Tabs default-value="recent" class="space-y-4">
         <TabsList>
           <TabsTrigger value="recent">
-            Recent Queries
+            {{ t("admin.observability.recentQueries") }}
             <Badge variant="secondary" class="ml-2">
-              {{ snapshot.queries.total }}
+              {{ formatNumber(snapshot.queries.total) }}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="slow">
-            Slow Queries
+            {{ t("admin.observability.slowQueries") }}
             <Badge
               :variant="
                 snapshot.queries.slow_count > 0 ? 'destructive' : 'secondary'
               "
               class="ml-2"
             >
-              {{ snapshot.queries.slow_count }}
+              {{ formatNumber(snapshot.queries.slow_count) }}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="n1">
-            N+1 Detected
+            {{ t("admin.observability.n1Detected") }}
             <Badge
               :variant="
                 snapshot.queries.n1_count > 0 ? 'destructive' : 'secondary'
               "
               class="ml-2"
             >
-              {{ snapshot.queries.n1_count }}
+              {{ formatNumber(snapshot.queries.n1_count) }}
             </Badge>
           </TabsTrigger>
         </TabsList>
@@ -357,10 +421,12 @@ const formatTimestamp = (ts: string): string => {
                 <TableHeader>
                   <TableRow>
                     <TableHead class="w-[50%]">SQL</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Rows</TableHead>
-                    <TableHead>Caller</TableHead>
-                    <TableHead>Time</TableHead>
+                    <TableHead>{{
+                      t("admin.observability.duration")
+                    }}</TableHead>
+                    <TableHead>{{ t("admin.observability.rows") }}</TableHead>
+                    <TableHead>{{ t("admin.observability.caller") }}</TableHead>
+                    <TableHead>{{ t("admin.observability.time") }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -371,21 +437,17 @@ const formatTimestamp = (ts: string): string => {
                   >
                     <TableCell class="max-w-md truncate font-mono text-xs">
                       <Badge v-if="q.slow" variant="destructive" class="mr-1">
-                        SLOW
+                        {{ t("admin.observability.slowBadge") }}
                       </Badge>
-                      <Badge
-                        v-if="q.error"
-                        variant="destructive"
-                        class="mr-1"
-                      >
-                        ERR
+                      <Badge v-if="q.error" variant="destructive" class="mr-1">
+                        {{ t("admin.observability.errorBadge") }}
                       </Badge>
                       {{ q.sql }}
                     </TableCell>
                     <TableCell class="font-mono text-xs">
                       {{ formatDuration(q.duration_ns / 1000000) }}
                     </TableCell>
-                    <TableCell>{{ q.rows }}</TableCell>
+                    <TableCell>{{ formatNumber(q.rows) }}</TableCell>
                     <TableCell class="text-xs text-muted-foreground">
                       {{ q.caller }}
                     </TableCell>
@@ -398,7 +460,7 @@ const formatTimestamp = (ts: string): string => {
                       colspan="5"
                       class="py-8 text-center text-muted-foreground"
                     >
-                      No queries recorded yet.
+                      {{ t("admin.observability.noQueries") }}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -415,10 +477,12 @@ const formatTimestamp = (ts: string): string => {
                 <TableHeader>
                   <TableRow>
                     <TableHead class="w-[50%]">SQL</TableHead>
-                    <TableHead>Duration</TableHead>
-                    <TableHead>Rows</TableHead>
-                    <TableHead>Caller</TableHead>
-                    <TableHead>Time</TableHead>
+                    <TableHead>{{
+                      t("admin.observability.duration")
+                    }}</TableHead>
+                    <TableHead>{{ t("admin.observability.rows") }}</TableHead>
+                    <TableHead>{{ t("admin.observability.caller") }}</TableHead>
+                    <TableHead>{{ t("admin.observability.time") }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -433,7 +497,7 @@ const formatTimestamp = (ts: string): string => {
                     <TableCell class="font-mono text-xs font-semibold">
                       {{ formatDuration(q.duration_ns / 1000000) }}
                     </TableCell>
-                    <TableCell>{{ q.rows }}</TableCell>
+                    <TableCell>{{ formatNumber(q.rows) }}</TableCell>
                     <TableCell class="text-xs text-muted-foreground">
                       {{ q.caller }}
                     </TableCell>
@@ -441,14 +505,12 @@ const formatTimestamp = (ts: string): string => {
                       {{ formatTimestamp(q.timestamp) }}
                     </TableCell>
                   </TableRow>
-                  <TableRow
-                    v-if="snapshot.queries.slow_queries.length === 0"
-                  >
+                  <TableRow v-if="snapshot.queries.slow_queries.length === 0">
                     <TableCell
                       colspan="5"
                       class="py-8 text-center text-muted-foreground"
                     >
-                      No slow queries detected.
+                      {{ t("admin.observability.noSlowQueries") }}
                     </TableCell>
                   </TableRow>
                 </TableBody>
@@ -464,11 +526,17 @@ const formatTimestamp = (ts: string): string => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead class="w-[50%]">SQL Pattern</TableHead>
-                    <TableHead>Count</TableHead>
-                    <TableHead>Total Time</TableHead>
-                    <TableHead>Caller</TableHead>
-                    <TableHead>Trace ID</TableHead>
+                    <TableHead class="w-[50%]">
+                      {{ t("admin.observability.sqlPattern") }}
+                    </TableHead>
+                    <TableHead>{{ t("admin.observability.count") }}</TableHead>
+                    <TableHead>{{
+                      t("admin.observability.totalTime")
+                    }}</TableHead>
+                    <TableHead>{{ t("admin.observability.caller") }}</TableHead>
+                    <TableHead>{{
+                      t("admin.observability.traceId")
+                    }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -482,16 +550,22 @@ const formatTimestamp = (ts: string): string => {
                     </TableCell>
                     <TableCell>
                       <Badge variant="destructive">
-                        {{ p.count }}x
+                        {{
+                          t("admin.observability.times", {
+                            count: formatNumber(p.count),
+                          })
+                        }}
                       </Badge>
                     </TableCell>
                     <TableCell class="font-mono text-xs">
-                      {{ p.total_ms }}ms
+                      {{ formatDecimal(p.total_ms, 1) }}ms
                     </TableCell>
                     <TableCell class="text-xs text-muted-foreground">
                       {{ p.caller }}
                     </TableCell>
-                    <TableCell class="max-w-[120px] truncate font-mono text-xs text-muted-foreground">
+                    <TableCell
+                      class="max-w-[120px] truncate font-mono text-xs text-muted-foreground"
+                    >
                       {{ p.trace_id || "—" }}
                     </TableCell>
                   </TableRow>
@@ -500,7 +574,7 @@ const formatTimestamp = (ts: string): string => {
                       colspan="5"
                       class="py-8 text-center text-muted-foreground"
                     >
-                      No N+1 patterns detected.
+                      {{ t("admin.observability.noN1Patterns") }}
                     </TableCell>
                   </TableRow>
                 </TableBody>

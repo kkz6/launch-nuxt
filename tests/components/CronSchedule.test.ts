@@ -1,8 +1,18 @@
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import CronSchedule from "../../components/shared/CronSchedule.vue";
 
 const passthrough = { template: "<div><slot /></div>" };
+
+vi.stubGlobal("useI18n", () => ({
+  locale: { value: "en" },
+  t: (key: string, params?: Record<string, unknown>) => {
+    if (key === "common.cron.timesUse") return `Times use ${params?.timeZone}.`;
+    if (key === "common.cron.accessibleWithTimeZone")
+      return `${params?.expression}: ${params?.description}. Times use ${params?.timeZone}.`;
+    return `${params?.expression}: ${params?.description}.`;
+  },
+}));
 
 const mountComponent = (props: Record<string, unknown>) =>
   mount(CronSchedule, {

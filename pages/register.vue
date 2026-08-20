@@ -1,75 +1,83 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
-import * as z from 'zod'
+import { toast } from "vue-sonner";
+import { useForm } from "vee-validate";
+import { toTypedSchema } from "@vee-validate/zod";
+import * as z from "zod";
 
-import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 
 definePageMeta({
-  layout: 'guest',
-  middleware: 'guest',
-})
+  layout: "guest",
+  middleware: "guest",
+});
 
-useHead({
-  title: 'Sign up',
-})
+const { t } = useI18n();
 
-const { register, isLoading } = useAuth()
+useHead(() => ({
+  title: t("auth.register.pageTitle"),
+}));
 
-const formSchema = toTypedSchema(
-  z
-    .object({
-      name: z.string().min(2, 'Name must be at least 2 characters'),
-      email: z.string().email('Please enter a valid email address'),
-      password: z.string().min(8, 'Password must be at least 8 characters'),
-      password_confirmation: z.string(),
-    })
-    .refine((data) => data.password === data.password_confirmation, {
-      message: 'Passwords do not match',
-      path: ['password_confirmation'],
-    })
-)
+const { register, isLoading } = useAuth();
+
+const formSchema = computed(() =>
+  toTypedSchema(
+    z
+      .object({
+        name: z.string().min(2, t("auth.validation.nameMin")),
+        email: z.string().email(t("auth.validation.email")),
+        password: z.string().min(8, t("auth.validation.passwordMin")),
+        password_confirmation: z.string(),
+      })
+      .refine((data) => data.password === data.password_confirmation, {
+        message: t("auth.validation.passwordMismatch"),
+        path: ["password_confirmation"],
+      }),
+  ),
+);
 
 const { handleSubmit, errors, defineField } = useForm({
   validationSchema: formSchema,
   initialValues: {
-    name: '',
-    email: '',
-    password: '',
-    password_confirmation: '',
+    name: "",
+    email: "",
+    password: "",
+    password_confirmation: "",
   },
-})
+});
 
-const [name, nameAttrs] = defineField('name')
-const [email, emailAttrs] = defineField('email')
-const [password, passwordAttrs] = defineField('password')
-const [passwordConfirmation, passwordConfirmationAttrs] = defineField('password_confirmation')
+const [name, nameAttrs] = defineField("name");
+const [email, emailAttrs] = defineField("email");
+const [password, passwordAttrs] = defineField("password");
+const [passwordConfirmation, passwordConfirmationAttrs] = defineField(
+  "password_confirmation",
+);
 
 const onSubmit = handleSubmit(async (values) => {
   try {
-    await register(values)
-    toast.success('Account created successfully')
-    navigateTo('/dashboard')
+    await register(values);
+    toast.success(t("auth.register.created"));
+    navigateTo("/dashboard");
   } catch (error: unknown) {
-    if (error && typeof error === 'object' && 'data' in error) {
+    if (error && typeof error === "object" && "data" in error) {
       const fetchError = error as {
-        data?: { message?: string; errors?: Record<string, string[]> }
-      }
+        data?: { message?: string; errors?: Record<string, string[]> };
+      };
       if (fetchError.data?.errors) {
         Object.values(fetchError.data.errors).forEach((messages) => {
-          messages.forEach((msg) => toast.error(msg))
-        })
+          messages.forEach((msg) => toast.error(msg));
+        });
       } else {
-        toast.error(fetchError.data?.message || 'Registration failed')
+        toast.error(
+          fetchError.data?.message || t("auth.errors.registrationFailed"),
+        );
       }
     } else {
-      toast.error('An error occurred during registration')
+      toast.error(t("auth.errors.registrationError"));
     }
   }
-})
+});
 </script>
 
 <template>
@@ -78,30 +86,37 @@ const onSubmit = handleSubmit(async (values) => {
       <NuxtLink to="/" class="text-2xl font-bold">launchctl</NuxtLink>
     </div>
 
-    <h3 class="mb-2 text-lg font-semibold text-foreground">Create an account</h3>
+    <h3 class="mb-2 text-lg font-semibold text-foreground">
+      {{ t("auth.register.heading") }}
+    </h3>
     <p class="mb-8 text-sm text-muted-foreground">
-      Already have an account?
-      <NuxtLink to="/login" class="font-medium text-primary hover:text-primary/90">
-        Sign in
+      {{ t("auth.register.hasAccount") }}
+      <NuxtLink
+        to="/login"
+        class="font-medium text-primary hover:text-primary/90"
+      >
+        {{ t("auth.actions.signIn") }}
       </NuxtLink>
     </p>
 
     <form class="space-y-4" @submit="onSubmit">
       <div class="space-y-2">
-        <Label for="name">Name</Label>
+        <Label for="name">{{ t("auth.fields.name") }}</Label>
         <Input
           id="name"
           v-model="name"
           v-bind="nameAttrs"
           type="text"
-          placeholder="John Doe"
+          :placeholder="t('auth.register.namePlaceholder')"
           autocomplete="name"
         />
-        <p v-if="errors.name" class="text-sm text-destructive">{{ errors.name }}</p>
+        <p v-if="errors.name" class="text-sm text-destructive">
+          {{ errors.name }}
+        </p>
       </div>
 
       <div class="space-y-2">
-        <Label for="email">Email</Label>
+        <Label for="email">{{ t("auth.fields.email") }}</Label>
         <Input
           id="email"
           v-model="email"
@@ -110,11 +125,13 @@ const onSubmit = handleSubmit(async (values) => {
           placeholder="m@example.com"
           autocomplete="email"
         />
-        <p v-if="errors.email" class="text-sm text-destructive">{{ errors.email }}</p>
+        <p v-if="errors.email" class="text-sm text-destructive">
+          {{ errors.email }}
+        </p>
       </div>
 
       <div class="space-y-2">
-        <Label for="password">Password</Label>
+        <Label for="password">{{ t("auth.fields.password") }}</Label>
         <Input
           id="password"
           v-model="password"
@@ -122,11 +139,15 @@ const onSubmit = handleSubmit(async (values) => {
           type="password"
           autocomplete="new-password"
         />
-        <p v-if="errors.password" class="text-sm text-destructive">{{ errors.password }}</p>
+        <p v-if="errors.password" class="text-sm text-destructive">
+          {{ errors.password }}
+        </p>
       </div>
 
       <div class="space-y-2">
-        <Label for="password_confirmation">Confirm Password</Label>
+        <Label for="password_confirmation">{{
+          t("auth.fields.confirmPassword")
+        }}</Label>
         <Input
           id="password_confirmation"
           v-model="passwordConfirmation"
@@ -140,8 +161,16 @@ const onSubmit = handleSubmit(async (values) => {
       </div>
 
       <Button type="submit" class="w-full" :disabled="isLoading">
-        <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-        {{ isLoading ? 'Creating account...' : 'Create account' }}
+        <Icon
+          v-if="isLoading"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
+        {{
+          isLoading
+            ? t("auth.actions.creatingAccount")
+            : t("auth.actions.createAccount")
+        }}
       </Button>
     </form>
   </div>

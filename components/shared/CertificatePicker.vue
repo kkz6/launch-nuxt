@@ -9,7 +9,8 @@
 // Certificates to create one — there's no inline create here to
 // keep this component focused.
 
-import { differenceInDays, formatDistanceToNow } from 'date-fns'
+import { differenceInDays, formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
 import {
   Select,
   SelectContent,
@@ -17,95 +18,97 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '~/components/ui/select'
-import { certificateService } from '~/services/certificateService'
-import type { StoredCertificate } from '~/types'
+} from "~/components/ui/select";
+import { certificateService } from "~/services/certificateService";
+import type { StoredCertificate } from "~/types";
 
 interface Props {
-  modelValue: string | null | undefined
-  disabled?: boolean
+  modelValue: string | null | undefined;
+  disabled?: boolean;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { locale, t } = useI18n();
 
 const emit = defineEmits<{
-  'update:modelValue': [value: string | null]
-}>()
+  "update:modelValue": [value: string | null];
+}>();
 
-const certificates = ref<StoredCertificate[]>([])
-const isLoading = ref(true)
+const certificates = ref<StoredCertificate[]>([]);
+const isLoading = ref(true);
 
 const fetchCertificates = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
-    const response = await certificateService.list()
-    certificates.value = response.data || []
+    const response = await certificateService.list();
+    certificates.value = response.data || [];
   } catch {
-    certificates.value = []
+    certificates.value = [];
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
-onMounted(fetchCertificates)
+onMounted(fetchCertificates);
 
 // Mirror the colouring rules used by Settings → Connections SSL
 // Certificates so the picker and the library agree on what's
 // "expiring soon" vs "expired".
 const expiryClasses = (notAfter: string) => {
-  const daysUntil = differenceInDays(new Date(notAfter), new Date())
-  if (daysUntil < 0) return 'text-destructive'
-  if (daysUntil <= 30) return 'text-amber-600 dark:text-amber-400'
-  return 'text-muted-foreground'
-}
+  const daysUntil = differenceInDays(new Date(notAfter), new Date());
+  if (daysUntil < 0) return "text-destructive";
+  if (daysUntil <= 30) return "text-amber-600 dark:text-amber-400";
+  return "text-muted-foreground";
+};
 
 const expiryLabel = (notAfter: string) => {
-  const date = new Date(notAfter)
-  const daysUntil = differenceInDays(date, new Date())
-  if (daysUntil < 0) return `expired ${formatDistanceToNow(date, { addSuffix: true })}`
-  return `expires ${formatDistanceToNow(date, { addSuffix: true })}`
-}
+  const date = new Date(notAfter);
+  const daysUntil = differenceInDays(date, new Date());
+  const relative = formatDistanceToNow(date, {
+    addSuffix: true,
+    locale: locale.value === "ja" ? ja : enUS,
+  });
+  return daysUntil < 0
+    ? t("shared.certificatePicker.expired", { relative })
+    : t("shared.certificatePicker.expires", { relative });
+};
 
 const primaryDomain = (cert: StoredCertificate) => {
-  return cert.domains?.[0] || cert.common_name || cert.name
-}
+  return cert.domains?.[0] || cert.common_name || cert.name;
+};
 
 // Select needs a string model — wrap the prop so the wire format
 // stays nullable (null = nothing picked) while the Select sees a
 // concrete string.
 const selectedId = computed({
-  get: () => props.modelValue ?? '',
-  set: (value: string) => emit('update:modelValue', value || null),
-})
+  get: () => props.modelValue ?? "",
+  set: (value: string) => emit("update:modelValue", value || null),
+});
 </script>
 
 <template>
   <div class="space-y-2">
     <div v-if="isLoading" class="text-sm text-muted-foreground">
-      Loading certificates…
+      {{ t("shared.certificatePicker.loading") }}
     </div>
 
     <div
       v-else-if="certificates.length === 0"
       class="rounded-md border p-4 text-sm text-muted-foreground"
     >
-      No stored certificates available.
+      {{ t("shared.certificatePicker.empty") }}
       <NuxtLink
         to="/settings/connections#ssl-certificates"
         class="font-medium text-primary hover:underline"
       >
-        Add one in Settings → Connections
+        {{ t("shared.certificatePicker.addInSettings") }}
       </NuxtLink>
-      then come back to pick it here.
+      {{ t("shared.certificatePicker.returnHint") }}
     </div>
 
-    <Select
-      v-else
-      v-model="selectedId"
-      :disabled="disabled"
-    >
+    <Select v-else v-model="selectedId" :disabled="disabled">
       <SelectTrigger>
-        <SelectValue placeholder="Select a stored certificate" />
+        <SelectValue :placeholder="t('shared.certificatePicker.placeholder')" />
       </SelectTrigger>
       <SelectContent>
         <SelectGroup>

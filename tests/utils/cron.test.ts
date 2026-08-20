@@ -45,4 +45,17 @@ describe("describeCronExpression", () => {
       "Runs on a custom schedule",
     );
   });
+
+  it.each([
+    [null, "スケジュールが設定されていません"],
+    ["@hourly", "毎時"],
+    ["*/5 * * * *", "5分ごと"],
+    ["0 3 * * *", "毎日 03:00"],
+    ["0 3 * * 1-5", "月曜日から金曜日 03:00"],
+    ["0 3 1 * *", "毎月1日 03:00"],
+    ["0 0 23 2 *", "毎年2月23日 00:00"],
+    ["not a cron", "カスタムスケジュールで実行されます"],
+  ])("describes %s in Japanese", (expression, expected) => {
+    expect(describeCronExpression(expression, "ja-JP")).toBe(expected);
+  });
 });

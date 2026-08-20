@@ -1,28 +1,29 @@
 <script setup lang="ts">
-const { isAuthenticated } = useAuth()
-const colorMode = useColorMode()
+const { isAuthenticated } = useAuth();
+const colorMode = useColorMode();
+const { t } = useI18n();
 
-const scrolled = ref(false)
-const mobileMenuOpen = ref(false)
+const scrolled = ref(false);
+const mobileMenuOpen = ref(false);
 
-const navLinks = [
-  { href: '/pricing', label: 'Pricing' },
-  { href: '/docs', label: 'Docs' },
-]
+const navLinks = computed(() => [
+  { href: "/pricing", label: t("public.navigation.pricing") },
+  { href: "/docs", label: t("public.navigation.docs") },
+]);
 
 const toggleTheme = () => {
-  colorMode.preference = colorMode.preference === 'dark' ? 'light' : 'dark'
-}
+  colorMode.preference = colorMode.preference === "dark" ? "light" : "dark";
+};
 
-const isDark = computed(() => colorMode.preference === 'dark')
+const isDark = computed(() => colorMode.preference === "dark");
 
 onMounted(() => {
   const handleScroll = () => {
-    scrolled.value = window.scrollY > 20
-  }
-  window.addEventListener('scroll', handleScroll)
-  onUnmounted(() => window.removeEventListener('scroll', handleScroll))
-})
+    scrolled.value = window.scrollY > 20;
+  };
+  window.addEventListener("scroll", handleScroll);
+  onUnmounted(() => window.removeEventListener("scroll", handleScroll));
+});
 </script>
 
 <template>
@@ -59,8 +60,12 @@ onMounted(() => {
         <div class="hidden items-center gap-3 lg:flex">
           <button
             class="flex h-8 w-8 items-center justify-center rounded-md border border-[hsl(var(--site-border))] bg-[hsl(var(--site-surface))] text-[hsl(var(--site-text-muted))] transition-colors hover:bg-[hsl(var(--site-surface-elevated))] hover:text-[hsl(var(--site-text))] focus:outline-none"
+            :title="
+              isDark
+                ? t('public.navigation.useLightTheme')
+                : t('public.navigation.useDarkTheme')
+            "
             @click="toggleTheme"
-            :title="isDark ? 'Switch to light mode' : 'Switch to dark mode'"
           >
             <svg
               v-if="isDark"
@@ -91,12 +96,28 @@ onMounted(() => {
               />
             </svg>
           </button>
-          <NuxtLink :to="isAuthenticated ? '/dashboard' : '/login'" class="btn-sm btn-site-ghost">
-            {{ isAuthenticated ? 'Dashboard' : 'Sign in' }}
+          <NuxtLink
+            :to="isAuthenticated ? '/dashboard' : '/login'"
+            class="btn-sm btn-site-ghost"
+          >
+            {{
+              isAuthenticated
+                ? t("public.navigation.dashboard")
+                : t("public.navigation.signIn")
+            }}
           </NuxtLink>
-          <NuxtLink v-if="!isAuthenticated" to="/register" class="btn-sm btn-site-primary">
-            Get Started
-            <svg class="ml-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <NuxtLink
+            v-if="!isAuthenticated"
+            to="/register"
+            class="btn-sm btn-site-primary"
+          >
+            {{ t("public.navigation.getStarted") }}
+            <svg
+              class="ml-2 h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
               <path
                 stroke-linecap="round"
                 stroke-linejoin="round"
@@ -110,6 +131,11 @@ onMounted(() => {
         <!-- Mobile menu button -->
         <button
           class="flex h-8 w-8 items-center justify-center rounded-md bg-[hsl(var(--site-text))]/5 lg:hidden"
+          :aria-label="
+            mobileMenuOpen
+              ? t('public.navigation.closeMenu')
+              : t('public.navigation.openMenu')
+          "
           @click="mobileMenuOpen = !mobileMenuOpen"
         >
           <svg
@@ -119,10 +145,26 @@ onMounted(() => {
             viewBox="0 0 24 24"
             stroke="currentColor"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" :stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              :stroke-width="2"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
           </svg>
-          <svg v-else class="h-5 w-5 text-[hsl(var(--site-text))]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" :stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          <svg
+            v-else
+            class="h-5 w-5 text-[hsl(var(--site-text))]"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              :stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
           </svg>
         </button>
       </nav>
@@ -148,7 +190,11 @@ onMounted(() => {
               class="block rounded-md px-3 py-2 font-mono text-sm text-[hsl(var(--site-text-muted))] hover:bg-[hsl(var(--site-text))]/5 hover:text-[hsl(var(--site-text))]"
               @click="mobileMenuOpen = false"
             >
-              {{ isAuthenticated ? 'Dashboard' : 'Sign in' }}
+              {{
+                isAuthenticated
+                  ? t("public.navigation.dashboard")
+                  : t("public.navigation.signIn")
+              }}
             </NuxtLink>
           </li>
           <li v-if="!isAuthenticated">
@@ -157,7 +203,7 @@ onMounted(() => {
               class="btn-site-primary block w-full justify-center text-center"
               @click="mobileMenuOpen = false"
             >
-              Get Started
+              {{ t("public.navigation.getStarted") }}
             </NuxtLink>
           </li>
         </ul>

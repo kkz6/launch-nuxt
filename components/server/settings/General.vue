@@ -1,114 +1,124 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
-import { Textarea } from '~/components/ui/textarea'
-import { Switch } from '~/components/ui/switch'
-import { Separator } from '~/components/ui/separator'
-import type { Server } from '~/types'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
+import { Switch } from "~/components/ui/switch";
+import { Separator } from "~/components/ui/separator";
+import type { Server } from "~/types";
 
 interface Props {
-  server: Server
+  server: Server;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
-const name = ref(props.server.name)
-const description = ref(props.server.description || '')
-const autoUpdate = ref(props.server.auto_update === 'true' || props.server.auto_update === '1')
-const isLoading = ref(false)
-const deleteLoading = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
-const siteCount = ref(0)
+const name = ref(props.server.name);
+const description = ref(props.server.description || "");
+const autoUpdate = ref(
+  props.server.auto_update === "true" || props.server.auto_update === "1",
+);
+const isLoading = ref(false);
+const deleteLoading = ref(false);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
+const siteCount = ref(0);
 
 // Projects only exist on docker servers — backend returns
 // `projects_count` on the server response, defaulting to 0 for the
 // PHP / database / loadbalancer types. We read it off the prop so the
 // guard works on first render without an extra HTTP roundtrip.
-const projectsCount = computed(() => Number(props.server.projects_count ?? 0))
-const isDockerServer = computed(() => props.server.type === 'docker')
+const projectsCount = computed(() => Number(props.server.projects_count ?? 0));
+const isDockerServer = computed(() => props.server.type === "docker");
 
 const canDelete = computed(() => {
-  if (siteCount.value > 0) return false
-  if (isDockerServer.value && projectsCount.value > 0) return false
-  return true
-})
+  if (siteCount.value > 0) return false;
+  if (isDockerServer.value && projectsCount.value > 0) return false;
+  return true;
+});
 
 onMounted(async () => {
   try {
-    const data = await $api<{ data: { count: number } }>(`/servers/${props.server.id}/site-count`)
-    siteCount.value = data.data?.count || 0
+    const data = await $api<{ data: { count: number } }>(
+      `/servers/${props.server.id}/site-count`,
+    );
+    siteCount.value = data.data?.count || 0;
   } catch {
-    siteCount.value = 0
+    siteCount.value = 0;
   }
-})
+});
 
 const updateServer = async () => {
-  isLoading.value = true
+  isLoading.value = true;
   try {
     await $api(`/servers/${props.server.id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: {
         name: name.value,
         description: description.value,
         auto_update: autoUpdate.value,
       },
-    })
-    toast.success('Server settings updated')
+    });
+    toast.success(t("server.settings.general.updated"));
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to update server')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("server.settings.general.updateFailed"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const deleteServer = async () => {
   if (siteCount.value > 0) {
-    toast.error('Cannot delete server with active sites. Please delete all sites first.')
-    return
+    toast.error(t("server.settings.general.activeSitesError"));
+    return;
   }
   // Docker servers carry projects (which carry apps / compose / db
   // workloads). Refuse the delete here so the user gets immediate
   // feedback — the backend re-validates the same condition and would
   // 422 otherwise, but a toast on click is friendlier than a roundtrip.
   if (isDockerServer.value && projectsCount.value > 0) {
-    const noun = projectsCount.value === 1 ? 'project' : 'projects'
     toast.error(
-      `Cannot delete server with ${projectsCount.value} Docker ${noun}. Remove every project (and the workloads inside) first.`,
-    )
-    return
+      t("server.settings.general.activeProjectsError", {
+        count: projectsCount.value,
+      }),
+    );
+    return;
   }
 
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete Server',
-    description: `Are you sure you want to delete "${props.server.name}"? This action cannot be undone and will permanently remove the server from your account.`,
-    confirmText: 'Delete Server',
-    cancelText: 'Cancel',
+    title: t("server.settings.general.deleteTitle"),
+    description: t("server.settings.general.deleteDescription", {
+      name: props.server.name,
+    }),
+    confirmText: t("server.settings.general.deleteTitle"),
+    cancelText: t("server.common.cancel"),
     destructive: true,
-    helpText: 'Type the server name to confirm deletion:',
+    helpText: t("server.settings.general.deleteHelp"),
     inputVerificationText: props.server.name,
-  })
+  });
 
-  if (!result.ok) return
+  if (!result.ok) return;
 
-  deleteLoading.value = true
+  deleteLoading.value = true;
   try {
     await $api(`/servers/${props.server.id}`, {
-      method: 'DELETE',
-    })
-    toast.success('Server deleted successfully')
-    navigateTo('/servers')
+      method: "DELETE",
+    });
+    toast.success(t("server.pending.deleted"));
+    navigateTo("/servers");
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Unable to delete server')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("server.pending.deleteFailed"));
   } finally {
-    deleteLoading.value = false
+    deleteLoading.value = false;
   }
-}
+};
 </script>
 
 <template>
@@ -118,41 +128,55 @@ const deleteServer = async () => {
     <!-- Server Information -->
     <div class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium">Server Information</h3>
+        <h3 class="text-lg font-medium">
+          {{ t("server.settings.general.information") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Update your server name and description.
+          {{ t("server.settings.general.informationDescription") }}
         </p>
       </div>
 
       <div class="space-y-4">
         <div class="space-y-2">
-          <Label for="name">Server Name</Label>
-          <Input id="name" v-model="name" placeholder="Enter server name" />
+          <Label for="name">{{
+            t("server.settings.general.serverName")
+          }}</Label>
+          <Input
+            id="name"
+            v-model="name"
+            :placeholder="t('server.settings.general.serverNamePlaceholder')"
+          />
         </div>
 
         <div class="space-y-2">
-          <Label for="description">Description</Label>
+          <Label for="description">{{
+            t("server.settings.general.description")
+          }}</Label>
           <Textarea
             id="description"
             v-model="description"
-            placeholder="Enter a description for your server (optional)"
+            :placeholder="t('server.settings.general.descriptionPlaceholder')"
             :rows="3"
           />
         </div>
 
         <div class="flex items-center justify-between rounded-lg border p-4">
           <div class="space-y-0.5">
-            <Label>Auto Updates</Label>
+            <Label>{{ t("server.settings.general.autoUpdates") }}</Label>
             <p class="text-sm text-muted-foreground">
-              Automatically install security updates
+              {{ t("server.settings.general.autoUpdatesDescription") }}
             </p>
           </div>
           <Switch v-model="autoUpdate" />
         </div>
 
         <Button :disabled="isLoading" @click="updateServer">
-          <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          Save Changes
+          <Icon
+            v-if="isLoading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          {{ t("server.settings.general.saveChanges") }}
         </Button>
       </div>
     </div>
@@ -162,9 +186,11 @@ const deleteServer = async () => {
     <!-- Danger Zone -->
     <div class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+        <h3 class="text-lg font-medium text-destructive">
+          {{ t("server.settings.general.dangerZone") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Permanently delete this server. This action cannot be undone.
+          {{ t("server.settings.general.dangerDescription") }}
         </p>
       </div>
 
@@ -172,19 +198,26 @@ const deleteServer = async () => {
            sites first (PHP servers can't have projects), then docker
            projects (which only apply when isDockerServer is true). The
            backend re-validates both — this banner is the proactive UX. -->
-      <div v-if="!canDelete" class="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/50">
+      <div
+        v-if="!canDelete"
+        class="flex items-start gap-3 rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950/50"
+      >
         <div class="space-y-1">
           <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            Cannot delete server
+            {{ t("server.settings.general.cannotDelete") }}
           </p>
-          <p v-if="siteCount > 0" class="text-sm text-yellow-700 dark:text-yellow-300">
-            This server has {{ siteCount }} active site{{ siteCount !== 1 ? 's' : '' }}.
-            Please delete all sites before removing the server.
+          <p
+            v-if="siteCount > 0"
+            class="text-sm text-yellow-700 dark:text-yellow-300"
+          >
+            {{ t("server.settings.general.activeSites", { count: siteCount }) }}
           </p>
           <p v-else class="text-sm text-yellow-700 dark:text-yellow-300">
-            This server has {{ projectsCount }} Docker project{{ projectsCount !== 1 ? 's' : '' }}.
-            Remove every project (and the apps, compose stacks, and databases
-            inside it) before removing the server.
+            {{
+              t("server.settings.general.activeProjects", {
+                count: projectsCount,
+              })
+            }}
           </p>
         </div>
       </div>
@@ -194,9 +227,13 @@ const deleteServer = async () => {
         :disabled="!canDelete || deleteLoading"
         @click="deleteServer"
       >
-        <Icon v-if="deleteLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+        <Icon
+          v-if="deleteLoading"
+          name="lucide:loader-2"
+          class="mr-2 h-4 w-4 animate-spin"
+        />
         <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
-        Delete Server
+        {{ t("server.settings.general.deleteTitle") }}
       </Button>
     </div>
   </div>

@@ -1,10 +1,16 @@
 import type { User } from "~/types";
+import type { LocalePreference } from "~/types/locale";
 import { authService } from "~/services/authService";
 
 let authInitPromise: Promise<void> | null = null;
 
+interface UserLocaleSyncOptions {
+  preserveEffectiveLocale?: boolean;
+}
+
 export const useAuth = () => {
   const { setTokens, clearTokens, getAccessToken, setCurrentTeamId } = useApi();
+  const { applySavedUserLocale } = useLocalePreference();
 
   const user = useState<User | null>("auth_user", () => null);
   const isLoading = useState("auth_loading", () => false);
@@ -31,7 +37,7 @@ export const useAuth = () => {
       try {
         const storedToken = getAccessToken();
         if (storedToken && !user.value) {
-          await fetchUser();
+          await fetchUser({ preserveEffectiveLocale: true });
         }
       } finally {
         isInitialized.value = true;
@@ -54,10 +60,30 @@ export const useAuth = () => {
     return initAuth();
   };
 
-  const setUser = (newUser: User | null) => {
+  const setUser = async (
+    newUser: User | null,
+    options: UserLocaleSyncOptions = {},
+  ): Promise<void> => {
     user.value = newUser;
     if (newUser?.current_team_id) {
       setCurrentTeamId(newUser.current_team_id);
+    }
+
+    if (newUser) {
+      try {
+        if (options.preserveEffectiveLocale) {
+          await applySavedUserLocale(newUser.locale, {
+            preferEffectiveCookie: true,
+          });
+        } else {
+          await applySavedUserLocale(newUser.locale);
+        }
+      } catch (error) {
+        // Authentication must remain usable if a lazy locale chunk fails to
+        // load. Callers still await the attempt so normal login transitions do
+        // not render or toast in the previous account's language.
+        console.error("Failed to apply the saved user locale:", error);
+      }
     }
   };
 
@@ -84,7 +110,7 @@ export const useAuth = () => {
       }
 
       setTokens(response.data.access_token!, response.data.refresh_token!);
-      setUser(response.data.user ?? null);
+      await setUser(response.data.user ?? null);
       isInitialized.value = true;
 
       return response.data;
@@ -99,7 +125,7 @@ export const useAuth = () => {
     withLoading(async () => {
       const response = await authService.register(data);
       setTokens(response.data.access_token!, response.data.refresh_token!);
-      setUser(response.data.user ?? null);
+      await setUser(response.data.user ?? null);
       isInitialized.value = true;
 
       return response.data;
@@ -112,22 +138,22 @@ export const useAuth = () => {
       }
     } finally {
       clearTokens();
-      setUser(null);
+      await setUser(null);
       navigateTo("/login");
     }
   };
 
-  const fetchUser = async () => {
+  const fetchUser = async (options: UserLocaleSyncOptions = {}) => {
     if (!getAccessToken()) return null;
 
     return withLoading(async () => {
       try {
         const response = await authService.getUser();
-        setUser(response.data);
+        await setUser(response.data, options);
         return response.data;
       } catch {
         clearTokens();
-        setUser(null);
+        await setUser(null);
         return null;
       }
     });
@@ -140,7 +166,14 @@ export const useAuth = () => {
   }) =>
     withLoading(async () => {
       const response = await authService.updateProfile(data);
-      setUser(response.data);
+      await setUser(response.data);
+      return response.data;
+    });
+
+  const updateLocale = (locale: LocalePreference) =>
+    withLoading(async () => {
+      const response = await authService.updateLocale(locale);
+      await setUser(response.data);
       return response.data;
     });
 
@@ -184,6 +217,7 @@ export const useAuth = () => {
     logout,
     fetchUser,
     updateProfile,
+    updateLocale,
     updatePassword,
     forgotPassword,
     resetPassword,

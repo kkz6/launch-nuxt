@@ -11,6 +11,8 @@ import {
 import { Button } from "~/components/ui/button";
 import type { ActionDef } from "~/types/data-table";
 
+const { t } = useI18n();
+
 defineProps<{
   action: ActionDef;
 }>();
@@ -25,14 +27,16 @@ const emit = defineEmits<{
   <Dialog :open="true" @update:open="(v) => !v && emit('cancel')">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>{{ action.confirm?.title ?? "Confirm" }}</DialogTitle>
+        <DialogTitle>{{
+          action.confirm?.title ?? t("data.confirm")
+        }}</DialogTitle>
         <DialogDescription v-if="action.confirm?.message">
           {{ action.confirm.message }}
         </DialogDescription>
       </DialogHeader>
       <DialogFooter>
         <Button variant="outline" @click="emit('cancel')">
-          {{ action.confirm?.cancelLabel ?? "Cancel" }}
+          {{ action.confirm?.cancelLabel ?? t("data.cancel") }}
         </Button>
         <Button
           :variant="
@@ -40,7 +44,7 @@ const emit = defineEmits<{
           "
           @click="emit('confirm')"
         >
-          {{ action.confirm?.confirmLabel ?? "Confirm" }}
+          {{ action.confirm?.confirmLabel ?? t("data.confirm") }}
         </Button>
       </DialogFooter>
     </DialogContent>

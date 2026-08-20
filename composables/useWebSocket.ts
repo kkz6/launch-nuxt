@@ -1,28 +1,28 @@
-type EventHandler = (data: unknown) => void
+type EventHandler = (data: unknown) => void;
 
 interface WebSocketMessage {
-  channel: string
-  event: string
+  channel: string;
+  event: string;
   data: {
-    id: string
-    model: string
-    action: 'created' | 'updated' | 'deleted'
-    team_id: string
-    server_id?: string
-    site_id?: string
-    [key: string]: unknown
-  }
+    id: string;
+    model: string;
+    action: "created" | "updated" | "deleted";
+    team_id: string;
+    server_id?: string;
+    site_id?: string;
+    [key: string]: unknown;
+  };
 }
 
 // Global state for WebSocket connection (singleton pattern)
-const ws = ref<WebSocket | null>(null)
-const isConnected = ref(false)
-const handlers = ref<Map<string, Set<EventHandler>>>(new Map())
-const reconnectTimeout = ref<ReturnType<typeof setTimeout> | null>(null)
-const reconnectAttempts = ref(0)
-let lifecycleInitialized = false
-const maxReconnectAttempts = 10
-const baseReconnectDelay = 1000 // 1 second
+const ws = ref<WebSocket | null>(null);
+const isConnected = ref(false);
+const handlers = ref<Map<string, Set<EventHandler>>>(new Map());
+const reconnectTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
+const reconnectAttempts = ref(0);
+let lifecycleInitialized = false;
+const maxReconnectAttempts = 10;
+const baseReconnectDelay = 1000; // 1 second
 
 // Reference count per channel. Many components can call
 // subscribeToChannel('team.X') concurrently (the servers index page,
@@ -33,47 +33,53 @@ const baseReconnectDelay = 1000 // 1 second
 // at the hub, even though other components still wanted events. This
 // caused the "server.deleted event never arrives" symptom: 6 subscribes
 // + 2 unsubscribes within 30ms killed the team-channel subscription.
-const channelRefCounts = new Map<string, number>()
+const channelRefCounts = new Map<string, number>();
 
 export const useWebSocket = () => {
-  const config = useRuntimeConfig()
-  const { token, isInitialized, waitForAuth } = useAuth()
-  const { getCurrentTeamId } = useApi()
+  const config = useRuntimeConfig();
+  const { token, isInitialized, waitForAuth } = useAuth();
+  const { getCurrentTeamId } = useApi();
+  const { effectiveLocale, getEffectiveLocale } = useLocalePreference();
 
   const connect = async () => {
     // Skip on server
-    if (import.meta.server) return
+    if (import.meta.server) return;
 
     // Wait for auth to be initialized
-    await waitForAuth()
+    await waitForAuth();
 
     // Don't connect if no token
-    if (!token.value) return
+    if (!token.value) return;
 
     // Don't reconnect if already connected or connecting
     if (
       ws.value?.readyState === WebSocket.OPEN ||
       ws.value?.readyState === WebSocket.CONNECTING
     )
-      return
+      return;
 
     // Close existing connection if any
     if (ws.value) {
-      ws.value.close()
+      ws.value.close();
     }
 
-    const wsBase = config.public.wsBase as string
-    const teamId = getCurrentTeamId()
-    const wsUrl = `${wsBase}/ws?token=${token.value}${teamId ? `&team_id=${teamId}` : ''}`
+    const wsBase = config.public.wsBase as string;
+    const teamId = getCurrentTeamId();
+    const params = new URLSearchParams({
+      token: token.value,
+      locale: getEffectiveLocale(),
+    });
+    if (teamId) params.set("team_id", teamId);
+    const wsUrl = `${wsBase}/ws?${params.toString()}`;
 
-    const socket = new WebSocket(wsUrl)
-    ws.value = socket
+    const socket = new WebSocket(wsUrl);
+    ws.value = socket;
 
     socket.onopen = () => {
-      if (ws.value !== socket) return
-      console.log('[WebSocket] Connected')
-      isConnected.value = true
-      reconnectAttempts.value = 0
+      if (ws.value !== socket) return;
+      console.log("[WebSocket] Connected");
+      isConnected.value = true;
+      reconnectAttempts.value = 0;
 
       // Re-send subscribe for every channel that still has live local
       // listeners. Otherwise on reconnect (or after the API restarts),
@@ -82,58 +88,58 @@ export const useWebSocket = () => {
       for (const channel of channelRefCounts.keys()) {
         ws.value?.send(
           JSON.stringify({
-            action: 'subscribe',
+            action: "subscribe",
             channel,
           }),
-        )
+        );
       }
-    }
+    };
 
     socket.onmessage = (e) => {
-      if (ws.value !== socket) return
+      if (ws.value !== socket) return;
       try {
-        const message: WebSocketMessage = JSON.parse(e.data)
-        const { event, data } = message
+        const message: WebSocketMessage = JSON.parse(e.data);
+        const { event, data } = message;
 
         // Call all handlers registered for this event
-        const eventHandlers = handlers.value.get(event)
+        const eventHandlers = handlers.value.get(event);
         if (eventHandlers) {
-          eventHandlers.forEach((handler) => handler(data))
+          eventHandlers.forEach((handler) => handler(data));
         }
 
         // Also call wildcard handlers
-        const wildcardHandlers = handlers.value.get('*')
+        const wildcardHandlers = handlers.value.get("*");
         if (wildcardHandlers) {
-          wildcardHandlers.forEach((handler) => handler({ event, data }))
+          wildcardHandlers.forEach((handler) => handler({ event, data }));
         }
       } catch (err) {
-        console.error('[WebSocket] Failed to parse message:', err)
+        console.error("[WebSocket] Failed to parse message:", err);
       }
-    }
+    };
 
     socket.onclose = () => {
-      if (ws.value !== socket) return
-      console.log('[WebSocket] Disconnected')
-      ws.value = null
-      isConnected.value = false
-      scheduleReconnect()
-    }
+      if (ws.value !== socket) return;
+      console.log("[WebSocket] Disconnected");
+      ws.value = null;
+      isConnected.value = false;
+      scheduleReconnect();
+    };
 
     socket.onerror = (err) => {
-      if (ws.value !== socket) return
-      console.error('[WebSocket] Error:', err)
-    }
-  }
+      if (ws.value !== socket) return;
+      console.error("[WebSocket] Error:", err);
+    };
+  };
 
   const scheduleReconnect = () => {
     // Don't reconnect if no token or max attempts reached
     if (!token.value || reconnectAttempts.value >= maxReconnectAttempts) {
-      return
+      return;
     }
 
     // Clear any existing timeout
     if (reconnectTimeout.value) {
-      clearTimeout(reconnectTimeout.value)
+      clearTimeout(reconnectTimeout.value);
     }
 
     // Exponential backoff with jitter
@@ -141,103 +147,112 @@ export const useWebSocket = () => {
       baseReconnectDelay * Math.pow(2, reconnectAttempts.value) +
         Math.random() * 1000,
       30000, // Max 30 seconds
-    )
+    );
 
     console.log(
       `[WebSocket] Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempts.value + 1})`,
-    )
+    );
 
     reconnectTimeout.value = setTimeout(() => {
-      reconnectAttempts.value++
-      connect()
-    }, delay)
-  }
+      reconnectAttempts.value++;
+      connect();
+    }, delay);
+  };
 
   const disconnect = () => {
     if (reconnectTimeout.value) {
-      clearTimeout(reconnectTimeout.value)
-      reconnectTimeout.value = null
+      clearTimeout(reconnectTimeout.value);
+      reconnectTimeout.value = null;
     }
 
     if (ws.value) {
-      const socket = ws.value
-      ws.value = null
-      socket.onclose = null
-      socket.onerror = null
-      socket.close()
+      const socket = ws.value;
+      ws.value = null;
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.close();
     }
 
-    isConnected.value = false
-  }
+    isConnected.value = false;
+  };
 
   const reconnect = () => {
     // Force reconnection (useful when team changes)
-    disconnect()
-    reconnectAttempts.value = 0
-    connect()
-  }
+    disconnect();
+    reconnectAttempts.value = 0;
+    connect();
+  };
 
   const subscribe = (event: string, handler: EventHandler): (() => void) => {
     if (!handlers.value.has(event)) {
-      handlers.value.set(event, new Set())
+      handlers.value.set(event, new Set());
     }
-    handlers.value.get(event)!.add(handler)
+    handlers.value.get(event)!.add(handler);
 
     // Return unsubscribe function
     return () => {
-      handlers.value.get(event)?.delete(handler)
-    }
-  }
+      handlers.value.get(event)?.delete(handler);
+    };
+  };
 
   const subscribeToChannel = (channel: string) => {
-    const before = channelRefCounts.get(channel) ?? 0
-    channelRefCounts.set(channel, before + 1)
+    const before = channelRefCounts.get(channel) ?? 0;
+    channelRefCounts.set(channel, before + 1);
     // Only send the wire-level subscribe on the first listener.
     if (before === 0 && ws.value?.readyState === WebSocket.OPEN) {
       ws.value.send(
         JSON.stringify({
-          action: 'subscribe',
+          action: "subscribe",
           channel,
         }),
-      )
+      );
     }
-  }
+  };
 
   const unsubscribeFromChannel = (channel: string) => {
-    const before = channelRefCounts.get(channel) ?? 0
-    if (before <= 0) return
-    const after = before - 1
+    const before = channelRefCounts.get(channel) ?? 0;
+    if (before <= 0) return;
+    const after = before - 1;
     if (after === 0) {
-      channelRefCounts.delete(channel)
+      channelRefCounts.delete(channel);
       // Only send the wire-level unsubscribe when the last listener
       // goes away. See the comment on channelRefCounts above.
       if (ws.value?.readyState === WebSocket.OPEN) {
         ws.value.send(
           JSON.stringify({
-            action: 'unsubscribe',
+            action: "unsubscribe",
             channel,
           }),
-        )
+        );
       }
     } else {
-      channelRefCounts.set(channel, after)
+      channelRefCounts.set(channel, after);
     }
-  }
+  };
 
   // Auto-connect when auth is initialized and token is available
   if (!lifecycleInitialized) {
-    lifecycleInitialized = true
+    lifecycleInitialized = true;
     watch(
       [isInitialized, token],
       ([initialized, newToken]) => {
         if (initialized && newToken) {
-          void connect()
+          void connect();
         } else if (initialized && !newToken) {
-          disconnect()
+          disconnect();
         }
       },
       { immediate: true },
-    )
+    );
+
+    // The handshake carries the locale because browsers cannot attach an
+    // Accept-Language header to WebSockets. Reconnect when it changes so
+    // subsequent control/error events use the newly selected language.
+    watch(effectiveLocale, (nextLocale, previousLocale) => {
+      if (nextLocale !== previousLocale && isInitialized.value && token.value) {
+        reconnect();
+      }
+    });
 
     // Bring the connection back when conditions change.
     //
@@ -258,23 +273,23 @@ export const useWebSocket = () => {
     // no-op while OPEN/CONNECTING, so spamming this is safe.
     if (import.meta.client) {
       const wake = () => {
-        if (ws.value?.readyState === WebSocket.OPEN) return
-        reconnectAttempts.value = 0
+        if (ws.value?.readyState === WebSocket.OPEN) return;
+        reconnectAttempts.value = 0;
         if (reconnectTimeout.value) {
-          clearTimeout(reconnectTimeout.value)
-          reconnectTimeout.value = null
+          clearTimeout(reconnectTimeout.value);
+          reconnectTimeout.value = null;
         }
-        void connect()
-      }
+        void connect();
+      };
       const onVisibility = () => {
-        if (document.visibilityState === 'visible') wake()
-      }
+        if (document.visibilityState === "visible") wake();
+      };
       // These listeners are installed once for the singleton connection.
       // The connection intentionally outlives any one component instance.
-      window.addEventListener('visibilitychange', onVisibility, {
+      window.addEventListener("visibilitychange", onVisibility, {
         passive: true,
-      })
-      window.addEventListener('online', wake, { passive: true })
+      });
+      window.addEventListener("online", wake, { passive: true });
     }
   }
 
@@ -286,5 +301,5 @@ export const useWebSocket = () => {
     subscribe,
     subscribeToChannel,
     unsubscribeFromChannel,
-  }
-}
+  };
+};

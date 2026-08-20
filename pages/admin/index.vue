@@ -8,11 +8,20 @@ definePageMeta({
   middleware: ["auth", "staff"],
 });
 
+const { locale, t } = useI18n();
+
 useHead({
-  title: "Admin — Users",
+  title: () => t("admin.usersList.pageTitle"),
 });
 
-setBreadcrumbs([{ label: "Admin", to: "/admin/overview" }, { label: "Users" }]);
+const applyBreadcrumb = (): void => {
+  setBreadcrumbs([
+    { label: t("admin.common.admin"), to: "/admin/overview" },
+    { label: t("admin.common.users") },
+  ]);
+};
+applyBreadcrumb();
+watch(locale, applyBreadcrumb);
 
 // The table is now pure data: actions (suspend/delete/spectate) live on the
 // per-user detail page. Clicking a row opens it.
@@ -24,7 +33,7 @@ const openUser = (row: AdminUserRow): void => {
 <template>
   <div class="space-y-6 pb-10">
     <p class="text-sm text-muted-foreground">
-      Browse customer accounts. Select a user to manage their account.
+      {{ t("admin.usersList.description") }}
     </p>
 
     <DataTable

@@ -1,0 +1,925 @@
+{
+  "public": {
+    "meta": {
+      "description": "複雑な作業なしでサーバーをデプロイ・管理。プロビジョニング、デプロイ、データベース、SSL、監視をひとつのプラットフォームで。"
+    },
+    "error": {
+      "pageNotFoundTitle": "ページが見つかりません",
+      "errorTitle": "エラー",
+      "notFoundHeading": "ページが見つかりません",
+      "genericHeading": "問題が発生しました",
+      "notFoundDescription": "お探しのページは存在しないか、移動した可能性があります。",
+      "unexpected": "予期しないエラーが発生しました。",
+      "goBack": "戻る",
+      "home": "ホーム"
+    },
+    "dashboard": {
+      "pageTitle": "ダッシュボード",
+      "greetings": {
+        "morning": "おはようございます",
+        "afternoon": "こんにちは",
+        "evening": "こんばんは"
+      },
+      "subscriptionRequired": "サブスクリプションが必要です",
+      "subscriptionDescription": "サブスクリプションは現在無効です。すべての機能を利用してサーバーを管理するには、お支払い方法を追加してください。",
+      "addPaymentMethod": "お支払い方法を追加",
+      "contactSupport": "サポートに問い合わせる",
+      "subscriptionIncludes": "サブスクリプションに含まれる機能：",
+      "benefits": {
+        "servers": "無制限のサーバーをデプロイ・管理",
+        "deployments": "Gitからの自動デプロイ",
+        "platform": "SSL証明書、データベース、バックアップ",
+        "teams": "チーム共同作業機能"
+      },
+      "noServers": "サーバーはまだありません",
+      "noServersDescription": "最初のサーバーを追加して始めましょう",
+      "servers": "サーバー",
+      "viewAll": "すべて表示（{count}件）",
+      "workload": "ワークロード",
+      "workloads": "ワークロード",
+      "site": "サイト",
+      "sites": "サイト",
+      "recentActivity": "最近のアクティビティ",
+      "noRecentActivity": "最近のアクティビティはありません",
+      "certificates": {
+        "allExpiredOne": "{count}件の証明書が期限切れです",
+        "allExpiredMany": "{count}件の証明書が期限切れです",
+        "someExpired": "{expired}件が期限切れ、{expiring}件が30日以内に期限切れになります",
+        "expiresOne": "{count}件の証明書が30日以内に期限切れになります",
+        "expiresMany": "{count}件の証明書が30日以内に期限切れになります",
+        "reviewSuffix": "SSL証明書を確認してください。",
+        "review": "確認"
+      }
+    },
+    "onboarding": {
+      "pageTitle": "初期設定",
+      "heading": "初期設定",
+      "skip": "今はスキップ",
+      "description": "以下の設定を完了して、launchctlを最大限に活用しましょう",
+      "steps": {
+        "serverProvider": {
+          "title": "サーバープロバイダー",
+          "description": "クラウドプロバイダーを接続してサーバーをデプロイします"
+        },
+        "gitProvider": {
+          "title": "Gitプロバイダー",
+          "description": "GitHub、GitLab、またはBitbucketアカウントを連携します"
+        },
+        "domainProvider": {
+          "title": "ドメインプロバイダー",
+          "description": "ドメインのDNS管理を設定します"
+        },
+        "storageProvider": {
+          "title": "ストレージプロバイダー",
+          "description": "バックアップとファイルストレージを設定します"
+        },
+        "notifications": {
+          "title": "通知",
+          "description": "アラートと通知の設定を行います"
+        }
+      }
+    },
+    "navigation": {
+      "pricing": "料金",
+      "docs": "ドキュメント",
+      "dashboard": "ダッシュボード",
+      "signIn": "ログイン",
+      "getStarted": "始める",
+      "useLightTheme": "ライトテーマを使用",
+      "useDarkTheme": "ダークテーマを使用",
+      "openMenu": "メニューを開く",
+      "closeMenu": "メニューを閉じる"
+    },
+    "footer": {
+      "description": "DevOpsの専門知識がなくても、サーバーをかんたんにデプロイ・管理できます。",
+      "product": "製品",
+      "support": "サポート",
+      "legal": "法的情報",
+      "features": "機能",
+      "changelog": "変更履歴",
+      "documentation": "ドキュメント",
+      "supportCenter": "サポートセンター",
+      "status": "稼働状況",
+      "reportVulnerability": "脆弱性を報告",
+      "privacy": "プライバシーポリシー",
+      "terms": "利用規約",
+      "refund": "返金ポリシー",
+      "copyright": "© {year} Gigcodes. 無断転載を禁じます。",
+      "operational": "すべてのシステムは正常に稼働しています"
+    },
+    "cta": {
+      "heading": "インフラ管理をシンプルにしませんか？",
+      "description": "launchctlでサーバーをデプロイ・管理する多くの開発者に加わりましょう。今すぐ無料トライアルを始められます。",
+      "startTrial": "無料トライアルを開始",
+      "readDocumentation": "ドキュメントを読む",
+      "trialNote": "クレジットカード不要 • 14日間無料 • いつでもキャンセル可能"
+    },
+    "testimonial": {
+      "quote": "「Launchによってデプロイの進め方が一変しました。複雑なワークフローの自動化からスムーズなクラウド連携まで、開発チームに欠かせないツールです。」",
+      "role": "Resolute DynamicsのCTO"
+    },
+    "pricing": {
+      "pageTitle": "料金",
+      "metaTitle": "料金 - launchctl",
+      "metaDescription": "サーバー管理のためのシンプルで明確な料金体系。チームに合ったプランを選び、成長に合わせて拡張できます。",
+      "eyebrow": "料金",
+      "heading": "成長に合わせて選べるプラン",
+      "description": "無料で始め、必要になったらアップグレード。隠れた料金も営業電話もありません。",
+      "popular": "人気",
+      "perMonth": "/月",
+      "startTrial": "無料トライアルを開始",
+      "trialNote": "14日間無料 · クレジットカード不要",
+      "ctaHeading": "launchctlでアプリやサイトをデプロイしましょう",
+      "registerNow": "今すぐ登録",
+      "plans": {
+        "hobby": {
+          "name": "Hobby",
+          "description": "個人プロジェクトや学習向け"
+        },
+        "compact": {
+          "name": "Compact",
+          "description": "成長中のアプリや小規模チーム向け"
+        },
+        "turbo": {
+          "name": "Turbo",
+          "description": "負荷の高い本番ワークロード向け"
+        }
+      },
+      "features": {
+        "oneServer": "サーバー1台",
+        "threeServers": "サーバー3台",
+        "tenServers": "サーバー10台",
+        "oneSitePerServer": "サーバー1台につきサイト1件",
+        "tenSitesPerServer": "サーバー1台につきサイト10件",
+        "twentySitesPerServer": "サーバー1台につきサイト20件",
+        "fiveDeployments": "デプロイ履歴を5件保持",
+        "oneTeamMember": "チームメンバー1名",
+        "databaseBackups": "データベースバックアップ",
+        "metricsMonitoring": "メトリクスと監視"
+      }
+    },
+    "support": {
+      "pageTitle": "お問い合わせ",
+      "metaDescription": "プロビジョニング、デプロイ、請求などについてlaunchctlチームにお問い合わせください。通常1営業日以内に返信します。",
+      "eyebrow": "お問い合わせ",
+      "heading": "担当者に\n相談する",
+      "description": "プロビジョニング、デプロイ、請求についての質問や、launchctlが用途に合うかのご相談など、お気軽にご連絡ください。通常1営業日以内に返信します。",
+      "readDocs": "ドキュメントを読む",
+      "successTitle": "メールを送信する準備ができました",
+      "successDescription": "内容を入力した状態でメールアプリが開きます。開かない場合はこちらへご連絡ください：",
+      "sendAnother": "別のメッセージを送る",
+      "sendMessage": "メッセージを送信",
+      "privacyNote": "お客様の情報を第三者と共有することはありません。通常1営業日以内に返信します。",
+      "openingEmailClient": "メールアプリを開いています…",
+      "documentation": "ドキュメント",
+      "heroTitle": "ドキュメントとサポート",
+      "heroDescription": "launchctlでアプリケーションをデプロイ・管理するために必要な情報をご案内します。",
+      "fields": {
+        "name": "お名前",
+        "email": "メールアドレス",
+        "topic": "お問い合わせ種別",
+        "message": "メッセージ"
+      },
+      "placeholders": {
+        "name": "山田 太郎",
+        "email": "you{'@'}company.com",
+        "message": "実現したいことやお困りの内容をご記入ください…"
+      },
+      "topics": {
+        "general": "一般的なお問い合わせ",
+        "sales": "導入・販売",
+        "technical": "技術サポート",
+        "billing": "請求"
+      },
+      "validation": {
+        "name": "お名前を入力してください",
+        "email": "有効なメールアドレスを入力してください",
+        "topic": "お問い合わせ種別を選択してください",
+        "message": "状況が分かるよう、もう少し詳しく入力してください"
+      },
+      "email": {
+        "subject": "［{topic}］{name}様からのお問い合わせ"
+      }
+    },
+    "home": {
+      "pageTitle": "自分のサーバーですべてのアプリを実行",
+      "metaTitle": "launchctl — 自分のサーバーですべてのアプリを実行",
+      "metaDescription": "どのクラウドでもサーバーを構築し、Laravel・PHPアプリ、Dockerスタック、マネージドデータベースを実行。CI/CD、ライブログ、キュー監視、定期バックアップ、Webターミナル、自動SSL、無停止デプロイに対応します。",
+      "socialDescription": "自分のクラウド上でサーバーを構築し、Laravel・PHPアプリ、Dockerスタック、マネージドデータベースを実行できる統合プラットフォーム。CI/CD、ログ、キュー監視、バックアップ、ターミナル、SSLも追加のプラットフォーム料金なしで利用できます。",
+      "readDocs": "ドキュメントを読む",
+      "runsOn": "対応クラウド",
+      "runsOnYourCloud": "お使いのクラウドで実行",
+      "hero": {
+        "eyebrow": "自分のクラウドをそのまま利用",
+        "heading": "あらゆるアプリを動かす、ひとつのプラットフォーム。",
+        "description": "サーバーを構築し、Laravel・PHPアプリ、Dockerスタック、マネージドデータベースを実行。CI/CD、ライブログ、キュー監視、バックアップ、無停止デプロイを、管理下のクラウドで利用できます。",
+        "startDeploying": "デプロイを始める"
+      },
+      "preview": {
+        "live": "稼働中",
+        "building": "ビルド中",
+        "production": "本番環境",
+        "justNow": "たった今",
+        "hoursAgo": "{count}時間前",
+        "running": "実行中",
+        "yesterday": "昨日",
+        "durationMinute": "{minutes}分{seconds}秒",
+        "durationSeconds": "{seconds}秒",
+        "cpu": "CPU",
+        "memory": "メモリ",
+        "uptime": "稼働率"
+      },
+      "cicd": {
+        "heading": "Actionsでビルド。\n自分のサーバーへデプロイ。",
+        "descriptionBefore": "ビルド方法に",
+        "descriptionAfter": "を選ぶと、管理されたワークフローをリポジトリへ追加します。イメージをビルドしてGHCRへプッシュし、サーバーへデプロイするため、本番環境にビルド負荷をかけず、レジストリも非公開のまま保てます。",
+        "appLive": "{app} が稼働しました",
+        "points": {
+          "shortLivedTokens": "長期トークンは不要 — デプロイごとに新しい短期プルトークンを発行",
+          "offProduction": "ビルド処理が本番サーバーに触れることはありません",
+          "explicitDeploys": "ワークフローのコミットや同期だけでは自動デプロイされず、実行は常に明示的です"
+        }
+      },
+      "steps": {
+        "eyebrow": "仕組み",
+        "heading": "3ステップで公開",
+        "provision": {
+          "title": "サーバーを構築",
+          "description": "クラウドアカウントを接続すると、Docker、Traefik、ファイアウォール、SSHまで設定済みのホストを構築します。"
+        },
+        "configure": {
+          "title": "アプリを設定",
+          "description": "GitからLaravel・PHPサイトをデプロイするか、Dockerfile、Composeスタック、イメージを指定し、環境変数、ドメイン、キューワーカー、ビルド方法を設定します。"
+        },
+        "ship": {
+          "title": "公開する",
+          "description": "デプロイを実行してビルドとロールアウトをリアルタイムで確認。自動SSLの背後でアプリが公開されます。"
+        }
+      },
+      "observe": {
+        "eyebrow": "監視と操作",
+        "heading": "すべてを把握。\n操作はワンクリック。",
+        "description": "ビルド、デプロイ、ランタイム、キューワーカーの色分けされたログをリアルタイムで検索・確認できます。コンテナのWebターミナル、サーバーメトリクス、リリースのロールバック、S3定期バックアップとワンクリック復元も利用できます。",
+        "chips": {
+          "liveLogs": "ライブログ",
+          "webTerminal": "Webターミナル",
+          "queueLogs": "キューログ",
+          "backups": "バックアップ → S3",
+          "rollback": "ロールバック",
+          "metrics": "メトリクス"
+        }
+      },
+      "faq": {
+        "eyebrow": "よくある質問",
+        "heading": "疑問に、\nお答えします。",
+        "description": "最初のサーバーを構築する前によく寄せられる質問です。さらに詳しく知りたい場合はドキュメントをご覧ください。",
+        "items": {
+          "location": {
+            "question": "アプリは実際にどこで動きますか？",
+            "answer": "お客様自身のクラウドアカウントにある、お客様所有のサーバー上で動作します。launchctlが構築と運用を支援しますが、インフラとデータの所有権はお客様にあります。"
+          },
+          "php": {
+            "question": "DockerだけでなくLaravelやPHPアプリも実行できますか？",
+            "answer": "はい。サーバーを構築し、Laravelや任意のPHPアプリをGitから直接デプロイできます。デプロイスクリプト、環境変数、スケジューラー、キューワーカーも設定されます。同じプラットフォーム上でDockerアプリ、Composeスタック、マネージドデータベースも実行できます。"
+          },
+          "queues": {
+            "question": "キューを監視できますか？",
+            "answer": "はい。キューワーカー、ジョブの処理量、失敗をリアルタイムで確認し、ダッシュボードから再起動、一時停止、スケール変更ができます。ワーカーログもリアルタイムで配信されます。"
+          },
+          "tokens": {
+            "question": "CI/CD用のGitHubトークンを管理する必要がありますか？",
+            "answer": "いいえ。launchctlがGitHub Actionsワークフローを追加し、GHCRへのビルドとプッシュを行います。デプロイごとに短期プルトークンを発行するため、長期PATの設定やローテーションは不要です。"
+          },
+          "workflow": {
+            "question": "ワークフローをコミットするとデプロイされますか？",
+            "answer": "いいえ。ワークフローはworkflow_dispatchでのみ実行されるため、ファイルの同期やコードのプッシュだけで自動デプロイされることはありません。デプロイは常に明示的に実行します。"
+          },
+          "databases": {
+            "question": "どのデータベースに対応していますか？",
+            "answer": "PostgreSQL、MySQL、MariaDB、MongoDB、Redisに対応しています。いずれもS3定期バックアップ、ワンクリック復元、接続情報の表示を利用できます。"
+          }
+        }
+      },
+      "bottomCta": {
+        "heading": "今日、最初のアプリをデプロイしましょう",
+        "description": "サーバーを接続してリポジトリを指定するだけ。CI/CD、ライブログ、バックアップはlaunchctlにお任せください。",
+        "getStarted": "始める",
+        "viewPricing": "料金を見る"
+      }
+    },
+    "heroHome": {
+      "eyebrow": "シンプルなサーバー管理",
+      "heading": "サーバーのデプロイと管理を",
+      "headingAccent": "もっとシンプルに",
+      "description": "サーバー構築、アプリのデプロイ、データベース管理、インフラ監視をひとつのプラットフォームで。DevOpsの専門知識は不要です。",
+      "getStartedFree": "無料で始める",
+      "viewPricing": "料金を見る",
+      "providers": "あらゆるプロバイダーのサーバーを接続できます",
+      "features": {
+        "servers": "サーバー管理",
+        "deploys": "無停止デプロイ",
+        "databases": "データベース管理",
+        "ssl": "SSL証明書",
+        "docker": "Docker & Compose",
+        "loadBalancers": "ロードバランサー"
+      },
+      "preview": {
+        "servers": "サーバー",
+        "domains": "ドメイン",
+        "scripts": "スクリプト",
+        "greeting": "おはようございます、{name}さん",
+        "viewAll": "すべて表示",
+        "production": "本番環境",
+        "staging": "ステージング",
+        "sitesCount": "サイト{count}件",
+        "servicesCount": "サービス{count}件",
+        "upstreamsCount": "アップストリーム{count}件",
+        "recentActivity": "最近のアクティビティ",
+        "minutesAgo": "{count}分前"
+      }
+    },
+    "featureBento": {
+      "heading": "リリースに必要なすべてを",
+      "description": "所有するサーバーの構築、実行、監視、保護を、ひとつの落ち着いたワークフローで操作できる統合運用コンソールです。",
+      "andMore": "その他の機能",
+      "alsoIncluded": "cron · デーモン · サーバーメトリクス · ファイアウォール · SSHキー · 環境変数とシークレット · ボリューム · 通知 · チームとロール · ファイルマネージャー",
+      "features": {
+        "appServers": {
+          "title": "Laravel・PHPアプリサーバー",
+          "description": "サーバーを構築し、Laravelや任意のPHPアプリをGitからデプロイ。デプロイスクリプト、環境変数、スケジューラー、キューワーカーも設定されます。Nodeや静的サイトにも対応します。"
+        },
+        "docker": {
+          "title": "Dockerアプリ、Compose、データベース",
+          "description": "単一コンテナ、複数サービスのComposeスタック、Postgres、MySQL、MariaDB、Mongo、Redisのワンクリック管理に対応します。"
+        },
+        "queues": {
+          "title": "リアルタイムのキュー監視",
+          "description": "キューワーカー、ジョブ、処理量、失敗をリアルタイムで確認し、ダッシュボードからワーカーの再起動、一時停止、スケール変更ができます。"
+        },
+        "logs": {
+          "title": "ライブログとWebターミナル",
+          "description": "ビルド、デプロイ、ランタイムの色分けされたログをリアルタイムで配信し、ブラウザからサーバーやコンテナのシェルを開けます。"
+        },
+        "cicd": {
+          "title": "CI/CDと無停止デプロイ",
+          "description": "GitHub ActionsでビルドしてGHCRへプッシュし、Traefikの背後へヘルスチェック付きで展開します。すべてのリリースをワンクリックでロールバックできます。"
+        },
+        "operations": {
+          "title": "SSL、DNS、バックアップ、マルチクラウド",
+          "description": "Let's Encryptの自動化、ドメインとDNS、ワンクリック復元付きS3定期バックアップを、DigitalOcean、Hetzner、AWS、Linode、Vultrで利用できます。"
+        }
+      }
+    },
+    "featuresHome": {
+      "eyebrow": "仕組み",
+      "heading": "3ステップでデプロイ",
+      "description": "複雑な設定もDevOpsの専門知識も不要。接続、設定、デプロイするだけです。",
+      "steps": {
+        "connect": {
+          "title": "サーバーを接続",
+          "description": "クラウドプロバイダーを連携するか、自分のサーバーを追加します。"
+        },
+        "configure": {
+          "title": "アプリを設定",
+          "description": "Gitリポジトリを接続し、環境変数を設定します。"
+        },
+        "deploy": {
+          "title": "デプロイとスケール",
+          "description": "プッシュでデプロイ。ワンクリックでスケールできます。"
+        }
+      },
+      "preview": {
+        "production": "本番環境",
+        "live": "稼働中",
+        "building": "ビルド中…",
+        "deploying": "デプロイ中…",
+        "deployed": "デプロイ完了！"
+      }
+    },
+    "business": {
+      "eyebrow": "ユースケース",
+      "heading": "あらゆるチームのために",
+      "summary": "個人開発者からエンタープライズチームまで、launchctlはニーズに合わせて拡張できます。",
+      "startups": {
+        "label": "スタートアップ",
+        "title": "すばやくリリース",
+        "description": "インフラ管理に時間を取られず、迅速に開発できます。"
+      },
+      "agencies": {
+        "label": "制作会社",
+        "title": "クライアントを一元管理",
+        "description": "すべてのクライアント案件をひとつのダッシュボードで管理します。"
+      },
+      "enterprise": {
+        "label": "エンタープライズ",
+        "title": "エンタープライズ向けセキュリティ",
+        "description": "大規模組織向けの高度なセキュリティを提供します。"
+      },
+      "features": {
+        "instantDeployments": "即時デプロイ",
+        "autoScaling": "自動スケーリング",
+        "freeSsl": "無料SSL",
+        "gitIntegration": "Git連携",
+        "multiTenant": "マルチテナント",
+        "teamCollaboration": "チーム共同作業",
+        "whiteLabel": "ホワイトラベル",
+        "clientAccess": "クライアントアクセス",
+        "auditLogs": "監査ログ",
+        "privateNetwork": "プライベートネットワーク"
+      }
+    },
+    "bento": {
+      "heading": "デプロイに必要なすべてを",
+      "description": "複雑な作業はlaunchctlに任せて、かんたんにデプロイできます。",
+      "siteLive": "サイトが公開されました",
+      "deployments": "デプロイ",
+      "uptime": "稼働率",
+      "servers": "サーバー",
+      "deploymentsThisWeek": "今週のデプロイ",
+      "sslCertificates": "SSL証明書",
+      "autoRenew": "自動更新",
+      "active": "有効",
+      "databases": "データベース",
+      "managed": "管理対象",
+      "storage": "ストレージ",
+      "oneClick": {
+        "title": "ワンクリックデプロイ",
+        "description": "ワンクリックでアプリを数秒でデプロイ。Gitへプッシュすれば、あとはlaunchctlが処理します。"
+      },
+      "workflow": {
+        "title": "直感的なワークフロー",
+        "description": "複雑な設定やDevOpsの専門知識がなくても、デプロイをかんたんに管理できます。"
+      },
+      "ssl": {
+        "title": "無料SSL証明書",
+        "description": "Let's Encryptですべてのサイトを自動HTTPS化。設定不要で、自動更新にも対応します。"
+      },
+      "database": {
+        "title": "データベース管理",
+        "description": "ワンクリックでデータベースを作成・管理。バックアップ、移行、監視も利用できます。"
+      }
+    },
+    "faq": {
+      "heading": "よくあるご質問",
+      "description": "launchctlについて知っておきたいこと",
+      "categories": {
+        "gettingStarted": {
+          "title": "はじめに",
+          "items": {
+            "start": {
+              "question": "launchctlを始めるには？",
+              "answer": "launchctlは分かりやすく直感的に使えるよう設計されています。サーバープロバイダーを接続し、Gitリポジトリを連携してデプロイするだけです。フレームワークを自動検出し、残りの処理を行います。"
+            },
+            "verify": {
+              "question": "アカウントを確認できません",
+              "answer": "受信トレイと迷惑メールフォルダーに確認メールが届いていないかご確認ください。解決しない場合はサポートチームへお問い合わせください。"
+            },
+            "providers": {
+              "question": "どのサーバープロバイダーに対応していますか？",
+              "answer": "AWS、DigitalOcean、Hetzner、Vultr、Linode、およびSSH接続できる任意のサーバーに対応しています。自分のサーバーも追加できます。"
+            }
+          }
+        },
+        "billing": {
+          "title": "請求とプラン",
+          "items": {
+            "trials": {
+              "question": "キャンペーンと無料トライアル",
+              "answer": "どのプランも14日間無料でお試しいただけます。クレジットカードは不要で、トライアル終了前にキャンセルすれば料金は発生しません。"
+            },
+            "charge": {
+              "question": "心当たりのない請求を報告するには？",
+              "answer": "注文番号と問題の詳細を添えてサポートチームへご連絡ください。24時間以内の解決に向けて対応します。"
+            },
+            "cancel": {
+              "question": "サブスクリプションをキャンセルするには？",
+              "answer": "ログインして［設定］を開き、［サブスクリプションをキャンセル］を選択してください。請求期間の終了までは引き続き利用できます。"
+            }
+          }
+        },
+        "account": {
+          "title": "アカウント管理",
+          "items": {
+            "plan": {
+              "question": "プランを変更できますか？",
+              "answer": "アカウント設定を開き、新しいプランを選んで画面の案内に従ってください。プラン変更はすぐに反映されます。"
+            },
+            "profile": {
+              "question": "プロフィールを編集できません",
+              "answer": "ブラウザーのキャッシュを消去するか、別のブラウザーをお試しください。解決しない場合はサポートチームへお問い合わせください。"
+            },
+            "delete": {
+              "question": "アカウントを削除するには？",
+              "answer": "launchctlダッシュボードから［設定］を開き、［アカウントを削除］を選択してください。この操作は元に戻せません。"
+            }
+          }
+        }
+      }
+    },
+    "docs": {
+      "documentation": "ドキュメント",
+      "search": "ドキュメントを検索",
+      "searchDocumentation": "ドキュメント検索",
+      "searchPlaceholder": "コマンド、ガイド、概念を検索…",
+      "openNavigation": "ドキュメントナビゲーションを開く",
+      "closeNavigation": "ドキュメントナビゲーションを閉じる",
+      "openGithub": "GitHubでlaunchctlを開く",
+      "noResults": "「{query}」に一致するドキュメントはありません。",
+      "results": "{count}件",
+      "searchHelp": "入力して絞り込み · Enterで開く",
+      "onThisPage": "このページの内容",
+      "pageTitle": "{title} - ドキュメント",
+      "metaDescription": "launchctlドキュメント"
+    },
+    "platformUpdate": {
+      "pageTitle": "プラットフォーム更新",
+      "loadFailed": "プラットフォーム更新を読み込めませんでした",
+      "startedFor": "{server}の更新を開始しました",
+      "startFailedFor": "{server}の更新を開始できませんでした",
+      "startedAll": "保留中のすべてのサーバーで更新を開始しました",
+      "startAllFailed": "すべてのサーバーの更新を開始できませんでした",
+      "runAll": "すべて実行",
+      "server": "サーバー",
+      "statusHeading": "ステータス",
+      "error": "エラー",
+      "completed": "完了日時",
+      "action": "操作",
+      "run": "実行",
+      "noServers": "この更新の対象となるサーバーはありません。",
+      "notFound": "プラットフォーム更新が見つかりません。",
+      "status": {
+        "pending": "保留中",
+        "running": "実行中",
+        "completed": "完了",
+        "failed": "失敗",
+        "skipped": "スキップ"
+      },
+      "severity": {
+        "critical": "重大",
+        "warning": "警告",
+        "info": "情報"
+      }
+    },
+    "docsFeatures": {
+      "heading": "機能",
+      "description": "launchctlデプロイプラットフォームの機能一覧です。",
+      "categories": {
+        "serverManagement": {
+          "title": "サーバー管理",
+          "items": {
+            "serverProvisioning": {
+              "name": "サーバープロビジョニング",
+              "description": "AWS、DigitalOcean、Hetzner、Vultr、Linode、または自分のサーバーを接続"
+            },
+            "serviceManagement": {
+              "name": "サービス管理",
+              "description": "nginx、MySQL、Redisなどのサービスを起動、停止、再起動"
+            },
+            "phpVersions": {
+              "name": "PHPバージョン管理",
+              "description": "PHP 7.4、8.0、8.1、8.2、8.3をインストールして切り替え"
+            },
+            "sshKeys": {
+              "name": "SSHキー管理",
+              "description": "安全なサーバーアクセスのためのSSHキーを追加・管理"
+            },
+            "firewall": {
+              "name": "ファイアウォールルール",
+              "description": "UFWファイアウォールルールを設定してサーバーを保護"
+            },
+            "monitoring": {
+              "name": "サーバー監視",
+              "description": "CPU、メモリ、ディスク使用量をリアルタイムで監視"
+            }
+          }
+        },
+        "applicationDeployment": {
+          "title": "アプリケーションデプロイ",
+          "items": {
+            "zeroDowntime": {
+              "name": "無停止デプロイ",
+              "description": "ユーザーへの中断なしでデプロイ"
+            },
+            "gitIntegration": {
+              "name": "Git連携",
+              "description": "GitHub、GitLab、Bitbucket、または任意のGitリポジトリを接続"
+            },
+            "autoDeploy": {
+              "name": "自動デプロイ",
+              "description": "設定したブランチへのプッシュ時に自動でデプロイ"
+            },
+            "deploymentHistory": {
+              "name": "デプロイ履歴",
+              "description": "過去のデプロイを確認し、ロールバック可能"
+            },
+            "environmentVariables": {
+              "name": "環境変数",
+              "description": ".envファイルとシークレットを安全に管理"
+            },
+            "deployScripts": {
+              "name": "カスタムデプロイスクリプト",
+              "description": "デプロイ前後にカスタムコマンドを実行"
+            }
+          }
+        },
+        "databaseManagement": {
+          "title": "データベース管理",
+          "items": {
+            "engines": {
+              "name": "MySQL & PostgreSQL",
+              "description": "MySQLとPostgreSQLデータベースを作成・管理"
+            },
+            "users": {
+              "name": "データベースユーザー",
+              "description": "データベース権限を指定してユーザーを作成"
+            },
+            "remoteAccess": {
+              "name": "リモートアクセス",
+              "description": "必要に応じてデータベースへのリモートアクセスを有効化"
+            },
+            "backups": {
+              "name": "データベースバックアップ",
+              "description": "S3、DigitalOcean Spaces、ローカルストレージへの自動バックアップ"
+            }
+          }
+        },
+        "dnsManagement": {
+          "title": "DNS管理",
+          "items": {
+            "providers": {
+              "name": "DNSプロバイダー",
+              "description": "Cloudflare、Route53、DigitalOcean DNSなどを接続"
+            },
+            "records": {
+              "name": "DNSレコード",
+              "description": "A、AAAA、CNAME、MX、TXTなどのレコードを管理"
+            },
+            "health": {
+              "name": "ドメイン状態",
+              "description": "ドメインの反映状況と健全性を監視"
+            }
+          }
+        },
+        "sslSecurity": {
+          "title": "SSLとセキュリティ",
+          "items": {
+            "letsEncrypt": {
+              "name": "Let's Encrypt SSL",
+              "description": "自動更新される無料SSL証明書"
+            },
+            "customSsl": {
+              "name": "カスタムSSL",
+              "description": "所有するSSL証明書をアップロード"
+            },
+            "sshAuthentication": {
+              "name": "SSHキー認証",
+              "description": "パスワードを使わない安全なサーバーアクセス"
+            },
+            "twoFactor": {
+              "name": "二要素認証",
+              "description": "launchctlアカウントのセキュリティを強化"
+            }
+          }
+        },
+        "queuesSchedulers": {
+          "title": "キューとスケジューラー",
+          "items": {
+            "workers": {
+              "name": "キューワーカー",
+              "description": "Laravel Horizon、Redisキュー、カスタムワーカーを管理"
+            },
+            "cron": {
+              "name": "Cronジョブ",
+              "description": "cron式を使ってタスクをスケジュール"
+            },
+            "daemons": {
+              "name": "デーモン",
+              "description": "自動再起動付きで長時間実行プロセスを運用"
+            },
+            "autoRestart": {
+              "name": "自動再起動",
+              "description": "デプロイ後にワーカーを自動で再起動"
+            }
+          }
+        },
+        "monitoringLogs": {
+          "title": "監視とログ",
+          "items": {
+            "realtimeLogs": {
+              "name": "リアルタイムログ",
+              "description": "nginx、PHP-FPM、アプリケーションログを配信"
+            },
+            "deploymentLogs": {
+              "name": "デプロイログ",
+              "description": "デプロイの各ステップを詳細なログで確認"
+            },
+            "metrics": {
+              "name": "サーバーメトリクス",
+              "description": "CPU、メモリ、ディスク、ネットワークを監視"
+            },
+            "notifications": {
+              "name": "通知",
+              "description": "イベントをSlack、メール、Webhookで通知"
+            }
+          }
+        },
+        "teamCollaboration": {
+          "title": "チーム共同作業",
+          "items": {
+            "management": {
+              "name": "チーム管理",
+              "description": "ロールベースの権限でチームメンバーを招待"
+            },
+            "activityLog": {
+              "name": "アクティビティログ",
+              "description": "チームメンバーが行ったすべての操作を追跡"
+            },
+            "multiTeam": {
+              "name": "複数チーム対応",
+              "description": "複数のチームにまたがるプロジェクトを整理"
+            }
+          }
+        }
+      }
+    },
+    "legal": {
+      "eyebrow": "法的情報",
+      "lastUpdated": "最終更新日 · {date}",
+      "contactForm": "お問い合わせフォーム",
+      "privacy": {
+        "title": "プライバシーポリシー",
+        "metaDescription": "launchctl（Gigcodes）によるデータの収集、利用、保護について説明します。アプリとデータはお客様所有のインフラ上で動作します。",
+        "intro": "本ポリシーでは、launchctlが収集するデータ、その目的、お客様が選択できる事項について説明します。launchctlはGigcodes（以下「当社」）が運営しています。",
+        "sections": {
+          "who": {
+            "heading": "1. 運営者について",
+            "body": "launchctlはGigcodesが運営するサーバー管理・デプロイプラットフォームです。お客様自身のクラウドアカウントへのサーバー構築と、その上でのアプリケーションのデプロイ・運用を支援します。本ポリシーはlaunchctlのWebサイト、ダッシュボード、APIに適用されます。"
+          },
+          "collect": {
+            "heading": "2. 収集する情報",
+            "accountLabel": "アカウント情報",
+            "accountBody": " — 登録時のお名前、メールアドレス、安全にハッシュ化されたパスワード、およびチーム所属情報。",
+            "billingLabel": "請求情報",
+            "billingBody": " — サブスクリプション決済は決済事業者Polarが処理します。当社はプラン、サブスクリプション状態、請求書の情報を受け取りますが、完全なカード番号を閲覧または保存することはありません。",
+            "credentialsLabel": "インフラ認証情報",
+            "credentialsBody": " — サーバーの構築・運用に必要なクラウドプロバイダーのAPIトークン、SSHキー、接続情報。これらは暗号化され、有効にした機能の実行にのみ使用されます。",
+            "usageLabel": "利用状況・診断データ",
+            "usageBody": " — サービスの運用と問題の調査に使用するログ、IPアドレス、ブラウザー種別、製品内での操作。",
+            "communicationsLabel": "お問い合わせ内容",
+            "communicationsBody": " — サポートまたはお問い合わせフォームから送信されたメッセージ。"
+          },
+          "use": {
+            "heading": "3. 情報の利用目的",
+            "platform": "launchctlプラットフォームの提供、運用、保護。",
+            "billing": "サブスクリプション、請求、返金の処理。",
+            "support": "サポートの提供とお問い合わせへの対応。",
+            "reliability": "信頼性の監視、不正利用の防止、製品の改善。",
+            "legal": "法令および規制上の義務への対応。",
+            "noSale": "当社がお客様の個人データを販売することはありません。"
+          },
+          "ownership": {
+            "heading": "4. アプリとデータの所有権",
+            "body": "デプロイしたアプリケーション、データベース、コンテンツは、お客様自身のクラウドアカウントにあるサーバー上で動作します。当社がインフラへアクセスするのは、サーバー構築、デプロイ、ログ配信、バックアップなど、お客様が依頼した操作を行う場合に限られます。これらのデータは当社ではなく、お客様のものです。"
+          },
+          "share": {
+            "heading": "5. 情報の共有先",
+            "intro": "サービスの運営に必要な次の事業者とのみデータを共有します。",
+            "polar": " — サブスクリプションの請求と決済。",
+            "connectedProviders": "お客様が接続したクラウドプロバイダー（DigitalOcean、Hetzner、AWS、Linode、Vultrなど）および、お客様の指示に基づいてCI/CDを実行するGitHub。",
+            "infrastructure": "launchctlのホスティングと取引メールの送信に使用するインフラ・メール事業者。",
+            "authorities": "法令で求められる場合、または当社とユーザーの権利を保護するための公的機関。"
+          },
+          "retention": {
+            "heading": "6. データの保持期間",
+            "body": "アカウントが有効な間、情報を保持します。アカウントを閉鎖した場合やデータ削除の依頼を受けた場合は、法的義務により一部の記録（請求書など）を保持する必要がある場合を除き、合理的な期間内に削除します。"
+          },
+          "security": {
+            "heading": "7. セキュリティ",
+            "body": "転送中のデータはTLSで保護し、クラウドトークンやSSHキーなどの機密情報は保存時に暗号化します。アクセスはサービス運用に必要な範囲へ制限されています。完全に安全なシステムはありませんが、お客様の情報を守るため継続的に取り組みます。"
+          },
+          "rights": {
+            "heading": "8. お客様の権利",
+            "body": "アカウント設定またはメールでのご連絡により、いつでも個人データへのアクセス、訂正、エクスポート、削除を依頼できます。合理的な期間内に対応します。"
+          },
+          "cookies": {
+            "heading": "9. Cookie",
+            "body": "ログイン状態の維持や、言語・ライト／ダークモードなどの設定を記憶するため、必要不可欠なCookieを使用します。他のサイトをまたいだ追跡には使用しません。"
+          },
+          "changes": {
+            "heading": "10. 本ポリシーの変更",
+            "body": "本ポリシーを更新する場合があります。その際は上記の「最終更新日」を改定し、重要な変更については製品内またはメールでお知らせします。"
+          },
+          "contact": {
+            "heading": "11. お問い合わせ",
+            "beforeEmail": "プライバシーに関するご質問は",
+            "between": "までメールいただくか、"
+          }
+        }
+      },
+      "refund": {
+        "title": "返金ポリシー",
+        "metaDescription": "launchctlでは理由を問わない返金制度を設けています。お支払いから30日以内であれば、メールでご連絡いただくことでサブスクリプション料金を全額返金します。",
+        "intro": "方針はシンプルです。launchctlがご期待に沿わなかった場合は、理由を問わず返金します。",
+        "leadTitle": "ご満足いただけなければ返金します。",
+        "leadBody": " サブスクリプションのお支払いから30日以内にメールでご連絡いただければ、フォームへの記入や理由の説明なしで全額返金します。",
+        "request": {
+          "heading": "返金の申請方法",
+          "beforeEmail": "アカウントに登録したメールアドレスから",
+          "between": "へメールするか、",
+          "afterForm": "をご利用ください。返金を希望する請求をお知らせいただくだけで、理由は不要です。"
+        },
+        "covered": {
+          "heading": "返金の対象",
+          "subscription": "launchctlが請求したサブスクリプション料金。請求から30日以内であれば、元のお支払い方法へ返金します。",
+          "full": "日割り計算や手数料の差し引きは行わず、全額を返金します。",
+          "effect": "返金後は該当するサブスクリプションが終了し、有料機能が無効になります。お客様のサーバーとデータは自分のクラウド上にあるため、影響を受けません。"
+        },
+        "notCovered": {
+          "heading": "返金対象外の料金",
+          "body": "launchctlはお客様所有のインフラ上でアプリを実行します。DigitalOcean、Hetzner、AWS、Linode、Vultrなどのクラウドプロバイダー料金は各事業者から直接請求されるため、当社では返金できません。各プロバイダーへお問い合わせください。"
+        },
+        "beyond": {
+          "heading": "30日を過ぎた場合",
+          "body": "30日を過ぎた場合もお気軽にご相談ください。将来の請求を止めるため、いつでもキャンセルできます。問題が発生していた場合は状況を確認し、誠実に対応します。"
+        },
+        "questions": {
+          "heading": "ご質問",
+          "beforeEmail": "ご不明な点は",
+          "afterEmail": "までご連絡ください。通常1営業日以内に返信します。"
+        }
+      },
+      "terms": {
+        "title": "利用規約",
+        "metaDescription": "Gigcodesが運営するlaunchctlの利用に適用される、アカウント、請求、禁止事項、お客様の責任に関する規約です。",
+        "intro": "本規約はGigcodesが運営するlaunchctlの利用に適用されます。アカウントの作成またはサービスの利用をもって、本規約に同意したものとみなします。",
+        "sections": {
+          "service": {
+            "heading": "1. サービス",
+            "body": "launchctlは、お客様が接続したクラウドアカウントにサーバーを構築し、Laravel・PHPアプリ、Dockerスタック、マネージドデータベースのほか、CI/CD、ログ、キュー、バックアップ、SSLなどの関連機能を使ったデプロイ・運用を支援するプラットフォームです。当社はコントロールプレーンを提供し、インフラはお客様自身のクラウド上で動作します。"
+          },
+          "account": {
+            "heading": "2. アカウント",
+            "accurate": "正確な情報を提供し、最新の状態に保つ必要があります。",
+            "security": "アカウント上の活動と、認証情報の安全な管理について責任を負います。",
+            "age": "16歳以上で、契約を締結できる必要があります。"
+          },
+          "responsibilities": {
+            "heading": "3. インフラとお客様の責任",
+            "intro": "サーバーとアプリケーションはお客様所有のクラウドアカウント上で動作するため、次の事項について責任を負います。",
+            "content": "デプロイするアプリケーション、データ、コンテンツ、およびそれらを利用する権利。",
+            "charges": "クラウドプロバイダーから直接請求される料金。これはlaunchctlのサブスクリプション料金とは別です。",
+            "providers": "接続するクラウドプロバイダーおよび第三者サービスの規約の遵守。"
+          },
+          "acceptable": {
+            "heading": "4. 禁止事項",
+            "intro": "launchctlを次の目的で使用しないことに同意するものとします。",
+            "law": "法令への違反、または他者の権利の侵害。",
+            "malware": "マルウェアのホスティングや配布、または所有していない、もしくはテスト権限のないシステムへの攻撃、調査、妨害。",
+            "abuse": "launchctlプラットフォームへの妨害や不正利用、またはセキュリティ・利用制限の回避。"
+          },
+          "billing": {
+            "heading": "5. 請求とサブスクリプション",
+            "renewal": "有料プランは決済事業者Polarを通じて前払いで請求され、キャンセルされるまで自動更新されます。",
+            "cancellation": "アカウントからいつでもキャンセルできます。キャンセルすると今後の請求が停止し、現在の請求期間の終了時に適用されます。",
+            "taxes": "表示価格に税金が含まれない場合があり、必要に応じて加算されます。",
+            "refundBefore": "返金については",
+            "refundAfter": "に基づき、お支払いから30日以内であれば理由を問わず対応します。"
+          },
+          "thirdParty": {
+            "heading": "6. 第三者サービス",
+            "body": "launchctlは、クラウドプロバイダー、GitHub、Polarなど、お客様が接続するサービスと連携します。当社はそれらのサービスや可用性について責任を負わず、利用には各サービスの規約が適用されます。"
+          },
+          "ip": {
+            "heading": "7. 知的財産",
+            "body": "launchctlのプラットフォーム、ソフトウェア、ブランドは当社が所有します。デプロイするアプリケーション、データ、コンテンツの権利はお客様に帰属します。お客様は、有効にした機能の運用に必要な範囲でのみ当社にアクセスを許可します。"
+          },
+          "disclaimers": {
+            "heading": "8. 免責事項",
+            "body": "launchctlは「現状有姿」かつ「提供可能な範囲」で提供されます。適用法で認められる最大限の範囲で、特定目的への適合性を含む明示または黙示の保証を行いません。バックアップの維持とインフラの耐障害性についてはお客様が責任を負います。"
+          },
+          "liability": {
+            "heading": "9. 責任の制限",
+            "body": "適用法で認められる最大限の範囲で、Gigcodesは間接的、付随的、結果的な損害、またはデータ、利益、収益の損失について責任を負いません。本サービスに関する請求に対する当社の責任総額は、請求前12か月間にお客様が当社へ支払った金額を上限とします。"
+          },
+          "termination": {
+            "heading": "10. 利用終了",
+            "body": "いつでもlaunchctlの利用を停止し、アカウントを閉鎖できます。本規約への違反、または他者やプラットフォームへ危害を及ぼすおそれのある利用があった場合、当社はアクセスを停止または終了することがあります。サーバーとデータはお客様自身のクラウド上に残ります。"
+          },
+          "changes": {
+            "heading": "11. 変更",
+            "body": "当社はサービスおよび本規約を更新する場合があります。上記の「最終更新日」を改定し、重要な変更については合理的な方法で事前にお知らせします。変更後もlaunchctlを利用し続けた場合、変更に同意したものとみなします。"
+          },
+          "governing": {
+            "heading": "12. 準拠法",
+            "body": "本規約は、抵触法の原則にかかわらず、Gigcodesが設立された法域の法律に準拠します。"
+          },
+          "contact": {
+            "heading": "13. お問い合わせ",
+            "beforeEmail": "本規約に関するご質問は",
+            "between": "までメールいただくか、"
+          }
+        }
+      }
+    }
+  }
+}

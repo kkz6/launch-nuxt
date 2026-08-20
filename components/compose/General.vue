@@ -6,6 +6,8 @@ interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t, locale } = useI18n();
+const dateLocale = computed(() => (locale.value === "ja" ? "ja-JP" : "en-US"));
 
 // Source-config rendering helpers. Compose stacks have two source
 // types: git (sourceConfig has repo + branch) or raw_yaml (inlined
@@ -24,14 +26,14 @@ const sourceMeta = computed(() => {
   switch (props.compose.compose_source_type) {
     case "git":
       return {
-        label: "Git Repository",
+        label: t("workload.sources.gitRepository"),
         icon: "lucide:git-branch",
         iconBg: "bg-violet-500/10",
         iconColor: "text-violet-500",
       };
     case "raw_yaml":
       return {
-        label: "Inline YAML",
+        label: t("workload.sources.inlineYaml"),
         icon: "lucide:file-code",
         iconBg: "bg-sky-500/10",
         iconColor: "text-sky-500",
@@ -53,7 +55,7 @@ const statusMeta = computed(() => {
   switch (props.compose.status) {
     case "running":
       return {
-        label: "Running",
+        label: t("workload.status.running"),
         icon: "lucide:activity",
         iconBg: "bg-emerald-500/10",
         iconColor: "text-emerald-500",
@@ -63,21 +65,21 @@ const statusMeta = computed(() => {
       // deploy is in flight (matches application status semantics).
       // There's no separate "deploying" value in the enum.
       return {
-        label: "Deploying",
+        label: t("workload.status.deploying"),
         icon: "lucide:loader",
         iconBg: "bg-amber-500/10",
         iconColor: "text-amber-500",
       };
     case "failed":
       return {
-        label: "Failed",
+        label: t("workload.status.failed"),
         icon: "lucide:circle-x",
         iconBg: "bg-rose-500/10",
         iconColor: "text-rose-500",
       };
     case "stopped":
       return {
-        label: "Stopped",
+        label: t("workload.status.stopped"),
         icon: "lucide:circle-pause",
         iconBg: "bg-zinc-500/10",
         iconColor: "text-zinc-500",
@@ -93,9 +95,9 @@ const statusMeta = computed(() => {
 });
 
 const formatDate = (iso?: string | null): string => {
-  if (!iso) return "Never";
+  if (!iso) return t("workload.application.general.never");
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString(dateLocale.value);
   } catch {
     return "—";
   }
@@ -105,9 +107,9 @@ const copyValue = async (label: string, value: string | null | undefined) => {
   if (!value) return;
   try {
     await navigator.clipboard.writeText(value);
-    toast.success(`${label} copied`);
+    toast.success(t("workload.copy.success", { label }));
   } catch {
-    toast.error(`Couldn't copy ${label}`);
+    toast.error(t("workload.copy.failed", { label }));
   }
 };
 
@@ -144,7 +146,9 @@ const stackName = computed(() => props.compose.name);
           />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Source</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.fields.source") }}
+          </p>
           <p class="text-sm font-medium text-foreground">
             {{ sourceMeta.label }}
           </p>
@@ -164,7 +168,9 @@ const stackName = computed(() => props.compose.name);
           />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Status</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.fields.status") }}
+          </p>
           <p class="text-sm font-medium capitalize text-foreground">
             {{ statusMeta.label }}
           </p>
@@ -181,7 +187,9 @@ const stackName = computed(() => props.compose.name);
           <Icon name="lucide:file-code-2" class="h-5 w-5 text-amber-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Compose File</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.compose.general.composeFile") }}
+          </p>
           <p class="truncate font-mono text-xs font-medium text-foreground">
             {{
               compose.compose_source_type === "git"
@@ -200,7 +208,9 @@ const stackName = computed(() => props.compose.name);
           <Icon name="lucide:clock" class="h-5 w-5 text-emerald-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Last Deployed</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.fields.lastDeployed") }}
+          </p>
           <p class="text-sm font-medium text-foreground">
             {{ formatDate(compose.last_deployed_at) }}
           </p>
@@ -221,7 +231,9 @@ const stackName = computed(() => props.compose.name);
           </div>
           <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-sm text-muted-foreground">Repository</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("workload.fields.repository") }}
+              </p>
               <p class="truncate font-mono text-xs font-medium text-foreground">
                 {{ gitRepo || "—" }}
               </p>
@@ -230,8 +242,8 @@ const stackName = computed(() => props.compose.name);
               v-if="gitRepo"
               type="button"
               class="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-              title="Copy repository URL"
-              @click="copyValue('Repository', gitRepo)"
+              :title="t('workload.copy.repositoryUrl')"
+              @click="copyValue(t('workload.fields.repository'), gitRepo)"
             >
               <Icon name="lucide:copy" class="h-4 w-4" />
             </button>
@@ -247,7 +259,9 @@ const stackName = computed(() => props.compose.name);
             />
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-sm text-muted-foreground">Branch</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.fields.branch") }}
+            </p>
             <p class="font-mono text-sm font-medium text-foreground">
               {{ gitBranch || "—" }}
             </p>
@@ -267,7 +281,9 @@ const stackName = computed(() => props.compose.name);
         </div>
         <div class="flex min-w-0 flex-1 items-center justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-sm text-muted-foreground">Stack Name</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.compose.general.stackName") }}
+            </p>
             <p class="truncate font-mono text-sm font-medium text-foreground">
               {{ stackName }}
             </p>
@@ -276,8 +292,10 @@ const stackName = computed(() => props.compose.name);
             v-if="stackName"
             type="button"
             class="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            title="Copy stack name"
-            @click="copyValue('Stack name', stackName)"
+            :title="t('workload.copy.stackName')"
+            @click="
+              copyValue(t('workload.compose.general.stackName'), stackName)
+            "
           >
             <Icon name="lucide:copy" class="h-4 w-4" />
           </button>

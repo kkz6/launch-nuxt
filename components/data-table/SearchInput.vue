@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Input } from "~/components/ui/input";
 
+const { t } = useI18n();
+
 defineProps<{
   modelValue: string;
   placeholder?: string;
@@ -29,7 +31,7 @@ const emit = defineEmits<{
     </svg>
     <Input
       :model-value="modelValue"
-      :placeholder="placeholder ?? 'Search...'"
+      :placeholder="placeholder ?? t('data.search')"
       class="pl-9"
       @update:model-value="emit('update:modelValue', String($event))"
     />

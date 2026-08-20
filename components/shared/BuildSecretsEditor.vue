@@ -51,6 +51,7 @@ const props = withDefaults(defineProps<Props>(), {
   ownerLabel: "application",
   githubActions: false,
 });
+const { t } = useI18n();
 
 // Must match the backend: gha_bootstrap_workflow.go pushes each build
 // secret as ("LAUNCH_BUILD_" + name) verbatim, and the workflow YAML
@@ -71,7 +72,9 @@ const newSecret = reactive({ name: "", value: "" });
 watch(showAddForm, async (open) => {
   if (!open) return;
   await nextTick();
-  const el = document.getElementById("build-secret-name") as HTMLInputElement | null;
+  const el = document.getElementById(
+    "build-secret-name",
+  ) as HTMLInputElement | null;
   el?.focus();
 });
 
@@ -81,9 +84,9 @@ const closeAddForm = () => {
   newSecret.value = "";
 };
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 // Per-row replace-value state. Different from env-var editing in that
 // the input is ALWAYS empty when we open it (we don't have the old
@@ -116,10 +119,10 @@ const saveEdit = async (s: BuildSecretRow) => {
   try {
     const updated = await props.onUpdate(s.id, { value: next.value });
     syncRow(updated);
-    toast.success(`${s.name} updated`);
+    toast.success(t("shared.buildSecrets.updated", { name: s.name }));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update build secret");
+    toast.error(e.data?.message || t("shared.buildSecrets.updateFailed"));
     return;
   }
   cancelEdit(s.id);
@@ -128,7 +131,7 @@ const saveEdit = async (s: BuildSecretRow) => {
 const addSecret = async () => {
   const name = newSecret.name.trim();
   if (!name) {
-    toast.error("Name is required");
+    toast.error(t("shared.buildSecrets.nameRequired"));
     return;
   }
   isSaving.value = true;
@@ -139,10 +142,10 @@ const addSecret = async () => {
     });
     emit("update:secrets", sortByName([...props.secrets, created]));
     closeAddForm();
-    toast.success("Build secret added");
+    toast.success(t("shared.buildSecrets.added"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to add build secret");
+    toast.error(e.data?.message || t("shared.buildSecrets.addFailed"));
   } finally {
     isSaving.value = false;
   }
@@ -151,20 +154,23 @@ const addSecret = async () => {
 const removeSecret = async (s: BuildSecretRow) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Remove build secret",
-    description: `Remove ${s.name}? Builds that reference id=${s.name} via --mount=type=secret will fail until you re-add it.`,
-    confirmText: "Remove",
-    cancelText: "Cancel",
+    title: t("shared.buildSecrets.removeTitle"),
+    description: t("shared.buildSecrets.removeDescription", { name: s.name }),
+    confirmText: t("shared.buildSecrets.remove"),
+    cancelText: t("common.cancel"),
     destructive: true,
   });
   if (!result.ok) return;
   try {
     await props.onDelete(s.id);
-    emit("update:secrets", props.secrets.filter((x) => x.id !== s.id));
-    toast.success("Build secret removed");
+    emit(
+      "update:secrets",
+      props.secrets.filter((x) => x.id !== s.id),
+    );
+    toast.success(t("shared.buildSecrets.removed"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to remove build secret");
+    toast.error(e.data?.message || t("shared.buildSecrets.removeFailed"));
   }
 };
 
@@ -185,19 +191,28 @@ const sortByName = (rows: BuildSecretRow[]) =>
 
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0 space-y-1">
-        <h3 class="text-base font-semibold tracking-tight">Build-time secrets</h3>
-        <p class="max-w-prose text-[13px] leading-relaxed text-muted-foreground">
-          Mounted into <span class="font-mono text-foreground/80">docker&nbsp;build</span>
-          via <span class="font-mono text-foreground/80">--mount=type=secret</span> —
-          available only while the image builds. Separate from the runtime
-          variables above.
+        <h3 class="text-base font-semibold tracking-tight">
+          {{ t("shared.buildSecrets.title") }}
+        </h3>
+        <p
+          class="max-w-prose text-[13px] leading-relaxed text-muted-foreground"
+        >
+          {{ t("shared.buildSecrets.description") }}
         </p>
       </div>
       <Button
         size="icon-sm"
         :variant="showAddForm ? 'outline' : 'default'"
-        :title="showAddForm ? 'Close' : 'Add build secret'"
-        :aria-label="showAddForm ? 'Close' : 'Add build secret'"
+        :title="
+          showAddForm
+            ? t('shared.buildSecrets.close')
+            : t('shared.buildSecrets.addSecret')
+        "
+        :aria-label="
+          showAddForm
+            ? t('shared.buildSecrets.close')
+            : t('shared.buildSecrets.addSecret')
+        "
         class="press shrink-0"
         @click="showAddForm ? closeAddForm() : (showAddForm = true)"
       >
@@ -225,7 +240,9 @@ const sortByName = (rows: BuildSecretRow[]) =>
       >
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-[220px_1fr]">
           <div class="space-y-1">
-            <Label for="build-secret-name" class="text-xs">Name</Label>
+            <Label for="build-secret-name" class="text-xs">
+              {{ t("shared.buildSecrets.name") }}
+            </Label>
             <Input
               id="build-secret-name"
               v-model="newSecret.name"
@@ -236,7 +253,9 @@ const sortByName = (rows: BuildSecretRow[]) =>
             />
           </div>
           <div class="space-y-1">
-            <Label for="build-secret-value" class="text-xs">Value</Label>
+            <Label for="build-secret-value" class="text-xs">
+              {{ t("shared.buildSecrets.value") }}
+            </Label>
             <Input
               id="build-secret-value"
               v-model="newSecret.value"
@@ -248,10 +267,11 @@ const sortByName = (rows: BuildSecretRow[]) =>
           </div>
         </div>
         <p class="text-[11px] text-muted-foreground">
-          Reference in your <span class="font-mono">Dockerfile</span> with
+          {{ t("shared.buildSecrets.dockerfileReference") }}
           <code class="rounded bg-muted px-1 py-0.5 text-[10px]">
-            RUN --mount=type=secret,id={{ newSecret.name || "NPM_TOKEN" }} cat /run/secrets/{{ newSecret.name || "NPM_TOKEN" }}
-          </code>.
+            RUN --mount=type=secret,id={{ newSecret.name || "NPM_TOKEN" }} cat
+            /run/secrets/{{ newSecret.name || "NPM_TOKEN" }} </code
+          >.
         </p>
         <p
           v-if="githubActions"
@@ -259,13 +279,16 @@ const sortByName = (rows: BuildSecretRow[]) =>
         >
           <Icon name="lucide:key-round" class="mt-0.5 h-3 w-3 shrink-0" />
           <span>
-            On your next re-sync this is uploaded to your repository as the
-            GitHub Actions secret
-            <code class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-foreground">{{ repoSecretName(newSecret.name || "NPM_TOKEN") }}</code>
-            and passed to the build as
-            <code class="rounded bg-muted px-1 py-0.5 text-[10px]">{{ newSecret.name || "NPM_TOKEN" }}</code>
-            — so your Dockerfile <span class="font-mono">id=</span> stays
-            the short name.
+            {{ t("shared.buildSecrets.githubPrefix") }}
+            <code
+              class="rounded bg-muted px-1 py-0.5 text-[10px] font-medium text-foreground"
+              >{{ repoSecretName(newSecret.name || "NPM_TOKEN") }}</code
+            >
+            {{ t("shared.buildSecrets.githubMiddle") }}
+            <code class="rounded bg-muted px-1 py-0.5 text-[10px]">{{
+              newSecret.name || "NPM_TOKEN"
+            }}</code>
+            {{ t("shared.buildSecrets.githubSuffix") }}
           </span>
         </p>
         <div class="flex justify-end gap-2">
@@ -276,7 +299,7 @@ const sortByName = (rows: BuildSecretRow[]) =>
             :disabled="isSaving"
             @click="closeAddForm"
           >
-            Cancel
+            {{ t("common.cancel") }}
           </Button>
           <Button type="submit" size="sm" :disabled="isSaving">
             <Icon
@@ -284,7 +307,7 @@ const sortByName = (rows: BuildSecretRow[]) =>
               name="lucide:loader-2"
               class="mr-2 h-3.5 w-3.5 animate-spin"
             />
-            Add
+            {{ t("shared.buildSecrets.add") }}
           </Button>
         </div>
       </form>
@@ -297,7 +320,9 @@ const sortByName = (rows: BuildSecretRow[]) =>
       values are never displayed; each row shows the name + a
       green "set" indicator instead.
     -->
-    <div class="overflow-hidden rounded-lg border border-border/50 bg-background/40">
+    <div
+      class="overflow-hidden rounded-lg border border-border/50 bg-background/40"
+    >
       <div v-if="loading" class="flex items-center justify-center py-12">
         <Icon
           name="lucide:loader-2"
@@ -309,16 +334,18 @@ const sortByName = (rows: BuildSecretRow[]) =>
         v-else-if="secrets.length === 0"
         class="flex flex-col items-center justify-center px-6 py-10 text-center"
       >
-        <div class="flex h-11 w-11 items-center justify-center rounded-lg border border-border/40 bg-muted/30">
+        <div
+          class="flex h-11 w-11 items-center justify-center rounded-lg border border-border/40 bg-muted/30"
+        >
           <Icon name="lucide:shield" class="h-5 w-5 text-muted-foreground/70" />
         </div>
         <h3 class="mt-3.5 text-[15px] font-semibold tracking-tight">
-          No build secrets yet
+          {{ t("shared.buildSecrets.emptyTitle") }}
         </h3>
-        <p class="mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground">
-          Add a secret here when your <span class="font-mono">Dockerfile</span>
-          needs a credential at build time — private package registries,
-          private git clones, build-time API keys.
+        <p
+          class="mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground"
+        >
+          {{ t("shared.buildSecrets.emptyDescription") }}
         </p>
       </div>
 
@@ -326,9 +353,9 @@ const sortByName = (rows: BuildSecretRow[]) =>
         <div
           class="grid grid-cols-[220px_1fr_140px] gap-2 border-b border-border/50 bg-muted/30 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
         >
-          <div>Name</div>
-          <div>Value</div>
-          <div class="text-right">Actions</div>
+          <div>{{ t("shared.buildSecrets.name") }}</div>
+          <div>{{ t("shared.buildSecrets.value") }}</div>
+          <div class="text-right">{{ t("shared.buildSecrets.actions") }}</div>
         </div>
 
         <div
@@ -343,7 +370,11 @@ const sortByName = (rows: BuildSecretRow[]) =>
             <code
               v-if="githubActions"
               class="truncate font-mono text-[10px] text-muted-foreground/70"
-              :title="`Repository Actions secret: ${repoSecretName(s.name)}`"
+              :title="
+                t('shared.buildSecrets.repositorySecret', {
+                  name: repoSecretName(s.name),
+                })
+              "
             >
               {{ repoSecretName(s.name) }}
             </code>
@@ -361,15 +392,14 @@ const sortByName = (rows: BuildSecretRow[]) =>
                 v-model="editing[s.id].value"
                 type="password"
                 class="h-9 w-full font-mono text-xs"
-                placeholder="Enter a new value to replace the current one"
+                :placeholder="t('shared.buildSecrets.newValuePlaceholder')"
                 autocomplete="off"
                 spellcheck="false"
                 @keyup.enter="saveEdit(s)"
                 @keyup.esc="cancelEdit(s.id)"
               />
               <p class="text-[10px] text-muted-foreground">
-                The existing value isn't shown — leave blank to cancel
-                without changes.
+                {{ t("shared.buildSecrets.existingHidden") }}
               </p>
             </div>
             <div v-else class="flex items-center gap-1.5">
@@ -378,17 +408,17 @@ const sortByName = (rows: BuildSecretRow[]) =>
                 class="inline-flex items-center gap-1 rounded border border-border/70 bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground/80"
               >
                 <Icon name="lucide:check" class="h-2.5 w-2.5" />
-                Set
+                {{ t("shared.buildSecrets.set") }}
               </span>
               <span
                 v-else
                 class="inline-flex items-center gap-1 rounded border border-destructive/30 bg-destructive/5 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-destructive"
               >
                 <Icon name="lucide:alert-triangle" class="h-2.5 w-2.5" />
-                Empty
+                {{ t("shared.buildSecrets.empty") }}
               </span>
               <span class="font-mono text-[11px] text-muted-foreground/80">
-                value hidden
+                {{ t("shared.buildSecrets.valueHidden") }}
               </span>
             </div>
           </div>
@@ -398,8 +428,8 @@ const sortByName = (rows: BuildSecretRow[]) =>
               <Button
                 variant="default"
                 size="icon-sm"
-                title="Save"
-                aria-label="Save"
+                :title="t('shared.buildSecrets.save')"
+                :aria-label="t('shared.buildSecrets.save')"
                 @click="saveEdit(s)"
               >
                 <Icon name="lucide:check" class="h-3.5 w-3.5" />
@@ -407,8 +437,8 @@ const sortByName = (rows: BuildSecretRow[]) =>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Cancel"
-                aria-label="Cancel"
+                :title="t('common.cancel')"
+                :aria-label="t('common.cancel')"
                 @click="cancelEdit(s.id)"
               >
                 <Icon name="lucide:x" class="h-3.5 w-3.5" />
@@ -418,8 +448,8 @@ const sortByName = (rows: BuildSecretRow[]) =>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Replace value"
-                aria-label="Replace value"
+                :title="t('shared.buildSecrets.replaceValue')"
+                :aria-label="t('shared.buildSecrets.replaceValue')"
                 @click="startEdit(s)"
               >
                 <Icon name="lucide:pencil" class="h-3.5 w-3.5" />
@@ -427,8 +457,8 @@ const sortByName = (rows: BuildSecretRow[]) =>
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Remove"
-                aria-label="Remove"
+                :title="t('shared.buildSecrets.remove')"
+                :aria-label="t('shared.buildSecrets.remove')"
                 class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 @click="removeSecret(s)"
               >
@@ -443,14 +473,19 @@ const sortByName = (rows: BuildSecretRow[]) =>
     <p class="text-[11px] leading-relaxed text-muted-foreground">
       <Icon name="lucide:info" class="-mt-0.5 mr-1 inline-block h-3 w-3" />
       <template v-if="githubActions">
-        Saved changes are <span class="font-medium text-foreground/80">staged, not pushed</span>.
-        Re-syncing the workflow uploads each secret to your repository as the
-        Actions secret
-        <code class="rounded bg-muted px-1 py-0.5 text-[10px]">LAUNCH_BUILD_&lt;NAME&gt;</code>
-        and commits the updated YAML — a change isn't in your build until you re-sync.
+        {{ t("shared.buildSecrets.stagedPrefix") }}
+        <span class="font-medium text-foreground/80">{{
+          t("shared.buildSecrets.staged")
+        }}</span
+        >.
+        {{ t("shared.buildSecrets.resyncPrefix") }}
+        <code class="rounded bg-muted px-1 py-0.5 text-[10px]"
+          >LAUNCH_BUILD_&lt;NAME&gt;</code
+        >
+        {{ t("shared.buildSecrets.resyncSuffix") }}
       </template>
       <template v-else>
-        Changes apply to the next build.
+        {{ t("shared.buildSecrets.nextBuild") }}
       </template>
     </p>
   </div>

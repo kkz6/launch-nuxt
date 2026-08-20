@@ -19,6 +19,8 @@ const props = defineProps<{
   currency: string;
 }>();
 
+const { locale, t } = useI18n();
+
 const colorMode = useColorMode();
 
 // Resolve a shadcn HSL design token (e.g. "240 5.9% 10%") into a usable
@@ -43,7 +45,7 @@ const palette = computed(() => {
 });
 
 function formatMoney(cents: number, compact = false): string {
-  return (cents / 100).toLocaleString(undefined, {
+  return (cents / 100).toLocaleString(locale.value, {
     style: "currency",
     currency: props.currency || "USD",
     maximumFractionDigits: compact ? 0 : 2,
@@ -51,11 +53,22 @@ function formatMoney(cents: number, compact = false): string {
   });
 }
 
+function formatMonth(value: string): string {
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1));
+  return new Intl.DateTimeFormat(locale.value, {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(date);
+}
+
 const chartData = computed<ChartData<"bar">>(() => ({
-  labels: props.trend.map((m) => m.month),
+  labels: props.trend.map((m) => formatMonth(m.month)),
   datasets: [
     {
-      label: "Revenue",
+      label: t("admin.revenueTrend.revenue"),
       data: props.trend.map((m) => m.total),
       backgroundColor: palette.value.bar,
       hoverBackgroundColor: palette.value.barHover,

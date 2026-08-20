@@ -1,3 +1,7 @@
+import type { LocaleCode } from "~/types/locale";
+
+export type { LocaleCode, LocalePreference, UserLocale } from "~/types/locale";
+
 export type ServerProvider =
   | "digitalocean"
   | "hetzner"
@@ -75,6 +79,7 @@ export interface User {
   two_factor_confirmed_at: string | null;
   profile_photo_url: string;
   timezone: string;
+  locale: LocaleCode | null;
   onboarded: boolean;
   staff_role?: "support" | "super_admin" | null;
   status?: string;
@@ -279,6 +284,18 @@ export type CertificateStatus =
 export interface CertificateStatusResult {
   host: string;
   status: CertificateStatus;
+  reason?:
+    | "valid"
+    | "no_hostname"
+    | "dns_lookup_failed"
+    | "dns_not_public"
+    | "no_certificate"
+    | "not_active"
+    | "expired"
+    | "hostname_mismatch"
+    | "untrusted"
+    | "https_disabled"
+    | "internal_ca";
   valid: boolean;
   message: string;
   issuer?: string;
@@ -354,6 +371,7 @@ export interface ProvisionStatus {
   // suppress the spinner on a never-resolving "current" step and render an
   // error banner instead. See BuildProvisionStatus in responses.go.
   failed?: boolean;
+  error_code?: string;
   error_message?: string;
 }
 

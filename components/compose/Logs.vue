@@ -7,15 +7,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import {
-  dockerService,
-  type DockerCompose,
-} from "~/services/dockerService";
+import { dockerService, type DockerCompose } from "~/services/dockerService";
 
 interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Compose Logs wraps ApplicationLogs in compose-mode (composeId set)
 // and slots a service-picker into ApplicationLogs's header so the
@@ -60,8 +58,8 @@ const refresh = async () => {
   await fetchServices();
   toast.success(
     services.value.length
-      ? `Found ${services.value.length} service${services.value.length === 1 ? "" : "s"}`
-      : "No services running yet",
+      ? t("workload.logs.servicesFound", { count: services.value.length })
+      : t("workload.logs.noServices"),
   );
 };
 
@@ -80,7 +78,7 @@ onMounted(fetchServices);
   <ApplicationLogs
     :compose-id="compose.id"
     :service="selected === '__all__' ? '' : selected"
-    empty-state-message="Deploy this compose stack first; logs start streaming once at least one service is running."
+    :empty-state-message="t('workload.logs.composeEmptyDescription')"
   >
     <!--
       Slot lands inside ApplicationLogs's terminal chrome bar — dark
@@ -94,10 +92,12 @@ onMounted(fetchServices);
         <SelectTrigger
           class="h-6 min-w-[140px] border-zinc-800 bg-zinc-900 px-2 text-[11px] text-zinc-200 hover:bg-zinc-800 focus:ring-0 focus:ring-offset-0"
         >
-          <SelectValue placeholder="All services" />
+          <SelectValue :placeholder="t('workload.logs.allServices')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="__all__">All services</SelectItem>
+          <SelectItem value="__all__">{{
+            t("workload.logs.allServices")
+          }}</SelectItem>
           <SelectItem v-for="svc in services" :key="svc" :value="svc">
             {{ svc }}
           </SelectItem>
@@ -108,16 +108,14 @@ onMounted(fetchServices);
         class="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
         :title="
           isLoadingServices
-            ? 'Re-fetching service list…'
-            : 'Re-fetch the service list (after a deploy)'
+            ? t('workload.logs.refreshingServices')
+            : t('workload.logs.refreshServices')
         "
         :disabled="isLoadingServices"
         @click="refresh"
       >
         <Icon
-          :name="
-            isLoadingServices ? 'lucide:loader-2' : 'lucide:refresh-cw'
-          "
+          :name="isLoadingServices ? 'lucide:loader-2' : 'lucide:refresh-cw'"
           class="h-3.5 w-3.5"
           :class="isLoadingServices ? 'animate-spin' : ''"
         />

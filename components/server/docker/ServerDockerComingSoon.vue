@@ -8,6 +8,8 @@ interface Props {
   icon: string;
 }
 defineProps<Props>();
+
+const { t } = useI18n();
 </script>
 
 <template>
@@ -23,7 +25,7 @@ defineProps<Props>();
       class="mt-4 inline-flex items-center gap-2 rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground"
     >
       <Icon name="lucide:hammer" class="h-3.5 w-3.5" />
-      Coming soon
+      {{ t("server.comingSoon") }}
     </div>
   </div>
 </template>

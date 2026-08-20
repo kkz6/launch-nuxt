@@ -11,28 +11,29 @@ interface Props {
   projectId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const databases = ref<DockerDatabase[]>([]);
 const isLoading = ref(true);
 
 // Shared with the navbar "+ New Database" button — see
 // components/layout/Navbar.vue.
-const createOpen = useState<boolean>(
-  "dockerCreateDatabaseOpen",
-  () => false,
-);
+const createOpen = useState<boolean>("dockerCreateDatabaseOpen", () => false);
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchDatabases = async (silent = false) => {
   if (!silent) isLoading.value = true;
   try {
-    const res = await dockerService.databases.list(props.serverId, props.projectId);
+    const res = await dockerService.databases.list(
+      props.serverId,
+      props.projectId,
+    );
     databases.value = res.data;
   } catch {
-    if (!silent) toast.error("Failed to load databases");
+    if (!silent) toast.error(t("workload.project.databases.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -46,36 +47,45 @@ const onCreated = (db: DockerDatabase) => {
 const deleteDatabase = async (db: DockerDatabase) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Delete Database",
-    description: `Remove "${db.name}"? The container will be stopped and removed. The data volume is preserved unless you tick the box below.`,
-    confirmText: "Delete",
-    cancelText: "Cancel",
+    title: t("workload.database.delete.title"),
+    description: t("workload.database.delete.listDescription", {
+      name: db.name,
+    }),
+    confirmText: t("workload.actions.delete"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
     inputVerificationText: db.name,
-    helpText: "Type the database name to confirm:",
+    helpText: t("workload.database.delete.confirmHelp"),
     // Off by default — `launch-db-<id>-data` survives unless ticked.
     checkbox: {
-      label: "Also delete the data volume (database state will be lost)",
+      label: t("workload.database.delete.volumeLabel"),
       checked: false,
     },
   });
   if (!result.ok) return;
   const removeVolumes = !!result.checkbox?.checked;
   try {
-    await dockerService.databases.delete(props.serverId, props.projectId, db.id, {
-      removeVolumes,
-    });
+    await dockerService.databases.delete(
+      props.serverId,
+      props.projectId,
+      db.id,
+      {
+        removeVolumes,
+      },
+    );
     databases.value = databases.value.filter((x) => x.id !== db.id);
     toast.success(
       removeVolumes
-        ? "Database + data volume deletion queued"
-        : "Database deletion queued (data preserved)",
+        ? t("workload.database.delete.queuedWithVolume")
+        : t("workload.database.delete.queuedPreserved"),
     );
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete database");
+    toast.error(e.data?.message || t("workload.database.delete.failed"));
   }
 };
+
+const statusLabel = (status: string) => t(`workload.status.${status}`, status);
 
 const engineIcon = (engine: DockerDatabaseEngine): string => {
   switch (engine) {
@@ -143,15 +153,19 @@ onMounted(fetchDatabases);
       project navbar next to Terminal.
     -->
     <div class="mb-6">
-      <h2 class="text-xl font-semibold">Databases</h2>
+      <h2 class="text-xl font-semibold">
+        {{ t("workload.project.databases.title") }}
+      </h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Managed Postgres, MySQL, MariaDB, Redis, or Mongo containers
-        with auto-generated credentials.
+        {{ t("workload.project.databases.description") }}
       </p>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <div
@@ -159,15 +173,17 @@ onMounted(fetchDatabases);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:database" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No databases yet</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("workload.project.databases.emptyTitle") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Spin up a database container in this project. Credentials are
-        generated on create and reachable from sibling containers by
-        the database's name on <code>launch-network</code>.
+        {{ t("workload.project.databases.emptyBefore") }}
+        <code>launch-network</code
+        >{{ t("workload.project.databases.emptyAfter") }}
       </p>
       <Button v-if="canEdit" class="mt-6" @click="createOpen = true">
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        New Database
+        {{ t("workload.project.databases.new") }}
       </Button>
     </div>
 
@@ -225,18 +241,22 @@ onMounted(fetchDatabases);
             </Button>
           </div>
 
-          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+          <div
+            class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm"
+          >
             <span
               class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
               :class="statusColor(db.status)"
             >
-              {{ db.status }}
+              {{ statusLabel(db.status) }}
             </span>
             <span class="text-xs text-muted-foreground">
               {{
                 db.external_port
-                  ? `Exposed on :${db.external_port}`
-                  : "Internal only"
+                  ? t("workload.database.exposedOn", {
+                      port: db.external_port,
+                    })
+                  : t("workload.database.internalOnly")
               }}
             </span>
           </div>

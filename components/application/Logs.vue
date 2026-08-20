@@ -12,6 +12,7 @@ interface Props {
   emptyStateMessage?: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 interface LogsState {
   lines: { raw: string; html: string }[];
@@ -40,6 +41,7 @@ let pingTimer: ReturnType<typeof setInterval> | null = null;
 const config = useRuntimeConfig();
 const { token, waitForAuth } = useAuth();
 const { getCurrentTeamId } = useApi();
+const { effectiveLocale } = useLocalePreference();
 
 const connect = async () => {
   disconnect();
@@ -67,6 +69,7 @@ const connect = async () => {
     [targetParam.name]: targetParam.value,
     tail: "200",
     token: token.value || "",
+    locale: effectiveLocale.value,
   });
   if (teamId) params.set("team_id", teamId);
   if (props.composeId && props.service) {
@@ -87,15 +90,21 @@ const connect = async () => {
       try {
         const evt = JSON.parse(data);
         if (evt.event === "no_container") {
-          toast.info(evt.message || "Application has not been deployed yet");
+          toast.info(
+            evt.data?.message ?? evt.message ?? t("workload.logs.notDeployed"),
+          );
           return;
         }
         if (evt.event === "error") {
-          toast.error(evt.message || "Log stream error");
+          toast.error(
+            evt.data?.message ?? evt.message ?? t("workload.logs.streamError"),
+          );
           return;
         }
         return;
-      } catch {}
+      } catch {
+        // Preserve non-JSON container output verbatim below.
+      }
     }
     lines.value.push({ raw: data, html: parseAnsiToHtml(data) });
     if (lines.value.length > 10000) {
@@ -167,6 +176,11 @@ watch(
   },
 );
 
+watch(effectiveLocale, () => {
+  lines.value = [];
+  void connect();
+});
+
 onMounted(() => {
   void connect();
 });
@@ -177,10 +191,9 @@ onBeforeUnmount(disconnect);
 <template>
   <div class="space-y-4">
     <div>
-      <h2 class="text-xl font-semibold">Logs</h2>
+      <h2 class="text-xl font-semibold">{{ t("workload.logs.title") }}</h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Live container output. Most recent 200 lines on connect, then tails as
-        new lines arrive.
+        {{ t("workload.logs.description") }}
       </p>
     </div>
 
@@ -189,12 +202,11 @@ onBeforeUnmount(disconnect);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:scroll" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No logs yet</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("workload.logs.emptyTitle") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        {{
-          emptyStateMessage ||
-          "Deploy the application first; logs start streaming once a container is running."
-        }}
+        {{ emptyStateMessage || t("workload.logs.emptyDescription") }}
       </p>
     </div>
 
@@ -227,7 +239,13 @@ onBeforeUnmount(disconnect);
                 wsOpen && 'animate-pulse',
               ]"
             />
-            {{ wsOpen ? "Live" : isConnecting ? "Connecting" : "Disconnected" }}
+            {{
+              wsOpen
+                ? t("workload.logs.live")
+                : isConnecting
+                  ? t("workload.logs.connecting")
+                  : t("workload.logs.disconnected")
+            }}
           </div>
           <slot name="header-actions" />
         </div>
@@ -236,7 +254,9 @@ onBeforeUnmount(disconnect);
           <button
             type="button"
             class="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
-            :title="isPaused ? 'Resume stream' : 'Pause stream'"
+            :title="
+              isPaused ? t('workload.logs.resume') : t('workload.logs.pause')
+            "
             @click="isPaused = !isPaused"
           >
             <Icon
@@ -247,7 +267,7 @@ onBeforeUnmount(disconnect);
           <button
             type="button"
             class="rounded p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 disabled:cursor-not-allowed disabled:opacity-40"
-            title="Clear buffer"
+            :title="t('workload.logs.clear')"
             :disabled="lines.length === 0"
             @click="clearBuffer"
           >
@@ -267,7 +287,7 @@ onBeforeUnmount(disconnect);
             name="lucide:loader-2"
             class="h-5 w-5 animate-spin"
           />
-          <span v-else>No log lines yet.</span>
+          <span v-else>{{ t("workload.logs.noLines") }}</span>
         </div>
         <div
           v-for="(line, idx) in lines"
@@ -284,7 +304,7 @@ onBeforeUnmount(disconnect);
         @click="jumpToBottom"
       >
         <Icon name="lucide:arrow-down" class="h-3 w-3" />
-        Jump to latest
+        {{ t("workload.logs.jumpToLatest") }}
       </button>
     </div>
   </div>

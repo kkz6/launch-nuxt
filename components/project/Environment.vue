@@ -10,16 +10,20 @@ interface Props {
   projectId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Description copy as a script-side constant so the literal
 // `${{project.KEY}}` token never lands in template-text territory.
 // Vue's compiler scans HTML attribute values for `{{...}}` mustaches
 // and would otherwise treat `{project.KEY}` as a (broken) JS object
 // literal — same trap the SharedEnvVarsEditor's v-pre <code> avoids.
-const description =
-  "Shared env vars any container under this project can reference via " +
-  "$" +
-  "{{project.KEY}}. Resolved at deploy / run time.";
+const description = computed(
+  () =>
+    t("workload.environment.projectDescriptionBefore") +
+    "$" +
+    "{{project.KEY}}" +
+    t("workload.environment.projectDescriptionAfter"),
+);
 
 // Project-level env-var editor. Container env vars (application +
 // database) can reference these via `${{project.<KEY>}}`; the
@@ -38,7 +42,7 @@ const fetchVars = async () => {
     );
     vars.value = res.data;
   } catch {
-    toast.error("Failed to load project env vars");
+    toast.error(t("workload.environment.projectLoadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -89,7 +93,7 @@ const onDelete = async (id: string) => {
     :vars="vars"
     :loading="isLoading"
     :show-project-hint="false"
-    title="Environment"
+    :title="t('workload.environment.title')"
     :description="description"
     :on-create="onCreate"
     :on-update="onUpdate"

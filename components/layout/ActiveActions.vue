@@ -1,26 +1,33 @@
 <script setup lang="ts">
-import { Activity, CircleAlert, CircleCheck, Loader2, X } from 'lucide-vue-next'
+import { unref } from "vue";
+import {
+  Activity,
+  CircleAlert,
+  CircleCheck,
+  Loader2,
+  X,
+} from "lucide-vue-next";
 import {
   useBackupEvents,
   useCommandEvents,
   useDeploymentEvents,
   useDockerBackupEvents,
   useTaskEvents,
-} from '~/composables/useChannelEvents'
+} from "~/composables/useChannelEvents";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
+} from "~/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '~/components/ui/sheet'
+} from "~/components/ui/sheet";
 import {
   activeActionPath,
   activeActionStatusLabel,
@@ -33,165 +40,216 @@ import {
   visibleActiveActions,
   type ActiveAction,
   type ActiveActionEventData,
-} from '~/utils/activeActions'
+} from "~/utils/activeActions";
 
-const { user } = useAuth()
-const { get } = useApi()
-const router = useRouter()
-const actions = ref<ActiveAction[]>([])
-const isLoading = ref(false)
-const logsOpen = ref(false)
-const selected = ref<ActiveAction | null>(null)
-let timer: ReturnType<typeof setInterval> | null = null
-const fetchGuard = createActiveActionRequestGuard()
+const { user } = useAuth();
+const { locale, t } = useI18n();
+const { get } = useApi();
+const router = useRouter();
+const actions = ref<ActiveAction[]>([]);
+const isLoading = ref(false);
+const logsOpen = ref(false);
+const selected = ref<ActiveAction | null>(null);
+let timer: ReturnType<typeof setInterval> | null = null;
+const fetchGuard = createActiveActionRequestGuard();
 
 // Terminal actions linger server-side so a failure is still readable after
 // it finishes. They are not work in progress though, so let the user clear
 // them, and remember that across reloads — the row would otherwise reappear
 // on the next poll for as long as the backend retains it.
-const DISMISSED_KEY = 'launch:dismissed-actions'
-const dismissed = ref<string[]>([])
+const DISMISSED_KEY = "launch:dismissed-actions";
+const dismissed = ref<string[]>([]);
 
 const loadDismissed = () => {
-  if (typeof window === 'undefined') return
+  if (typeof window === "undefined") return;
   try {
-    const stored = JSON.parse(localStorage.getItem(DISMISSED_KEY) || '[]')
-    dismissed.value = Array.isArray(stored) ? stored.map(String) : []
+    const stored = JSON.parse(localStorage.getItem(DISMISSED_KEY) || "[]");
+    dismissed.value = Array.isArray(stored) ? stored.map(String) : [];
   } catch {
-    dismissed.value = []
+    dismissed.value = [];
   }
-}
+};
 
 const dismiss = (action: ActiveAction) => {
-  dismissed.value = [...new Set([...dismissed.value, action.id])]
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed.value))
+  dismissed.value = [...new Set([...dismissed.value, action.id])];
+  if (typeof window !== "undefined") {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(dismissed.value));
   }
-}
+};
 
 // Only keep ids we could still receive, so the list cannot grow forever.
 const pruneDismissed = (current: ActiveAction[]) => {
-  const kept = pruneDismissedIds(dismissed.value, current)
-  if (kept.length === dismissed.value.length) return
-  dismissed.value = kept
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(DISMISSED_KEY, JSON.stringify(kept))
+  const kept = pruneDismissedIds(dismissed.value, current);
+  if (kept.length === dismissed.value.length) return;
+  dismissed.value = kept;
+  if (typeof window !== "undefined") {
+    localStorage.setItem(DISMISSED_KEY, JSON.stringify(kept));
   }
-}
+};
 
 const visibleActions = computed(() =>
   visibleActiveActions(actions.value, dismissed.value),
-)
+);
 const failedActions = computed(() =>
   visibleActions.value.filter(
-    (action) => activeActionStatusTone(action.status) === 'failure',
+    (action) => activeActionStatusTone(action.status) === "failure",
   ),
-)
+);
 
-const teamId = computed(() => String(user.value?.current_team_id || ''))
+const teamId = computed(() => String(user.value?.current_team_id || ""));
 const fetchActions = async () => {
-  if (!teamId.value) return
-  const request = fetchGuard.start()
-  isLoading.value = true
+  if (!teamId.value) return;
+  const request = fetchGuard.start();
+  isLoading.value = true;
   try {
-    const response = await get<{ data: ActiveAction[] }>('/actions/active')
-    if (!fetchGuard.isCurrent(request)) return
+    const response = await get<{ data: ActiveAction[] }>("/actions/active");
+    if (!fetchGuard.isCurrent(request)) return;
 
-    const nextActions = response.data || []
-    actions.value = nextActions
-    pruneDismissed(nextActions)
+    const nextActions = response.data || [];
+    actions.value = nextActions;
+    pruneDismissed(nextActions);
 
     const refreshedSelection = nextActions.find(
       (action) => action.id === selected.value?.id,
-    )
+    );
     if (
       refreshedSelection &&
       selected.value &&
       isActiveActionRunning(selected.value)
     ) {
-      selected.value = refreshedSelection
+      selected.value = refreshedSelection;
     }
   } catch {
-    return
+    return;
   } finally {
     if (fetchGuard.isCurrent(request)) {
-      isLoading.value = false
+      isLoading.value = false;
     }
   }
-}
+};
 
 const handleLifecycleEvent = async (
   data: ActiveActionEventData,
   event: string,
 ) => {
-  selected.value = updateActionFromEvent(selected.value, data, event)
-  await fetchActions()
-}
+  selected.value = updateActionFromEvent(selected.value, data, event);
+  await fetchActions();
+};
 
-useDeploymentEvents(teamId, handleLifecycleEvent)
-useBackupEvents(teamId, handleLifecycleEvent)
-useDockerBackupEvents(teamId, handleLifecycleEvent)
+useDeploymentEvents(teamId, handleLifecycleEvent);
+useBackupEvents(teamId, handleLifecycleEvent);
+useDockerBackupEvents(teamId, handleLifecycleEvent);
 
-useCommandEvents(teamId, fetchActions)
+useCommandEvents(teamId, fetchActions);
 
-useTaskEvents(teamId, handleLifecycleEvent)
+useTaskEvents(teamId, handleLifecycleEvent);
 
 watch(teamId, (currentTeamId, previousTeamId) => {
-  if (currentTeamId === previousTeamId) return
+  if (currentTeamId === previousTeamId) return;
 
-  fetchGuard.invalidate()
-  actions.value = []
-  isLoading.value = false
-  selected.value = null
-  logsOpen.value = false
-  if (currentTeamId) void fetchActions()
-})
+  fetchGuard.invalidate();
+  actions.value = [];
+  isLoading.value = false;
+  selected.value = null;
+  logsOpen.value = false;
+  if (currentTeamId) void fetchActions();
+});
 
 const elapsed = (action: ActiveAction) => {
-  const startedAt = new Date(action.started_at || action.created_at).getTime()
-  const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000))
-  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m`
-}
+  const startedAt = new Date(action.started_at || action.created_at).getTime();
+  const seconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+  return seconds < 60
+    ? t("common.activeActions.seconds", { count: seconds })
+    : t("common.activeActions.minutes", { count: Math.floor(seconds / 60) });
+};
+
+const localizedActionValue = (value: string, group: "kind" | "target") => {
+  const key = `common.activeActions.${group}.${value}`;
+  const translated = t(key);
+  return translated === key ? humanizeActionValue(value) : translated;
+};
+
+const localizedStatusLabel = (action: ActiveAction) => {
+  const key = `common.activeActions.status.${action.status}`;
+  const translated = t(key);
+  return translated === key ? activeActionStatusLabel(action) : translated;
+};
+
+const localizedActionLabel = (action: ActiveAction) => {
+  // Deployment/workload/backup labels are resource names supplied by the
+  // user. Task names are backend-authored English copy, so use a stable label
+  // in Japanese until task events expose a dedicated code + parameters.
+  if (action.kind === "task" && unref(locale) === "ja") {
+    return t("common.activeActions.taskLabel");
+  }
+  return action.label;
+};
+
+const localizedActionDescription = (action: ActiveAction) => {
+  if (
+    action.description &&
+    unref(locale) === "ja" &&
+    (action.kind === "server_backup" || action.kind === "database_backup")
+  ) {
+    return t("common.activeActions.backupFailureDescription");
+  }
+  return action.description;
+};
 
 const actionStateDescription = (action: ActiveAction) => {
-  if (isActiveActionRunning(action)) return `Running for ${elapsed(action)}`
-
-  const tone = activeActionStatusTone(action.status)
-  if (tone === 'success') return `${humanizeActionValue(action.kind)} complete`
-  if (tone === 'failure') return activeActionStatusLabel(action)
-  return humanizeActionValue(action.status)
-}
-
-const actionOutputContextLabel = (action: ActiveAction | null) => {
-  if (!action) return 'Live output'
-
-  const phase = isActiveActionRunning(action) ? 'Live' : 'Final'
-  return `${phase} ${humanizeActionValue(action.kind).toLowerCase()} output`
-}
-
-const outputModeLabel = (action: ActiveAction) =>
-  isActiveActionRunning(action) ? 'Live output' : 'Final output'
-
-const openAction = (action: ActiveAction) => {
-  selected.value = action
-  if (action.task_id) {
-    logsOpen.value = true
-    return
+  if (isActiveActionRunning(action)) {
+    return t("common.activeActions.runningFor", { duration: elapsed(action) });
   }
 
-  router.push(activeActionPath(action))
-}
+  const tone = activeActionStatusTone(action.status);
+  if (tone === "success") {
+    return t("common.activeActions.complete", {
+      kind: localizedActionValue(action.kind, "kind"),
+    });
+  }
+  return localizedStatusLabel(action);
+};
+
+const actionOutputContextLabel = (action: ActiveAction | null) => {
+  if (!action) return t("common.activeActions.liveOutput");
+
+  return t("common.activeActions.outputContext", {
+    phase: t(
+      isActiveActionRunning(action)
+        ? "common.activeActions.phaseLive"
+        : "common.activeActions.phaseFinal",
+    ),
+    kind: localizedActionValue(action.kind, "kind"),
+  });
+};
+
+const outputModeLabel = (action: ActiveAction) =>
+  t(
+    isActiveActionRunning(action)
+      ? "common.activeActions.liveOutput"
+      : "common.activeActions.finalOutput",
+  );
+
+const openAction = (action: ActiveAction) => {
+  selected.value = action;
+  if (action.task_id) {
+    logsOpen.value = true;
+    return;
+  }
+
+  router.push(activeActionPath(action));
+};
 
 onMounted(() => {
-  loadDismissed()
-  fetchActions()
-  timer = setInterval(fetchActions, 10_000)
-})
+  loadDismissed();
+  fetchActions();
+  timer = setInterval(fetchActions, 10_000);
+});
 
 onUnmounted(() => {
-  fetchGuard.invalidate()
-  if (timer) clearInterval(timer)
-})
+  fetchGuard.invalidate();
+  if (timer) clearInterval(timer);
+});
 </script>
 
 <template>
@@ -199,7 +257,7 @@ onUnmounted(() => {
     <DropdownMenuTrigger as-child>
       <button
         class="relative grid h-9 w-9 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        aria-label="Active actions"
+        :aria-label="t('common.activeActions.title')"
       >
         <Activity
           class="h-4 w-4"
@@ -226,13 +284,13 @@ onUnmounted(() => {
     <DropdownMenuContent align="end" class="w-80 p-1">
       <DropdownMenuLabel class="flex items-center gap-2">
         <Loader2 v-if="isLoading" class="h-3.5 w-3.5 animate-spin" />
-        Active actions
+        {{ t("common.activeActions.title") }}
       </DropdownMenuLabel>
       <p
         v-if="!visibleActions.length && !isLoading"
         class="px-2 py-5 text-center text-sm text-muted-foreground"
       >
-        No actions are running.
+        {{ t("common.activeActions.noneRunning") }}
       </p>
       <DropdownMenuItem
         v-for="action in visibleActions"
@@ -251,13 +309,13 @@ onUnmounted(() => {
         <CircleCheck v-else class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
         <span class="min-w-0 flex-1">
           <span class="block truncate text-sm font-medium">{{
-            action.label
+            localizedActionLabel(action)
           }}</span>
           <span
-            v-if="action.description"
+            v-if="localizedActionDescription(action)"
             class="block truncate font-mono text-xs text-foreground/75"
           >
-            {{ action.description }}
+            {{ localizedActionDescription(action) }}
           </span>
           <span
             class="block text-xs"
@@ -267,8 +325,8 @@ onUnmounted(() => {
                 : 'text-muted-foreground'
             "
           >
-            {{ humanizeActionValue(action.kind) }} ·
-            {{ activeActionStatusLabel(action) }} ·
+            {{ localizedActionValue(action.kind, "kind") }} ·
+            {{ localizedStatusLabel(action) }} ·
             {{ elapsed(action) }}
           </span>
         </span>
@@ -276,7 +334,11 @@ onUnmounted(() => {
           v-if="!isActiveActionRunning(action)"
           type="button"
           class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded text-muted-foreground opacity-0 transition-opacity hover:bg-muted hover:text-foreground focus:opacity-100 group-hover:opacity-100"
-          :aria-label="`Dismiss ${action.label}`"
+          :aria-label="
+            t('common.activeActions.dismiss', {
+              action: localizedActionLabel(action),
+            })
+          "
           @click.stop="dismiss(action)"
         >
           <X class="h-3.5 w-3.5" />
@@ -315,7 +377,7 @@ onUnmounted(() => {
           <SheetTitle
             class="truncate text-xl font-semibold tracking-[-0.025em] sm:text-2xl"
           >
-            {{ selected?.label }}
+            {{ selected ? localizedActionLabel(selected) : "" }}
           </SheetTitle>
           <span
             v-if="selected"
@@ -339,7 +401,7 @@ onUnmounted(() => {
               v-else-if="activeActionStatusTone(selected.status) === 'failure'"
               class="h-3.5 w-3.5"
             />
-            {{ activeActionStatusLabel(selected) }}
+            {{ localizedStatusLabel(selected) }}
           </span>
         </div>
         <div
@@ -347,10 +409,12 @@ onUnmounted(() => {
           class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground"
         >
           <span class="font-medium text-foreground/70">{{
-            humanizeActionValue(selected.kind)
+            localizedActionValue(selected.kind, "kind")
           }}</span>
           <span class="h-3 w-px bg-border" aria-hidden="true" />
-          <span>{{ humanizeActionValue(selected.target_type) }}</span>
+          <span>{{
+            localizedActionValue(selected.target_type, "target")
+          }}</span>
           <span class="h-3 w-px bg-border" aria-hidden="true" />
           <span>{{ actionStateDescription(selected) }}</span>
         </div>
@@ -359,7 +423,9 @@ onUnmounted(() => {
         <div
           class="flex h-10 shrink-0 items-center justify-between border-b border-white/[0.06] px-5 text-[11px] text-zinc-500 sm:px-7"
         >
-          <span class="font-mono">Task output</span>
+          <span class="font-mono">{{
+            t("common.activeActions.taskOutput")
+          }}</span>
           <span
             v-if="selected"
             class="inline-flex items-center gap-2 transition-colors duration-200"

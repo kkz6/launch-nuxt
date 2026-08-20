@@ -1,9 +1,6 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import {
-  dockerService,
-  type DockerDatabase,
-} from "~/services/dockerService";
+import { dockerService, type DockerDatabase } from "~/services/dockerService";
 import type { Server } from "~/types";
 
 definePageMeta({
@@ -12,6 +9,7 @@ definePageMeta({
 });
 
 const route = useRoute();
+const { t } = useI18n();
 const serverId = computed(() => route.params.id as string);
 const projectId = computed(() => route.params.projectId as string);
 const databaseId = computed(() => route.params.databaseId as string);
@@ -24,15 +22,25 @@ const isLoading = ref(true);
 // deploys. The audit history still lives in the polymorphic
 // docker_deployments table on the backend for ops, but the UI surfaces
 // it via the action buttons + Logs tab instead of a dedicated tab.
-const SUBTABS = [
-  { value: "general", label: "General", icon: "lucide:info" },
-  { value: "databases", label: "Databases", icon: "lucide:database" },
-  { value: "environment", label: "Environment", icon: "lucide:key" },
-  { value: "backups", label: "Backups", icon: "lucide:hard-drive" },
-  { value: "logs", label: "Logs", icon: "lucide:scroll" },
-  { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
+const SUBTAB_DEFINITIONS = [
+  { value: "general", labelKey: "general", icon: "lucide:info" },
+  { value: "databases", labelKey: "databases", icon: "lucide:database" },
+  { value: "environment", labelKey: "environment", icon: "lucide:key" },
+  { value: "backups", labelKey: "backups", icon: "lucide:hard-drive" },
+  { value: "logs", labelKey: "logs", icon: "lucide:scroll" },
+  {
+    value: "advanced",
+    labelKey: "advanced",
+    icon: "lucide:sliders-horizontal",
+  },
 ] as const;
-type SubTabId = (typeof SUBTABS)[number]["value"];
+type SubTabId = (typeof SUBTAB_DEFINITIONS)[number]["value"];
+const SUBTABS = computed(() =>
+  SUBTAB_DEFINITIONS.map(({ labelKey, ...subtab }) => ({
+    ...subtab,
+    label: t(`server.workloadTabs.${labelKey}`),
+  })),
+);
 
 const READY_SUBTABS: Record<string, boolean> = {
   general: true,
@@ -48,7 +56,7 @@ const READY_SUBTABS: Record<string, boolean> = {
 // and this computed picks the change up reactively. A local ref +
 // watcher loop was the original implementation but it only mirrored
 // the URL on mount, so navbar clicks didn't switch tabs.
-const validIds = SUBTABS.map((s) => s.value);
+const validIds = SUBTAB_DEFINITIONS.map((s) => s.value);
 const subTab = computed<SubTabId>(() => {
   const q = route.query.subtab as string | undefined;
   return q && (validIds as readonly string[]).includes(q)
@@ -67,7 +75,7 @@ const fetchDatabase = async () => {
     db.value = res.data;
     useHead({ title: db.value.name });
   } catch {
-    toast.error("Database not found");
+    toast.error(t("server.workload.databaseNotFound"));
     navigateTo(
       `/servers/${serverId.value}/projects/${projectId.value}?tab=databases`,
     );
@@ -184,10 +192,7 @@ const statusBadge = computed(() => {
     <template v-else>
       <DatabaseGeneral v-if="subTab === 'general'" :database="db" />
 
-      <DatabaseDatabases
-        v-else-if="subTab === 'databases'"
-        :database="db"
-      />
+      <DatabaseDatabases v-else-if="subTab === 'databases'" :database="db" />
 
       <DatabaseEnvironment
         v-else-if="subTab === 'environment'"
@@ -209,7 +214,7 @@ const statusBadge = computed(() => {
       <ServerDockerComingSoon
         v-else-if="!READY_SUBTABS[subTab]"
         :title="SUBTABS.find((s) => s.value === subTab)?.label ?? subTab"
-        description="This tab is reserved for future use."
+        :description="t('server.workload.databaseComingSoon')"
         :icon="SUBTABS.find((s) => s.value === subTab)?.icon ?? 'lucide:hammer'"
       />
     </template>

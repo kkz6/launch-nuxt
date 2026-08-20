@@ -25,6 +25,7 @@ import {
 } from "~/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Checkbox } from "~/components/ui/checkbox";
+import { useStableMetadataLabels } from "~/composables/useStableMetadataLabels";
 import type { SSHKey, ConnectedServerProvider } from "~/types";
 import {
   serverService,
@@ -55,7 +56,7 @@ const isLoadingOptions = ref(false);
 const errors = ref<Record<string, string>>({});
 
 // Get the shared refresh key to trigger server list refresh
-const serversRefreshKey = useState('serversRefreshKey', () => 0);
+const serversRefreshKey = useState("serversRefreshKey", () => 0);
 
 // Options from API
 const serverProviders = ref<ConnectedServerProvider[]>([]);
@@ -82,30 +83,34 @@ const ip = ref("");
 const port = ref("22");
 const installAgent = ref(true);
 
-const serviceProviders: Record<string, string> = {
+const { t } = useI18n();
+const { getServerTypeLabel } = useStableMetadataLabels();
+
+const serviceProviders = computed<Record<string, string>>(() => ({
   digitalocean: "DigitalOcean",
   hetzner: "Hetzner",
   linode: "Linode",
   vultr: "Vultr",
   aws: "AWS",
-  custom_server: "Custom Server",
-};
+  custom_server: t("server.create.customServer"),
+}));
 
-const schema = z.object({
-  name: z.string().min(1, "Server name is required").max(255),
-  service_provider: z.string().min(1, "Provider is required"),
-  server_provider_id: z.string().optional(),
-  region: z.string().optional(),
-  plan: z.string().optional(),
-  type: z.string(),
-  operating_system: z.string(),
-  database: z.string(),
-  php: z.string(),
-  ssh_keys: z.array(z.string()),
-  ip: z.string().optional(),
-  port: z.string(),
-  install_agent: z.boolean(),
-});
+const getSchema = () =>
+  z.object({
+    name: z.string().min(1, t("server.create.nameRequired")).max(255),
+    service_provider: z.string().min(1, t("server.create.providerRequired")),
+    server_provider_id: z.string().optional(),
+    region: z.string().optional(),
+    plan: z.string().optional(),
+    type: z.string(),
+    operating_system: z.string(),
+    database: z.string(),
+    php: z.string(),
+    ssh_keys: z.array(z.string()),
+    ip: z.string().optional(),
+    port: z.string(),
+    install_agent: z.boolean(),
+  });
 
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
@@ -137,7 +142,7 @@ const validate = () => {
   // from leaking through when the user switches type after editing the field.
   const rules = getServerTypeRules(serverType.value);
 
-  const result = schema.safeParse({
+  const result = getSchema().safeParse({
     name: name.value.trim(),
     service_provider: serviceProvider.value,
     server_provider_id: serverProviderId.value || undefined,
@@ -167,7 +172,7 @@ const validate = () => {
 
 const filteredProviders = computed(() => {
   return serverProviders.value.filter(
-    (p) => p.provider === serviceProvider.value
+    (p) => p.provider === serviceProvider.value,
   );
 });
 
@@ -184,13 +189,23 @@ const currentRegions = computed(() => {
 });
 
 const dbOptions = computed(() => {
-  return { ...databaseTypes.value, none: "None" };
+  return { ...databaseTypes.value, none: t("server.common.none") };
 });
 
 // Capability rules per server type (mirrors backend ServerType.GetFeatures()).
 // Drives which optional fields are visible in Advanced Options and what the
 // final payload looks like — see useServerTypeRules.ts.
 const typeRules = computed(() => getServerTypeRules(serverType.value));
+const serverTypeDescription = computed(() => {
+  const keys: Record<string, string> = {
+    php: "phpDescription",
+    database: "databaseDescription",
+    loadbalancer: "loadBalancerDescription",
+    docker: "dockerDescription",
+  };
+  const key = keys[serverType.value];
+  return key ? t(`server.create.${key}`) : "";
+});
 
 // Whether we already have enough data to render the form. Used to skip
 // the full-dialog spinner on subsequent opens — the spinner caused a
@@ -216,7 +231,7 @@ const fetchOptions = async (silent = false) => {
     serverProviders.value = providersData.data;
     sshKeys.value = sshData.data;
   } catch {
-    if (!silent) toast.error("Failed to load server options");
+    if (!silent) toast.error(t("server.create.optionsLoadFailed"));
   } finally {
     isLoadingOptions.value = false;
   }
@@ -236,7 +251,7 @@ const onSubmit = async () => {
   isLoading.value = true;
   try {
     await serverService.create(data);
-    toast.success("Server creation initiated");
+    toast.success(t("server.create.creationStarted"));
     isOpen.value = false;
     // Trigger server list refresh
     serversRefreshKey.value++;
@@ -249,7 +264,7 @@ const onSubmit = async () => {
         toast.error(messages[0]);
       });
     } else {
-      toast.error(err.data?.message || "Failed to create server");
+      toast.error(err.data?.message || t("server.create.creationFailed"));
     }
   } finally {
     isLoading.value = false;
@@ -273,17 +288,17 @@ watch(isOpen, (open) => {
     <DialogTrigger as-child>
       <!-- On mobile we collapse to an icon-only button so the tabs nav has
            enough room. The label reappears at sm and up. -->
-      <Button class="px-2.5 sm:px-4" aria-label="Create server">
+      <Button class="px-2.5 sm:px-4" :aria-label="t('server.create.title')">
         <PlusIcon class="h-4 w-4 sm:mr-2" />
-        <span class="hidden sm:inline">Create</span>
+        <span class="hidden sm:inline">{{ t("server.common.create") }}</span>
       </Button>
     </DialogTrigger>
 
     <DialogContent class="sm:max-w-3xl">
       <DialogHeader>
-        <DialogTitle>Create Server</DialogTitle>
+        <DialogTitle>{{ t("server.create.title") }}</DialogTitle>
         <DialogDescription>
-          Deploy a new server to your infrastructure
+          {{ t("server.create.description") }}
         </DialogDescription>
       </DialogHeader>
 
@@ -299,7 +314,9 @@ watch(isOpen, (open) => {
           name="lucide:loader-2"
           class="h-6 w-6 animate-spin text-muted-foreground"
         />
-        <p class="text-sm text-muted-foreground">Loading options...</p>
+        <p class="text-sm text-muted-foreground">
+          {{ t("server.create.loadingOptions") }}
+        </p>
       </div>
 
       <form
@@ -309,10 +326,7 @@ watch(isOpen, (open) => {
         @submit.prevent="onSubmit"
       >
         <!-- Provider Tabs -->
-        <Tabs
-          v-model="serviceProvider"
-          class="w-full space-y-2"
-        >
+        <Tabs v-model="serviceProvider" class="w-full space-y-2">
           <TabsList class="flex flex-row">
             <TabsTrigger
               v-for="(label, key) in serviceProviders"
@@ -329,12 +343,17 @@ watch(isOpen, (open) => {
         <!-- Server Provider (for cloud providers) -->
         <div v-if="serviceProvider !== 'custom_server'" class="space-y-2">
           <Label class="flex items-center gap-2">
-            <Icon name="lucide:key-round" class="h-4 w-4 text-muted-foreground" />
-            Server Provider
+            <Icon
+              name="lucide:key-round"
+              class="h-4 w-4 text-muted-foreground"
+            />
+            {{ t("server.create.providerAccount") }}
           </Label>
           <Select v-model="serverProviderId">
             <SelectTrigger>
-              <SelectValue placeholder="Select a provider account" />
+              <SelectValue
+                :placeholder="t('server.create.selectProviderAccount')"
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
@@ -345,13 +364,18 @@ watch(isOpen, (open) => {
                     :value="String(provider.id)"
                   >
                     <span class="flex items-center gap-2">
-                      <Icon :name="getProviderIcon(provider.provider)" class="h-4 w-4" />
-                      {{ provider.profile }} ({{ serviceProviders[provider.provider] }})
+                      <Icon
+                        :name="getProviderIcon(provider.provider)"
+                        class="h-4 w-4"
+                      />
+                      {{ provider.profile }} ({{
+                        serviceProviders[provider.provider]
+                      }})
                     </span>
                   </SelectItem>
                 </template>
                 <SelectLabel v-else class="text-muted-foreground">
-                  No provider accounts connected
+                  {{ t("server.create.noProviderAccounts") }}
                 </SelectLabel>
               </SelectGroup>
             </SelectContent>
@@ -365,13 +389,9 @@ watch(isOpen, (open) => {
         <div class="space-y-2">
           <Label for="name" class="flex items-center gap-2">
             <Icon name="lucide:tag" class="h-4 w-4 text-muted-foreground" />
-            Name
+            {{ t("server.common.name") }}
           </Label>
-          <Input
-            id="name"
-            v-model="name"
-            placeholder="my-awesome-server"
-          />
+          <Input id="name" v-model="name" placeholder="my-awesome-server" />
           <p v-if="errors.name" class="text-sm text-destructive">
             {{ errors.name }}
           </p>
@@ -384,12 +404,15 @@ watch(isOpen, (open) => {
         >
           <div class="space-y-2">
             <Label class="flex items-center gap-2">
-              <Icon name="lucide:layers" class="h-4 w-4 text-muted-foreground" />
-              Plan
+              <Icon
+                name="lucide:layers"
+                class="h-4 w-4 text-muted-foreground"
+              />
+              {{ t("server.create.serverSize") }}
             </Label>
             <Select v-model="plan">
               <SelectTrigger>
-                <SelectValue placeholder="Select a plan" />
+                <SelectValue :placeholder="t('server.create.selectSize')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -406,11 +429,11 @@ watch(isOpen, (open) => {
           <div class="space-y-2">
             <Label class="flex items-center gap-2">
               <Icon name="lucide:globe" class="h-4 w-4 text-muted-foreground" />
-              Region
+              {{ t("server.create.region") }}
             </Label>
             <Select v-model="region">
               <SelectTrigger>
-                <SelectValue placeholder="Select a region" />
+                <SelectValue :placeholder="t('server.create.selectRegion')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -432,25 +455,20 @@ watch(isOpen, (open) => {
         >
           <div class="space-y-2">
             <Label for="ip" class="flex items-center gap-2">
-              <Icon name="lucide:globe-2" class="h-4 w-4 text-muted-foreground" />
-              IP Address
+              <Icon
+                name="lucide:globe-2"
+                class="h-4 w-4 text-muted-foreground"
+              />
+              {{ t("server.create.ipAddress") }}
             </Label>
-            <Input
-              id="ip"
-              v-model="ip"
-              placeholder="192.168.1.1"
-            />
+            <Input id="ip" v-model="ip" placeholder="192.168.1.1" />
           </div>
           <div class="space-y-2">
             <Label for="port" class="flex items-center gap-2">
               <Icon name="lucide:plug" class="h-4 w-4 text-muted-foreground" />
-              SSH Port
+              {{ t("server.create.sshPort") }}
             </Label>
-            <Input
-              id="port"
-              v-model="port"
-              placeholder="22"
-            />
+            <Input id="port" v-model="port" placeholder="22" />
           </div>
         </div>
 
@@ -458,10 +476,13 @@ watch(isOpen, (open) => {
         <div class="space-y-2">
           <Label class="flex items-center gap-2">
             <Icon name="lucide:key" class="h-4 w-4 text-muted-foreground" />
-            SSH Keys
+            {{ t("server.sshKeys.title") }}
           </Label>
-          <div v-if="sshKeys.length === 0" class="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground">
-            No SSH keys available. Add one in Settings.
+          <div
+            v-if="sshKeys.length === 0"
+            class="rounded-md border border-dashed p-3 text-center text-sm text-muted-foreground"
+          >
+            {{ t("server.create.noSshKeys") }}
           </div>
           <div v-else class="grid gap-2">
             <div
@@ -472,17 +493,24 @@ watch(isOpen, (open) => {
               <Checkbox
                 :id="`ssh-key-${key.id}`"
                 :checked="selectedSshKeys.includes(key.id)"
-                @update:checked="(checked: boolean) => {
-                  if (checked) {
-                    selectedSshKeys.push(key.id)
-                  } else {
-                    selectedSshKeys = selectedSshKeys.filter(id => id !== key.id)
+                @update:checked="
+                  (checked: boolean) => {
+                    if (checked) {
+                      selectedSshKeys.push(key.id);
+                    } else {
+                      selectedSshKeys = selectedSshKeys.filter(
+                        (id) => id !== key.id,
+                      );
+                    }
                   }
-                }"
+                "
               />
               <Label :for="`ssh-key-${key.id}`" class="flex-1 cursor-pointer">
                 <span class="font-medium">{{ key.name }}</span>
-                <span v-if="key.fingerprint" class="ml-2 font-mono text-xs text-muted-foreground">
+                <span
+                  v-if="key.fingerprint"
+                  class="ml-2 font-mono text-xs text-muted-foreground"
+                >
                   {{ key.fingerprint.slice(0, 20) }}...
                 </span>
               </Label>
@@ -494,14 +522,17 @@ watch(isOpen, (open) => {
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-2">
             <Label class="flex items-center gap-2">
-              <Icon name="lucide:server" class="h-4 w-4 text-muted-foreground" />
-              Type
+              <Icon
+                name="lucide:server"
+                class="h-4 w-4 text-muted-foreground"
+              />
+              {{ t("server.create.serverType") }}
             </Label>
             <Select v-model="serverType">
               <SelectTrigger>
                 <span class="flex items-center gap-2">
                   <Icon :name="getServerTypeIcon(serverType)" class="h-4 w-4" />
-                  <SelectValue placeholder="Select type" />
+                  <SelectValue :placeholder="t('server.create.selectType')" />
                 </span>
               </SelectTrigger>
               <SelectContent>
@@ -512,13 +543,13 @@ watch(isOpen, (open) => {
                 >
                   <span class="flex items-center gap-2">
                     <Icon :name="getServerTypeIcon(key)" class="h-4 w-4" />
-                    {{ label }}
+                    {{ getServerTypeLabel(String(key), label) }}
                   </span>
                 </SelectItem>
               </SelectContent>
             </Select>
             <p class="text-xs text-muted-foreground">
-              {{ typeRules.description }}
+              {{ serverTypeDescription }}
             </p>
           </div>
         </div>
@@ -531,18 +562,15 @@ watch(isOpen, (open) => {
             @click="isAdvancedOpen = true"
           >
             <Settings2 class="h-4 w-4" />
-            Advanced Options
+            {{ t("server.create.advancedOptions") }}
           </Button>
-          <Button
-            type="submit"
-            :disabled="!canSubmit"
-          >
+          <Button type="submit" :disabled="!canSubmit">
             <Icon
               v-if="isLoading"
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Create
+            {{ t("server.common.create") }}
           </Button>
         </DialogFooter>
       </form>
@@ -553,27 +581,34 @@ watch(isOpen, (open) => {
   <Dialog v-model:open="isAdvancedOpen">
     <DialogContent class="border-2 border-border/50 sm:max-w-2xl">
       <DialogHeader>
-        <DialogTitle>Advanced Options</DialogTitle>
+        <DialogTitle>{{ t("server.create.advancedOptions") }}</DialogTitle>
         <DialogDescription>
-          Configure additional server settings
+          {{ t("server.create.advancedDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <div class="mt-4 space-y-6">
         <!-- Server Configuration Group -->
         <div class="space-y-4 border-b border-border/50 pb-4">
-          <h3 class="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Icon name="lucide:sliders-horizontal" class="h-4 w-4 text-muted-foreground" />
-            Server Configuration
+          <h3
+            class="flex items-center gap-2 text-sm font-medium text-foreground"
+          >
+            <Icon
+              name="lucide:sliders-horizontal"
+              class="h-4 w-4 text-muted-foreground"
+            />
+            {{ t("server.create.serverConfiguration") }}
           </h3>
           <div class="space-y-2">
             <Label class="flex items-center gap-2">
               <Icon name="lucide:disc" class="h-4 w-4 text-muted-foreground" />
-              Operating System
+              {{ t("server.create.operatingSystem") }}
             </Label>
             <Select v-model="operatingSystem">
               <SelectTrigger>
-                <SelectValue placeholder="Select OS" />
+                <SelectValue
+                  :placeholder="t('server.create.selectOperatingSystem')"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -590,19 +625,26 @@ watch(isOpen, (open) => {
 
         <!-- Software Stack Group -->
         <div class="space-y-4 border-b border-border/50 pb-4">
-          <h3 class="flex items-center gap-2 text-sm font-medium text-foreground">
+          <h3
+            class="flex items-center gap-2 text-sm font-medium text-foreground"
+          >
             <Icon name="lucide:package" class="h-4 w-4 text-muted-foreground" />
-            Software Stack
+            {{ t("server.create.softwareStack") }}
           </h3>
           <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div v-if="typeRules.showsPhp" class="space-y-2">
               <Label class="flex items-center gap-2">
-                <Icon name="lucide:code-2" class="h-4 w-4 text-muted-foreground" />
-                PHP Version
+                <Icon
+                  name="lucide:code-2"
+                  class="h-4 w-4 text-muted-foreground"
+                />
+                {{ t("server.create.phpVersion") }}
               </Label>
               <Select v-model="php">
                 <SelectTrigger>
-                  <SelectValue placeholder="Select PHP version" />
+                  <SelectValue
+                    :placeholder="t('server.create.selectPhpVersion')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -618,12 +660,17 @@ watch(isOpen, (open) => {
 
             <div v-if="typeRules.showsDatabase" class="space-y-2">
               <Label class="flex items-center gap-2">
-                <Icon name="lucide:database" class="h-4 w-4 text-muted-foreground" />
-                Database
+                <Icon
+                  name="lucide:database"
+                  class="h-4 w-4 text-muted-foreground"
+                />
+                {{ t("server.create.database") }}
               </Label>
               <Select v-model="database">
                 <SelectTrigger>
-                  <SelectValue placeholder="Select database" />
+                  <SelectValue
+                    :placeholder="t('server.create.selectDatabase')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -641,35 +688,43 @@ watch(isOpen, (open) => {
               v-if="!typeRules.showsPhp && !typeRules.showsDatabase"
               class="col-span-full text-sm text-muted-foreground"
             >
-              {{ typeRules.description }}
+              {{ serverTypeDescription }}
             </p>
           </div>
         </div>
 
         <!-- Agent Configuration Group -->
         <div class="space-y-4">
-          <h3 class="flex items-center gap-2 text-sm font-medium text-foreground">
-            <Icon name="lucide:activity" class="h-4 w-4 text-muted-foreground" />
-            Agent Configuration
+          <h3
+            class="flex items-center gap-2 text-sm font-medium text-foreground"
+          >
+            <Icon
+              name="lucide:activity"
+              class="h-4 w-4 text-muted-foreground"
+            />
+            {{ t("server.create.agentConfiguration") }}
           </h3>
           <div class="flex items-start space-x-3 rounded-md border p-4">
-            <Checkbox
-              id="install_agent"
-              v-model="installAgent"
-            />
+            <Checkbox id="install_agent" v-model="installAgent" />
             <div class="space-y-1 leading-none">
               <Label for="install_agent" class="cursor-pointer">
-                Install Launch Agent
+                {{ t("server.create.installAgent") }}
               </Label>
               <p class="text-sm text-muted-foreground">
-                Required for backups, monitoring, and advanced features
+                {{ t("server.create.installAgentDescription") }}
               </p>
             </div>
           </div>
-          <div v-if="!installAgent" class="rounded-md border border-amber-500/50 bg-amber-500/10 p-3">
+          <div
+            v-if="!installAgent"
+            class="rounded-md border border-amber-500/50 bg-amber-500/10 p-3"
+          >
             <p class="text-sm text-amber-600 dark:text-amber-400">
-              <Icon name="lucide:alert-triangle" class="mr-1.5 inline h-4 w-4" />
-              Without the Launch Agent, you will not be able to use backups, server metrics, real-time monitoring, and other advanced features.
+              <Icon
+                name="lucide:alert-triangle"
+                class="mr-1.5 inline h-4 w-4"
+              />
+              {{ t("server.create.agentWarning") }}
             </p>
           </div>
         </div>
@@ -677,7 +732,7 @@ watch(isOpen, (open) => {
 
       <DialogFooter class="mt-6">
         <Button variant="outline" @click="isAdvancedOpen = false">
-          Close
+          {{ t("server.common.close") }}
         </Button>
       </DialogFooter>
     </DialogContent>

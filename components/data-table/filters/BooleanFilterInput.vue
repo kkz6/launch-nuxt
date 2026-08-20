@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Button } from "~/components/ui/button";
+const { t } = useI18n();
 defineProps<{ clause: string }>();
 const emit = defineEmits<{ update: [clause: string] }>();
 </script>
@@ -9,13 +10,13 @@ const emit = defineEmits<{ update: [clause: string] }>();
       size="sm"
       :variant="clause === 'is_true' ? 'default' : 'outline'"
       @click="emit('update', 'is_true')"
-      >True</Button
+      >{{ t("data.true") }}</Button
     >
     <Button
       size="sm"
       :variant="clause === 'is_false' ? 'default' : 'outline'"
       @click="emit('update', 'is_false')"
-      >False</Button
+      >{{ t("data.false") }}</Button
     >
   </div>
 </template>

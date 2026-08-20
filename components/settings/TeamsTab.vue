@@ -40,6 +40,7 @@ interface TeamInvitation {
 }
 
 const { user, fetchUser } = useAuth();
+const { t } = useI18n();
 const { setCurrentTeamId } = useApi();
 const { close: closeSettings } = useSettingsSheet();
 const { canManageTeam } = useCan();
@@ -58,25 +59,31 @@ const isRenaming = ref(false);
 const isDeleting = ref(false);
 const resendingId = ref<string | null>(null);
 
-const roles = [
-  { value: "owner", label: "Owner", description: "Full access to the team." },
+const roles = computed(() => [
+  {
+    value: "owner",
+    label: t("settings.teams.roles.owner"),
+    description: t("settings.teams.roles.ownerDescription"),
+  },
   {
     value: "admin",
-    label: "Admin",
-    description: "Can manage members, settings, and team resources.",
+    label: t("settings.teams.roles.admin"),
+    description: t("settings.teams.roles.adminDescription"),
   },
   {
     value: "editor",
-    label: "Editor",
-    description: "Can create and update team resources.",
+    label: t("settings.teams.roles.editor"),
+    description: t("settings.teams.roles.editorDescription"),
   },
   {
     value: "member",
-    label: "Member",
-    description: "Can view team resources.",
+    label: t("settings.teams.roles.member"),
+    description: t("settings.teams.roles.memberDescription"),
   },
-];
-const assignableRoles = roles.filter((role) => role.value !== "owner");
+]);
+const assignableRoles = computed(() =>
+  roles.value.filter((role) => role.value !== "owner"),
+);
 
 const isOwner = computed(
   () => currentTeam.value?.user_id === String(user.value?.id),
@@ -123,7 +130,7 @@ const fetchTeamMembers = async () => {
     invitations.value = invitationsResponse.data;
     transferToTeamId.value = transferTeams.value[0]?.id || "";
   } catch {
-    toast.error("Failed to load team settings");
+    toast.error(t("settings.teams.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -145,9 +152,9 @@ const renameTeam = async () => {
     teamName.value = response.data.name;
     updateTeam(response.data);
     await fetchUser();
-    toast.success("Team name updated");
+    toast.success(t("settings.teams.nameUpdated"));
   } catch (error) {
-    toast.error(errorMessage(error, "Failed to update team name"));
+    toast.error(errorMessage(error, t("settings.teams.nameUpdateFailed")));
   } finally {
     isRenaming.value = false;
   }
@@ -169,10 +176,10 @@ const deleteTeam = async () => {
     refreshActiveTeam();
     isDeleteOpen.value = false;
     closeSettings();
-    toast.success("Team deleted and resources transferred");
+    toast.success(t("settings.teams.deleted"));
     await navigateTo("/dashboard");
   } catch (error) {
-    toast.error(errorMessage(error, "Failed to delete team"));
+    toast.error(errorMessage(error, t("settings.teams.deleteFailed")));
   } finally {
     isDeleting.value = false;
   }
@@ -187,9 +194,9 @@ const resendInvitation = async (invitationId: string) => {
         method: "POST",
       },
     );
-    toast.success("Invitation resent");
+    toast.success(t("settings.teams.invitationResent"));
   } catch {
-    toast.error("Failed to resend invitation");
+    toast.error(t("settings.teams.invitationResendFailed"));
   } finally {
     resendingId.value = null;
   }
@@ -203,9 +210,9 @@ const cancelInvitation = async (invitationId: string) => {
     invitations.value = invitations.value.filter(
       (invitation) => invitation.id !== invitationId,
     );
-    toast.success("Invitation cancelled");
+    toast.success(t("settings.teams.invitationCancelled"));
   } catch {
-    toast.error("Failed to cancel invitation");
+    toast.error(t("settings.teams.invitationCancelFailed"));
   }
 };
 
@@ -217,9 +224,9 @@ const updateMemberRole = async (memberId: string, role: string) => {
     });
     const member = members.value.find((item) => item.id === memberId);
     if (member) member.role = role;
-    toast.success("Role updated");
+    toast.success(t("settings.teams.roleUpdated"));
   } catch {
-    toast.error("Failed to update role");
+    toast.error(t("settings.teams.roleUpdateFailed"));
   }
 };
 
@@ -232,6 +239,9 @@ const getMemberInitials = (name: string) =>
     .slice(0, 2);
 
 const isCurrentUser = (memberId: string) => memberId === String(user.value?.id);
+
+const roleLabel = (role: string) =>
+  roles.value.find((item) => item.value === role)?.label || role;
 
 onMounted(fetchTeamMembers);
 </script>
@@ -247,12 +257,14 @@ onMounted(fetchTeamMembers);
 
     <template v-else>
       <div v-if="isOwner" class="px-6 pb-6">
-        <h3 class="text-base font-semibold">Team details</h3>
+        <h3 class="text-base font-semibold">
+          {{ t("settings.teams.detailsTitle") }}
+        </h3>
         <p class="mt-1 text-sm text-muted-foreground">
-          Change the name shown to everyone in this team.
+          {{ t("settings.teams.detailsDescription") }}
         </p>
         <form class="mt-4 max-w-xl" @submit.prevent="renameTeam">
-          <Label for="team-name">Team name</Label>
+          <Label for="team-name">{{ t("settings.teams.teamName") }}</Label>
           <div class="mt-2 flex items-center gap-2">
             <Input
               id="team-name"
@@ -267,7 +279,7 @@ onMounted(fetchTeamMembers);
                 name="lucide:loader-2"
                 class="mr-2 h-4 w-4 animate-spin"
               />
-              Save
+              {{ t("settings.teams.save") }}
             </Button>
           </div>
         </form>
@@ -276,9 +288,11 @@ onMounted(fetchTeamMembers);
       <div class="px-6 py-6 first:pt-0">
         <div class="mb-4 flex items-center justify-between">
           <div>
-            <h3 class="text-base font-semibold">Team members</h3>
+            <h3 class="text-base font-semibold">
+              {{ t("settings.teams.membersTitle") }}
+            </h3>
             <p class="text-sm text-muted-foreground">
-              Manage who has access to this team.
+              {{ t("settings.teams.membersDescription") }}
             </p>
           </div>
           <Button
@@ -288,7 +302,7 @@ onMounted(fetchTeamMembers);
             @click="isInviteOpen = true"
           >
             <Icon name="lucide:plus" class="mr-1.5 h-4 w-4" />
-            Invite
+            {{ t("settings.teams.invite") }}
           </Button>
         </div>
 
@@ -315,7 +329,7 @@ onMounted(fetchTeamMembers);
                     v-if="isCurrentUser(member.id)"
                     class="text-xs text-muted-foreground"
                   >
-                    (you)
+                    {{ t("settings.teams.you") }}
                   </span>
                 </div>
                 <span class="text-xs text-muted-foreground">{{
@@ -349,7 +363,9 @@ onMounted(fetchTeamMembers);
       </div>
 
       <div v-if="invitations.length > 0" class="px-6 py-6">
-        <h3 class="mb-4 text-base font-semibold">Pending invitations</h3>
+        <h3 class="mb-4 text-base font-semibold">
+          {{ t("settings.teams.pendingInvitations") }}
+        </h3>
         <div class="space-y-1">
           <div
             v-for="invitation in invitations"
@@ -366,9 +382,11 @@ onMounted(fetchTeamMembers);
                 <span class="text-sm font-medium">{{ invitation.email }}</span>
                 <div class="flex items-center gap-1.5">
                   <Badge variant="secondary" class="text-xs capitalize">{{
-                    invitation.role
+                    roleLabel(invitation.role)
                   }}</Badge>
-                  <span class="text-xs text-muted-foreground">Pending</span>
+                  <span class="text-xs text-muted-foreground">{{
+                    t("settings.teams.pending")
+                  }}</span>
                 </div>
               </div>
             </div>
@@ -388,7 +406,7 @@ onMounted(fetchTeamMembers);
                   class="mr-1 h-3.5 w-3.5"
                   :class="{ 'animate-spin': resendingId === invitation.id }"
                 />
-                Resend
+                {{ t("settings.teams.resend") }}
               </Button>
               <Button
                 variant="ghost"
@@ -396,7 +414,7 @@ onMounted(fetchTeamMembers);
                 class="text-destructive hover:text-destructive"
                 @click="cancelInvitation(invitation.id)"
               >
-                Cancel
+                {{ t("settings.teams.cancel") }}
               </Button>
             </div>
           </div>
@@ -421,10 +439,11 @@ onMounted(fetchTeamMembers);
           class="flex items-start justify-between gap-4 rounded-lg border border-destructive/30 p-4"
         >
           <div>
-            <h3 class="text-sm font-semibold">Delete team</h3>
+            <h3 class="text-sm font-semibold">
+              {{ t("settings.teams.deleteTitle") }}
+            </h3>
             <p class="mt-1 text-sm text-muted-foreground">
-              Transfer all resources to another team you own, then permanently
-              delete this team.
+              {{ t("settings.teams.deleteDescription") }}
             </p>
           </div>
           <Button
@@ -432,7 +451,7 @@ onMounted(fetchTeamMembers);
             :disabled="transferTeams.length === 0"
             @click="isDeleteOpen = true"
           >
-            Delete team
+            {{ t("settings.teams.deleteTitle") }}
           </Button>
         </div>
       </div>
@@ -447,14 +466,17 @@ onMounted(fetchTeamMembers);
     <AlertDialog v-model:open="isDeleteOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete {{ currentTeam?.name }}?</AlertDialogTitle>
+          <AlertDialogTitle>{{
+            t("settings.teams.deleteDialogTitle", { name: currentTeam?.name })
+          }}</AlertDialogTitle>
           <AlertDialogDescription>
-            Choose where every server, site, database, backup, provider, and
-            related resource should move.
+            {{ t("settings.teams.deleteDialogDescription") }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div class="space-y-2 py-2">
-          <Label for="transfer-team">Transfer resources to</Label>
+          <Label for="transfer-team">{{
+            t("settings.teams.transferTo")
+          }}</Label>
           <select
             id="transfer-team"
             v-model="transferToTeamId"
@@ -465,12 +487,17 @@ onMounted(fetchTeamMembers);
               :key="team.id"
               :value="team.id"
             >
-              {{ team.name }}{{ team.personal_team ? " (Personal)" : "" }}
+              {{ team.name
+              }}{{
+                team.personal_team ? ` ${t("settings.teams.personal")}` : ""
+              }}
             </option>
           </select>
         </div>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel>
+          <AlertDialogCancel :disabled="isDeleting">{{
+            t("settings.teams.cancel")
+          }}</AlertDialogCancel>
           <AlertDialogAction
             class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             :disabled="!transferToTeamId || isDeleting"
@@ -481,7 +508,7 @@ onMounted(fetchTeamMembers);
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Transfer and delete
+            {{ t("settings.teams.transferAndDelete") }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -27,6 +27,8 @@ interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t, locale } = useI18n();
+const dateLocale = computed(() => (locale.value === "ja" ? "ja-JP" : "en-US"));
 
 // Card-per-row list — same shape components/application/Deployments.vue
 // uses. The compose-specific bits are: there's no commit_sha or
@@ -62,7 +64,7 @@ const fetchDeployments = async (silent = false) => {
     );
     deployments.value = res.data;
   } catch {
-    if (!silent) toast.error("Failed to load deployments");
+    if (!silent) toast.error(t("workload.deployments.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -79,10 +81,10 @@ const triggerDeploy = async () => {
     // Prepend so the user sees the row immediately; the WS event will
     // overwrite it with the canonical server copy.
     deployments.value = [res.data, ...deployments.value];
-    toast.success("Deployment started");
+    toast.success(t("workload.deployments.started"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to start deployment");
+    toast.error(e.data?.message || t("workload.deployments.startFailed"));
   } finally {
     isDeploying.value = false;
   }
@@ -103,10 +105,10 @@ const triggerReload = async () => {
       props.compose.project_id,
       props.compose.id,
     );
-    toast.success("Reload started — applying current env");
+    toast.success(t("workload.deployments.reloadStarted"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to reload");
+    toast.error(e.data?.message || t("workload.deployments.reloadFailed"));
   } finally {
     isReloading.value = false;
   }
@@ -177,17 +179,17 @@ const statusDotClass = (status: string): string => {
 const statusLabel = (status: string): string => {
   switch (status) {
     case "pending":
-      return "Pending";
+      return t("workload.status.pending");
     case "building":
-      return "Building";
+      return t("workload.status.building");
     case "deploying":
-      return "Deploying";
+      return t("workload.status.deploying");
     case "success":
-      return "Finished";
+      return t("workload.status.finished");
     case "failed":
-      return "Failed";
+      return t("workload.status.failed");
     case "cancelled":
-      return "Cancelled";
+      return t("workload.status.cancelled");
     default:
       return status;
   }
@@ -245,9 +247,10 @@ const elapsedLabel = (deployment: DockerDeployment): string => {
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
   const s = secs % 60;
-  if (h > 0) return `${h}h ${m}m ${s}s`;
-  if (m > 0) return `${m}m ${s}s`;
-  return `${s}s`;
+  if (h > 0)
+    return t("workload.duration.hms", { hours: h, minutes: m, seconds: s });
+  if (m > 0) return t("workload.duration.ms", { minutes: m, seconds: s });
+  return t("workload.duration.seconds", { seconds: s });
 };
 
 // Delete-deployment dialog state.
@@ -281,11 +284,11 @@ const confirmDelete = async () => {
       canRemoveFromGitHub.value && alsoDeleteGitHub.value,
     );
     deployments.value = deployments.value.filter((x) => x.id !== d.id);
-    toast.success("Deployment deleted");
+    toast.success(t("workload.deployments.deleted"));
     deleteOpen.value = false;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete deployment");
+    toast.error(e.data?.message || t("workload.deployments.deleteFailed"));
   } finally {
     deleting.value = false;
   }
@@ -328,12 +331,14 @@ const failureSummary = (raw?: string | null): FailureSummary | null => {
 const openLogs = (d: DockerDeployment) => {
   if (!d.task_id) return;
   logSheetTaskId.value = d.task_id;
-  logSheetTitle.value = `Deployment · ${statusLabel(d.status)}`;
+  logSheetTitle.value = t("workload.deployments.logTitleWithStatus", {
+    status: statusLabel(d.status),
+  });
   // No image_ref / commit_sha on compose deployments — subtitle is
   // the relative time string so the sheet header still names the
   // run.
   logSheetSubtitle.value = d.started_at
-    ? new Date(d.started_at).toLocaleString()
+    ? new Date(d.started_at).toLocaleString(dateLocale.value)
     : "";
   logSheetOpen.value = true;
 };
@@ -345,24 +350,26 @@ onMounted(fetchDeployments);
   <div>
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 class="text-lg font-semibold">Deployments</h3>
+        <h3 class="text-lg font-semibold">
+          {{ t("workload.deployments.title") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
           <code class="font-mono text-xs">docker compose up -d</code>
-          history. Most recent first.
+          {{ t("workload.deployments.composeDescription") }}
         </p>
       </div>
       <div class="flex items-center gap-2">
         <Button
           variant="outline"
           :disabled="isReloading || isDeploying"
-          title="Re-up the stack with the current env, no rebuild — applies saved env changes fast"
+          :title="t('workload.deployments.reloadHelp')"
           @click="triggerReload"
         >
           <Icon
             :name="isReloading ? 'lucide:loader-2' : 'lucide:refresh-cw'"
             :class="['mr-2 h-4 w-4', isReloading && 'animate-spin']"
           />
-          Reload
+          {{ t("workload.actions.reload") }}
         </Button>
         <Button :disabled="isDeploying || isReloading" @click="triggerDeploy">
           <Icon
@@ -371,7 +378,7 @@ onMounted(fetchDeployments);
             class="mr-2 h-4 w-4 animate-spin"
           />
           <Icon v-else name="lucide:rocket" class="mr-2 h-4 w-4" />
-          Deploy now
+          {{ t("workload.deployments.deployNow") }}
         </Button>
       </div>
     </div>
@@ -389,10 +396,11 @@ onMounted(fetchDeployments);
         class="flex w-full flex-col items-center justify-center gap-3 rounded-lg border border-dashed bg-card py-12"
       >
         <Icon name="lucide:rocket" class="h-8 w-8 text-muted-foreground" />
-        <span class="text-base text-muted-foreground">No deployments yet</span>
+        <span class="text-base text-muted-foreground">{{
+          t("workload.deployments.emptyTitle")
+        }}</span>
         <p class="max-w-md px-4 text-center text-xs text-muted-foreground">
-          Click <span class="font-medium">Deploy now</span> to bring the stack
-          up on the server.
+          {{ t("workload.deployments.composeEmptyDescription") }}
         </p>
       </div>
 
@@ -428,7 +436,11 @@ onMounted(fetchDeployments);
               class="mt-0.5 inline-flex w-fit items-center rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-xs text-red-600 dark:text-red-400"
               :title="d.error || ''"
             >
-              Failed at {{ failureSummary(d.error)?.step }}
+              {{
+                t("workload.deployments.failedAt", {
+                  step: failureSummary(d.error)?.step,
+                })
+              }}
             </span>
           </div>
 
@@ -452,8 +464,11 @@ onMounted(fetchDeployments);
                 size="sm"
                 @click="openSteps(d)"
               >
-                <Icon name="simple-icons:githubactions" class="mr-2 block size-4" />
-                Steps
+                <Icon
+                  name="simple-icons:githubactions"
+                  class="mr-2 block size-4"
+                />
+                {{ t("workload.deployments.steps") }}
               </Button>
               <Button
                 v-if="d.task_id"
@@ -462,7 +477,7 @@ onMounted(fetchDeployments);
                 @click="openLogs(d)"
               >
                 <Icon name="lucide:scroll-text" class="mr-2 block size-4" />
-                View Logs
+                {{ t("workload.deployments.viewLogs") }}
               </Button>
               <Button
                 variant="ghost"
@@ -471,8 +486,8 @@ onMounted(fetchDeployments);
                 :disabled="isInProgress(d.status)"
                 :title="
                   isInProgress(d.status)
-                    ? 'Cannot delete a running deployment'
-                    : 'Delete deployment'
+                    ? t('workload.deployments.cannotDeleteRunning')
+                    : t('workload.deployments.deleteTitle')
                 "
                 @click="openDelete(d)"
               >
@@ -488,10 +503,9 @@ onMounted(fetchDeployments);
     <Dialog v-model:open="deleteOpen">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Delete deployment</DialogTitle>
+          <DialogTitle>{{ t("workload.deployments.deleteTitle") }}</DialogTitle>
           <DialogDescription>
-            This removes the deployment record and its logs from Launch. This
-            can't be undone.
+            {{ t("workload.deployments.deleteDescription") }}
           </DialogDescription>
         </DialogHeader>
         <label
@@ -500,9 +514,11 @@ onMounted(fetchDeployments);
         >
           <Checkbox v-model="alsoDeleteGitHub" class="mt-0.5" />
           <span>
-            <span class="font-medium">Also remove from GitHub Actions</span>
+            <span class="font-medium">{{
+              t("workload.deployments.removeFromGitHub")
+            }}</span>
             <span class="block text-muted-foreground">
-              Deletes the linked workflow run from the repo's Actions tab.
+              {{ t("workload.deployments.removeFromGitHubDescription") }}
             </span>
           </span>
         </label>
@@ -512,7 +528,7 @@ onMounted(fetchDeployments);
             :disabled="deleting"
             @click="deleteOpen = false"
           >
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button
             variant="destructive"
@@ -524,7 +540,7 @@ onMounted(fetchDeployments);
               name="lucide:loader-2"
               class="mr-2 size-4 animate-spin"
             />
-            Delete
+            {{ t("workload.actions.delete") }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -541,7 +557,9 @@ onMounted(fetchDeployments);
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none"
       >
         <SheetHeader class="shrink-0">
-          <SheetTitle>{{ logSheetTitle || "Deployment logs" }}</SheetTitle>
+          <SheetTitle>{{
+            logSheetTitle || t("workload.deployments.logsTitle")
+          }}</SheetTitle>
           <SheetDescription v-if="logSheetSubtitle">
             {{ logSheetSubtitle }}
           </SheetDescription>
@@ -566,9 +584,9 @@ onMounted(fetchDeployments);
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-xl flex flex-col overflow-hidden outline-none"
       >
         <SheetHeader class="shrink-0">
-          <SheetTitle>Deployment steps</SheetTitle>
+          <SheetTitle>{{ t("workload.deployments.stepsTitle") }}</SheetTitle>
           <SheetDescription>
-            Live GitHub Actions workflow progress for this deployment.
+            {{ t("workload.deployments.stepsDescription") }}
           </SheetDescription>
         </SheetHeader>
         <div class="mt-4 flex flex-1 flex-col min-h-0 overflow-y-auto pr-1">

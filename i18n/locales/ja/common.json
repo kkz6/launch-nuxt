@@ -1,0 +1,271 @@
+{
+  "common": {
+    "language": "言語",
+    "languageAutomatic": "自動",
+    "english": "English",
+    "japanese": "日本語",
+    "settings": "設定",
+    "adminPanel": "管理パネル",
+    "backToApp": "アプリに戻る",
+    "theme": "テーマ",
+    "themeLight": "ライトテーマを使用",
+    "themeDark": "ダークテーマを使用",
+    "themeSystem": "システム設定のテーマを使用",
+    "signOut": "ログアウト",
+    "subscriptionInactive": "サブスクリプションが無効です",
+    "subscribeNow": "今すぐ登録",
+    "localeUpdated": "言語設定を更新しました",
+    "localeUpdateFailed": "言語設定を更新できませんでした",
+    "confirm": "確認",
+    "cancel": "キャンセル",
+    "copy": "コピー",
+    "download": "ダウンロード",
+    "typeToConfirm": "確認のため入力してください...",
+    "impersonation": {
+      "viewingAs": "{name}として表示中（読み取り専用）",
+      "exit": "終了"
+    },
+    "ui": {
+      "more": "その他",
+      "close": "閉じる",
+      "morePages": "その他のページ",
+      "previous": "前へ",
+      "next": "次へ",
+      "first": "最初",
+      "last": "最後",
+      "breadcrumb": "パンくずリスト",
+      "carousel": "カルーセル",
+      "slide": "スライド",
+      "previousSlide": "前のスライド",
+      "nextSlide": "次のスライド"
+    },
+    "logs": "ログ",
+    "viewLogs": "ログを表示",
+    "noLogs": "利用できるログはありません",
+    "loadLogsFailed": "ログを読み込めませんでした",
+    "siteLogsFor": "{name}のサイトログ",
+    "serverLogsFor": "{name}のサーバーログ",
+    "teams": {
+      "new": "新しいチーム",
+      "loadFailed": "チームを読み込めませんでした",
+      "switchFailed": "チームを切り替えられませんでした",
+      "switched": "{team}に切り替えました",
+      "defaultName": "チーム",
+      "personal": "個人用",
+      "owned": "所有",
+      "joined": "参加中"
+    },
+    "platformUpdate": {
+      "updates": {
+        "rename_username_captain": {
+          "title": "デフォルトユーザー名をcaptainへ変更",
+          "description": "プロビジョニング済みサーバーのデフォルトUNIXユーザー名を`launcher`から`captain`へ変更します。この更新では、システムユーザーとホームディレクトリを移行し、サーバー上の関連設定ファイル（Caddyfile、systemdサービス、crontab）を更新します。\n\nこの処理は安全で、繰り返し実行しても同じ結果になります。`captain`ユーザーがすでに存在するサーバーは自動的にスキップされます。"
+        }
+      },
+      "pendingOne": "{count}台のサーバーが保留中",
+      "pendingMany": "{count}台のサーバーが保留中",
+      "viewDetails": "詳細を表示",
+      "dismiss": "通知を閉じる"
+    },
+    "activeActions": {
+      "title": "実行中の操作",
+      "noneRunning": "実行中の操作はありません。",
+      "dismiss": "{action}を閉じる",
+      "taskOutput": "タスク出力",
+      "liveOutput": "ライブ出力",
+      "finalOutput": "最終出力",
+      "outputContext": "{kind}の{phase}出力",
+      "phaseLive": "ライブ",
+      "phaseFinal": "最終",
+      "runningFor": "実行時間：{duration}",
+      "complete": "{kind}が完了しました",
+      "taskLabel": "サーバータスク",
+      "backupFailureDescription": "バックアップに失敗しました。詳細はログを確認してください。",
+      "seconds": "{count}秒",
+      "minutes": "{count}分",
+      "status": {
+        "triggered": "待機中",
+        "pending": "待機中",
+        "installing": "デプロイ中",
+        "building": "ビルド中",
+        "deploying": "デプロイ中",
+        "running": "実行中",
+        "finished": "完了",
+        "completed": "完了",
+        "success": "完了",
+        "failed": "失敗",
+        "timeout": "タイムアウト",
+        "cancelled": "キャンセル済み"
+      },
+      "kind": {
+        "deployment": "デプロイ",
+        "server_backup": "サーバーバックアップ",
+        "database_backup": "データベースバックアップ",
+        "command": "コマンド",
+        "task": "タスク"
+      },
+      "target": {
+        "server": "サーバー",
+        "site": "サイト",
+        "application": "アプリケーション",
+        "compose": "Compose",
+        "database": "データベース"
+      }
+    },
+    "certificate": {
+      "status": {
+        "retryQueued": "再試行を待機中",
+        "checking": "確認中",
+        "valid": "有効",
+        "expired": "期限切れ",
+        "invalid": "無効",
+        "notIssued": "未発行",
+        "unreachable": "接続不可",
+        "verify": "確認"
+      },
+      "diagnosis": {
+        "retry": {
+          "title": "プロビジョニングの再試行を待機中",
+          "guidance": "プロキシ設定を再適用しています。まもなく再度確認されます。"
+        },
+        "checking": {
+          "title": "公開エンドポイントを確認中",
+          "guidance": "DNSを解決し、ポート443で配信されている証明書を確認しています。"
+        },
+        "valid": {
+          "title": "証明書は有効です",
+          "guidance": "このホスト名には信頼された証明書が配信されています。"
+        },
+        "expired": {
+          "title": "証明書の有効期限が切れています",
+          "guidance": "トラフィックを配信する前に自動発行を再試行するか、証明書を置き換えてください。"
+        },
+        "hostnameMismatch": {
+          "title": "ホスト名が一致しません",
+          "guidance": "別のホスト名用の証明書が配信されています。DNSがこのサーバーを指していることを確認してから、発行を再試行してください。"
+        },
+        "untrusted": {
+          "title": "証明書が信頼されていません",
+          "guidance": "カスタム証明書を置き換えるか、DNSを修正してから自動発行を再試行してください。"
+        },
+        "notActive": {
+          "title": "証明書はまだ有効ではありません",
+          "guidance": "サーバー時刻を確認するか、有効期間が始まっている証明書をインストールしてください。"
+        },
+        "invalid": {
+          "title": "証明書の検証に失敗しました",
+          "guidance": "再試行する前に、DNS、設定したホスト名、プロキシが選択した証明書を確認してください。"
+        },
+        "dns": {
+          "title": "DNSを解決できません",
+          "guidance": "公開AまたはAAAAレコードを作成・修正し、反映を待ってから発行を再試行してください。"
+        },
+        "notServed": {
+          "title": "証明書が配信されていません",
+          "guidance": "ドメインがポート443でこのサーバーに到達することを確認してから、証明書の発行を再試行してください。"
+        },
+        "unreachable": {
+          "title": "HTTPSエンドポイントに接続できません",
+          "guidance": "公開DNSを確認し、ポート80と443がプロキシに到達することを確認してください。"
+        },
+        "unverified": {
+          "title": "証明書は未確認です",
+          "guidance": "確認を実行して、公開クライアントに配信される証明書を検査してください。"
+        }
+      },
+      "daysRemaining": "残り{count}日",
+      "verificationFailed": "証明書の確認に失敗しました。",
+      "retryToast": "証明書の再試行をキューに追加しました",
+      "retryDescription": "プロキシ設定を再適用しています。",
+      "retryFailed": "証明書のプロビジョニングを再試行できませんでした",
+      "checkingPublic": "公開クライアントに配信される証明書を確認中...",
+      "whatToCheck": "確認項目",
+      "issuer": "発行者",
+      "expires": "有効期限",
+      "resolvedIp": "解決されたIP",
+      "checked": "確認日時",
+      "verifyAgain": "もう一度確認",
+      "retry": "再試行",
+      "retryCertificate": "証明書を再試行",
+      "certificateStatus": "証明書の状態"
+    },
+    "loading": "読み込み中…",
+    "loadBalancer": "ロードバランサー",
+    "customServer": "カスタムサーバー",
+    "genericPhp": "汎用PHP",
+    "deploymentQueued": "デプロイをキューに追加しました",
+    "rebuildQueued": "再ビルドをキューに追加しました",
+    "actionQueued": "{action}をキューに追加しました",
+    "actionFailed": "{action}に失敗しました",
+    "navigation": {
+      "overview": "概要",
+      "users": "ユーザー",
+      "invitations": "招待",
+      "servers": "サーバー",
+      "failures": "失敗",
+      "observability": "監視",
+      "dashboard": "ダッシュボード",
+      "domains": "ドメイン",
+      "scripts": "スクリプト",
+      "onboarding": "オンボーディング",
+      "sites": "サイト",
+      "metrics": "メトリクス",
+      "databases": "データベース",
+      "networks": "ネットワーク",
+      "daemons": "デーモン",
+      "schedulers": "スケジューラー",
+      "advanced": "詳細設定",
+      "upstreams": "アップストリーム",
+      "projects": "プロジェクト",
+      "containers": "コンテナ",
+      "general": "一般",
+      "backups": "バックアップ",
+      "sshKeys": "SSHキー",
+      "packages": "パッケージ",
+      "services": "サービス",
+      "traefik": "Traefik",
+      "maintenance": "メンテナンス",
+      "deployments": "デプロイ",
+      "files": "ファイル",
+      "queues": "キュー",
+      "redirects": "リダイレクト",
+      "commands": "コマンド",
+      "settings": "設定",
+      "records": "レコード",
+      "environment": "環境変数",
+      "logs": "ログ",
+      "volumes": "ボリューム",
+      "githubActions": "GitHub Actions",
+      "runtime": "ランタイム",
+      "dangerZone": "危険な操作",
+      "database": "データベース",
+      "application": "アプリケーション",
+      "composeStack": "Composeスタック",
+      "applications": "アプリケーション",
+      "compose": "Compose"
+    },
+    "cron": {
+      "timesUse": "タイムゾーンは{timeZone}です。",
+      "accessible": "{expression}: {description}。",
+      "accessibleWithTimeZone": "{expression}: {description}。タイムゾーンは{timeZone}です。"
+    },
+    "actions": {
+      "provision": "プロビジョニング",
+      "terminal": "ターミナル",
+      "environment": "環境変数",
+      "newApplication": "新しいアプリケーション",
+      "newComposeStack": "新しいComposeスタック",
+      "newDatabase": "新しいデータベース",
+      "actions": "操作",
+      "start": "起動",
+      "stop": "停止",
+      "restart": "再起動",
+      "connectionInfo": "接続情報",
+      "deploy": "デプロイ",
+      "reload": "リロード",
+      "rebuild": "再ビルド",
+      "viewLogs": "ログを表示",
+      "viewYaml": "YAMLを表示"
+    }
+  }
+}

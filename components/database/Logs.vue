@@ -5,6 +5,7 @@ interface Props {
   database: DockerDatabase;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -15,6 +16,6 @@ const props = defineProps<Props>();
   -->
   <ApplicationLogs
     :database-id="props.database.id"
-    empty-state-message="The database hasn't started yet. Logs appear here once the container is running."
+    :empty-state-message="t('workload.database.logs.empty')"
   />
 </template>

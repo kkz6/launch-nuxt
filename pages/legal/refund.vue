@@ -1,66 +1,62 @@
 <script setup lang="ts">
-definePageMeta({ layout: 'site' })
+definePageMeta({ layout: "site" });
 
-useHead({ title: 'Refund Policy' })
+const { t, locale } = useI18n();
+const updated = computed(() =>
+  new Intl.DateTimeFormat(locale.value === "ja" ? "ja-JP" : "en-US", {
+    dateStyle: "long",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(2026, 5, 11))),
+);
+
+useHead({ title: () => t("public.legal.refund.title") });
 useSeoMeta({
-  description:
-    'launchctl offers no-questions-asked refunds. Not happy in your first 30 days? Email us and we refund your subscription in full.',
-})
+  description: () => t("public.legal.refund.metaDescription"),
+});
 </script>
 
 <template>
   <LegalDoc
-    title="Refund Policy"
-    updated="11 June 2026"
-    intro="We keep this simple. If launchctl isn't working out for you, we'll refund you — no questions asked."
+    :title="t('public.legal.refund.title')"
+    :updated="updated"
+    :intro="t('public.legal.refund.intro')"
   >
     <p class="lead">
-      <strong>Not happy? We refund you.</strong> Within 30 days of any
-      subscription payment, email us and we'll refund it in full — no forms, no
-      hoops, no "why are you leaving?" interrogation.
+      <strong>{{ t("public.legal.refund.leadTitle") }}</strong
+      >{{ t("public.legal.refund.leadBody") }}
     </p>
 
-    <h2>How to request a refund</h2>
+    <h2>{{ t("public.legal.refund.request.heading") }}</h2>
     <p>
-      Email <a href="mailto:support@launchctl.io">support@launchctl.io</a> from
-      the address on your account, or use our
-      <NuxtLink to="/support">contact form</NuxtLink>. Tell us which charge you'd
-      like refunded — that's it. You don't need to give a reason.
+      {{ t("public.legal.refund.request.beforeEmail") }}
+      <a href="mailto:support@launchctl.io">support@launchctl.io</a
+      >{{ t("public.legal.refund.request.between") }}
+      <NuxtLink to="/support">{{ t("public.legal.contactForm") }}</NuxtLink
+      >{{ t("public.legal.refund.request.afterForm") }}
     </p>
 
-    <h2>What's covered</h2>
+    <h2>{{ t("public.legal.refund.covered.heading") }}</h2>
     <ul>
-      <li>
-        <strong>Subscription payments</strong> billed by launchctl, refunded to
-        your original payment method within 30 days of the charge.
-      </li>
-      <li>Refunds are issued in full — we don't pro-rate or deduct fees.</li>
-      <li>
-        Once refunded, the related subscription ends and paid features switch
-        off. Your servers and data are untouched — they live on your own cloud.
-      </li>
+      <li>{{ t("public.legal.refund.covered.subscription") }}</li>
+      <li>{{ t("public.legal.refund.covered.full") }}</li>
+      <li>{{ t("public.legal.refund.covered.effect") }}</li>
     </ul>
 
-    <h2>What we can't refund</h2>
+    <h2>{{ t("public.legal.refund.notCovered.heading") }}</h2>
     <p>
-      launchctl runs your apps on infrastructure <strong>you own</strong>, so any
-      charges from your cloud provider (DigitalOcean, Hetzner, AWS, Linode,
-      Vultr and the like) are billed directly by them, not by us. We can't refund
-      those — please raise them with your provider.
+      {{ t("public.legal.refund.notCovered.body") }}
     </p>
 
-    <h2>Beyond 30 days</h2>
+    <h2>{{ t("public.legal.refund.beyond.heading") }}</h2>
     <p>
-      Outside the 30-day window we're still happy to talk. You can cancel any
-      time to stop future charges, and if something went genuinely wrong, reach
-      out — we'll do the right thing.
+      {{ t("public.legal.refund.beyond.body") }}
     </p>
 
-    <h2>Questions</h2>
+    <h2>{{ t("public.legal.refund.questions.heading") }}</h2>
     <p>
-      Anything unclear? We're at
-      <a href="mailto:support@launchctl.io">support@launchctl.io</a> and usually
-      reply within a business day.
+      {{ t("public.legal.refund.questions.beforeEmail") }}
+      <a href="mailto:support@launchctl.io">support@launchctl.io</a
+      >{{ t("public.legal.refund.questions.afterEmail") }}
     </p>
   </LegalDoc>
 </template>

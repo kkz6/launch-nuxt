@@ -28,6 +28,7 @@ interface Props {
   projectId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   "update:open": [value: boolean];
   created: [app: DockerApplication];
@@ -203,13 +204,13 @@ watch(isOpen, (open) => {
 const submit = async () => {
   const trimmedName = name.value.trim();
   if (!trimmedName) {
-    toast.error("Application name is required");
+    toast.error(t("workload.application.create.nameRequired"));
     return;
   }
 
   const port = Number(internalPort.value);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    toast.error("Internal port must be between 1 and 65535");
+    toast.error(t("workload.validation.portRange"));
     return;
   }
 
@@ -223,7 +224,7 @@ const submit = async () => {
     case "image": {
       const v = imageRef.value.trim();
       if (!v) {
-        toast.error("Image reference is required (e.g. nginx:1.27)");
+        toast.error(t("workload.application.create.imageRequired"));
         return;
       }
       payload.image = { image: v };
@@ -238,7 +239,7 @@ const submit = async () => {
         const p = inlineRegistryPassword.value;
         if (!u || !p) {
           toast.error(
-            "Inline registry auth requires both username AND password",
+            t("workload.application.create.inlineCredentialsRequired"),
           );
           return;
         }
@@ -261,11 +262,11 @@ const submit = async () => {
       }
       const branch = gitBranch.value.trim();
       if (!repoUrl) {
-        toast.error("Pick a repository or paste a public URL");
+        toast.error(t("workload.application.create.repositoryRequired"));
         return;
       }
       if (!branch) {
-        toast.error("Git branch is required");
+        toast.error(t("workload.validation.branchRequired"));
         return;
       }
       payload.git = {
@@ -288,9 +289,7 @@ const submit = async () => {
         gitBuildLocation.value === "github_actions" &&
         !sourceControlId.value
       ) {
-        toast.error(
-          "GitHub Actions builds require a connected GitHub source control",
-        );
+        toast.error(t("workload.githubActions.connectedSourceRequired"));
         return;
       }
       break;
@@ -298,7 +297,7 @@ const submit = async () => {
     case "dockerfile": {
       const contents = dockerfileContents.value;
       if (!contents.trim()) {
-        toast.error("Dockerfile contents are required");
+        toast.error(t("workload.application.create.dockerfileRequired"));
         return;
       }
       payload.dockerfile = { contents };
@@ -313,11 +312,11 @@ const submit = async () => {
       props.projectId,
       payload,
     );
-    toast.success("Application created");
+    toast.success(t("workload.application.create.success"));
     emit("created", res.data);
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to create application");
+    toast.error(e.data?.message || t("workload.application.create.failed"));
   } finally {
     isSubmitting.value = false;
   }
@@ -328,27 +327,28 @@ const submit = async () => {
   <Dialog v-model:open="isOpen">
     <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-xl">
       <DialogHeader>
-        <DialogTitle>New Application</DialogTitle>
+        <DialogTitle>{{ t("workload.application.create.title") }}</DialogTitle>
         <DialogDescription>
-          Register a single-container workload. Once created, deploying will
-          pull or build the image and start the container on the docker server.
+          {{ t("workload.application.create.description") }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="space-y-4" @submit.prevent="submit">
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-2">
-            <Label for="app-name">Name</Label>
+            <Label for="app-name">{{ t("workload.fields.name") }}</Label>
             <Input
               id="app-name"
               v-model="name"
-              placeholder="e.g. api, web, worker"
+              :placeholder="t('workload.application.create.namePlaceholder')"
               autocomplete="off"
               required
             />
           </div>
           <div class="space-y-2">
-            <Label for="app-port">Internal port</Label>
+            <Label for="app-port">{{
+              t("workload.fields.internalPort")
+            }}</Label>
             <Input
               id="app-port"
               v-model.number="internalPort"
@@ -358,29 +358,29 @@ const submit = async () => {
               required
             />
             <p class="text-xs text-muted-foreground">
-              What your container listens on internally.
+              {{ t("workload.application.create.internalPortHelp") }}
             </p>
           </div>
         </div>
 
         <div class="space-y-2">
-          <Label>Source</Label>
+          <Label>{{ t("workload.fields.source") }}</Label>
           <div class="grid grid-cols-3 gap-2">
             <button
               v-for="opt in [
                 {
                   value: 'image' as const,
-                  label: 'Docker image',
+                  labelKey: 'dockerImage',
                   icon: 'simple-icons:docker',
                 },
                 {
                   value: 'git' as const,
-                  label: 'Git repo',
+                  labelKey: 'gitRepository',
                   icon: 'lucide:git-branch',
                 },
                 {
                   value: 'dockerfile' as const,
-                  label: 'Dockerfile',
+                  labelKey: 'dockerfile',
                   icon: 'lucide:file-code',
                 },
               ]"
@@ -395,28 +395,33 @@ const submit = async () => {
               @click="sourceType = opt.value"
             >
               <Icon :name="opt.icon" class="h-5 w-5" />
-              {{ opt.label }}
+              {{ t(`workload.sources.${opt.labelKey}`) }}
             </button>
           </div>
         </div>
 
         <div v-if="sourceType === 'image'" class="space-y-4">
           <div class="space-y-2">
-            <Label for="app-image">Image reference</Label>
+            <Label for="app-image">{{
+              t("workload.fields.imageReference")
+            }}</Label>
             <Input
               id="app-image"
               v-model="imageRef"
-              placeholder="nginx:1.27 or ghcr.io/acme/api:v3"
+              :placeholder="t('workload.application.create.imagePlaceholder')"
               autocomplete="off"
             />
             <p class="text-xs text-muted-foreground">
-              Include a specific tag — we don't silently use
-              <code>:latest</code>.
+              {{ t("workload.application.create.imageTagBefore") }}
+              <code>:latest</code
+              >{{ t("workload.application.create.imageTagAfter") }}
             </p>
           </div>
 
           <div class="space-y-2 rounded-md border bg-muted/20 p-3">
-            <Label class="text-sm font-medium">Image authentication</Label>
+            <Label class="text-sm font-medium">
+              {{ t("workload.application.create.imageAuthentication") }}
+            </Label>
             <div class="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
               <button
                 type="button"
@@ -429,10 +434,11 @@ const submit = async () => {
                 @click="registryAuthMode = 'public'"
               >
                 <div class="flex items-center gap-1.5 font-medium">
-                  <Icon name="lucide:globe" class="h-3.5 w-3.5" /> Public
+                  <Icon name="lucide:globe" class="h-3.5 w-3.5" />
+                  {{ t("workload.application.create.public") }}
                 </div>
                 <p class="mt-0.5 text-[11px] text-muted-foreground">
-                  No login.
+                  {{ t("workload.application.create.noLogin") }}
                 </p>
               </button>
               <button
@@ -446,10 +452,11 @@ const submit = async () => {
                 @click="registryAuthMode = 'saved'"
               >
                 <div class="flex items-center gap-1.5 font-medium">
-                  <Icon name="lucide:key-round" class="h-3.5 w-3.5" /> Saved
+                  <Icon name="lucide:key-round" class="h-3.5 w-3.5" />
+                  {{ t("workload.application.create.saved") }}
                 </div>
                 <p class="mt-0.5 text-[11px] text-muted-foreground">
-                  From Settings.
+                  {{ t("workload.application.create.fromSettings") }}
                 </p>
               </button>
               <button
@@ -463,10 +470,11 @@ const submit = async () => {
                 @click="registryAuthMode = 'inline'"
               >
                 <div class="flex items-center gap-1.5 font-medium">
-                  <Icon name="lucide:lock" class="h-3.5 w-3.5" /> Inline
+                  <Icon name="lucide:lock" class="h-3.5 w-3.5" />
+                  {{ t("workload.application.create.inline") }}
                 </div>
                 <p class="mt-0.5 text-[11px] text-muted-foreground">
-                  One-off creds.
+                  {{ t("workload.application.create.oneOffCredentials") }}
                 </p>
               </button>
             </div>
@@ -480,15 +488,16 @@ const submit = async () => {
                   name="lucide:triangle-alert"
                   class="mr-1 inline-block h-3 w-3 align-text-bottom"
                 />
-                No saved registry credentials. Add one in Settings →
-                Connections, or switch to Inline.
+                {{ t("workload.application.create.noSavedCredentials") }}
               </div>
               <select
                 v-else
                 v-model="selectedRegistryCredentialId"
                 class="h-9 w-full rounded-md border bg-background px-2 text-sm"
               >
-                <option value="">Pick a saved credential…</option>
+                <option value="">
+                  {{ t("workload.application.create.pickSavedCredential") }}
+                </option>
                 <option
                   v-for="c in registryCredentials"
                   :key="c.id"
@@ -503,7 +512,9 @@ const submit = async () => {
             <div v-if="registryAuthMode === 'inline'" class="space-y-2 pt-2">
               <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <div class="space-y-1">
-                  <Label for="reg-inline-user" class="text-xs">Username</Label>
+                  <Label for="reg-inline-user" class="text-xs">
+                    {{ t("workload.fields.username") }}
+                  </Label>
                   <Input
                     id="reg-inline-user"
                     v-model="inlineRegistryUsername"
@@ -511,7 +522,9 @@ const submit = async () => {
                   />
                 </div>
                 <div class="space-y-1">
-                  <Label for="reg-inline-pass" class="text-xs">Password</Label>
+                  <Label for="reg-inline-pass" class="text-xs">
+                    {{ t("workload.fields.password") }}
+                  </Label>
                   <Input
                     id="reg-inline-pass"
                     v-model="inlineRegistryPassword"
@@ -522,9 +535,9 @@ const submit = async () => {
               </div>
               <div class="space-y-1">
                 <Label for="reg-inline-url" class="text-xs">
-                  Registry URL
+                  {{ t("workload.fields.registryUrl") }}
                   <span class="font-normal text-muted-foreground">
-                    (leave blank for Docker Hub)
+                    {{ t("workload.application.create.dockerHubDefault") }}
                   </span>
                 </Label>
                 <Input
@@ -547,14 +560,12 @@ const submit = async () => {
               name="lucide:triangle-alert"
               class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom"
             />
-            No Git provider connected. Paste a public repo URL below, or connect
-            GitHub / GitLab / Bitbucket in Settings &rarr; Integrations to pick
-            from a list.
+            {{ t("workload.git.noProviderConnected") }}
           </div>
 
           <div v-if="sourceControls.length > 0" class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-              <Label>Git provider</Label>
+              <Label>{{ t("workload.fields.gitProvider") }}</Label>
               <Select
                 :model-value="sourceControlId"
                 @update:model-value="
@@ -562,7 +573,9 @@ const submit = async () => {
                 "
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select git provider" />
+                  <SelectValue
+                    :placeholder="t('workload.git.selectProvider')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -579,7 +592,11 @@ const submit = async () => {
                         {{ sc.login }}
                         <span class="text-muted-foreground">
                           ({{ sc.repository_count }}
-                          {{ sc.repository_count === 1 ? "repo" : "repos" }})
+                          {{
+                            t("workload.git.repositoryCount", {
+                              count: sc.repository_count,
+                            })
+                          }})
                         </span>
                       </span>
                     </div>
@@ -589,7 +606,7 @@ const submit = async () => {
             </div>
 
             <div class="space-y-2">
-              <Label>Repository</Label>
+              <Label>{{ t("workload.fields.repository") }}</Label>
               <ComboboxRoot
                 v-model:search-term="repositorySearchTerm"
                 :model-value="selectedRepo"
@@ -607,8 +624,8 @@ const submit = async () => {
                     class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
                     :placeholder="
                       isLoadingRepositories
-                        ? 'Loading...'
-                        : 'Search repository...'
+                        ? t('workload.actions.loading')
+                        : t('workload.git.searchRepository')
                     "
                     :display-value="(repo: Repository) => repo?.name || ''"
                   />
@@ -628,7 +645,7 @@ const submit = async () => {
                     <ComboboxEmpty
                       class="py-6 text-center text-sm text-muted-foreground"
                     >
-                      No repository found.
+                      {{ t("workload.git.noRepositoryFound") }}
                     </ComboboxEmpty>
                     <ComboboxGroup class="overflow-auto p-1">
                       <ComboboxItem
@@ -657,9 +674,9 @@ const submit = async () => {
           </div>
 
           <div v-if="!selectedRepo" class="space-y-2">
-            <Label for="app-git-repo-url"
-              >Or paste a public repository URL</Label
-            >
+            <Label for="app-git-repo-url">{{
+              t("workload.git.pastePublicUrl")
+            }}</Label>
             <Input
               id="app-git-repo-url"
               v-model="gitRepoFallback"
@@ -670,7 +687,9 @@ const submit = async () => {
 
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
-              <Label for="app-git-branch">Branch</Label>
+              <Label for="app-git-branch">{{
+                t("workload.fields.branch")
+              }}</Label>
               <Input
                 id="app-git-branch"
                 v-model="gitBranch"
@@ -679,14 +698,18 @@ const submit = async () => {
               />
             </div>
             <div class="space-y-2">
-              <Label>Builder</Label>
+              <Label>{{ t("workload.fields.builder") }}</Label>
               <Select v-model="gitBuildType">
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose builder" />
+                  <SelectValue
+                    :placeholder="
+                      t('workload.application.create.chooseBuilder')
+                    "
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="auto">
-                    Auto-detect (Dockerfile, else Nixpacks)
+                    {{ t("workload.application.create.autoDetectBuilder") }}
                   </SelectItem>
                   <SelectItem value="dockerfile">Dockerfile</SelectItem>
                   <SelectItem value="nixpacks">Nixpacks</SelectItem>
@@ -696,7 +719,9 @@ const submit = async () => {
           </div>
 
           <div v-if="gitBuildType === 'dockerfile'" class="space-y-2">
-            <Label for="app-dockerfile-path">Dockerfile path</Label>
+            <Label for="app-dockerfile-path">
+              {{ t("workload.fields.dockerfilePath") }}
+            </Label>
             <Input
               id="app-dockerfile-path"
               v-model="gitDockerfilePath"
@@ -704,13 +729,13 @@ const submit = async () => {
               autocomplete="off"
             />
             <p class="text-xs text-muted-foreground">
-              Relative to the repository root. Leave blank for
-              <code>./Dockerfile</code>.
+              {{ t("workload.application.create.dockerfilePathBefore") }}
+              <code>./Dockerfile</code>{{ t("workload.punctuation.period") }}
             </p>
           </div>
 
           <div class="space-y-2 rounded-md border bg-muted/40 p-4">
-            <Label>Build location</Label>
+            <Label>{{ t("workload.fields.buildLocation") }}</Label>
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <button
                 type="button"
@@ -724,11 +749,10 @@ const submit = async () => {
               >
                 <span class="flex items-center gap-2 text-sm font-medium">
                   <Icon name="lucide:server" class="h-4 w-4" />
-                  On the server
+                  {{ t("workload.application.create.onServer") }}
                 </span>
                 <span class="text-xs text-muted-foreground">
-                  Worker SSHes into the docker host and runs the build there.
-                  Default — works for any size repo.
+                  {{ t("workload.application.create.onServerDescription") }}
                 </span>
               </button>
               <button
@@ -743,11 +767,12 @@ const submit = async () => {
               >
                 <span class="flex items-center gap-2 text-sm font-medium">
                   <Icon name="simple-icons:github" class="h-4 w-4" />
-                  GitHub Actions
+                  {{ t("workload.githubActions.title") }}
                 </span>
                 <span class="text-xs text-muted-foreground">
-                  Launch commits a workflow into your repo. CI builds + pushes
-                  to GHCR; we deploy the image. Recommended for large apps.
+                  {{
+                    t("workload.application.create.githubActionsDescription")
+                  }}
                 </span>
               </button>
             </div>
@@ -759,7 +784,7 @@ const submit = async () => {
                 name="lucide:triangle-alert"
                 class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom"
               />
-              Requires a connected GitHub source control above.
+              {{ t("workload.githubActions.connectedSourceRequired") }}
             </p>
             <p
               v-if="gitBuildLocation === 'github_actions' && sourceControlId"
@@ -769,9 +794,10 @@ const submit = async () => {
                 name="lucide:git-commit-horizontal"
                 class="mr-1 inline-block h-3.5 w-3.5 align-text-bottom"
               />
-              On create, Launch commits a workflow file to
-              <span class="font-mono">.github/workflows/</span> in this repo.
-              Changing the build settings later re-syncs that file.
+              {{ t("workload.application.create.workflowCommitBefore") }}
+              <span class="font-mono">.github/workflows/</span>
+              {{ t("workload.application.create.workflowCommitLocationAfter") }}
+              {{ t("workload.application.create.workflowCommitAfter") }}
             </p>
 
             <div
@@ -780,23 +806,21 @@ const submit = async () => {
             >
               <div class="mb-1 flex items-center gap-1.5 font-medium">
                 <Icon name="lucide:check-circle" class="h-3.5 w-3.5" />
-                Private GHCR packages work automatically
+                {{ t("workload.githubActions.privatePackagesTitle") }}
               </div>
               <p class="text-emerald-900/90 dark:text-emerald-200/90">
-                Each workflow run mints a short-lived (<span class="font-mono"
-                  >~1 hour</span
-                >) GHCR pull token scoped to this repository and hands it to
-                Launch as part of the deploy callback. Your built images can
-                stay <span class="font-mono">Private</span> on GitHub — no
-                Personal Access Token, no visibility flip, no long-lived secret
-                to rotate.
+                {{ t("workload.githubActions.privatePackagesBeforeDuration") }}
+                <span class="font-mono">~1 hour</span>
+                {{ t("workload.githubActions.privatePackagesAfterDuration") }}
               </p>
             </div>
           </div>
         </div>
 
         <div v-else class="space-y-2">
-          <Label for="app-dockerfile">Dockerfile contents</Label>
+          <Label for="app-dockerfile">
+            {{ t("workload.fields.dockerfileContents") }}
+          </Label>
           <SharedCodeEditor
             v-model="dockerfileContents"
             language="shell"
@@ -805,8 +829,7 @@ const submit = async () => {
             placeholder='FROM alpine:3.20&#10;CMD ["echo", "hello"]'
           />
           <p class="text-xs text-muted-foreground">
-            The Dockerfile is stored as-is; deploying re-uses it without
-            re-fetching. Cap is 64 KB.
+            {{ t("workload.application.create.dockerfileContentsHelp") }}
           </p>
         </div>
 
@@ -817,7 +840,7 @@ const submit = async () => {
             :disabled="isSubmitting"
             @click="isOpen = false"
           >
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="isSubmitting">
             <Icon
@@ -825,7 +848,7 @@ const submit = async () => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Create Application
+            {{ t("workload.application.create.submit") }}
           </Button>
         </DialogFooter>
       </form>

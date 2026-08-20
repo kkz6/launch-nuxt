@@ -32,6 +32,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   container: "",
 });
+const { t } = useI18n();
 const emit = defineEmits<{
   close: [];
 }>();
@@ -264,7 +265,7 @@ onBeforeUnmount(() => {
           class="group absolute inset-x-0 -top-1.5 z-10 flex h-3 cursor-ns-resize items-center justify-center"
           role="separator"
           aria-orientation="horizontal"
-          aria-label="Resize terminal"
+          :aria-label="t('server.terminal.resize')"
           @mousedown="startResize"
           @touchstart="startResize"
         >
@@ -297,7 +298,7 @@ onBeforeUnmount(() => {
                       : 'fill-red-500 text-red-500',
                 ]"
               />
-              <span class="capitalize">{{ connectionStatus }}</span>
+              <span>{{ t(`server.terminal.${connectionStatus}`) }}</span>
               <span class="text-zinc-600">•</span>
 
               <template v-if="isContainerMode">
@@ -376,7 +377,7 @@ onBeforeUnmount(() => {
                 variant="ghost"
                 size="icon"
                 class="h-6 w-6 text-zinc-400 hover:text-zinc-100"
-                title="Reconnect"
+                :title="t('server.terminal.reconnect')"
                 @click="handleReconnect"
               >
                 <RotateCcw class="h-3 w-3" />
@@ -412,9 +413,10 @@ onBeforeUnmount(() => {
                 class="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500"
               />
               <AlertDescription class="flex-1 text-xs text-amber-200/90">
-                <span class="font-medium">Caution:</span> Only make changes if
-                you understand what you're doing. Incorrect commands may break
-                application connectivity or server functionality.
+                <span class="font-medium">{{
+                  t("server.terminal.caution")
+                }}</span>
+                {{ t("server.terminal.cautionDescription") }}
               </AlertDescription>
               <Button
                 variant="ghost"

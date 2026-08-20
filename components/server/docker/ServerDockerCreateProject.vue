@@ -7,6 +7,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 const emit = defineEmits<{ created: [project: DockerProject] }>();
+const { t } = useI18n();
 
 // Self-contained create flow — same convention ServerAddSite uses.
 // The Navbar mounts this component next to Terminal / Provision when
@@ -26,7 +27,7 @@ const openDialog = () => {
 const submit = async () => {
   const name = form.name.trim();
   if (!name) {
-    toast.error("Project name is required");
+    toast.error(t("server.docker.project.nameRequired"));
     return;
   }
   isCreating.value = true;
@@ -35,12 +36,12 @@ const submit = async () => {
       name,
       description: form.description.trim() || undefined,
     });
-    toast.success("Project created");
+    toast.success(t("server.docker.project.created"));
     emit("created", res.data);
     open.value = false;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to create project");
+    toast.error(e.data?.message || t("server.docker.project.createFailed"));
   } finally {
     isCreating.value = false;
   }
@@ -50,21 +51,20 @@ const submit = async () => {
 <template>
   <Button size="sm" @click="openDialog">
     <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-    New Project
+    {{ t("server.docker.project.new") }}
   </Button>
 
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
-        <DialogTitle>New Project</DialogTitle>
+        <DialogTitle>{{ t("server.docker.project.new") }}</DialogTitle>
         <DialogDescription>
-          A project groups docker applications, compose stacks, and
-          databases running on this server.
+          {{ t("server.docker.project.description") }}
         </DialogDescription>
       </DialogHeader>
       <form class="space-y-4" @submit.prevent="submit">
         <div class="space-y-2">
-          <Label for="navbar-project-name">Name</Label>
+          <Label for="navbar-project-name">{{ t("server.common.name") }}</Label>
           <Input
             id="navbar-project-name"
             v-model="form.name"
@@ -73,15 +73,17 @@ const submit = async () => {
             required
           />
           <p class="text-xs text-muted-foreground">
-            Must be unique on this server.
+            {{ t("server.docker.project.uniqueHelp") }}
           </p>
         </div>
         <div class="space-y-2">
-          <Label for="navbar-project-description">Description (optional)</Label>
+          <Label for="navbar-project-description">{{
+            t("server.docker.project.descriptionOptional")
+          }}</Label>
           <Textarea
             id="navbar-project-description"
             v-model="form.description"
-            placeholder="What lives in this project?"
+            :placeholder="t('server.docker.project.descriptionPlaceholder')"
             rows="3"
           />
         </div>
@@ -92,7 +94,7 @@ const submit = async () => {
             :disabled="isCreating"
             @click="open = false"
           >
-            Cancel
+            {{ t("server.common.cancel") }}
           </Button>
           <Button type="submit" :disabled="isCreating">
             <Icon
@@ -100,7 +102,7 @@ const submit = async () => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Create Project
+            {{ t("server.docker.project.create") }}
           </Button>
         </DialogFooter>
       </form>

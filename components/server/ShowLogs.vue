@@ -1,71 +1,82 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Label } from '~/components/ui/label'
+import { toast } from "vue-sonner";
+import { Label } from "~/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '~/components/ui/select'
-import type { LogInfo } from '~/types'
+} from "~/components/ui/select";
+import type { LogInfo } from "~/types";
+import { useStableMetadataLabels } from "~/composables/useStableMetadataLabels";
 
 interface Props {
-  serverId: string
-  type?: 'server' | 'site'
-  siteId?: string
+  serverId: string;
+  type?: "server" | "site";
+  siteId?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  type: 'server',
-})
+  type: "server",
+});
+const { t } = useI18n();
+const { getLogName } = useStableMetadataLabels();
 
-const logs = ref<LogInfo[]>([])
-const selectedLogIndex = ref<string>('')
-const isLoading = ref(true)
+const logs = ref<LogInfo[]>([]);
+const selectedLogIndex = ref<string>("");
+const isLoading = ref(true);
 
 const fetchLogs = async () => {
   try {
-    const endpoint = props.type === 'site'
-      ? `/servers/${props.serverId}/sites/${props.siteId}/logs`
-      : `/servers/${props.serverId}/logs`
-    const data = await $api<{ data: LogInfo[] }>(endpoint)
-    logs.value = data.data
+    const endpoint =
+      props.type === "site"
+        ? `/servers/${props.serverId}/sites/${props.siteId}/logs`
+        : `/servers/${props.serverId}/logs`;
+    const data = await $api<{ data: LogInfo[] }>(endpoint);
+    logs.value = data.data;
   } catch {
-    toast.error('Failed to load logs')
+    toast.error(t("server.logs.loadFailed"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const selectedLog = computed(() => {
-  if (!selectedLogIndex.value) return null
-  return logs.value[parseInt(selectedLogIndex.value)]
-})
+  if (!selectedLogIndex.value) return null;
+  return logs.value[parseInt(selectedLogIndex.value)];
+});
 
-onMounted(fetchLogs)
+onMounted(fetchLogs);
 </script>
 
 <template>
   <div>
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 class="text-lg font-semibold">Logs</h3>
-        <p class="text-sm text-muted-foreground">View server and service logs</p>
+        <h3 class="text-lg font-semibold">{{ t("server.logs.title") }}</h3>
+        <p class="text-sm text-muted-foreground">
+          {{ t("server.logs.description") }}
+        </p>
       </div>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <template v-else>
       <div class="space-y-4">
         <div class="space-y-2">
-          <Label>Select Service</Label>
+          <Label>{{ t("server.logs.selectService") }}</Label>
           <Select v-model="selectedLogIndex">
             <SelectTrigger class="w-full max-w-sm">
-              <SelectValue placeholder="Select a service to view logs" />
+              <SelectValue
+                :placeholder="t('server.logs.selectServicePlaceholder')"
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectItem
@@ -73,7 +84,7 @@ onMounted(fetchLogs)
                 :key="index"
                 :value="String(index)"
               >
-                {{ log.name }}
+                {{ getLogName(log) }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -84,7 +95,7 @@ onMounted(fetchLogs)
           :key="`${selectedLogIndex}-${selectedLog.software}`"
           :server-id="serverId"
           :entity="type"
-          :entity-id="type === 'site' ? (siteId || '') : serverId"
+          :entity-id="type === 'site' ? siteId || '' : serverId"
           :software="selectedLog.software"
           :route="selectedLog.show_route"
           no-timestamp

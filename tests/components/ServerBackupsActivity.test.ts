@@ -2,6 +2,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ServerBackups from "../../components/server/settings/Backups.vue";
+import { createI18nStub } from "../helpers/i18n";
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
@@ -137,6 +138,7 @@ describe("server backup activity", () => {
     mocks.closeHandler = undefined;
     vi.stubGlobal("$api", mocks.api);
     vi.stubGlobal("useAuth", () => ({ user }));
+    vi.stubGlobal("useI18n", createI18nStub);
     vi.stubGlobal("useSettingsSheet", () => ({ open: mocks.openSettings }));
     vi.stubGlobal(
       "useBackupEvents",

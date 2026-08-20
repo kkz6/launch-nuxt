@@ -1,67 +1,87 @@
 <script setup lang="ts">
 definePageMeta({
-  layout: 'docs',
-})
+  layout: "docs",
+});
 
-const route = useRoute()
+const route = useRoute();
+const { t } = useI18n();
 const slug = computed(() => {
-  const parts = route.params.slug
-  const joined = Array.isArray(parts) ? parts.join('/') : parts || ''
-  return joined
-})
-const docPath = computed(() => (slug.value ? `/docs/${slug.value}` : '/docs'))
+  const parts = route.params.slug;
+  const joined = Array.isArray(parts) ? parts.join("/") : parts || "";
+  return joined;
+});
+const docPath = computed(() => (slug.value ? `/docs/${slug.value}` : "/docs"));
 
-const { data: page } = await useAsyncData(`docs-${slug.value || 'index'}`, () =>
-  queryCollection('docs').path(docPath.value).first()
-)
+const { data: page } = await useAsyncData(`docs-${slug.value || "index"}`, () =>
+  queryCollection("docs").path(docPath.value).first(),
+);
 
 if (!page.value) {
   throw createError({
     statusCode: 404,
-    statusMessage: 'Page not found',
-  })
+    statusMessage: t("public.error.pageNotFoundTitle"),
+  });
 }
 
 useHead({
-  title: page.value?.title ? `${page.value.title} - Docs` : 'Documentation',
+  title: page.value?.title
+    ? () => t("public.docs.pageTitle", { title: page.value?.title ?? "" })
+    : () => t("public.docs.documentation"),
   meta: [
-    { name: 'description', content: page.value?.description || 'launchctl documentation' },
+    {
+      name: "description",
+      content: page.value?.description || t("public.docs.metaDescription"),
+    },
   ],
-})
+});
 
 // Extract TOC from page
 const toc = computed(() => {
-  if (!page.value?.body?.toc?.links) return []
-  return page.value.body.toc.links
-})
+  if (!page.value?.body?.toc?.links) return [];
+  return page.value.body.toc.links;
+});
 
 // Provide TOC to layout
-provide('docsToc', toc)
+provide("docsToc", toc);
 
 // Mono breadcrumb eyebrow, e.g. "application / servers", matching the CLI motif.
 const breadcrumb = computed(() =>
   slug.value
-    ? slug.value.split('/').map((s) => s.replace(/-/g, ' '))
-    : ['docs']
-)
+    ? slug.value.split("/").map((s) => s.replace(/-/g, " "))
+    : ["docs"],
+);
 </script>
 
 <template>
   <div class="mx-auto max-w-[49rem]">
     <!-- Page header -->
-    <div v-if="page" class="relative mb-10 overflow-hidden border-b border-[hsl(var(--site-border))] pb-9">
-      <div class="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-[hsl(var(--site-accent))]/10 blur-3xl" />
-      <div class="relative mb-5 flex items-center gap-1.5 font-docs-mono text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--site-text-muted))]">
+    <div
+      v-if="page"
+      class="relative mb-10 overflow-hidden border-b border-[hsl(var(--site-border))] pb-9"
+    >
+      <div
+        class="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-[hsl(var(--site-accent))]/10 blur-3xl"
+      />
+      <div
+        class="relative mb-5 flex items-center gap-1.5 font-docs-mono text-[11px] uppercase tracking-[0.12em] text-[hsl(var(--site-text-muted))]"
+      >
         <span class="text-[hsl(var(--site-accent))]">~</span>
         <template v-for="(crumb, i) in breadcrumb" :key="i">
-          <span v-if="i > 0" class="text-[hsl(var(--site-text-muted))]/50">/</span>
+          <span v-if="i > 0" class="text-[hsl(var(--site-text-muted))]/50"
+            >/</span
+          >
           <span>{{ crumb }}</span>
         </template>
       </div>
-      <h1 class="relative max-w-3xl text-4xl font-bold leading-[1.08] tracking-[-0.045em] text-[hsl(var(--site-text))] md:text-5xl">
+      <h1
+        class="relative max-w-3xl text-4xl font-bold leading-[1.08] tracking-[-0.045em] text-[hsl(var(--site-text))] md:text-5xl"
+      >
         {{ page.title }}
       </h1>
-      <p v-if="page.description" class="relative mt-5 max-w-2xl text-lg leading-8 text-[hsl(var(--site-text-muted))]">
+      <p
+        v-if="page.description"
+        class="relative mt-5 max-w-2xl text-lg leading-8 text-[hsl(var(--site-text-muted))]"
+      >
         {{ page.description }}
       </p>
     </div>
@@ -161,7 +181,9 @@ const breadcrumb = computed(() =>
   @apply mb-7 overflow-x-auto rounded-xl p-5 font-docs-mono text-[13px] leading-6;
   background: linear-gradient(145deg, #0b1018, #0c111b 60%, #101722);
   border: 1px solid hsl(220 12% 20%);
-  box-shadow: 0 22px 55px -32px rgb(2 6 23 / 0.8), inset 0 1px 0 rgb(255 255 255 / 0.04);
+  box-shadow:
+    0 22px 55px -32px rgb(2 6 23 / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.04);
 }
 
 .docs-content pre code {

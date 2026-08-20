@@ -10,6 +10,7 @@
 import { useCertificateAlerts } from "~/composables/useCertificateAlerts";
 
 const { expiringSoon, isLoading } = useCertificateAlerts();
+const { t } = useI18n();
 
 const summary = computed(() => {
   const total = expiringSoon.value.length;
@@ -18,12 +19,25 @@ const summary = computed(() => {
     (c) => new Date(c.not_after) < new Date(),
   ).length;
   if (expired === total) {
-    return `${expired} ${expired === 1 ? "certificate has" : "certificates have"} expired`;
+    return t(
+      expired === 1
+        ? "public.dashboard.certificates.allExpiredOne"
+        : "public.dashboard.certificates.allExpiredMany",
+      { count: expired },
+    );
   }
   if (expired > 0) {
-    return `${expired} expired, ${total - expired} expiring in the next 30 days`;
+    return t("public.dashboard.certificates.someExpired", {
+      expired,
+      expiring: total - expired,
+    });
   }
-  return `${total} ${total === 1 ? "certificate expires" : "certificates expire"} in the next 30 days`;
+  return t(
+    total === 1
+      ? "public.dashboard.certificates.expiresOne"
+      : "public.dashboard.certificates.expiresMany",
+    { count: total },
+  );
 });
 
 const variantClasses = computed(() => {
@@ -46,13 +60,16 @@ const variantClasses = computed(() => {
   >
     <div class="flex items-center gap-3">
       <Icon name="lucide:shield-alert" class="h-5 w-5 shrink-0" />
-      <span>{{ summary }} — review your SSL certificates.</span>
+      <span
+        >{{ summary }} —
+        {{ t("public.dashboard.certificates.reviewSuffix") }}</span
+      >
     </div>
     <NuxtLink
       to="/settings/connections#ssl-certificates"
       class="shrink-0 rounded-md border bg-background px-3 py-1.5 text-xs font-medium hover:bg-accent"
     >
-      Review
+      {{ t("public.dashboard.certificates.review") }}
     </NuxtLink>
   </div>
 </template>

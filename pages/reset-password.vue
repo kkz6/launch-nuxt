@@ -9,9 +9,11 @@ definePageMeta({
   middleware: "guest",
 });
 
-useHead({
-  title: "Reset Password",
-});
+const { t } = useI18n();
+
+useHead(() => ({
+  title: t("auth.resetPassword.pageTitle"),
+}));
 
 const route = useRoute();
 const { resetPassword, isLoading } = useAuth();
@@ -35,7 +37,7 @@ const handleSubmit = async () => {
       password_confirmation: passwordConfirmation.value,
     });
 
-    toast.success("Password has been reset successfully");
+    toast.success(t("auth.resetPassword.success"));
     navigateTo("/login");
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
@@ -50,11 +52,11 @@ const handleSubmit = async () => {
         errors.value = errs;
       } else {
         errors.value = {
-          password: fetchError.data?.message || "An error occurred",
+          password: fetchError.data?.message || t("auth.errors.genericShort"),
         };
       }
     } else {
-      errors.value = { password: "An error occurred. Please try again." };
+      errors.value = { password: t("auth.errors.generic") };
     }
   }
 };
@@ -66,14 +68,16 @@ const handleSubmit = async () => {
       <NuxtLink to="/" class="text-2xl font-bold">launchctl</NuxtLink>
     </div>
 
-    <h3 class="mb-2 text-lg font-semibold text-foreground">Reset Password</h3>
+    <h3 class="mb-2 text-lg font-semibold text-foreground">
+      {{ t("auth.resetPassword.heading") }}
+    </h3>
     <p class="mb-8 text-sm text-muted-foreground">
-      Enter your new password below to reset your account password.
+      {{ t("auth.resetPassword.description") }}
     </p>
 
     <form class="space-y-4" @submit.prevent="handleSubmit">
       <div class="space-y-2">
-        <Label for="email">Email</Label>
+        <Label for="email">{{ t("auth.fields.email") }}</Label>
         <Input
           id="email"
           v-model="email"
@@ -87,7 +91,7 @@ const handleSubmit = async () => {
       </div>
 
       <div class="space-y-2">
-        <Label for="password">New Password</Label>
+        <Label for="password">{{ t("auth.fields.newPassword") }}</Label>
         <Input
           id="password"
           v-model="password"
@@ -101,7 +105,9 @@ const handleSubmit = async () => {
       </div>
 
       <div class="space-y-2">
-        <Label for="password_confirmation">Confirm Password</Label>
+        <Label for="password_confirmation">{{
+          t("auth.fields.confirmPassword")
+        }}</Label>
         <Input
           id="password_confirmation"
           v-model="passwordConfirmation"
@@ -109,10 +115,7 @@ const handleSubmit = async () => {
           autocomplete="new-password"
           required
         />
-        <p
-          v-if="errors.password_confirmation"
-          class="text-sm text-destructive"
-        >
+        <p v-if="errors.password_confirmation" class="text-sm text-destructive">
           {{ errors.password_confirmation }}
         </p>
       </div>
@@ -123,7 +126,11 @@ const handleSubmit = async () => {
           name="lucide:loader-2"
           class="mr-2 h-4 w-4 animate-spin"
         />
-        {{ isLoading ? 'Resetting...' : 'Reset Password' }}
+        {{
+          isLoading
+            ? t("auth.actions.resetting")
+            : t("auth.actions.resetPassword")
+        }}
       </Button>
     </form>
   </div>

@@ -12,6 +12,7 @@ interface Props {
   project: DockerProject;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Per-workload lists live here so the Overview can show status
 // breakdowns + recent-activity without hitting a project-wide
@@ -74,9 +75,7 @@ const databasesBreakdown = computed(() => breakdownFor(databases.value));
 
 const totalWorkloads = computed(
   () =>
-    applications.value.length +
-    composes.value.length +
-    databases.value.length,
+    applications.value.length + composes.value.length + databases.value.length,
 );
 
 const hasAny = computed(() => totalWorkloads.value > 0);
@@ -185,6 +184,9 @@ const statusBadgeClass = (status: string): string => {
   }
 };
 
+const statusLabel = (status: string) => t(`workload.status.${status}`, status);
+const kindLabel = (kind: Activity["kind"]) => t(`workload.kind.${kind}`, kind);
+
 // formatDate + relative used to live here as one-off helpers. Both
 // got replaced by SharedDateTooltip — it ticks via useNow(), shows
 // the absolute time in the browser's TZ in a hover tooltip, and
@@ -233,19 +235,21 @@ onMounted(fetchAll);
       anchored and scannable.
     -->
     <div>
-      <h3 class="mb-4 text-lg font-semibold">Project overview</h3>
+      <h3 class="mb-4 text-lg font-semibold">
+        {{ t("workload.project.overview.title") }}
+      </h3>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <!-- Applications -->
-        <div
-          class="flex items-start gap-3 rounded-lg border bg-card p-4"
-        >
+        <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10"
           >
             <Icon name="lucide:box" class="h-5 w-5 text-blue-500" />
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-sm text-muted-foreground">Applications</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.kind.applications") }}
+            </p>
             <p class="text-2xl font-semibold leading-tight text-foreground">
               {{ applications.length }}
             </p>
@@ -257,14 +261,22 @@ onMounted(fetchAll);
                 v-if="applicationsBreakdown.running"
                 class="text-emerald-600 dark:text-emerald-400"
               >
-                {{ applicationsBreakdown.running }} running
+                {{
+                  t("workload.project.overview.runningCount", {
+                    count: applicationsBreakdown.running,
+                  })
+                }}
               </span>
               <span
                 v-if="applicationsBreakdown.failed"
                 class="text-rose-600 dark:text-rose-400"
               >
                 <span v-if="applicationsBreakdown.running"> · </span>
-                {{ applicationsBreakdown.failed }} failed
+                {{
+                  t("workload.project.overview.failedCount", {
+                    count: applicationsBreakdown.failed,
+                  })
+                }}
               </span>
               <span
                 v-if="
@@ -276,32 +288,37 @@ onMounted(fetchAll);
               >
                 <span
                   v-if="
-                    applicationsBreakdown.running || applicationsBreakdown.failed
+                    applicationsBreakdown.running ||
+                    applicationsBreakdown.failed
                   "
-                > · </span>
+                >
+                  ·
+                </span>
                 {{
                   applicationsBreakdown.idle +
                   applicationsBreakdown.building +
                   applicationsBreakdown.stopped
                 }}
-                other
+                {{ t("workload.project.overview.other") }}
               </span>
             </p>
-            <p v-else class="mt-1 text-xs text-muted-foreground">None yet</p>
+            <p v-else class="mt-1 text-xs text-muted-foreground">
+              {{ t("workload.project.overview.noneYet") }}
+            </p>
           </div>
         </div>
 
         <!-- Compose stacks -->
-        <div
-          class="flex items-start gap-3 rounded-lg border bg-card p-4"
-        >
+        <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-500/10"
           >
             <Icon name="lucide:layers" class="h-5 w-5 text-violet-500" />
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-sm text-muted-foreground">Compose stacks</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.kind.composeStacks") }}
+            </p>
             <p class="text-2xl font-semibold leading-tight text-foreground">
               {{ composes.length }}
             </p>
@@ -313,31 +330,41 @@ onMounted(fetchAll);
                 v-if="composesBreakdown.running"
                 class="text-emerald-600 dark:text-emerald-400"
               >
-                {{ composesBreakdown.running }} running
+                {{
+                  t("workload.project.overview.runningCount", {
+                    count: composesBreakdown.running,
+                  })
+                }}
               </span>
               <span
                 v-if="composesBreakdown.failed"
                 class="text-rose-600 dark:text-rose-400"
               >
                 <span v-if="composesBreakdown.running"> · </span>
-                {{ composesBreakdown.failed }} failed
+                {{
+                  t("workload.project.overview.failedCount", {
+                    count: composesBreakdown.failed,
+                  })
+                }}
               </span>
             </p>
-            <p v-else class="mt-1 text-xs text-muted-foreground">None yet</p>
+            <p v-else class="mt-1 text-xs text-muted-foreground">
+              {{ t("workload.project.overview.noneYet") }}
+            </p>
           </div>
         </div>
 
         <!-- Databases -->
-        <div
-          class="flex items-start gap-3 rounded-lg border bg-card p-4"
-        >
+        <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10"
           >
             <Icon name="lucide:database" class="h-5 w-5 text-emerald-500" />
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-sm text-muted-foreground">Databases</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.kind.databases") }}
+            </p>
             <p class="text-2xl font-semibold leading-tight text-foreground">
               {{ databases.length }}
             </p>
@@ -349,33 +376,46 @@ onMounted(fetchAll);
                 v-if="databasesBreakdown.running"
                 class="text-emerald-600 dark:text-emerald-400"
               >
-                {{ databasesBreakdown.running }} running
+                {{
+                  t("workload.project.overview.runningCount", {
+                    count: databasesBreakdown.running,
+                  })
+                }}
               </span>
               <span
                 v-if="databasesBreakdown.failed"
                 class="text-rose-600 dark:text-rose-400"
               >
                 <span v-if="databasesBreakdown.running"> · </span>
-                {{ databasesBreakdown.failed }} failed
+                {{
+                  t("workload.project.overview.failedCount", {
+                    count: databasesBreakdown.failed,
+                  })
+                }}
               </span>
             </p>
-            <p v-else class="mt-1 text-xs text-muted-foreground">None yet</p>
+            <p v-else class="mt-1 text-xs text-muted-foreground">
+              {{ t("workload.project.overview.noneYet") }}
+            </p>
           </div>
         </div>
 
         <!-- Last activity -->
-        <div
-          class="flex items-start gap-3 rounded-lg border bg-card p-4"
-        >
+        <div class="flex items-start gap-3 rounded-lg border bg-card p-4">
           <div
             class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-500/10"
           >
             <Icon name="lucide:activity" class="h-5 w-5 text-orange-500" />
           </div>
           <div class="min-w-0 flex-1">
-            <p class="text-sm text-muted-foreground">Last deploy</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.project.overview.lastDeploy") }}
+            </p>
             <p class="text-2xl font-semibold leading-tight text-foreground">
-              <SharedDateTooltip v-if="lastDeploy" :date="lastDeploy.toISOString()" />
+              <SharedDateTooltip
+                v-if="lastDeploy"
+                :date="lastDeploy.toISOString()"
+              />
               <span v-else>—</span>
             </p>
             <!--
@@ -411,17 +451,16 @@ onMounted(fetchAll);
     <div v-else-if="hasAny" class="rounded-lg border bg-card">
       <div class="flex items-center justify-between border-b px-5 py-4">
         <div>
-          <h3 class="text-sm font-semibold">Recent activity</h3>
+          <h3 class="text-sm font-semibold">
+            {{ t("workload.project.overview.recentActivity") }}
+          </h3>
           <p class="text-xs text-muted-foreground">
-            Workloads sorted by latest deploy or status change.
+            {{ t("workload.project.overview.recentDescription") }}
           </p>
         </div>
       </div>
       <ul class="divide-y">
-        <li
-          v-for="row in recentActivity"
-          :key="`${row.kind}:${row.id}`"
-        >
+        <li v-for="row in recentActivity" :key="`${row.kind}:${row.id}`">
           <NuxtLink
             :to="row.to"
             class="group flex items-center gap-4 px-5 py-3 transition-colors hover:bg-muted/50"
@@ -438,11 +477,13 @@ onMounted(fetchAll);
                   class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
                   :class="statusBadgeClass(row.status)"
                 >
-                  {{ row.status }}
+                  {{ statusLabel(row.status) }}
                 </span>
               </div>
-              <p class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
-                <span class="capitalize">{{ row.kind }}</span>
+              <p
+                class="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground"
+              >
+                <span class="capitalize">{{ kindLabel(row.kind) }}</span>
                 <template v-if="row.timestamp">
                   <span>·</span>
                   <SharedDateTooltip :date="row.timestamp" />
@@ -470,12 +511,11 @@ onMounted(fetchAll);
         >
           <Icon name="lucide:rocket" class="h-6 w-6 text-muted-foreground" />
         </div>
-        <h3 class="mt-4 text-lg font-semibold">Nothing deployed yet</h3>
+        <h3 class="mt-4 text-lg font-semibold">
+          {{ t("workload.project.overview.emptyTitle") }}
+        </h3>
         <p class="mt-1 text-sm text-muted-foreground">
-          Use the
-          <span class="font-medium">+ New&nbsp;…</span>
-          button in the toolbar above on each tab to ship your first
-          workload.
+          {{ t("workload.project.overview.emptyDescription") }}
         </p>
       </div>
       <div class="mt-6 grid gap-3 sm:grid-cols-3">
@@ -486,10 +526,11 @@ onMounted(fetchAll);
             <Icon name="lucide:box" class="h-4 w-4 text-blue-500" />
           </div>
           <div class="min-w-0">
-            <p class="text-sm font-medium">Applications</p>
+            <p class="text-sm font-medium">
+              {{ t("workload.kind.applications") }}
+            </p>
             <p class="text-xs text-muted-foreground">
-              Single-container workloads from an image, git repo, or
-              Dockerfile.
+              {{ t("workload.project.overview.applicationsDescription") }}
             </p>
           </div>
         </div>
@@ -500,10 +541,13 @@ onMounted(fetchAll);
             <Icon name="lucide:layers" class="h-4 w-4 text-violet-500" />
           </div>
           <div class="min-w-0">
-            <p class="text-sm font-medium">Compose</p>
+            <p class="text-sm font-medium">
+              {{ t("workload.kind.compose") }}
+            </p>
             <p class="text-xs text-muted-foreground">
-              Multi-container stacks deployed with
-              <code>docker compose up</code>.
+              {{ t("workload.project.overview.composeDescriptionBefore") }}
+              <code>docker compose up</code
+              >{{ t("workload.punctuation.period") }}
             </p>
           </div>
         </div>
@@ -514,10 +558,11 @@ onMounted(fetchAll);
             <Icon name="lucide:database" class="h-4 w-4 text-emerald-500" />
           </div>
           <div class="min-w-0">
-            <p class="text-sm font-medium">Databases</p>
+            <p class="text-sm font-medium">
+              {{ t("workload.kind.databases") }}
+            </p>
             <p class="text-xs text-muted-foreground">
-              Managed Postgres / MySQL / MariaDB / Redis / Mongo
-              containers.
+              {{ t("workload.project.overview.databasesDescription") }}
             </p>
           </div>
         </div>

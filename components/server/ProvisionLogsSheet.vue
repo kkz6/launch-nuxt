@@ -1,33 +1,34 @@
 <script setup lang="ts">
-import { reactive, toRefs } from 'vue'
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
+import { reactive, toRefs } from "vue";
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '~/components/ui/sheet'
-import type { Server, ProvisionStatus } from '~/types'
-import { serverService } from '~/services/serverService'
-import { useServersStore } from '~/stores/useServersStore'
+} from "~/components/ui/sheet";
+import type { Server, ProvisionStatus, ProvisionStatusStep } from "~/types";
+import { serverService } from "~/services/serverService";
+import { useServersStore } from "~/stores/useServersStore";
 
 interface Props {
-  server: Server | null
+  server: Server | null;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
-const open = defineModel<boolean>('open', { default: false })
+const open = defineModel<boolean>("open", { default: false });
 
-const { open: openSettingsSheet } = useSettingsSheet()
+const { open: openSettingsSheet } = useSettingsSheet();
 
 interface ProvisionState {
-  provisionStatus: ProvisionStatus | null
-  isLoading: boolean
-  showLogs: boolean
-  isRetrying: boolean
+  provisionStatus: ProvisionStatus | null;
+  isLoading: boolean;
+  showLogs: boolean;
+  isRetrying: boolean;
 }
 
 const state = reactive({
@@ -35,61 +36,59 @@ const state = reactive({
   isLoading: false,
   showLogs: false,
   isRetrying: false,
-}) as ProvisionState
+}) as ProvisionState;
 
-const { provisionStatus, isLoading, showLogs, isRetrying } = toRefs(state)
+const { provisionStatus, isLoading, showLogs, isRetrying } = toRefs(state);
 
 const onRetryProvision = async () => {
-  if (!props.server || isRetrying.value) return
-  isRetrying.value = true
+  if (!props.server || isRetrying.value) return;
+  isRetrying.value = true;
   try {
-    await serverService.retryProvision(props.server.id)
-    toast.success("Provisioning queued — we'll try again now.")
-    await fetchProvisionStatus(true)
+    await serverService.retryProvision(props.server.id);
+    toast.success(t("server.provisionStatus.retryQueued"));
+    await fetchProvisionStatus(true);
   } catch (err: unknown) {
-    const e = err as { data?: { message?: string } }
-    toast.error(
-      e.data?.message || "Couldn't queue the retry. Please try again.",
-    )
+    const e = err as { data?: { message?: string } };
+    toast.error(e.data?.message || t("server.provisionStatus.retryFailed"));
   } finally {
-    isRetrying.value = false
+    isRetrying.value = false;
   }
-}
+};
 
 const onManageCredentials = () => {
-  open.value = false
-  openSettingsSheet('connections')
-}
+  open.value = false;
+  openSettingsSheet("connections");
+};
 
-const serversStore = useServersStore()
-const serverId = computed(() => props.server?.id || '')
+const serversStore = useServersStore();
+const serverId = computed(() => props.server?.id || "");
 const storeServer = computed(() => {
-  if (!serverId.value) return undefined
-  return serversStore.servers.find((s) => s.id === serverId.value)
-})
+  if (!serverId.value) return undefined;
+  return serversStore.servers.find((s) => s.id === serverId.value);
+});
 
 const fetchProvisionStatus = async (silent = false) => {
-  if (!props.server) return
+  if (!props.server) return;
 
-  if (!silent) isLoading.value = true
+  if (!silent) isLoading.value = true;
   try {
-    const response = await serverService.getProvisionStatus(props.server.id)
-    provisionStatus.value = response.data
+    const response = await serverService.getProvisionStatus(props.server.id);
+    provisionStatus.value = response.data;
   } catch {
-    if (!silent) provisionStatus.value = null
+    if (!silent) provisionStatus.value = null;
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 watch(open, (isOpen) => {
   if (isOpen && props.server) {
-    showLogs.value = false
-    fetchProvisionStatus()
+    showLogs.value = false;
+    fetchProvisionStatus();
   }
-})
+});
 
-let statusFetchTimeout: ReturnType<typeof setTimeout> | null = null
+let statusFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 watch(
   () =>
@@ -100,40 +99,94 @@ watch(
       storeServer.value?.connected,
     ] as const,
   (next, prev) => {
-    if (!open.value || !storeServer.value) return
-    if (next.every((v, i) => v === prev[i])) return
+    if (!open.value || !storeServer.value) return;
+    if (next.every((v, i) => v === prev[i])) return;
 
-    if (statusFetchTimeout) clearTimeout(statusFetchTimeout)
-    statusFetchTimeout = setTimeout(() => fetchProvisionStatus(true), 100)
+    if (statusFetchTimeout) clearTimeout(statusFetchTimeout);
+    statusFetchTimeout = setTimeout(() => fetchProvisionStatus(true), 100);
   },
-)
+);
 
 const latestCompletedIndex = computed(() => {
-  if (!provisionStatus.value?.steps) return -1
-  const steps = provisionStatus.value.steps
+  if (!provisionStatus.value?.steps) return -1;
+  const steps = provisionStatus.value.steps;
   for (let i = steps.length - 1; i >= 0; i--) {
-    if (steps[i].status === 'completed') return i
+    if (steps[i].status === "completed") return i;
   }
-  return -1
-})
+  return -1;
+});
 
 const completedCount = computed(() => {
-  if (!provisionStatus.value?.steps) return 0
-  return provisionStatus.value.steps.filter((s) => s.status === 'completed')
-    .length
-})
+  if (!provisionStatus.value?.steps) return 0;
+  return provisionStatus.value.steps.filter((s) => s.status === "completed")
+    .length;
+});
 
-const totalSteps = computed(() => provisionStatus.value?.steps?.length ?? 0)
+const totalSteps = computed(() => provisionStatus.value?.steps?.length ?? 0);
 
 const progressPercent = computed(() => {
-  if (totalSteps.value === 0) return 0
-  return Math.round((completedCount.value / totalSteps.value) * 100)
-})
+  if (totalSteps.value === 0) return 0;
+  return Math.round((completedCount.value / totalSteps.value) * 100);
+});
+
+const provisionStepKeys: Record<string, string> = {
+  connecting_server: "connectingServer",
+  detect_os: "detectOs",
+  configure_firewall: "configureFirewall",
+  configure_swap: "configureSwap",
+  install_essential_packages: "installEssentialPackages",
+  setup_default_user: "setupDefaultUser",
+  setup_root: "setupRoot",
+  ssh_security: "sshSecurity",
+  validate_ports: "validatePorts",
+  install_docker: "installDocker",
+  setup_docker_network: "setupDockerNetwork",
+  setup_launch_dirs: "setupLaunchDirs",
+  install_traefik: "installTraefik",
+  setup_swarm_network: "setupSwarmNetwork",
+};
+
+const provisionErrorKeys: Record<string, string> = {
+  package_manager_busy: "packageManagerBusy",
+  package_unavailable: "packageUnavailable",
+  sudo_permission: "sudoPermission",
+  disk_space: "diskSpace",
+  dns_unreachable: "dnsUnreachable",
+  server_unreachable: "serverUnreachable",
+  ssl_verification: "sslVerification",
+  out_of_memory: "outOfMemory",
+  setup_incomplete: "setupIncomplete",
+  provision_failed: "provisionFailed",
+  reported_error: "reportedError",
+};
+
+const provisionStepDescription = (step: ProvisionStatusStep): string => {
+  const key = provisionStepKeys[step.name];
+  if (key) return t(`server.provisionStatus.stepDescriptions.${key}`);
+  return t(
+    step.status === "completed"
+      ? "server.provisionStatus.serviceInstalled"
+      : "server.provisionStatus.serviceInstalling",
+    { name: step.name },
+  );
+};
+
+const localizedProvisionError = computed(() => {
+  const status = provisionStatus.value;
+  if (!status) return "";
+  const key = status.error_code && provisionErrorKeys[status.error_code];
+  if (key) return t(`server.provisionStatus.errors.${key}`);
+  return (
+    status.error_message || t("server.provisionStatus.errors.provisionFailed")
+  );
+});
 
 const currentStepLabel = computed(() => {
-  const step = provisionStatus.value?.steps?.find((s) => s.status === 'current')
-  return step?.description ?? ''
-})
+  const step = provisionStatus.value?.steps?.find(
+    (s) => s.status === "current",
+  );
+  return step ? provisionStepDescription(step) : "";
+});
 </script>
 
 <template>
@@ -142,7 +195,7 @@ const currentStepLabel = computed(() => {
       class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-auto w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none"
     >
       <SheetHeader class="flex-shrink-0">
-        <SheetTitle>Server Provision Status</SheetTitle>
+        <SheetTitle>{{ t("server.provisionStatus.title") }}</SheetTitle>
         <SheetDescription v-if="server">
           {{ server.name }}
         </SheetDescription>
@@ -161,10 +214,10 @@ const currentStepLabel = computed(() => {
             </div>
             <div class="flex-1 min-w-0">
               <h3 class="text-base font-semibold text-foreground">
-                We couldn't provision this server
+                {{ t("server.provisionStatus.failed") }}
               </h3>
               <p class="mt-1 text-sm leading-relaxed text-muted-foreground">
-                {{ provisionStatus.error_message }}
+                {{ localizedProvisionError }}
               </p>
               <div class="mt-4 flex flex-wrap gap-2">
                 <Button
@@ -183,7 +236,7 @@ const currentStepLabel = computed(() => {
                     name="lucide:refresh-cw"
                     class="mr-1.5 h-3.5 w-3.5"
                   />
-                  Try again
+                  {{ t("server.provisionStatus.tryAgain") }}
                 </Button>
                 <Button
                   size="sm"
@@ -191,7 +244,7 @@ const currentStepLabel = computed(() => {
                   @click="onManageCredentials"
                 >
                   <Icon name="lucide:key-round" class="mr-1.5 h-3.5 w-3.5" />
-                  Manage credentials
+                  {{ t("server.provisionStatus.manageCredentials") }}
                 </Button>
               </div>
             </div>
@@ -213,7 +266,7 @@ const currentStepLabel = computed(() => {
               @click="showLogs = false"
             >
               <Icon name="lucide:list-checks" class="h-3.5 w-3.5" />
-              Steps
+              {{ t("server.provisionStatus.steps") }}
             </button>
             <button
               :class="[
@@ -225,7 +278,7 @@ const currentStepLabel = computed(() => {
               @click="showLogs = true"
             >
               <Icon name="lucide:terminal" class="h-3.5 w-3.5" />
-              Logs
+              {{ t("server.logs.title") }}
             </button>
           </div>
 
@@ -242,7 +295,7 @@ const currentStepLabel = computed(() => {
               <span class="font-medium text-foreground"
                 >{{ completedCount }}/{{ totalSteps }}</span
               >
-              <span>steps</span>
+              <span>{{ t("server.provisionStatus.stepsCount") }}</span>
             </div>
             <div class="h-3 w-px bg-border" />
             <span class="font-medium text-foreground"
@@ -270,10 +323,11 @@ const currentStepLabel = computed(() => {
           class="space-y-4 rounded-lg border bg-muted/30 p-4"
         >
           <div>
-            <h4 class="font-semibold">Provision Script</h4>
+            <h4 class="font-semibold">
+              {{ t("server.provisionStatus.script") }}
+            </h4>
             <p class="text-sm text-muted-foreground">
-              Run this script as root on your server to start the provisioning
-              process
+              {{ t("server.provisionStatus.scriptHelp") }}
             </p>
           </div>
           <div
@@ -296,7 +350,7 @@ const currentStepLabel = computed(() => {
                 class="h-3.5 w-3.5 flex-shrink-0 text-zinc-400"
               />
               <span class="truncate font-mono text-xs text-zinc-400">
-                {{ currentStepLabel || 'provision.log' }}
+                {{ currentStepLabel || "provision.log" }}
               </span>
             </div>
             <div
@@ -305,7 +359,7 @@ const currentStepLabel = computed(() => {
               <span
                 class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"
               />
-              Live
+              {{ t("server.provisionStatus.live") }}
             </div>
           </div>
           <ServerLogViewer
@@ -328,7 +382,7 @@ const currentStepLabel = computed(() => {
             class="h-6 w-6 animate-spin text-primary"
           />
           <p class="text-sm text-muted-foreground">
-            Waiting for provision task to start...
+            {{ t("server.provisionStatus.waiting") }}
           </p>
         </div>
 
@@ -345,7 +399,7 @@ const currentStepLabel = computed(() => {
               class="h-6 w-6 animate-spin text-primary"
             />
             <p class="text-sm text-muted-foreground">
-              Loading provision status...
+              {{ t("server.provisionStatus.loading") }}
             </p>
           </div>
 
@@ -416,7 +470,7 @@ const currentStepLabel = computed(() => {
                         : 'text-muted-foreground',
                   ]"
                 >
-                  {{ step.description }}
+                  {{ provisionStepDescription(step) }}
                 </p>
               </div>
 
@@ -424,7 +478,7 @@ const currentStepLabel = computed(() => {
                 v-if="step.status === 'current'"
                 class="flex-shrink-0 inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary"
               >
-                In progress
+                {{ t("server.provisionStatus.inProgress") }}
               </span>
             </li>
           </ul>
@@ -433,7 +487,7 @@ const currentStepLabel = computed(() => {
             v-else
             class="flex h-full items-center justify-center text-muted-foreground py-12"
           >
-            No status available
+            {{ t("server.provisionStatus.noStatus") }}
           </div>
         </div>
       </div>

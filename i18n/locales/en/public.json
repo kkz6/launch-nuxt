@@ -1,0 +1,925 @@
+{
+  "public": {
+    "meta": {
+      "description": "Deploy and manage servers without the complexity. One platform for provisioning, deploying, databases, SSL, and monitoring."
+    },
+    "error": {
+      "pageNotFoundTitle": "Page not found",
+      "errorTitle": "Error",
+      "notFoundHeading": "Page not found",
+      "genericHeading": "Something went wrong",
+      "notFoundDescription": "The page you're looking for doesn't exist or has been moved.",
+      "unexpected": "An unexpected error occurred.",
+      "goBack": "Go back",
+      "home": "Home"
+    },
+    "dashboard": {
+      "pageTitle": "Dashboard",
+      "greetings": {
+        "morning": "Good morning",
+        "afternoon": "Good afternoon",
+        "evening": "Good evening"
+      },
+      "subscriptionRequired": "Subscription required",
+      "subscriptionDescription": "Your subscription is currently inactive. Add a payment method to access all features and manage your servers.",
+      "addPaymentMethod": "Add payment method",
+      "contactSupport": "Contact support",
+      "subscriptionIncludes": "What you'll get with a subscription:",
+      "benefits": {
+        "servers": "Deploy and manage unlimited servers",
+        "deployments": "Automatic deployments from Git",
+        "platform": "SSL certificates, databases, and backups",
+        "teams": "Team collaboration features"
+      },
+      "noServers": "No servers yet",
+      "noServersDescription": "Add your first server to get started",
+      "servers": "Servers",
+      "viewAll": "View all {count}",
+      "workload": "workload",
+      "workloads": "workloads",
+      "site": "site",
+      "sites": "sites",
+      "recentActivity": "Recent activity",
+      "noRecentActivity": "No recent activity",
+      "certificates": {
+        "allExpiredOne": "{count} certificate has expired",
+        "allExpiredMany": "{count} certificates have expired",
+        "someExpired": "{expired} expired, {expiring} expiring in the next 30 days",
+        "expiresOne": "{count} certificate expires in the next 30 days",
+        "expiresMany": "{count} certificates expire in the next 30 days",
+        "reviewSuffix": "review your SSL certificates.",
+        "review": "Review"
+      }
+    },
+    "onboarding": {
+      "pageTitle": "Onboarding",
+      "heading": "Onboarding",
+      "skip": "Skip for now",
+      "description": "Complete these steps to get the best experience",
+      "steps": {
+        "serverProvider": {
+          "title": "Server service provider",
+          "description": "Connect your cloud provider to deploy servers"
+        },
+        "gitProvider": {
+          "title": "Git provider",
+          "description": "Link your GitHub, GitLab, or Bitbucket account"
+        },
+        "domainProvider": {
+          "title": "Domain provider",
+          "description": "Configure DNS management for your domains"
+        },
+        "storageProvider": {
+          "title": "Storage provider",
+          "description": "Set up backup and file storage solutions"
+        },
+        "notifications": {
+          "title": "Notifications",
+          "description": "Configure alerts and notification preferences"
+        }
+      }
+    },
+    "navigation": {
+      "pricing": "Pricing",
+      "docs": "Docs",
+      "dashboard": "Dashboard",
+      "signIn": "Sign in",
+      "getStarted": "Get started",
+      "useLightTheme": "Use light theme",
+      "useDarkTheme": "Use dark theme",
+      "openMenu": "Open menu",
+      "closeMenu": "Close menu"
+    },
+    "footer": {
+      "description": "Deploy and manage your servers with ease. No DevOps expertise required.",
+      "product": "Product",
+      "support": "Support",
+      "legal": "Legal",
+      "features": "Features",
+      "changelog": "Changelog",
+      "documentation": "Documentation",
+      "supportCenter": "Support center",
+      "status": "Status",
+      "reportVulnerability": "Report vulnerability",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "refund": "Refund Policy",
+      "copyright": "© {year} Gigcodes. All rights reserved.",
+      "operational": "All systems operational"
+    },
+    "cta": {
+      "heading": "Ready to simplify your infrastructure?",
+      "description": "Join thousands of developers who deploy and manage their servers with launchctl. Start your free trial today.",
+      "startTrial": "Start free trial",
+      "readDocumentation": "Read documentation",
+      "trialNote": "No credit card required • 14-day free trial • Cancel anytime"
+    },
+    "testimonial": {
+      "quote": "“Launch has transformed how we handle deployments. From automating complex workflows to effortless cloud integration, it is the essential tool for our development team.”",
+      "role": "CTO at Resolute Dynamics"
+    },
+    "pricing": {
+      "pageTitle": "Pricing",
+      "metaTitle": "Pricing - launchctl",
+      "metaDescription": "Simple, transparent pricing for server management. Choose the plan that fits your team and scale as you grow.",
+      "eyebrow": "pricing",
+      "heading": "Plans that scale with you",
+      "description": "Start free, upgrade when you're ready. No hidden fees, no sales calls.",
+      "popular": "Popular",
+      "perMonth": "/mo",
+      "startTrial": "Start free trial",
+      "trialNote": "14-day free trial · no credit card required",
+      "ctaHeading": "Deploy your apps and sites with launchctl",
+      "registerNow": "Register now",
+      "plans": {
+        "hobby": {
+          "name": "Hobby",
+          "description": "For side projects and learning"
+        },
+        "compact": {
+          "name": "Compact",
+          "description": "For growing apps and small teams"
+        },
+        "turbo": {
+          "name": "Turbo",
+          "description": "For heavier production workloads"
+        }
+      },
+      "features": {
+        "oneServer": "1 server",
+        "threeServers": "3 servers",
+        "tenServers": "10 servers",
+        "oneSitePerServer": "1 site per server",
+        "tenSitesPerServer": "10 sites per server",
+        "twentySitesPerServer": "20 sites per server",
+        "fiveDeployments": "5 deployments retained",
+        "oneTeamMember": "1 team member",
+        "databaseBackups": "Database backups",
+        "metricsMonitoring": "Metrics & monitoring"
+      }
+    },
+    "support": {
+      "pageTitle": "Contact",
+      "metaDescription": "Get in touch with the launchctl team — questions about provisioning, deployments, billing or anything else. We usually reply within a business day.",
+      "eyebrow": "contact",
+      "heading": "Talk to a\nhuman.",
+      "description": "Questions about provisioning, deployments, billing — or just want to see if launchctl fits? Send us a note and we'll usually reply within a business day.",
+      "readDocs": "Read the docs",
+      "successTitle": "Message ready to send",
+      "successDescription": "Your email client should have opened with the message filled in. Didn't open? Write to",
+      "sendAnother": "Send another",
+      "sendMessage": "Send message",
+      "privacyNote": "We'll never share your details. Reply within ~1 business day.",
+      "openingEmailClient": "Opening your email client…",
+      "documentation": "Documentation",
+      "heroTitle": "Documentation & Support",
+      "heroDescription": "Everything you need to deploy and manage your applications with launchctl.",
+      "fields": {
+        "name": "Name",
+        "email": "Email",
+        "topic": "Topic",
+        "message": "Message"
+      },
+      "placeholders": {
+        "name": "Ada Lovelace",
+        "email": "you{'@'}company.com",
+        "message": "Tell us what you're trying to do…"
+      },
+      "topics": {
+        "general": "General",
+        "sales": "Sales",
+        "technical": "Technical support",
+        "billing": "Billing"
+      },
+      "validation": {
+        "name": "Please enter your name",
+        "email": "Please enter a valid email address",
+        "topic": "Pick a topic",
+        "message": "A little more detail helps us help you"
+      },
+      "email": {
+        "subject": "[{topic}] Contact from {name}"
+      }
+    },
+    "home": {
+      "pageTitle": "Run every app on your own servers",
+      "metaTitle": "launchctl — run every app on your own servers",
+      "metaDescription": "Provision servers on any cloud and run Laravel and PHP apps, Docker stacks and managed databases — with CI/CD, live logs, live queue monitoring, scheduled backups, web terminal access, automatic SSL and zero-downtime rollouts.",
+      "socialDescription": "One platform to provision servers and run Laravel/PHP apps, Docker stacks and managed databases on your own cloud. CI/CD, live logs, queue monitoring, backups, terminal access, SSL — without the platform tax.",
+      "readDocs": "Read the docs",
+      "runsOn": "Runs on",
+      "runsOnYourCloud": "runs on your cloud",
+      "hero": {
+        "eyebrow": "Bring your own cloud",
+        "heading": "One platform to run everything.",
+        "description": "Provision a server and run Laravel and PHP apps, Docker stacks and managed databases — with CI/CD, live logs, queue monitoring, backups and zero-downtime rollouts. On the cloud you control.",
+        "startDeploying": "Start deploying"
+      },
+      "preview": {
+        "live": "Live",
+        "building": "Building",
+        "production": "Production",
+        "justNow": "just now",
+        "hoursAgo": "{count}h ago",
+        "running": "running",
+        "yesterday": "yesterday",
+        "durationMinute": "{minutes}m {seconds}s",
+        "durationSeconds": "{seconds}s",
+        "cpu": "CPU",
+        "memory": "Memory",
+        "uptime": "Uptime"
+      },
+      "cicd": {
+        "heading": "Build in Actions.\nDeploy to your box.",
+        "descriptionBefore": "Pick",
+        "descriptionAfter": "as your build method and we commit a managed workflow to your repo. It builds your image, pushes to GHCR and deploys to your server — keeping build load off production and your registry private.",
+        "appLive": "{app} is live",
+        "points": {
+          "shortLivedTokens": "No long-lived tokens — a fresh pull token is minted per deploy",
+          "offProduction": "Builds never touch your production server",
+          "explicitDeploys": "Committing or syncing the workflow never auto-ships — deploys are explicit"
+        }
+      },
+      "steps": {
+        "eyebrow": "how it works",
+        "heading": "Live in three steps",
+        "provision": {
+          "title": "Provision a server",
+          "description": "Connect a cloud account and launch a fully-provisioned host — Docker, Traefik, firewall and SSH set up for you."
+        },
+        "configure": {
+          "title": "Configure your app",
+          "description": "Deploy a Laravel or PHP site from Git, or point at a Dockerfile, compose stack or image — set env, domains, queue workers and the build method."
+        },
+        "ship": {
+          "title": "Ship it",
+          "description": "Run the deploy and watch the build and rollout stream live, then your app is online behind automatic SSL."
+        }
+      },
+      "observe": {
+        "eyebrow": "observe & control",
+        "heading": "See everything.\nChange it in a click.",
+        "description": "Tail build, deploy, runtime and queue-worker logs live — colour-coded and searchable. Open a web terminal into any container, watch server metrics, roll back to any release, and give databases scheduled S3 backups with one-click restore.",
+        "chips": {
+          "liveLogs": "live logs",
+          "webTerminal": "web terminal",
+          "queueLogs": "queue logs",
+          "backups": "backups → S3",
+          "rollback": "rollback",
+          "metrics": "metrics"
+        }
+      },
+      "faq": {
+        "eyebrow": "FAQ",
+        "heading": "Questions,\nanswered.",
+        "description": "The things people ask before spinning up their first server. Need more detail?",
+        "items": {
+          "location": {
+            "question": "Where do my apps actually run?",
+            "answer": "On servers you own, in your own cloud account. launchctl provisions and operates them for you, but the infrastructure and data stay yours."
+          },
+          "php": {
+            "question": "Can I run Laravel and PHP apps, not just Docker?",
+            "answer": "Yes. Provision a server and deploy Laravel or any PHP app straight from Git — deploy scripts, environment, the scheduler and queue workers are set up for you. Docker apps, compose stacks and managed databases run alongside on the same platform."
+          },
+          "queues": {
+            "question": "Can I monitor my queues?",
+            "answer": "Yes — watch queue workers, job throughput and failures live, and restart, pause or scale workers from the dashboard, with worker logs streamed in real time."
+          },
+          "tokens": {
+            "question": "Do I need to manage GitHub tokens for CI/CD?",
+            "answer": "No. We commit a managed GitHub Actions workflow that builds and pushes to GHCR, and mints a short-lived pull token per deploy — no long-lived PAT to set up or rotate."
+          },
+          "workflow": {
+            "question": "Does committing the workflow trigger a deploy?",
+            "answer": "Never. The workflow runs on workflow_dispatch only, so syncing the file or pushing code never auto-ships. Deploys are always explicit."
+          },
+          "databases": {
+            "question": "Which databases are supported?",
+            "answer": "Managed PostgreSQL, MySQL, MariaDB, MongoDB and Redis — each with scheduled S3 backups, one-click restore and connection details on tap."
+          }
+        }
+      },
+      "bottomCta": {
+        "heading": "Deploy your first app today",
+        "description": "Connect a server, point at a repo, and ship — with CI/CD, live logs and backups handled for you.",
+        "getStarted": "get-started",
+        "viewPricing": "view pricing"
+      }
+    },
+    "heroHome": {
+      "eyebrow": "Server management simplified",
+      "heading": "Deploy and manage servers",
+      "headingAccent": "without the complexity",
+      "description": "One platform for provisioning servers, deploying applications, managing databases, and monitoring your infrastructure. No DevOps expertise required.",
+      "getStartedFree": "Get started free",
+      "viewPricing": "View pricing",
+      "providers": "Connect your servers from any provider",
+      "features": {
+        "servers": "Server management",
+        "deploys": "Zero-downtime deploys",
+        "databases": "Database control",
+        "ssl": "SSL certificates",
+        "docker": "Docker & Compose",
+        "loadBalancers": "Load balancers"
+      },
+      "preview": {
+        "servers": "Servers",
+        "domains": "Domains",
+        "scripts": "Scripts",
+        "greeting": "Good morning, {name}",
+        "viewAll": "View all",
+        "production": "Production",
+        "staging": "Staging",
+        "sitesCount": "{count} sites",
+        "servicesCount": "{count} services",
+        "upstreamsCount": "{count} upstreams",
+        "recentActivity": "Recent activity",
+        "minutesAgo": "{count}m ago"
+      }
+    },
+    "featureBento": {
+      "heading": "Everything you need to ship",
+      "description": "A full operations console for the servers you already own — build, run, observe and secure, in one calm workflow.",
+      "andMore": "and more",
+      "alsoIncluded": "cron · daemons · server metrics · firewall · SSH keys · env & secrets · volumes · notifications · teams & roles · file manager",
+      "features": {
+        "appServers": {
+          "title": "Laravel & PHP app servers",
+          "description": "Provision a server and deploy Laravel or any PHP app from Git — deploy scripts, environment, the scheduler and queue workers wired up. Node and static sites too."
+        },
+        "docker": {
+          "title": "Docker apps, compose & databases",
+          "description": "Single containers, multi-service compose stacks, and one-click managed Postgres, MySQL, MariaDB, Mongo and Redis."
+        },
+        "queues": {
+          "title": "Live queue monitoring",
+          "description": "Watch queue workers, jobs, throughput and failures in real time — restart, pause or scale workers straight from the dashboard."
+        },
+        "logs": {
+          "title": "Live logs & web terminal",
+          "description": "Stream colour-coded build, deploy and runtime logs in real time, and open a real shell into any server or container from the browser."
+        },
+        "cicd": {
+          "title": "CI/CD & zero-downtime",
+          "description": "Build in GitHub Actions, push to GHCR and roll out health-checked behind Traefik. Every deploy is a release you can roll back in a click."
+        },
+        "operations": {
+          "title": "SSL, DNS, backups & multi-cloud",
+          "description": "Automatic Let's Encrypt, domains and DNS, plus scheduled S3 backups with one-click restore — across DigitalOcean, Hetzner, AWS, Linode or Vultr."
+        }
+      }
+    },
+    "featuresHome": {
+      "eyebrow": "How it works",
+      "heading": "Deploy in three steps",
+      "description": "No complex configurations. No DevOps expertise required. Just connect, configure, and deploy.",
+      "steps": {
+        "connect": {
+          "title": "Connect your server",
+          "description": "Link your cloud provider or bring your own server."
+        },
+        "configure": {
+          "title": "Configure your app",
+          "description": "Connect a Git repository and set environment variables."
+        },
+        "deploy": {
+          "title": "Deploy & scale",
+          "description": "Push to deploy. Scale with a single click."
+        }
+      },
+      "preview": {
+        "production": "production",
+        "live": "live",
+        "building": "Building…",
+        "deploying": "Deploying…",
+        "deployed": "Deployed!"
+      }
+    },
+    "business": {
+      "eyebrow": "use cases",
+      "heading": "Built for every team",
+      "summary": "Whether you're a solo developer or an enterprise team, launchctl scales with your needs.",
+      "startups": {
+        "label": "Startups",
+        "title": "Ship fast",
+        "description": "Move quickly without managing infrastructure."
+      },
+      "agencies": {
+        "label": "Agencies",
+        "title": "Manage clients",
+        "description": "One dashboard for all client projects."
+      },
+      "enterprise": {
+        "label": "Enterprise",
+        "title": "Enterprise security",
+        "description": "Advanced security for large organizations."
+      },
+      "features": {
+        "instantDeployments": "Instant deployments",
+        "autoScaling": "Auto-scaling",
+        "freeSsl": "Free SSL",
+        "gitIntegration": "Git integration",
+        "multiTenant": "Multi-tenant",
+        "teamCollaboration": "Team collaboration",
+        "whiteLabel": "White-label",
+        "clientAccess": "Client access",
+        "auditLogs": "Audit logs",
+        "privateNetwork": "Private network"
+      }
+    },
+    "bento": {
+      "heading": "Everything you need to deploy",
+      "description": "Deploy with ease, leave complexities to us.",
+      "siteLive": "your site is live",
+      "deployments": "Deployments",
+      "uptime": "Uptime",
+      "servers": "Servers",
+      "deploymentsThisWeek": "Deployments this week",
+      "sslCertificates": "SSL certificates",
+      "autoRenew": "Auto-renew",
+      "active": "Active",
+      "databases": "Databases",
+      "managed": "Managed",
+      "storage": "Storage",
+      "oneClick": {
+        "title": "One-click deploy",
+        "description": "Deploy your app in seconds with our one-click deploy feature. Push to Git and we handle the rest."
+      },
+      "workflow": {
+        "title": "Intuitive workflow",
+        "description": "Easily manage your deployments without complex configurations or DevOps expertise."
+      },
+      "ssl": {
+        "title": "Free SSL certificates",
+        "description": "Automatic HTTPS for all your sites with Let's Encrypt. Zero configuration, auto-renewal included."
+      },
+      "database": {
+        "title": "Database management",
+        "description": "Create and manage databases with one click. Backups, migrations, and monitoring included."
+      }
+    },
+    "faq": {
+      "heading": "Good questions",
+      "description": "Everything you need to know about launchctl",
+      "categories": {
+        "gettingStarted": {
+          "title": "Getting started",
+          "items": {
+            "start": {
+              "question": "Getting started with launchctl",
+              "answer": "launchctl is designed to be friendly and intuitive. Connect your server provider, link your Git repository, and deploy. The platform detects your framework and handles the rest."
+            },
+            "verify": {
+              "question": "I'm unable to verify my account",
+              "answer": "Check your inbox and spam folder for our verification email. If you still have trouble, contact our support team."
+            },
+            "providers": {
+              "question": "What server providers do you support?",
+              "answer": "We support AWS, DigitalOcean, Hetzner, Vultr, Linode, and any custom server with SSH access. You can also bring your own server."
+            }
+          }
+        },
+        "billing": {
+          "title": "Billing & plans",
+          "items": {
+            "trials": {
+              "question": "Promotional and free plan trials",
+              "answer": "You can try any plan free for 14 days. No credit card is required, and you can cancel any time before the trial ends to avoid charges."
+            },
+            "charge": {
+              "question": "How to report an unrecognized charge",
+              "answer": "Contact our support team with your order number and a description of the issue. We'll help you resolve it within 24 hours."
+            },
+            "cancel": {
+              "question": "Cancel my subscription",
+              "answer": "To cancel, sign in, open Settings, and select Cancel Subscription. Your access continues until the end of the billing period."
+            }
+          }
+        },
+        "account": {
+          "title": "Account management",
+          "items": {
+            "plan": {
+              "question": "Can I change my plan?",
+              "answer": "Open your account settings, choose a new plan, and follow the prompts. Plan changes take effect immediately."
+            },
+            "profile": {
+              "question": "I am unable to edit my profile",
+              "answer": "Try clearing your browser cache or using another browser. If the issue continues, contact our support team."
+            },
+            "delete": {
+              "question": "How to delete my account",
+              "answer": "Open Settings from your launchctl dashboard and select Delete Account. This action cannot be undone."
+            }
+          }
+        }
+      }
+    },
+    "docs": {
+      "documentation": "Documentation",
+      "search": "Search docs",
+      "searchDocumentation": "Search documentation",
+      "searchPlaceholder": "Search commands, guides, and concepts…",
+      "openNavigation": "Open documentation navigation",
+      "closeNavigation": "Close documentation navigation",
+      "openGithub": "Open launchctl on GitHub",
+      "noResults": "No documentation matched “{query}”.",
+      "results": "{count} results",
+      "searchHelp": "Type to filter · Enter to open",
+      "onThisPage": "On this page",
+      "pageTitle": "{title} - Docs",
+      "metaDescription": "launchctl documentation"
+    },
+    "platformUpdate": {
+      "pageTitle": "Platform update",
+      "loadFailed": "Failed to load platform update",
+      "startedFor": "Update started for {server}",
+      "startFailedFor": "Failed to start update for {server}",
+      "startedAll": "Update started for all pending servers",
+      "startAllFailed": "Failed to start update for all servers",
+      "runAll": "Run all",
+      "server": "Server",
+      "statusHeading": "Status",
+      "error": "Error",
+      "completed": "Completed",
+      "action": "Action",
+      "run": "Run",
+      "noServers": "No servers are affected by this update.",
+      "notFound": "Platform update not found.",
+      "status": {
+        "pending": "Pending",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed",
+        "skipped": "Skipped"
+      },
+      "severity": {
+        "critical": "Critical",
+        "warning": "Warning",
+        "info": "Information"
+      }
+    },
+    "docsFeatures": {
+      "heading": "Features",
+      "description": "Complete feature reference for the launchctl deployment platform.",
+      "categories": {
+        "serverManagement": {
+          "title": "Server management",
+          "items": {
+            "serverProvisioning": {
+              "name": "Server provisioning",
+              "description": "Connect AWS, DigitalOcean, Hetzner, Vultr, Linode or bring your own server"
+            },
+            "serviceManagement": {
+              "name": "Service management",
+              "description": "Start, stop, and restart nginx, MySQL, Redis, and other services"
+            },
+            "phpVersions": {
+              "name": "PHP version management",
+              "description": "Install and switch between PHP versions (7.4, 8.0, 8.1, 8.2, 8.3)"
+            },
+            "sshKeys": {
+              "name": "SSH key management",
+              "description": "Add and manage SSH keys for secure server access"
+            },
+            "firewall": {
+              "name": "Firewall rules",
+              "description": "Configure UFW firewall rules to secure your servers"
+            },
+            "monitoring": {
+              "name": "Server monitoring",
+              "description": "Real-time CPU, memory, and disk usage monitoring"
+            }
+          }
+        },
+        "applicationDeployment": {
+          "title": "Application deployment",
+          "items": {
+            "zeroDowntime": {
+              "name": "Zero-downtime deployments",
+              "description": "Deploy without any interruption to your users"
+            },
+            "gitIntegration": {
+              "name": "Git integration",
+              "description": "Connect GitHub, GitLab, Bitbucket, or any Git repository"
+            },
+            "autoDeploy": {
+              "name": "Auto-deploy",
+              "description": "Automatically deploy on push to your configured branch"
+            },
+            "deploymentHistory": {
+              "name": "Deployment history",
+              "description": "View all past deployments with rollback capability"
+            },
+            "environmentVariables": {
+              "name": "Environment variables",
+              "description": "Securely manage .env files and secrets"
+            },
+            "deployScripts": {
+              "name": "Custom deploy scripts",
+              "description": "Run custom commands before and after deployment"
+            }
+          }
+        },
+        "databaseManagement": {
+          "title": "Database management",
+          "items": {
+            "engines": {
+              "name": "MySQL & PostgreSQL",
+              "description": "Create and manage MySQL and PostgreSQL databases"
+            },
+            "users": {
+              "name": "Database users",
+              "description": "Create users with specific database permissions"
+            },
+            "remoteAccess": {
+              "name": "Remote access",
+              "description": "Enable remote database access when needed"
+            },
+            "backups": {
+              "name": "Database backups",
+              "description": "Automated backups to S3, DigitalOcean Spaces, or local storage"
+            }
+          }
+        },
+        "dnsManagement": {
+          "title": "DNS management",
+          "items": {
+            "providers": {
+              "name": "DNS providers",
+              "description": "Connect Cloudflare, Route53, DigitalOcean DNS, and more"
+            },
+            "records": {
+              "name": "DNS records",
+              "description": "Manage A, AAAA, CNAME, MX, TXT, and other record types"
+            },
+            "health": {
+              "name": "Domain health",
+              "description": "Monitor domain propagation and health status"
+            }
+          }
+        },
+        "sslSecurity": {
+          "title": "SSL & security",
+          "items": {
+            "letsEncrypt": {
+              "name": "Let's Encrypt SSL",
+              "description": "Free SSL certificates with automatic renewal"
+            },
+            "customSsl": {
+              "name": "Custom SSL",
+              "description": "Upload your own SSL certificates"
+            },
+            "sshAuthentication": {
+              "name": "SSH key authentication",
+              "description": "Secure passwordless server access"
+            },
+            "twoFactor": {
+              "name": "Two-factor authentication",
+              "description": "Extra security for your launchctl account"
+            }
+          }
+        },
+        "queuesSchedulers": {
+          "title": "Queues & schedulers",
+          "items": {
+            "workers": {
+              "name": "Queue workers",
+              "description": "Manage Laravel Horizon, Redis queues, and custom workers"
+            },
+            "cron": {
+              "name": "Cron jobs",
+              "description": "Schedule tasks with cron expression support"
+            },
+            "daemons": {
+              "name": "Daemons",
+              "description": "Run long-running processes with automatic restart"
+            },
+            "autoRestart": {
+              "name": "Auto-restart",
+              "description": "Automatically restart workers after deployment"
+            }
+          }
+        },
+        "monitoringLogs": {
+          "title": "Monitoring & logs",
+          "items": {
+            "realtimeLogs": {
+              "name": "Real-time logs",
+              "description": "Stream nginx, PHP-FPM, and application logs"
+            },
+            "deploymentLogs": {
+              "name": "Deployment logs",
+              "description": "Detailed logs for every deployment step"
+            },
+            "metrics": {
+              "name": "Server metrics",
+              "description": "CPU, memory, disk, and network monitoring"
+            },
+            "notifications": {
+              "name": "Notifications",
+              "description": "Slack, email, and webhook notifications for events"
+            }
+          }
+        },
+        "teamCollaboration": {
+          "title": "Team collaboration",
+          "items": {
+            "management": {
+              "name": "Team management",
+              "description": "Invite team members with role-based permissions"
+            },
+            "activityLog": {
+              "name": "Activity log",
+              "description": "Track all actions performed by team members"
+            },
+            "multiTeam": {
+              "name": "Multi-team support",
+              "description": "Organize projects across multiple teams"
+            }
+          }
+        }
+      }
+    },
+    "legal": {
+      "eyebrow": "legal",
+      "lastUpdated": "Last updated · {date}",
+      "contactForm": "contact form",
+      "privacy": {
+        "title": "Privacy Policy",
+        "metaDescription": "How launchctl (Gigcodes) collects, uses and protects your data. Your apps and data run on infrastructure you own.",
+        "intro": "This policy explains what data launchctl collects, why, and the choices you have. launchctl is operated by Gigcodes (“we”, “us”).",
+        "sections": {
+          "who": {
+            "heading": "1. Who we are",
+            "body": "launchctl is a server-management and deployment platform operated by Gigcodes. We help you provision servers on your own cloud accounts and deploy and operate applications on them. This policy covers the launchctl website, dashboard and API."
+          },
+          "collect": {
+            "heading": "2. Information we collect",
+            "accountLabel": "Account information",
+            "accountBody": " — your name, email address and a securely hashed password when you sign up, plus team membership details.",
+            "billingLabel": "Billing information",
+            "billingBody": " — subscriptions are processed by our payment provider, Polar. We receive your plan, subscription status and invoices, but we never see or store full card numbers.",
+            "credentialsLabel": "Infrastructure credentials",
+            "credentialsBody": " — cloud-provider API tokens, SSH keys and connection details you add so we can provision and operate your servers. These are encrypted and used only to run the features you enable.",
+            "usageLabel": "Usage & diagnostic data",
+            "usageBody": " — logs, IP address, browser type and actions taken in the product, used to operate the service and debug issues.",
+            "communicationsLabel": "Communications",
+            "communicationsBody": " — messages you send us via support or the contact form."
+          },
+          "use": {
+            "heading": "3. How we use your information",
+            "platform": "To provide, operate and secure the launchctl platform.",
+            "billing": "To process subscriptions, billing and refunds.",
+            "support": "To provide support and respond to your requests.",
+            "reliability": "To monitor reliability, prevent abuse and improve the product.",
+            "legal": "To meet legal and regulatory obligations.",
+            "noSale": "We do not sell your personal data, and we never have."
+          },
+          "ownership": {
+            "heading": "4. Your apps and data stay yours",
+            "body": "The applications, databases and content you deploy run on servers in your own cloud accounts. We access your infrastructure only to perform the actions you ask of us — provisioning, deploying, streaming logs, running backups and similar. That data is yours, not ours."
+          },
+          "share": {
+            "heading": "5. Who we share it with",
+            "intro": "We share data only with the providers needed to run the service:",
+            "polar": " — subscription billing and payments.",
+            "connectedProviders": "Cloud providers you connect (for example, DigitalOcean, Hetzner, AWS, Linode and Vultr) and GitHub for CI/CD, acting on your instructions.",
+            "infrastructure": "Infrastructure and email providers we use to host launchctl and send transactional email.",
+            "authorities": "Authorities, where required by law or to protect our rights and users."
+          },
+          "retention": {
+            "heading": "6. Data retention",
+            "body": "We keep your information for as long as your account is active. When you close your account or ask us to delete your data, we remove it within a reasonable period, except where we must retain certain records (for example, invoices) to meet legal obligations."
+          },
+          "security": {
+            "heading": "7. Security",
+            "body": "We protect data in transit with TLS and encrypt sensitive secrets such as cloud tokens and SSH keys at rest. Access is restricted to what's needed to operate the service. No system is perfectly secure, but we work hard to keep yours safe."
+          },
+          "rights": {
+            "heading": "8. Your rights",
+            "body": "You can access, correct, export or delete your personal data at any time — from your account settings or by emailing us. We'll respond within a reasonable timeframe."
+          },
+          "cookies": {
+            "heading": "9. Cookies",
+            "body": "We use essential cookies to keep you signed in and to remember preferences such as language and light/dark mode. We don't use them to track you across other sites."
+          },
+          "changes": {
+            "heading": "10. Changes to this policy",
+            "body": "We may update this policy from time to time. We'll revise the “last updated” date above and, for material changes, notify you in the product or by email."
+          },
+          "contact": {
+            "heading": "11. Contact",
+            "beforeEmail": "Questions about your privacy? Email",
+            "between": "or use our"
+          }
+        }
+      },
+      "refund": {
+        "title": "Refund Policy",
+        "metaDescription": "launchctl offers no-questions-asked refunds. Not happy in your first 30 days? Email us and we refund your subscription in full.",
+        "intro": "We keep this simple. If launchctl isn't working out for you, we'll refund you — no questions asked.",
+        "leadTitle": "Not happy? We refund you.",
+        "leadBody": " Within 30 days of any subscription payment, email us and we'll refund it in full — no forms, no hoops, no interrogation.",
+        "request": {
+          "heading": "How to request a refund",
+          "beforeEmail": "Email",
+          "between": " from the address on your account, or use our ",
+          "afterForm": ". Tell us which charge you'd like refunded — that's it. You don't need to give a reason."
+        },
+        "covered": {
+          "heading": "What's covered",
+          "subscription": "Subscription payments billed by launchctl, refunded to your original payment method within 30 days of the charge.",
+          "full": "Refunds are issued in full — we don't pro-rate or deduct fees.",
+          "effect": "Once refunded, the related subscription ends and paid features switch off. Your servers and data are untouched — they live on your own cloud."
+        },
+        "notCovered": {
+          "heading": "What we can't refund",
+          "body": "launchctl runs your apps on infrastructure you own, so charges from your cloud provider (such as DigitalOcean, Hetzner, AWS, Linode or Vultr) are billed directly by them, not by us. We can't refund those — please raise them with your provider."
+        },
+        "beyond": {
+          "heading": "Beyond 30 days",
+          "body": "Outside the 30-day window we're still happy to talk. You can cancel any time to stop future charges, and if something went genuinely wrong, reach out — we'll do the right thing."
+        },
+        "questions": {
+          "heading": "Questions",
+          "beforeEmail": "Anything unclear? We're at",
+          "afterEmail": " and usually reply within a business day."
+        }
+      },
+      "terms": {
+        "title": "Terms of Service",
+        "metaDescription": "The terms that govern your use of launchctl, operated by Gigcodes — accounts, billing, acceptable use and your responsibilities.",
+        "intro": "These terms govern your use of launchctl, operated by Gigcodes. By creating an account or using the service, you agree to them.",
+        "sections": {
+          "service": {
+            "heading": "1. The service",
+            "body": "launchctl is a platform that provisions servers on cloud accounts you connect and helps you deploy and operate applications — Laravel and PHP apps, Docker stacks, managed databases and related tooling such as CI/CD, logs, queues, backups and SSL. We provide the control plane; the infrastructure runs on your own cloud."
+          },
+          "account": {
+            "heading": "2. Your account",
+            "accurate": "You must provide accurate information and keep it up to date.",
+            "security": "You're responsible for activity under your account and for keeping your credentials secure.",
+            "age": "You must be at least 16 and able to enter into a contract."
+          },
+          "responsibilities": {
+            "heading": "3. Your infrastructure and responsibilities",
+            "intro": "Because your servers and applications run on cloud accounts you own, you are responsible for:",
+            "content": "The applications, data and content you deploy, and having the right to use them.",
+            "charges": "Any charges your cloud provider bills you directly — these are separate from your launchctl subscription.",
+            "providers": "Complying with the terms of the cloud providers and third-party services you connect."
+          },
+          "acceptable": {
+            "heading": "4. Acceptable use",
+            "intro": "You agree not to use launchctl to:",
+            "law": "Break the law or infringe others' rights.",
+            "malware": "Host or distribute malware, or attack, probe or disrupt systems you don't own or aren't authorised to test.",
+            "abuse": "Interfere with or abuse the launchctl platform, or attempt to bypass its security or usage limits."
+          },
+          "billing": {
+            "heading": "5. Billing and subscriptions",
+            "renewal": "Paid plans are billed in advance through our payment provider, Polar, and renew automatically until cancelled.",
+            "cancellation": "You can cancel any time from your account; cancellation stops future charges and takes effect at the end of the current period.",
+            "taxes": "Prices may exclude taxes, which are added where required.",
+            "refundBefore": "Refunds are handled under our",
+            "refundAfter": " — no questions asked within 30 days."
+          },
+          "thirdParty": {
+            "heading": "6. Third-party services",
+            "body": "launchctl works with services you connect, such as your cloud providers, GitHub and Polar. We're not responsible for those services or their availability, and your use of them is governed by their own terms."
+          },
+          "ip": {
+            "heading": "7. Intellectual property",
+            "body": "We own the launchctl platform, software and brand. You keep all rights to the applications, data and content you deploy. You grant us only the access needed to operate the features you enable."
+          },
+          "disclaimers": {
+            "heading": "8. Disclaimers",
+            "body": "launchctl is provided “as is” and “as available”. To the fullest extent permitted by law, we disclaim all warranties, express or implied, including fitness for a particular purpose. You're responsible for maintaining your own backups and for the resilience of your infrastructure."
+          },
+          "liability": {
+            "heading": "9. Limitation of liability",
+            "body": "To the fullest extent permitted by law, Gigcodes will not be liable for any indirect, incidental or consequential damages, or for loss of data, profits or revenue. Our total liability for any claim relating to the service is limited to the amount you paid us for it in the 12 months before the claim."
+          },
+          "termination": {
+            "heading": "10. Termination",
+            "body": "You can stop using launchctl and close your account at any time. We may suspend or terminate access if you breach these terms or use the service in a way that risks harm to others or to the platform. Your servers and data remain on your own cloud."
+          },
+          "changes": {
+            "heading": "11. Changes",
+            "body": "We may update the service and these terms. We'll revise the “last updated” date above and, for material changes, give reasonable notice. Continuing to use launchctl after changes means you accept them."
+          },
+          "governing": {
+            "heading": "12. Governing law",
+            "body": "These terms are governed by the laws of the jurisdiction in which Gigcodes is established, without regard to conflict-of-law principles."
+          },
+          "contact": {
+            "heading": "13. Contact",
+            "beforeEmail": "Questions about these terms? Email",
+            "between": "or use our"
+          }
+        }
+      }
+    }
+  }
+}

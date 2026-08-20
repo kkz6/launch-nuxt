@@ -28,6 +28,7 @@ interface Props {
   serverId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Form state
 const projectName = ref("");
@@ -38,7 +39,9 @@ const isSubmitting = ref(false);
 
 // Confirmation dialog ref — same shared component the server-delete
 // flow uses. Typed-confirmation guards against accidental clicks.
-const confirmationDialog = ref<InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null>(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const canSubmit = computed(() => projectName.value.trim().length > 0);
 
@@ -48,14 +51,17 @@ const handleSubmit = async () => {
 
   const name = projectName.value.trim();
   const result = await confirmationDialog.value.show({
-    title: "Run Compose Cleanup",
-    description: `This will remove every container, network${
-      removeVolumes.value ? ", and volume" : ""
-    } on the host carrying the label com.docker.compose.project=${name}. The action runs the same job used during a normal stack delete.`,
-    confirmText: "Run cleanup",
-    cancelText: "Cancel",
+    title: t("server.docker.cleanup.confirmTitle"),
+    description: t(
+      removeVolumes.value
+        ? "server.docker.cleanup.confirmDescriptionWithVolumes"
+        : "server.docker.cleanup.confirmDescription",
+      { name },
+    ),
+    confirmText: t("server.docker.cleanup.run"),
+    cancelText: t("server.common.cancel"),
     destructive: true,
-    helpText: "Type the project name to confirm:",
+    helpText: t("server.docker.cleanup.confirmHelp"),
     inputVerificationText: name,
   });
 
@@ -69,7 +75,7 @@ const handleSubmit = async () => {
       compose_slug: composeSlug.value.trim() || undefined,
       remove_volumes: removeVolumes.value,
     });
-    toast.success("Cleanup job queued — containers will be removed shortly");
+    toast.success(t("server.docker.cleanup.queued"));
     // Reset the form so a follow-up cleanup doesn't accidentally
     // re-target the previous name.
     projectName.value = "";
@@ -78,7 +84,7 @@ const handleSubmit = async () => {
     removeVolumes.value = false;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to queue cleanup job");
+    toast.error(e.data?.message || t("server.docker.cleanup.queueFailed"));
   } finally {
     isSubmitting.value = false;
   }
@@ -92,18 +98,19 @@ const handleSubmit = async () => {
     <!-- Orphaned compose stacks — the only maintenance action for now -->
     <div class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium">Orphaned compose stacks</h3>
+        <h3 class="text-lg font-medium">
+          {{ t("server.docker.cleanup.title") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Re-run the compose teardown for a stack that's no longer in the UI
-          but whose containers are still running on the host. The same job
-          used during a normal stack delete is queued against the project
-          name you provide.
+          {{ t("server.docker.cleanup.description") }}
         </p>
       </div>
 
       <div class="space-y-4">
         <div class="space-y-2">
-          <Label for="orphan-project-name">Compose project name</Label>
+          <Label for="orphan-project-name">{{
+            t("server.docker.cleanup.projectName")
+          }}</Label>
           <Input
             id="orphan-project-name"
             v-model="projectName"
@@ -111,17 +118,21 @@ const handleSubmit = async () => {
             class="font-mono"
           />
           <p class="text-xs text-muted-foreground">
-            The value of the
-            <code class="rounded bg-muted px-1 py-0.5 text-xs">com.docker.compose.project</code>
-            label — visible in the Containers tab.
+            {{ t("server.docker.cleanup.labelValuePrefix") }}
+            <code class="rounded bg-muted px-1 py-0.5 text-xs"
+              >com.docker.compose.project</code
+            >
+            {{ t("server.docker.cleanup.labelValueSuffix") }}
           </p>
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="space-y-2">
             <Label for="orphan-project-slug">
-              Project slug
-              <span class="text-xs font-normal text-muted-foreground">(optional)</span>
+              {{ t("server.docker.cleanup.projectSlug") }}
+              <span class="text-xs font-normal text-muted-foreground">{{
+                t("server.docker.cleanup.optional")
+              }}</span>
             </Label>
             <Input
               id="orphan-project-slug"
@@ -132,8 +143,10 @@ const handleSubmit = async () => {
           </div>
           <div class="space-y-2">
             <Label for="orphan-compose-slug">
-              Compose slug
-              <span class="text-xs font-normal text-muted-foreground">(optional)</span>
+              {{ t("server.docker.cleanup.composeSlug") }}
+              <span class="text-xs font-normal text-muted-foreground">{{
+                t("server.docker.cleanup.optional")
+              }}</span>
             </Label>
             <Input
               id="orphan-compose-slug"
@@ -144,16 +157,18 @@ const handleSubmit = async () => {
           </div>
         </div>
         <p class="text-xs text-muted-foreground -mt-2">
-          When provided, also removes the stack directory at
-          <code class="rounded bg-muted px-1 py-0.5 text-xs">/var/lib/launch/projects/&lt;project&gt;/&lt;compose&gt;</code>
-          and the per-stack Traefik config file.
+          {{ t("server.docker.cleanup.pathHelpPrefix") }}
+          <code class="rounded bg-muted px-1 py-0.5 text-xs"
+            >/var/lib/launch/projects/&lt;project&gt;/&lt;compose&gt;</code
+          >
+          {{ t("server.docker.cleanup.pathHelpSuffix") }}
         </p>
 
         <div class="flex items-center justify-between rounded-lg border p-4">
           <div class="space-y-0.5">
-            <Label>Remove volumes</Label>
+            <Label>{{ t("server.docker.cleanup.removeVolumes") }}</Label>
             <p class="text-sm text-muted-foreground">
-              Also delete named volumes the stack created. Cannot be undone.
+              {{ t("server.docker.cleanup.removeVolumesHelp") }}
             </p>
           </div>
           <Switch v-model="removeVolumes" />
@@ -170,7 +185,7 @@ const handleSubmit = async () => {
             class="mr-2 h-4 w-4 animate-spin"
           />
           <Icon v-else name="lucide:eraser" class="mr-2 h-4 w-4" />
-          Run cleanup
+          {{ t("server.docker.cleanup.run") }}
         </Button>
       </div>
     </div>

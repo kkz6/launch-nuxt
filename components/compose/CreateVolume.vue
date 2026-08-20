@@ -12,10 +12,7 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import {
-  dockerService,
-  type DockerCompose,
-} from "~/services/dockerService";
+import { dockerService, type DockerCompose } from "~/services/dockerService";
 
 // Compose volume create dialog. Same 3-flavour shape as the
 // application equivalent — the form layout is identical because the
@@ -32,6 +29,7 @@ interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{ created: [] }>();
 
 const open = defineModel<boolean>("open", { default: false });
@@ -59,50 +57,49 @@ const resetForm = () => {
   form.content = "";
 };
 
-const typeOptions: {
-  value: FormType;
-  label: string;
-  icon: string;
-  blurb: string;
-}[] = [
+const typeOptions = computed<
+  {
+    value: FormType;
+    label: string;
+    icon: string;
+    blurb: string;
+  }[]
+>(() => [
   {
     value: "file",
-    label: "File Mount",
+    label: t("workload.volumes.fileMount"),
     icon: "lucide:file-text",
-    blurb:
-      "Write a config file under ${STACK_DIR}/files/ — YAML mounts it via ./files/<path>.",
+    blurb: t("workload.volumes.composeFileDescription"),
   },
   {
     value: "volume",
-    label: "Volume Mount",
+    label: t("workload.volumes.volumeMount"),
     icon: "lucide:database",
-    blurb:
-      "Track a docker named volume the stack uses. Reference it in your YAML.",
+    blurb: t("workload.volumes.composeVolumeDescription"),
   },
   {
     value: "bind",
-    label: "Bind Mount",
+    label: t("workload.volumes.bindMount"),
     icon: "lucide:link-2",
-    blurb:
-      "Track a host directory the stack mounts. Reference it in your YAML.",
+    blurb: t("workload.volumes.composeBindDescription"),
   },
-];
+]);
 
 const submit = async () => {
   if (!form.name.trim()) {
-    toast.error("Name is required");
+    toast.error(t("workload.validation.nameRequired"));
     return;
   }
   if (!form.mount_path.trim()) {
-    toast.error("Mount path is required");
+    toast.error(t("workload.volumes.mountPathRequired"));
     return;
   }
   if (form.type === "bind" && !form.host_path.trim()) {
-    toast.error("Bind mounts need a host path");
+    toast.error(t("workload.volumes.hostPathRequired"));
     return;
   }
   if (form.type === "file" && !form.file_path.trim()) {
-    toast.error("File mounts need a file path (the on-host filename)");
+    toast.error(t("workload.volumes.filePathRequired"));
     return;
   }
 
@@ -126,13 +123,13 @@ const submit = async () => {
       props.compose.id,
       payload,
     );
-    toast.success("Mount added");
+    toast.success(t("workload.volumes.added"));
     emit("created");
     open.value = false;
     resetForm();
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to add mount");
+    toast.error(e.data?.message || t("workload.volumes.addFailed"));
   } finally {
     isSaving.value = false;
   }
@@ -148,40 +145,40 @@ watch(open, (isOpen) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Mount
+        {{ t("workload.volumes.add") }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-3xl">
       <DialogHeader>
-        <DialogTitle>Volumes / Mounts</DialogTitle>
+        <DialogTitle>{{ t("workload.volumes.title") }}</DialogTitle>
         <DialogDescription>
-          File mounts are written to disk and bind-mounted by your
-          YAML; bind / volume rows are tracked here but you wire them
-          into the compose YAML yourself.
+          {{ t("workload.volumes.composeCreateDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="grid w-full gap-4" @submit.prevent="submit">
         <div class="space-y-2">
-          <Label>Select the mount type</Label>
+          <Label>{{ t("workload.volumes.selectType") }}</Label>
           <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
             <button
-              v-for="t in typeOptions"
-              :key="t.value"
+              v-for="mountOption in typeOptions"
+              :key="mountOption.value"
               type="button"
               class="flex flex-col items-start gap-1 rounded-md border-2 px-3 py-3 text-left transition"
               :class="
-                form.type === t.value
+                form.type === mountOption.value
                   ? 'border-primary bg-primary/5 text-foreground'
                   : 'border-muted text-muted-foreground hover:border-foreground/40'
               "
-              @click="form.type = t.value"
+              @click="form.type = mountOption.value"
             >
               <div class="flex items-center gap-2 text-sm font-medium">
-                <Icon :name="t.icon" class="h-4 w-4" />
-                {{ t.label }}
+                <Icon :name="mountOption.icon" class="h-4 w-4" />
+                {{ mountOption.label }}
               </div>
-              <p class="text-xs text-muted-foreground">{{ t.blurb }}</p>
+              <p class="text-xs text-muted-foreground">
+                {{ mountOption.blurb }}
+              </p>
             </button>
           </div>
         </div>
@@ -196,22 +193,27 @@ watch(open, (isOpen) => {
             class="-mt-0.5 mr-1 inline-block h-3.5 w-3.5"
           />
           <template v-if="form.type === 'bind'">
-            Compose doesn't rewrite your YAML — add the matching
-            <code class="font-mono">volumes:</code> entry yourself
-            (e.g. <code class="font-mono">{{ form.host_path || '/host/path' }}:{{ form.mount_path || '/container/path' }}</code>).
-            Make sure the host path exists on the docker server.
+            {{ t("workload.volumes.composeBindWarningBefore") }}
+            <code class="font-mono">volumes:</code
+            >{{ t("workload.volumes.composeBindWarningMiddle") }}
+            <code class="font-mono"
+              >{{ form.host_path || "/host/path" }}:{{
+                form.mount_path || "/container/path"
+              }}</code
+            >{{ t("workload.volumes.composeBindWarningAfter") }}
           </template>
           <template v-else>
-            Compose doesn't rewrite your YAML — add the matching
-            <code class="font-mono">volumes:</code> entry yourself
-            and declare the named volume at the top level of the
-            compose file.
+            {{ t("workload.volumes.composeVolumeWarningBefore") }}
+            <code class="font-mono">volumes:</code>
+            {{ t("workload.volumes.composeVolumeWarningAfter") }}
           </template>
         </div>
 
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-1">
-            <Label for="cvol-dialog-name">Name</Label>
+            <Label for="cvol-dialog-name">{{
+              t("workload.fields.name")
+            }}</Label>
             <Input
               id="cvol-dialog-name"
               v-model="form.name"
@@ -220,15 +222,19 @@ watch(open, (isOpen) => {
             />
             <p class="text-xs text-muted-foreground">
               <template v-if="form.type === 'volume'">
-                Docker named-volume identifier — must match the name
-                in your compose YAML's top-level
-                <code class="font-mono">volumes:</code> block.
+                {{ t("workload.volumes.composeVolumeNameBefore") }}
+                <code class="font-mono">volumes:</code
+                >{{ t("workload.volumes.composeVolumeNameAfter") }}
               </template>
-              <template v-else>Friendly label for this mount.</template>
+              <template v-else>{{
+                t("workload.volumes.friendlyNameHelp")
+              }}</template>
             </p>
           </div>
           <div class="space-y-1">
-            <Label for="cvol-dialog-mount">Mount path (in the container)</Label>
+            <Label for="cvol-dialog-mount">{{
+              t("workload.volumes.mountPathContainer")
+            }}</Label>
             <Input
               id="cvol-dialog-mount"
               v-model="form.mount_path"
@@ -239,7 +245,9 @@ watch(open, (isOpen) => {
         </div>
 
         <div v-if="form.type === 'bind'" class="space-y-1">
-          <Label for="cvol-dialog-host">Host path</Label>
+          <Label for="cvol-dialog-host">{{
+            t("workload.fields.hostPath")
+          }}</Label>
           <Input
             id="cvol-dialog-host"
             v-model="form.host_path"
@@ -247,13 +255,15 @@ watch(open, (isOpen) => {
             autocomplete="off"
           />
           <p class="text-xs text-muted-foreground">
-            Absolute path on the docker server.
+            {{ t("workload.volumes.absoluteHostPath") }}
           </p>
         </div>
 
         <template v-if="form.type === 'file'">
           <div class="space-y-1">
-            <Label for="cvol-dialog-content">Content</Label>
+            <Label for="cvol-dialog-content">{{
+              t("workload.fields.content")
+            }}</Label>
             <SharedCodeEditor
               v-model="form.content"
               language="properties"
@@ -262,12 +272,15 @@ watch(open, (isOpen) => {
               placeholder="NODE_ENV=production&#10;PORT=3000"
             />
             <p class="text-xs text-muted-foreground">
-              File body written to the host before
-              <code class="font-mono">docker compose up</code> runs.
+              {{ t("workload.volumes.contentBeforeComposeUp") }}
+              <code class="font-mono">docker compose up</code
+              >{{ t("workload.volumes.contentAfterComposeUp") }}
             </p>
           </div>
           <div class="space-y-1">
-            <Label for="cvol-dialog-file-path">File path (relative)</Label>
+            <Label for="cvol-dialog-file-path">{{
+              t("workload.volumes.relativeFilePath")
+            }}</Label>
             <Input
               id="cvol-dialog-file-path"
               v-model="form.file_path"
@@ -275,17 +288,23 @@ watch(open, (isOpen) => {
               autocomplete="off"
             />
             <p class="text-xs text-muted-foreground">
-              Written to <code class="font-mono">${{ '{STACK_DIR}' }}/files/&lt;file_path&gt;</code>.
-              Reference in YAML via
-              <code class="font-mono">./files/{{ form.file_path || 'your-file' }}:{{ form.mount_path || '/container/path' }}:ro</code>.
-              Subpaths are honored — parents are <code class="font-mono">mkdir -p</code>'d.
+              {{ t("workload.volumes.relativePathBefore") }}
+              <code class="font-mono"
+                >${{ "{STACK_DIR}" }}/files/&lt;file_path&gt;</code
+              >{{ t("workload.volumes.relativePathBetween") }}
+              <code class="font-mono"
+                >./files/{{ form.file_path || "your-file" }}:{{
+                  form.mount_path || "/container/path"
+                }}:ro</code
+              >.
+              {{ t("workload.volumes.relativePathAfter") }}
             </p>
           </div>
         </template>
 
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="isSaving">
             <Icon
@@ -293,7 +312,7 @@ watch(open, (isOpen) => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Add Mount
+            {{ t("workload.volumes.add") }}
           </Button>
         </DialogFooter>
       </form>

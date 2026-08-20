@@ -9,19 +9,24 @@ definePageMeta({
   middleware: ["auth", "staff"],
 });
 
+const { locale, t } = useI18n();
+
 useHead({
-  title: "Admin — Failures",
+  title: () => t("admin.failures.pageTitle"),
 });
 
-setBreadcrumbs([
-  { label: "Admin", to: "/admin/overview" },
-  { label: "Failures" },
-]);
+const applyBreadcrumb = (): void => {
+  setBreadcrumbs([
+    { label: t("admin.common.admin"), to: "/admin/overview" },
+    { label: t("admin.common.failures") },
+  ]);
+};
+applyBreadcrumb();
+watch(locale, applyBreadcrumb);
 
 // The caveat isn't part of the table meta, so keep it as static copy below
 // the table.
-const caveat =
-  "Showing the most recent failures across the platform. Older records may have been pruned.";
+const caveat = computed(() => t("admin.failures.caveat"));
 
 interface FailureRow {
   id?: string;
@@ -45,8 +50,7 @@ function openLog(row: FailureRow): void {
 <template>
   <div class="space-y-6 pb-10">
     <p class="text-sm text-muted-foreground">
-      Recent provisioning, site installation, and service installation failures
-      across the platform.
+      {{ t("admin.failures.description") }}
     </p>
 
     <DataTable endpoint="/admin/failures/table" @row-click="openLog">
@@ -61,7 +65,7 @@ function openLog(row: FailureRow): void {
           @click.stop="openLog(row as FailureRow)"
         >
           <Icon name="lucide:scroll-text" class="h-3.5 w-3.5" />
-          View log
+          {{ t("admin.failures.viewLog") }}
         </Button>
         <span v-else class="text-xs text-muted-foreground">—</span>
       </template>

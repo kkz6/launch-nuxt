@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { formatDistanceToNow } from "date-fns";
 import { toast } from "vue-sonner";
 
 definePageMeta({
@@ -7,7 +6,11 @@ definePageMeta({
   middleware: "auth",
 });
 
-useHead({ title: "Domains" });
+const { t, locale } = useI18n();
+useHead({ title: () => t("operations.dns.list.pageTitle") });
+
+const localeTag = computed(() => (locale.value === "ja" ? "ja-JP" : "en-US"));
+const numberFormatter = computed(() => new Intl.NumberFormat(localeTag.value));
 
 interface DomainProvider {
   id: string;
@@ -52,7 +55,7 @@ const providers = ref<DnsProvider[]>([]);
 const isLoading = ref(true);
 
 // Watch for refresh trigger from navbar
-const dnsRefreshKey = useState('dnsRefreshKey', () => 0);
+const dnsRefreshKey = useState("dnsRefreshKey", () => 0);
 watch(dnsRefreshKey, () => {
   fetchDomains();
 });
@@ -63,27 +66,31 @@ const fetchDomains = async () => {
     domains.value = response.data.domains;
     providers.value = response.data.providers;
   } catch {
-    toast.error("Failed to load domains");
+    toast.error(t("operations.dns.list.loadError"));
   } finally {
     isLoading.value = false;
   }
 };
 
-const formatCreatedDate = (date: string): string => {
-  try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
-  } catch {
-    return "";
-  }
-};
+const formatRecordCount = (count: number): string =>
+  t(
+    count === 1
+      ? "operations.dns.list.recordsOne"
+      : "operations.dns.list.recordsMany",
+    { count: numberFormatter.value.format(count) },
+  );
 
-const getProviderInfo = (domain: Domain): { label: string; profile: string } => {
+const getProviderInfo = (
+  domain: Domain,
+): { label: string; profile: string } => {
   // First try to get from providers list using domain_provider_id
-  const provider = providers.value.find(p => p.id === domain.domain_provider_id);
+  const provider = providers.value.find(
+    (p) => p.id === domain.domain_provider_id,
+  );
   if (provider) {
     return {
       label: provider.provider_label,
-      profile: provider.profile
+      profile: provider.profile,
     };
   }
 
@@ -91,29 +98,30 @@ const getProviderInfo = (domain: Domain): { label: string; profile: string } => 
   if (domain.provider) {
     return {
       label: domain.provider.provider,
-      profile: domain.provider.profile
+      profile: domain.provider.profile,
     };
   }
 
-  return { label: "Unknown", profile: "" };
+  return { label: t("operations.dns.common.unknownProvider"), profile: "" };
 };
 
 const getProviderIcon = (providerName: string): string => {
   const name = providerName.toLowerCase();
-  if (name.includes('cloudflare')) return 'simple-icons:cloudflare';
-  if (name.includes('route53') || name.includes('aws')) return 'simple-icons:amazonwebservices';
-  if (name.includes('digitalocean')) return 'simple-icons:digitalocean';
-  if (name.includes('godaddy')) return 'simple-icons:godaddy';
-  return 'lucide:globe';
+  if (name.includes("cloudflare")) return "simple-icons:cloudflare";
+  if (name.includes("route53") || name.includes("aws"))
+    return "simple-icons:amazonwebservices";
+  if (name.includes("digitalocean")) return "simple-icons:digitalocean";
+  if (name.includes("godaddy")) return "simple-icons:godaddy";
+  return "lucide:globe";
 };
 
 const getProviderColor = (providerName: string): string => {
   const name = providerName.toLowerCase();
-  if (name.includes('cloudflare')) return '#F38020';
-  if (name.includes('route53') || name.includes('aws')) return '#FF9900';
-  if (name.includes('digitalocean')) return '#0080FF';
-  if (name.includes('godaddy')) return '#00A63F';
-  return '#6B7280';
+  if (name.includes("cloudflare")) return "#F38020";
+  if (name.includes("route53") || name.includes("aws")) return "#FF9900";
+  if (name.includes("digitalocean")) return "#0080FF";
+  if (name.includes("godaddy")) return "#00A63F";
+  return "#6B7280";
 };
 
 onMounted(fetchDomains);
@@ -134,8 +142,10 @@ onMounted(fetchDomains);
     >
       <Icon name="lucide:globe" class="h-16 w-16 text-muted-foreground" />
       <div class="text-center">
-        <p class="font-medium">No domains configured yet</p>
-        <p class="text-sm text-muted-foreground">Click on Add Domain to get started</p>
+        <p class="font-medium">{{ t("operations.dns.list.emptyTitle") }}</p>
+        <p class="text-sm text-muted-foreground">
+          {{ t("operations.dns.list.emptyDescription") }}
+        </p>
       </div>
     </div>
 
@@ -146,11 +156,17 @@ onMounted(fetchDomains);
         :to="`/dns/${domain.id}`"
         class="group"
       >
-        <div class="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50">
+        <div
+          class="rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+        >
           <div class="flex items-start gap-3">
             <div
               class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
-              :style="{ '--brand-color': getProviderColor(getProviderInfo(domain).label) }"
+              :style="{
+                '--brand-color': getProviderColor(
+                  getProviderInfo(domain).label,
+                ),
+              }"
             >
               <Icon
                 :name="getProviderIcon(getProviderInfo(domain).label)"
@@ -171,12 +187,10 @@ onMounted(fetchDomains);
             <div class="flex items-center gap-4">
               <div class="flex items-center gap-1.5 text-muted-foreground">
                 <Icon name="lucide:file-text" class="h-3.5 w-3.5" />
-                <span>{{ domain.records_count }} records</span>
+                <span>{{ formatRecordCount(domain.records_count) }}</span>
               </div>
             </div>
-            <span class="text-muted-foreground">
-              {{ formatCreatedDate(domain.created_at) }}
-            </span>
+            <SharedDateTooltip :date="domain.created_at" />
           </div>
         </div>
       </NuxtLink>

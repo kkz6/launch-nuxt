@@ -66,6 +66,26 @@ const action = (overrides: Partial<ActiveAction> = {}): ActiveAction => ({
   ...overrides,
 });
 
+const translate = (key: string, params: Record<string, unknown> = {}) => {
+  const messages: Record<string, string> = {
+    "common.activeActions.status.pending": "Queued",
+    "common.activeActions.status.running": "Running",
+    "common.activeActions.status.finished": "Completed",
+    "common.activeActions.status.failed": "Failed",
+    "common.activeActions.kind.server_backup": "Server backup",
+    "common.activeActions.kind.database_backup": "Database backup",
+    "common.activeActions.target.server": "Server",
+    "common.activeActions.target.database": "Database",
+    "common.activeActions.runningFor": `Running for ${String(params.duration ?? "")}`,
+    "common.activeActions.complete": `${String(params.kind ?? "")} complete`,
+    "common.activeActions.seconds": `${String(params.count ?? 0)}s`,
+    "common.activeActions.minutes": `${String(params.count ?? 0)}m`,
+    "common.activeActions.liveOutput": "Live output",
+    "common.activeActions.finalOutput": "Final output",
+  };
+  return messages[key] ?? key;
+};
+
 const mountComponent = () =>
   shallowMount(ActiveActions, {
     global: {
@@ -101,6 +121,7 @@ describe("ActiveActions", () => {
     mocks.push.mockReset();
     mocks.handlers = {};
     vi.stubGlobal("useAuth", () => ({ user }));
+    vi.stubGlobal("useI18n", () => ({ t: translate }));
     vi.stubGlobal("useApi", () => ({ get: mocks.get }));
     vi.stubGlobal("useRouter", () => ({ push: mocks.push }));
     vi.stubGlobal("ref", ref);

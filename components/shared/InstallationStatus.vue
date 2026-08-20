@@ -7,21 +7,22 @@ interface Props extends InstallationStatus {
 }
 
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const status = computed(() => {
   if (props.installation_failed_at) {
-    return { text: "Installation failed", loading: false };
+    return { text: t("shared.installation.installFailed"), loading: false };
   }
   if (props.uninstallation_failed_at) {
-    return { text: "Uninstallation failed", loading: false };
+    return { text: t("shared.installation.uninstallFailed"), loading: false };
   }
   if (props.uninstallation_requested_at) {
-    return { text: "Uninstalling", loading: true };
+    return { text: t("shared.installation.uninstalling"), loading: true };
   }
   if (props.installed_at) {
-    return { text: "Installed", loading: false };
+    return { text: t("shared.installation.installed"), loading: false };
   }
-  return { text: "Installing", loading: true };
+  return { text: t("shared.installation.installing"), loading: true };
 });
 </script>
 

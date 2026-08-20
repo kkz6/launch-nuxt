@@ -1,15 +1,12 @@
 <script setup lang="ts">
-import { toast } from "vue-sonner";
 import { parseDotEnv } from "~/composables/useDockerHelpers";
-import {
-  dockerService,
-  type DockerCompose,
-} from "~/services/dockerService";
+import { dockerService, type DockerCompose } from "~/services/dockerService";
 
 interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Compose Environment uses the same SharedEnvVarsEditor as
 // application + database + project Environment so the UX is one
@@ -125,7 +122,7 @@ const onUpdate = async (
 ) => {
   const idx = vars.value.findIndex((r) => r.id === id);
   if (idx === -1) {
-    throw new Error("Row vanished — refresh and try again");
+    throw new Error(t("workload.environment.rowMissing"));
   }
   const updated: VirtualRow = {
     ...vars.value[idx],
@@ -181,10 +178,10 @@ const onRestart = async () => {
     :loading="isLoading"
     :is-running="compose.status === 'running'"
     :on-restart="onRestart"
-    restart-label="Reload"
-    title="Environment"
-    description="Written to .env next to the compose file. Save, then Reload to apply — Reload re-ups the stack with no rebuild. Compose uses it for ${VAR} substitution and passes matching keys to services."
-    empty-description="Add KEY=VALUE pairs (or paste a .env file) — they're written next to the compose file on every deploy and used by docker compose for ${VAR} substitution."
+    :restart-label="t('workload.actions.reload')"
+    :title="t('workload.environment.title')"
+    :description="t('workload.environment.composeDescription')"
+    :empty-description="t('workload.environment.composeEmptyDescription')"
     :on-create="onCreate"
     :on-update="onUpdate"
     :on-delete="onDelete"

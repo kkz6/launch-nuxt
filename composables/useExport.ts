@@ -6,6 +6,8 @@ import { ref } from "vue";
 // composable is kept as a faithful port so the feature can be wired up
 // later without re-deriving the SSE progress flow.
 export function useExport() {
+  const { t } = useI18n();
+  const { getEffectiveLocale } = useLocalePreference();
   const isExporting = ref(false);
   const exportProgress = ref(0);
   const exportError = ref<string | null>(null);
@@ -25,16 +27,27 @@ export function useExport() {
         `/table/export/${tableClass}/${exportName}`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Accept-Language": getEffectiveLocale(),
+          },
           body: JSON.stringify({ selectedIds, ...queryParams }),
         },
       );
 
-      if (!response.ok)
-        throw new Error(`Export trigger failed: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(
+          t("data.exportTriggerFailed", { status: response.statusText }),
+        );
+      }
       const { jobId } = await response.json();
 
-      const eventSource = new EventSource(`/table/export/stream/${jobId}`);
+      const streamQuery = new URLSearchParams({
+        locale: getEffectiveLocale(),
+      });
+      const eventSource = new EventSource(
+        `/table/export/stream/${jobId}?${streamQuery.toString()}`,
+      );
 
       eventSource.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -56,7 +69,7 @@ export function useExport() {
       eventSource.onerror = () => {
         eventSource.close();
         isExporting.value = false;
-        exportError.value = "Connection lost";
+        exportError.value = t("data.connectionLost");
       };
     } catch (error: any) {
       isExporting.value = false;

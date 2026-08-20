@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button } from '~/components/ui/button'
+import { Button } from "~/components/ui/button";
 import {
   Sheet,
   SheetContent,
@@ -7,30 +7,31 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-} from '~/components/ui/sheet'
+} from "~/components/ui/sheet";
 
 interface Props {
-  serverId: string
-  taskId: string
-  commitMessage?: string
-  commitSha?: string
+  serverId: string;
+  taskId: string;
+  commitMessage?: string;
+  commitSha?: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
-const isOpen = ref(false)
+const isOpen = ref(false);
 
 const description = computed(() => {
-  const parts: string[] = []
+  const parts: string[] = [];
   if (props.commitSha) {
-    parts.push(props.commitSha.substring(0, 6))
+    parts.push(props.commitSha.substring(0, 6));
   }
   if (props.commitMessage) {
-    const heading = props.commitMessage.split('\n')[0]
-    parts.push(heading)
+    const heading = props.commitMessage.split("\n")[0];
+    parts.push(heading);
   }
-  return parts.join(' - ')
-})
+  return parts.join(" - ");
+});
 </script>
 
 <template>
@@ -38,12 +39,14 @@ const description = computed(() => {
     <SheetTrigger as-child>
       <Button variant="outline" size="sm">
         <Icon name="lucide:scroll-text" class="mr-2 block size-4" />
-        View Logs
+        {{ t("site.deploymentLogs.view") }}
       </Button>
     </SheetTrigger>
-    <SheetContent class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none">
+    <SheetContent
+      class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-4xl flex flex-col overflow-hidden outline-none"
+    >
       <SheetHeader class="shrink-0">
-        <SheetTitle>Deployment Logs</SheetTitle>
+        <SheetTitle>{{ t("site.deploymentLogs.title") }}</SheetTitle>
         <SheetDescription v-if="description">
           {{ description }}
         </SheetDescription>

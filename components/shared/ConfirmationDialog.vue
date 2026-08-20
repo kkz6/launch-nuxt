@@ -8,102 +8,104 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '~/components/ui/alert-dialog'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
-import { Checkbox } from '~/components/ui/checkbox'
+} from "~/components/ui/alert-dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Checkbox } from "~/components/ui/checkbox";
+
+const { t } = useI18n();
 
 interface ConfirmationOptions {
-  title: string
-  description: string
-  confirmText?: string
-  cancelText?: string
-  destructive?: boolean
-  warning?: string
-  inputVerificationText?: string
-  helpText?: string
-  hasInput?: boolean
-  inputType?: string
+  title: string;
+  description: string;
+  confirmText?: string;
+  cancelText?: string;
+  destructive?: boolean;
+  warning?: string;
+  inputVerificationText?: string;
+  helpText?: string;
+  hasInput?: boolean;
+  inputType?: string;
   checkbox?: {
-    label: string
-    checked: boolean
-  }
+    label: string;
+    checked: boolean;
+  };
 }
 
 interface ConfirmationResult {
-  ok: boolean
-  value?: string
-  checkbox?: { checked: boolean }
+  ok: boolean;
+  value?: string;
+  checkbox?: { checked: boolean };
 }
 
-const isOpen = ref(false)
+const isOpen = ref(false);
 const options = ref<ConfirmationOptions>({
-  title: '',
-  description: '',
-  confirmText: 'Confirm',
-  cancelText: 'Cancel',
+  title: "",
+  description: "",
+  confirmText: t("common.confirm"),
+  cancelText: t("common.cancel"),
   destructive: false,
-})
-const verifiedText = ref('')
-const checkboxState = ref<{ label: string; checked: boolean } | undefined>()
+});
+const verifiedText = ref("");
+const checkboxState = ref<{ label: string; checked: boolean } | undefined>();
 
-let resolvePromise: ((value: ConfirmationResult) => void) | null = null
+let resolvePromise: ((value: ConfirmationResult) => void) | null = null;
 
 const show = (opts: ConfirmationOptions): Promise<ConfirmationResult> => {
   options.value = {
-    confirmText: 'Confirm',
-    cancelText: 'Cancel',
+    confirmText: t("common.confirm"),
+    cancelText: t("common.cancel"),
     destructive: false,
     ...opts,
-  }
-  verifiedText.value = ''
-  isCopied.value = false
-  checkboxState.value = opts.checkbox ? { ...opts.checkbox } : undefined
-  isOpen.value = true
+  };
+  verifiedText.value = "";
+  isCopied.value = false;
+  checkboxState.value = opts.checkbox ? { ...opts.checkbox } : undefined;
+  isOpen.value = true;
   return new Promise((resolve) => {
-    resolvePromise = resolve
-  })
-}
+    resolvePromise = resolve;
+  });
+};
 
 const isConfirmDisabled = computed(() => {
   if (options.value.inputVerificationText) {
-    return options.value.inputVerificationText !== verifiedText.value
+    return options.value.inputVerificationText !== verifiedText.value;
   }
-  return false
-})
+  return false;
+});
 
 const handleConfirm = () => {
-  isOpen.value = false
+  isOpen.value = false;
   resolvePromise?.({
     ok: true,
     value: verifiedText.value || undefined,
     checkbox: checkboxState.value,
-  })
-}
+  });
+};
 
 const handleCancel = () => {
-  isOpen.value = false
-  resolvePromise?.({ ok: false })
-}
+  isOpen.value = false;
+  resolvePromise?.({ ok: false });
+};
 
 const handleKeyUp = (e: KeyboardEvent) => {
-  if (e.key === 'Enter' && !isConfirmDisabled.value) {
-    handleConfirm()
+  if (e.key === "Enter" && !isConfirmDisabled.value) {
+    handleConfirm();
   }
-}
+};
 
-const isCopied = ref(false)
+const isCopied = ref(false);
 const copyVerificationText = async () => {
   if (options.value.inputVerificationText) {
-    await navigator.clipboard.writeText(options.value.inputVerificationText)
-    isCopied.value = true
+    await navigator.clipboard.writeText(options.value.inputVerificationText);
+    isCopied.value = true;
     setTimeout(() => {
-      isCopied.value = false
-    }, 2000)
+      isCopied.value = false;
+    }, 2000);
   }
-}
+};
 
-defineExpose({ show })
+defineExpose({ show });
 </script>
 
 <template>
@@ -111,21 +113,38 @@ defineExpose({ show })
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ options.title }}</AlertDialogTitle>
-        <AlertDialogDescription>{{ options.description }}</AlertDialogDescription>
+        <AlertDialogDescription>{{
+          options.description
+        }}</AlertDialogDescription>
 
         <div
           v-if="options.warning"
           class="mt-3 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive dark:border-destructive/40 dark:bg-destructive/10 dark:text-red-400"
         >
           <div class="flex items-start gap-2">
-            <Icon name="lucide:triangle-alert" class="mt-0.5 h-4 w-4 shrink-0" />
+            <Icon
+              name="lucide:triangle-alert"
+              class="mt-0.5 h-4 w-4 shrink-0"
+            />
             <p>{{ options.warning }}</p>
           </div>
         </div>
 
-        <section v-if="options.inputVerificationText || options.hasInput || options.checkbox" class="pt-4 text-sm">
+        <section
+          v-if="
+            options.inputVerificationText ||
+            options.hasInput ||
+            options.checkbox
+          "
+          class="pt-4 text-sm"
+        >
           <div class="grid w-full items-center gap-3">
-            <Label v-if="options.helpText" for="verification" class="text-foreground">{{ options.helpText }}</Label>
+            <Label
+              v-if="options.helpText"
+              for="verification"
+              class="text-foreground"
+              >{{ options.helpText }}</Label
+            >
 
             <div
               v-if="options.inputVerificationText"
@@ -143,7 +162,7 @@ defineExpose({ show })
                   :name="isCopied ? 'lucide:check' : 'lucide:copy'"
                   :class="[
                     'block h-4 w-4 transition-all duration-200',
-                    isCopied && 'text-green-500'
+                    isCopied && 'text-green-500',
                   ]"
                 />
               </button>
@@ -154,7 +173,9 @@ defineExpose({ show })
               id="verification"
               v-model="verifiedText"
               :type="options.inputType || 'text'"
-              :placeholder="options.inputVerificationText ? 'Type to confirm...' : ''"
+              :placeholder="
+                options.inputVerificationText ? t('common.typeToConfirm') : ''
+              "
               class="w-full"
               @keyup="handleKeyUp"
             />
@@ -176,7 +197,10 @@ defineExpose({ show })
         </AlertDialogCancel>
         <AlertDialogAction
           :disabled="isConfirmDisabled"
-          :class="{ 'bg-destructive text-destructive-foreground hover:bg-destructive/90': options.destructive }"
+          :class="{
+            'bg-destructive text-destructive-foreground hover:bg-destructive/90':
+              options.destructive,
+          }"
           @click="handleConfirm"
         >
           {{ options.confirmText }}

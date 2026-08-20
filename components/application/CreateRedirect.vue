@@ -33,6 +33,7 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   created: [];
@@ -49,42 +50,44 @@ const from = ref(props.redirect?.from || "");
 const to = ref(props.redirect?.to || "");
 const redirectType = ref(props.redirect?.type?.toString() || "301");
 
-const redirectTypes = [
+const redirectTypes = computed(() => [
   {
     value: "301",
-    label: "Permanent (301)",
-    description: "Recommended for SEO",
+    label: t("workload.redirects.permanent", { code: 301 }),
+    description: t("workload.redirects.recommendedSeo"),
   },
   {
     value: "302",
-    label: "Temporary (302)",
-    description: "Temporary redirect",
+    label: t("workload.redirects.temporary", { code: 302 }),
+    description: t("workload.redirects.temporaryDescription"),
   },
   {
     value: "307",
-    label: "Temporary (307)",
-    description: "Preserves method",
+    label: t("workload.redirects.temporary", { code: 307 }),
+    description: t("workload.redirects.preservesMethod"),
   },
   {
     value: "308",
-    label: "Permanent (308)",
-    description: "Preserves method",
+    label: t("workload.redirects.permanent", { code: 308 }),
+    description: t("workload.redirects.preservesMethod"),
   },
-];
+]);
 
-const schema = z.object({
-  from: z
-    .string()
-    .min(1, "From path is required")
-    .regex(/^\//, "Path must start with /"),
-  to: z.string().min(1, "To path or URL is required"),
-  type: z
-    .number()
-    .refine(
-      (val) => [301, 302, 307, 308].includes(val),
-      "Invalid redirect type",
-    ),
-});
+const schema = computed(() =>
+  z.object({
+    from: z
+      .string()
+      .min(1, t("workload.redirects.fromRequired"))
+      .regex(/^\//, t("workload.redirects.pathSlashRequired")),
+    to: z.string().min(1, t("workload.redirects.toRequired")),
+    type: z
+      .number()
+      .refine(
+        (val) => [301, 302, 307, 308].includes(val),
+        t("workload.redirects.invalidType"),
+      ),
+  }),
+);
 
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
@@ -113,7 +116,9 @@ const previewExamples = computed(() => {
     return [
       {
         from: `${previewBase}${examplePath}`,
-        to: exampleTo.startsWith("http") ? exampleTo : `${previewBase}${exampleTo}`,
+        to: exampleTo.startsWith("http")
+          ? exampleTo
+          : `${previewBase}${exampleTo}`,
       },
     ];
   }
@@ -133,7 +138,7 @@ const resetForm = () => {
 };
 
 const validate = () => {
-  const result = schema.safeParse({
+  const result = schema.value.safeParse({
     from: from.value.trim(),
     to: to.value.trim(),
     type: parseInt(redirectType.value, 10),
@@ -170,7 +175,7 @@ const onSubmit = async () => {
           type: data.type as 301 | 302 | 307 | 308,
         },
       );
-      toast.success("Redirect updated");
+      toast.success(t("workload.redirects.updated"));
       emit("updated");
     } else {
       await dockerService.applications.createRedirect(
@@ -183,7 +188,7 @@ const onSubmit = async () => {
           type: data.type as 301 | 302 | 307 | 308,
         },
       );
-      toast.success("Redirect created");
+      toast.success(t("workload.redirects.created"));
       emit("created");
     }
     open.value = false;
@@ -199,7 +204,9 @@ const onSubmit = async () => {
     } else {
       toast.error(
         err.data?.message ||
-          `Failed to ${props.redirect ? "update" : "create"} redirect`,
+          (props.redirect
+            ? t("workload.redirects.updateFailed")
+            : t("workload.redirects.createFailed")),
       );
     }
   } finally {
@@ -217,23 +224,28 @@ watch(open, (isOpen) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        Add Redirect
+        {{ t("workload.redirects.add") }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>
-          {{ redirect ? "Update Redirect" : "Create Redirect" }}
+          {{
+            redirect
+              ? t("workload.redirects.updateTitle")
+              : t("workload.redirects.createTitle")
+          }}
         </DialogTitle>
         <DialogDescription>
-          Configure URL redirects for your application. Compiled to a
-          Traefik RedirectRegex middleware on the next deploy.
+          {{ t("workload.redirects.formDescription") }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
-          <Label for="redirect-from">From Path</Label>
+          <Label for="redirect-from">{{
+            t("workload.redirects.fromPath")
+          }}</Label>
           <Input
             id="redirect-from"
             v-model="from"
@@ -243,14 +255,16 @@ watch(open, (isOpen) => {
             {{ errors.from }}
           </p>
           <p v-else class="text-sm text-muted-foreground">
-            Use <code class="rounded bg-muted px-1">*</code> for pattern
-            matching (e.g.,
-            <code class="rounded bg-muted px-1">/blog/*</code>)
+            {{ t("workload.redirects.patternBefore") }}
+            <code class="rounded bg-muted px-1">*</code>
+            {{ t("workload.redirects.patternBetween") }}
+            <code class="rounded bg-muted px-1">/blog/*</code
+            >{{ t("workload.redirects.patternAfter") }}
           </p>
         </div>
 
         <div class="space-y-2">
-          <Label for="redirect-to">To Path or URL</Label>
+          <Label for="redirect-to">{{ t("workload.redirects.toPath") }}</Label>
           <Input
             id="redirect-to"
             v-model="to"
@@ -261,18 +275,19 @@ watch(open, (isOpen) => {
           </p>
           <p v-else class="text-sm text-muted-foreground">
             <template v-if="isPatternRedirect">
-              Use <code class="rounded bg-muted px-1">{path}</code> to
-              include the matched wildcard
+              {{ t("workload.redirects.wildcardBefore") }}
+              <code class="rounded bg-muted px-1">{path}</code>
+              {{ t("workload.redirects.wildcardAfter") }}
             </template>
-            <template v-else>Enter a path or full URL</template>
+            <template v-else>{{ t("workload.redirects.enterPath") }}</template>
           </p>
         </div>
 
         <div class="space-y-2">
-          <Label for="redirect-type">Redirect Type</Label>
+          <Label for="redirect-type">{{ t("workload.redirects.type") }}</Label>
           <Select v-model="redirectType">
             <SelectTrigger id="redirect-type">
-              <SelectValue placeholder="Select redirect type" />
+              <SelectValue :placeholder="t('workload.redirects.selectType')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem
@@ -300,11 +315,15 @@ watch(open, (isOpen) => {
         >
           <div class="mb-3 flex items-center gap-2">
             <Icon name="lucide:eye" class="h-4 w-4 text-muted-foreground" />
-            <span class="text-sm font-medium">Preview</span>
+            <span class="text-sm font-medium">{{
+              t("workload.redirects.preview")
+            }}</span>
             <Badge v-if="isPatternRedirect" variant="secondary" class="text-xs">
-              Pattern
+              {{ t("workload.redirects.pattern") }}
             </Badge>
-            <Badge v-else variant="outline" class="text-xs">Exact</Badge>
+            <Badge v-else variant="outline" class="text-xs">
+              {{ t("workload.redirects.exact") }}
+            </Badge>
           </div>
           <div
             v-for="(example, index) in previewExamples"
@@ -312,8 +331,10 @@ watch(open, (isOpen) => {
             class="space-y-2"
           >
             <div class="flex items-baseline gap-2">
-              <span class="w-8 shrink-0 text-xs font-medium text-muted-foreground">
-                From
+              <span
+                class="w-8 shrink-0 text-xs font-medium text-muted-foreground"
+              >
+                {{ t("workload.redirects.from") }}
               </span>
               <code
                 class="min-w-0 break-all rounded bg-background px-2 py-1 text-xs"
@@ -322,8 +343,10 @@ watch(open, (isOpen) => {
               </code>
             </div>
             <div class="flex items-baseline gap-2">
-              <span class="w-8 shrink-0 text-xs font-medium text-muted-foreground">
-                To
+              <span
+                class="w-8 shrink-0 text-xs font-medium text-muted-foreground"
+              >
+                {{ t("workload.redirects.to") }}
               </span>
               <code
                 class="min-w-0 break-all rounded bg-background px-2 py-1 text-xs"
@@ -336,7 +359,7 @@ watch(open, (isOpen) => {
 
         <DialogFooter class="mt-4">
           <Button type="button" variant="outline" @click="open = false">
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="!canSubmit">
             <Icon
@@ -344,7 +367,11 @@ watch(open, (isOpen) => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            {{ redirect ? "Update" : "Create" }}
+            {{
+              redirect
+                ? t("workload.actions.update")
+                : t("workload.actions.create")
+            }}
           </Button>
         </DialogFooter>
       </form>

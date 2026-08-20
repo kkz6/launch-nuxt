@@ -8,6 +8,7 @@ interface Props {
   project: DockerProject;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   updated: [];
   deleted: [];
@@ -18,9 +19,9 @@ const description = ref(props.project.description ?? "");
 const isLoading = ref(false);
 const deleteLoading = ref(false);
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 // Keep refs in sync if the parent refetches.
 watch(
@@ -50,18 +51,28 @@ const workloadSummary = computed(() => {
   const parts: string[] = [];
   const p = props.project;
   if (p.applications_count > 0)
-    parts.push(`${p.applications_count} application${p.applications_count === 1 ? "" : "s"}`);
+    parts.push(
+      t("workload.project.settings.applicationCount", {
+        count: p.applications_count,
+      }),
+    );
   if (p.composes_count > 0)
-    parts.push(`${p.composes_count} compose stack${p.composes_count === 1 ? "" : "s"}`);
+    parts.push(
+      t("workload.project.settings.composeCount", { count: p.composes_count }),
+    );
   if (p.databases_count > 0)
-    parts.push(`${p.databases_count} database${p.databases_count === 1 ? "" : "s"}`);
+    parts.push(
+      t("workload.project.settings.databaseCount", {
+        count: p.databases_count,
+      }),
+    );
   return parts.join(", ");
 });
 
 const updateProject = async () => {
   const trimmed = name.value.trim();
   if (!trimmed) {
-    toast.error("Project name is required");
+    toast.error(t("workload.project.settings.nameRequired"));
     return;
   }
   isLoading.value = true;
@@ -70,11 +81,11 @@ const updateProject = async () => {
       name: trimmed,
       description: description.value.trim(),
     });
-    toast.success("Project settings updated");
+    toast.success(t("workload.project.settings.updated"));
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update project");
+    toast.error(e.data?.message || t("workload.project.settings.updateFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -83,19 +94,23 @@ const updateProject = async () => {
 const deleteProject = async () => {
   if (!canDelete.value) {
     toast.error(
-      `Cannot delete project: remove ${workloadSummary.value} first.`,
+      t("workload.project.settings.deleteBlockedToast", {
+        workloads: workloadSummary.value,
+      }),
     );
     return;
   }
   if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: "Delete Project",
-    description: `Are you sure you want to delete "${props.project.name}"? This action cannot be undone.`,
-    confirmText: "Delete Project",
-    cancelText: "Cancel",
+    title: t("workload.project.settings.deleteTitle"),
+    description: t("workload.project.settings.deleteDescription", {
+      name: props.project.name,
+    }),
+    confirmText: t("workload.project.settings.deleteTitle"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
-    helpText: "Type the project name to confirm deletion:",
+    helpText: t("workload.project.settings.deleteHelp"),
     inputVerificationText: props.project.name,
   });
   if (!result.ok) return;
@@ -103,11 +118,11 @@ const deleteProject = async () => {
   deleteLoading.value = true;
   try {
     await dockerService.projects.delete(props.serverId, props.project.id);
-    toast.success("Project deleted successfully");
+    toast.success(t("workload.project.settings.deleted"));
     emit("deleted");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Unable to delete project");
+    toast.error(e.data?.message || t("workload.project.settings.deleteFailed"));
   } finally {
     deleteLoading.value = false;
   }
@@ -128,28 +143,34 @@ const deleteProject = async () => {
     <!-- Project Information -->
     <div class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium">Project Information</h3>
+        <h3 class="text-lg font-medium">
+          {{ t("workload.project.settings.information") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Update your project name and description.
+          {{ t("workload.project.settings.informationDescription") }}
         </p>
       </div>
 
       <div class="space-y-4">
         <div class="space-y-2">
-          <Label for="project-name">Project Name</Label>
+          <Label for="project-name">
+            {{ t("workload.project.settings.projectName") }}
+          </Label>
           <Input
             id="project-name"
             v-model="name"
-            placeholder="Enter project name"
+            :placeholder="t('workload.project.settings.namePlaceholder')"
           />
         </div>
 
         <div class="space-y-2">
-          <Label for="project-description">Description</Label>
+          <Label for="project-description">{{
+            t("workload.fields.description")
+          }}</Label>
           <Textarea
             id="project-description"
             v-model="description"
-            placeholder="Enter a description for your project (optional)"
+            :placeholder="t('workload.project.settings.descriptionPlaceholder')"
             :rows="3"
           />
         </div>
@@ -160,7 +181,7 @@ const deleteProject = async () => {
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Save Changes
+          {{ t("workload.actions.saveChanges") }}
         </Button>
       </div>
     </div>
@@ -170,9 +191,11 @@ const deleteProject = async () => {
     <!-- Danger Zone -->
     <div v-if="canDeleteByRole" class="space-y-4">
       <div>
-        <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+        <h3 class="text-lg font-medium text-destructive">
+          {{ t("workload.danger.title") }}
+        </h3>
         <p class="text-sm text-muted-foreground">
-          Permanently delete this project. This action cannot be undone.
+          {{ t("workload.project.settings.dangerDescription") }}
         </p>
       </div>
 
@@ -187,11 +210,14 @@ const deleteProject = async () => {
       >
         <div class="space-y-1">
           <p class="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-            Cannot delete project
+            {{ t("workload.project.settings.cannotDelete") }}
           </p>
           <p class="text-sm text-yellow-700 dark:text-yellow-300">
-            This project has {{ workloadSummary }}. Please delete
-            every workload before removing the project.
+            {{
+              t("workload.project.settings.cannotDeleteDescription", {
+                workloads: workloadSummary,
+              })
+            }}
           </p>
         </div>
       </div>
@@ -207,7 +233,7 @@ const deleteProject = async () => {
           class="mr-2 h-4 w-4 animate-spin"
         />
         <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
-        Delete Project
+        {{ t("workload.project.settings.deleteTitle") }}
       </Button>
     </div>
   </div>

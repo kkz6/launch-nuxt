@@ -4,52 +4,55 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from '~/components/ui/sheet'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
-import { ScrollArea } from '~/components/ui/scroll-area'
+} from "~/components/ui/sheet";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { ScrollArea } from "~/components/ui/scroll-area";
 
-const { isOpen, activeTab } = useSettingsSheet()
+const { isOpen, activeTab } = useSettingsSheet();
+const { t } = useI18n();
 
-const tabsContainer = ref<HTMLElement | null>(null)
-const contentContainer = ref<HTMLElement | null>(null)
-const isScrolled = ref(false)
+const tabsContainer = ref<HTMLElement | null>(null);
+const contentContainer = ref<HTMLElement | null>(null);
+const isScrolled = ref(false);
 
 const handleScroll = (event: Event) => {
-  const target = event.target as HTMLElement
-  isScrolled.value = target.scrollTop > 0
-}
+  const target = event.target as HTMLElement;
+  isScrolled.value = target.scrollTop > 0;
+};
 
-const tabs = [
-  { value: 'general', label: 'General' },
-  { value: 'teams', label: 'Members' },
-  { value: 'connections', label: 'Connections' },
-  { value: 'ssh-keys', label: 'SSH Keys' },
-  { value: 'security', label: 'Security' },
-  { value: 'notifications', label: 'Notifications' },
-  { value: 'billing', label: 'Billing' },
-  { value: 'danger', label: 'Danger Zone' },
-]
+const tabs = computed(() => [
+  { value: "general", label: t("settings.tabs.general") },
+  { value: "teams", label: t("settings.tabs.members") },
+  { value: "connections", label: t("settings.tabs.connections") },
+  { value: "ssh-keys", label: t("settings.tabs.sshKeys") },
+  { value: "security", label: t("settings.tabs.security") },
+  { value: "notifications", label: t("settings.tabs.notifications") },
+  { value: "billing", label: t("settings.tabs.billing") },
+  { value: "danger", label: t("settings.tabs.dangerZone") },
+]);
 
 // activeTab is already set by useSettingsSheet().open(); here we just
 // reset scroll position and scroll the active tab into view.
 watch(isOpen, (open) => {
   if (open) {
-    isScrolled.value = false
+    isScrolled.value = false;
     nextTick(() => {
       if (tabsContainer.value) {
-        const activeTabIndex = tabs.findIndex(t => t.value === activeTab.value)
+        const activeTabIndex = tabs.value.findIndex(
+          (t) => t.value === activeTab.value,
+        );
         if (activeTabIndex > 0) {
-          tabsContainer.value.scrollLeft = activeTabIndex * 100
+          tabsContainer.value.scrollLeft = activeTabIndex * 100;
         } else {
-          tabsContainer.value.scrollLeft = 0
+          tabsContainer.value.scrollLeft = 0;
         }
       }
       if (contentContainer.value) {
-        contentContainer.value.scrollTop = 0
+        contentContainer.value.scrollTop = 0;
       }
-    })
+    });
   }
-})
+});
 </script>
 
 <template>
@@ -59,7 +62,9 @@ watch(isOpen, (open) => {
       :show-close="true"
     >
       <SheetHeader class="flex-shrink-0 px-6 pt-6 pb-0">
-        <SheetTitle class="text-xl font-semibold">Settings</SheetTitle>
+        <SheetTitle class="text-xl font-semibold">{{
+          t("settings.title")
+        }}</SheetTitle>
       </SheetHeader>
 
       <Tabs v-model="activeTab" class="flex min-h-0 flex-1 flex-col">
@@ -68,10 +73,7 @@ watch(isOpen, (open) => {
           class="relative flex-shrink-0 border-b transition-shadow duration-200"
           :class="isScrolled ? 'shadow-md' : ''"
         >
-          <div
-            ref="tabsContainer"
-            class="scrollbar-hide overflow-x-auto px-6"
-          >
+          <div ref="tabsContainer" class="scrollbar-hide overflow-x-auto px-6">
             <TabsList class="inline-flex h-auto w-max gap-1 bg-transparent p-0">
               <TabsTrigger
                 v-for="tab in tabs"
@@ -92,35 +94,59 @@ watch(isOpen, (open) => {
           @scroll="handleScroll"
         >
           <div class="py-6">
-            <TabsContent value="general" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="general"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsGeneralTab />
             </TabsContent>
 
-            <TabsContent value="teams" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="teams"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsTeamsTab />
             </TabsContent>
 
-            <TabsContent value="connections" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="connections"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsConnectionsTab />
             </TabsContent>
 
-            <TabsContent value="ssh-keys" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="ssh-keys"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsSSHKeysTab />
             </TabsContent>
 
-            <TabsContent value="security" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="security"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsSecurityTab />
             </TabsContent>
 
-            <TabsContent value="notifications" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="notifications"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsNotificationsTab />
             </TabsContent>
 
-            <TabsContent value="billing" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="billing"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsBillingTab />
             </TabsContent>
 
-            <TabsContent value="danger" class="mt-0 focus-visible:outline-none focus-visible:ring-0">
+            <TabsContent
+              value="danger"
+              class="mt-0 focus-visible:outline-none focus-visible:ring-0"
+            >
               <SettingsDangerTab />
             </TabsContent>
           </div>

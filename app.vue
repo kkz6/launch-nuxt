@@ -1,9 +1,17 @@
 <script setup lang="ts">
-useHead({
+const { locale, t } = useI18n();
+
+useHead(() => ({
   htmlAttrs: {
-    lang: 'en',
+    lang: locale.value === "ja" ? "ja-JP" : "en-US",
   },
-})
+}));
+
+useSeoMeta({
+  description: () => t("public.meta.description"),
+  ogDescription: () => t("public.meta.description"),
+  twitterDescription: () => t("public.meta.description"),
+});
 </script>
 
 <template>

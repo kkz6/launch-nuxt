@@ -8,6 +8,8 @@ import {
 import { Button } from "~/components/ui/button";
 import type { FilterDef } from "~/types/data-table";
 
+const { t } = useI18n();
+
 defineProps<{
   filters: FilterDef[];
   activeFilterKeys: string[];
@@ -35,7 +37,7 @@ const emit = defineEmits<{
         >
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
-        Filter
+        {{ t("data.filter") }}
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start">

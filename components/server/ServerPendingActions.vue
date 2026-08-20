@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu'
+} from "~/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,81 +17,88 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '~/components/ui/alert-dialog'
-import type { Server } from '~/types'
-import { serverService } from '~/services/serverService'
+} from "~/components/ui/alert-dialog";
+import type { Server } from "~/types";
+import { serverService } from "~/services/serverService";
 
 interface Props {
-  server: Server
+  server: Server;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
-  provision: [server: Server]
-  deleted: [serverId: string]
-  viewLogs: [server: Server]
-  retryProvision: [server: Server]
-}>()
+  provision: [server: Server];
+  deleted: [serverId: string];
+  viewLogs: [server: Server];
+  retryProvision: [server: Server];
+}>();
 
-const showDeleteDialog = ref(false)
-const isDeleting = ref(false)
+const showDeleteDialog = ref(false);
+const isDeleting = ref(false);
 
 // Check if server can be deleted (not during active provisioning)
 const canDelete = computed(() => {
-  return ['new', 'starting', 'failed', 'awaiting_connection'].includes(props.server.status)
-})
+  return ["new", "starting", "failed", "awaiting_connection"].includes(
+    props.server.status,
+  );
+});
 
 // Check if this is a custom server that needs manual provisioning.
 // Drives the Provision button on the card; the dialog it opens now
 // owns the Try Connection step as well.
 const isCustomServerPending = computed(() => {
-  return props.server.provider === 'custom_server' && props.server.provision_command
-})
+  return (
+    props.server.provider === "custom_server" && props.server.provision_command
+  );
+});
 
 // Check if retry provision is available (failed status + connected)
 const canRetryProvision = computed(() => {
-  return props.server.status === 'failed' && props.server.connected
-})
+  return props.server.status === "failed" && props.server.connected;
+});
 
 const handleProvision = () => {
-  emit('provision', props.server)
-}
+  emit("provision", props.server);
+};
 
 const handleRetryProvision = () => {
-  emit('retryProvision', props.server)
-}
+  emit("retryProvision", props.server);
+};
 
 const handleViewLogs = () => {
-  emit('viewLogs', props.server)
-}
+  emit("viewLogs", props.server);
+};
 
 const handleDelete = async () => {
-  isDeleting.value = true
+  isDeleting.value = true;
   try {
-    await serverService.delete(props.server.id)
-    toast.success('Server deleted successfully')
-    emit('deleted', props.server.id)
-    showDeleteDialog.value = false
+    await serverService.delete(props.server.id);
+    toast.success(t("server.pending.deleted"));
+    emit("deleted", props.server.id);
+    showDeleteDialog.value = false;
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to delete server')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("server.pending.deleteFailed"));
   } finally {
-    isDeleting.value = false
+    isDeleting.value = false;
   }
-}
+};
 </script>
 
 <template>
-  <div :class="[
-    'pointer-events-auto flex items-center',
-    // gap-0 is the joined split-button look — only applies when the
-    // Provision pill is glued to the dots menu in custom-server pending
-    // states. Every other state (failed shows two independent buttons,
-    // new/starting shows just the dots menu) wants the standard 1.5
-    // gap so the buttons don't visually merge.
-    server.status !== 'failed' && isCustomServerPending ? 'gap-0' : 'gap-1.5'
-  ]">
+  <div
+    :class="[
+      'pointer-events-auto flex items-center',
+      // gap-0 is the joined split-button look — only applies when the
+      // Provision pill is glued to the dots menu in custom-server pending
+      // states. Every other state (failed shows two independent buttons,
+      // new/starting shows just the dots menu) wants the standard 1.5
+      // gap so the buttons don't visually merge.
+      server.status !== 'failed' && isCustomServerPending ? 'gap-0' : 'gap-1.5',
+    ]"
+  >
     <!-- Failed servers get inline, discoverable actions. View Logs is the
          primary affordance (it opens the friendly error sheet with the
          Try-again / Manage-credentials buttons), Delete is destructive and
@@ -107,7 +114,7 @@ const handleDelete = async () => {
         @click.prevent="handleViewLogs"
       >
         <Icon name="lucide:scroll-text" class="h-3 w-3" />
-        View Logs
+        {{ t("server.pending.viewLogs") }}
       </Button>
       <Button
         variant="outline"
@@ -116,7 +123,7 @@ const handleDelete = async () => {
         @click.prevent="showDeleteDialog = true"
       >
         <Icon name="lucide:trash-2" class="h-3 w-3" />
-        Delete
+        {{ t("server.common.delete") }}
       </Button>
     </template>
 
@@ -148,7 +155,7 @@ const handleDelete = async () => {
         @click.prevent="handleProvision"
       >
         <Icon name="lucide:terminal" class="h-3 w-3" />
-        Provision
+        {{ t("server.pending.provision") }}
       </Button>
 
       <!-- Dropdown Menu — uses the conventional "more actions" dots icon
@@ -165,10 +172,10 @@ const handleDelete = async () => {
               'h-7 w-7 p-0',
               isCustomServerPending
                 ? 'rounded-l-none border-yellow-300 dark:border-yellow-800/60'
-                : ''
+                : '',
             ]"
-            aria-label="More actions"
-            title="More actions"
+            :aria-label="t('server.pending.moreActions')"
+            :title="t('server.pending.moreActions')"
             @click.prevent
           >
             <Icon name="lucide:more-horizontal" class="h-3.5 w-3.5" />
@@ -178,7 +185,7 @@ const handleDelete = async () => {
           <!-- View Logs -->
           <DropdownMenuItem @click.prevent="handleViewLogs">
             <Icon name="lucide:scroll-text" class="mr-2 h-4 w-4" />
-            View Logs
+            {{ t("server.pending.viewLogs") }}
           </DropdownMenuItem>
 
           <!-- Retry Provision (only for failed servers that connected) -->
@@ -187,7 +194,7 @@ const handleDelete = async () => {
             @click.prevent="handleRetryProvision"
           >
             <Icon name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-            Retry Provision
+            {{ t("server.pending.retryProvision") }}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
@@ -199,7 +206,7 @@ const handleDelete = async () => {
             @click.prevent="showDeleteDialog = true"
           >
             <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
-            Delete
+            {{ t("server.common.delete") }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -209,14 +216,20 @@ const handleDelete = async () => {
     <AlertDialog v-model:open="showDeleteDialog">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Server</AlertDialogTitle>
+          <AlertDialogTitle>{{
+            t("server.pending.deleteTitle")
+          }}</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete <strong>{{ server.name }}</strong>?
-            This action cannot be undone.
+            {{ t("server.pending.deletePrefix") }}
+            <strong>{{ server.name }}</strong
+            >?
+            {{ t("server.pending.deleteSuffix") }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel :disabled="isDeleting">Cancel</AlertDialogCancel>
+          <AlertDialogCancel :disabled="isDeleting">{{
+            t("server.common.cancel")
+          }}</AlertDialogCancel>
           <AlertDialogAction
             :disabled="isDeleting"
             class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -227,7 +240,7 @@ const handleDelete = async () => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Delete
+            {{ t("server.common.delete") }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

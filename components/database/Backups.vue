@@ -2,6 +2,7 @@
 import { reactive, toRefs } from "vue";
 import { toast } from "vue-sonner";
 import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
 import {
   Card,
   CardContent,
@@ -32,11 +33,40 @@ import {
   type DockerDatabaseBackupRun,
 } from "~/services/dockerService";
 import type { StorageProviderRecord } from "~/types";
+import englishWorkloadMessages from "~/i18n/locales/en/workload.json";
 
 interface Props {
   database: DockerDatabase;
 }
 const props = defineProps<Props>();
+
+type TranslationParams = Record<string, string | number | undefined>;
+const fallbackTranslate = (key: string, params: TranslationParams = {}) => {
+  const value = key
+    .split(".")
+    .reduce<unknown>(
+      (message, segment) =>
+        message && typeof message === "object"
+          ? (message as Record<string, unknown>)[segment]
+          : undefined,
+      englishWorkloadMessages,
+    );
+  let message = typeof value === "string" ? value : key;
+  if (message.includes("|") && typeof params.count === "number") {
+    const forms = message.split("|").map((form) => form.trim());
+    message = forms[params.count === 1 ? 0 : 1] ?? forms[0] ?? message;
+  }
+  return message.replace(/\{(\w+)\}/g, (_, name: string) =>
+    String(params[name] ?? `{${name}}`),
+  );
+};
+const i18n = typeof useI18n === "function" ? useI18n() : null;
+const t = (key: string, params?: TranslationParams) =>
+  i18n ? String(i18n.t(key, params ?? {})) : fallbackTranslate(key, params);
+const effectiveLocale =
+  typeof useLocalePreference === "function"
+    ? useLocalePreference().effectiveLocale
+    : computed(() => "en" as const);
 
 interface BackupState {
   backup: DockerDatabaseBackup | null;
@@ -231,13 +261,13 @@ watch(restoreDialogOpen, (isOpen) => {
   }
 });
 
-const cronPresets: { label: string; value: string }[] = [
-  { label: "Hourly", value: "0 * * * *" },
-  { label: "Daily at midnight", value: "0 0 * * *" },
-  { label: "Daily at 03:00 UTC", value: "0 3 * * *" },
-  { label: "Weekly (Sun 03:00)", value: "0 3 * * 0" },
-  { label: "Monthly (1st 03:00)", value: "0 3 1 * *" },
-];
+const cronPresets = computed(() => [
+  { label: t("workload.database.backups.hourly"), value: "0 * * * *" },
+  { label: t("workload.database.backups.dailyMidnight"), value: "0 0 * * *" },
+  { label: t("workload.database.backups.dailyUtc"), value: "0 3 * * *" },
+  { label: t("workload.database.backups.weekly"), value: "0 3 * * 0" },
+  { label: t("workload.database.backups.monthly"), value: "0 3 1 * *" },
+]);
 
 const isConfigured = computed(() => backup.value !== null);
 const hasProviders = computed(() => providers.value.length > 0);
@@ -274,7 +304,7 @@ const load = async () => {
       return;
     }
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to load backup configuration");
+    toast.error(e.data?.message || t("workload.database.backups.loadFailed"));
   } finally {
     if (requestToken === loadRequestToken && databaseId === props.database.id) {
       loading.value = false;
@@ -330,7 +360,7 @@ const bufferRunConsoleEvent = (
     buffered.terminal = "failed";
     buffered.error =
       String(data.error ?? "").trim() ||
-      "Backup failed before log streaming could start.";
+      t("workload.database.backups.failedBeforeLogs");
   } else if (event === "docker.database.backup.run.succeeded") {
     buffered.terminal = "succeeded";
   }
@@ -358,7 +388,7 @@ const applyBufferedRunConsole = (
     awaitingRunLogs.value = false;
     if (buffered.terminal === "failed" && !buffered.taskId) {
       logSheetError.value =
-        buffered.error || "Backup failed before log streaming could start.";
+        buffered.error || t("workload.database.backups.failedBeforeLogs");
     }
     if (buffered.taskId) {
       scheduleLogRefresh(runId);
@@ -414,7 +444,7 @@ const applyRunSnapshotToConsole = (
       String(run.error ?? "").trim() ||
       (logSheetTaskId.value
         ? ""
-        : "Backup failed before log streaming could start.");
+        : t("workload.database.backups.failedBeforeLogs"));
   } else {
     logSheetError.value = "";
   }
@@ -440,8 +470,7 @@ const scheduleRunReconciliation = (
   }
   if (attempt >= RUN_RECONCILE_MAX_ATTEMPTS) {
     awaitingRunLogs.value = false;
-    logSheetError.value =
-      "Live output is not available yet. Follow this backup in Active actions.";
+    logSheetError.value = t("workload.database.backups.liveUnavailable");
     return;
   }
   runReconcileTimer = setTimeout(() => {
@@ -494,13 +523,13 @@ const toastRunTerminal = (
   if (runId && terminalToastRunIds.has(runId)) return;
   if (runId) terminalToastRunIds.add(runId);
   if (terminal === "succeeded") {
-    toast.success("Backup completed");
+    toast.success(t("workload.database.backups.completed"));
     return;
   }
   toast.error(
     showLogHint
-      ? "Backup failed — check the log console for details"
-      : error || "Backup failed before log streaming could start",
+      ? t("workload.database.backups.failedCheckLogs")
+      : error || t("workload.database.backups.failedBeforeLogsToast"),
   );
 };
 
@@ -570,7 +599,7 @@ useDockerBackupEvents(teamId, (data, event) => {
       ) {
         logSheetError.value =
           String(data.error ?? "").trim() ||
-          "Backup failed before log streaming could start.";
+          t("workload.database.backups.failedBeforeLogs");
       }
     }
     if (matchesOpenRun && logSheetTaskId.value) {
@@ -615,7 +644,7 @@ const openDialog = () => {
 
 const saveConfig = async () => {
   if (!storageProviderId.value) {
-    toast.error("Select a storage provider");
+    toast.error(t("workload.database.backups.selectProvider"));
     return;
   }
   saving.value = true;
@@ -639,13 +668,13 @@ const saveConfig = async () => {
     resetLiveStepOwnership();
     toast.success(
       isEditing.value
-        ? "Backup configuration updated"
-        : "Backup configuration created",
+        ? t("workload.database.backups.updated")
+        : t("workload.database.backups.created"),
     );
     dialogOpen.value = false;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to save backup configuration");
+    toast.error(e.data?.message || t("workload.database.backups.saveFailed"));
   } finally {
     saving.value = false;
   }
@@ -670,8 +699,7 @@ const runNow = async () => {
       props.database.id,
     );
     const runId = String(res.data.id ?? "");
-    if (!runId)
-      throw new Error("Backup started without a valid run identifier");
+    if (!runId) throw new Error(t("workload.database.backups.invalidRun"));
     const ownsPendingRequest = pendingManualRunRequestToken === runRequestToken;
     if (ownsPendingRequest) pendingManualRunRequestToken = null;
     const isCurrentDatabase = requestedDatabaseId === props.database.id;
@@ -717,7 +745,7 @@ const runNow = async () => {
       !buffered?.terminal &&
       !responseTerminal
     ) {
-      toast.success("Backup triggered — running in the background");
+      toast.success(t("workload.database.backups.triggered"));
       if (awaitingRunLogs.value) {
         scheduleRunReconciliation(runId, runRequestToken);
       }
@@ -726,7 +754,8 @@ const runNow = async () => {
     if (!componentUnmounted) await load();
   } catch (err: unknown) {
     const e = err as { data?: { message?: string }; message?: string };
-    const message = e.data?.message || e.message || "Failed to run backup";
+    const message =
+      e.data?.message || e.message || t("workload.database.backups.runFailed");
     const ownsPendingRequest = pendingManualRunRequestToken === runRequestToken;
     if (ownsPendingRequest) {
       pendingManualRunRequestToken = null;
@@ -753,11 +782,7 @@ const runNow = async () => {
 
 const deleteConfig = async () => {
   if (!isConfigured.value) return;
-  if (
-    !window.confirm(
-      "Delete this backup configuration? Past run history is preserved for audit.",
-    )
-  ) {
+  if (!window.confirm(t("workload.database.backups.deleteConfirmation"))) {
     return;
   }
   deleting.value = true;
@@ -769,10 +794,10 @@ const deleteConfig = async () => {
     );
     backup.value = null;
     resetLiveStepOwnership();
-    toast.success("Backup configuration deleted");
+    toast.success(t("workload.database.backups.deleted"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete backup configuration");
+    toast.error(e.data?.message || t("workload.database.backups.deleteFailed"));
   } finally {
     deleting.value = false;
   }
@@ -791,50 +816,54 @@ const formatBytes = (n?: number | null) => {
     v /= 1024;
     i++;
   }
-  return `${v.toFixed(v < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
+  return `${new Intl.NumberFormat(effectiveLocale.value, {
+    maximumFractionDigits: v < 10 && i > 0 ? 1 : 0,
+  }).format(v)} ${units[i]}`;
 };
 
 const formatTimeAgo = (s?: string | null) => {
   if (!s) return "—";
   try {
-    return formatDistanceToNow(new Date(s), { addSuffix: true });
+    return formatDistanceToNow(new Date(s), {
+      addSuffix: true,
+      locale: effectiveLocale.value === "ja" ? ja : enUS,
+    });
   } catch {
     return s;
   }
 };
 
-const runStatusConfig: Record<
-  string,
-  { icon: string; label: string; class: string }
-> = {
+const runStatusConfig = computed<
+  Record<string, { icon: string; label: string; class: string }>
+>(() => ({
   success: {
     icon: "lucide:check-circle-2",
-    label: "Finished",
+    label: t("workload.status.finished"),
     class:
       "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   },
   triggered: {
     icon: "lucide:loader-2",
-    label: "Triggered",
+    label: t("workload.database.backups.statusTriggered"),
     class: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   },
   running: {
     icon: "lucide:loader-2",
-    label: "Running",
+    label: t("workload.status.running"),
     class: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   },
   failed: {
     icon: "lucide:alert-circle",
-    label: "Failed",
+    label: t("workload.status.failed"),
     class: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   },
   pending: {
     icon: "lucide:clock",
-    label: "Pending",
+    label: t("workload.status.pending"),
     class:
       "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   },
-};
+}));
 
 const providerLabel = (p: StorageProviderRecord) => {
   return p.label || `${p.provider.toUpperCase()} #${p.id}`;
@@ -853,10 +882,11 @@ const currentProviderLabel = computed(() => {
   <div class="space-y-4">
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0 space-y-1">
-        <h2 class="text-base font-semibold">Backups</h2>
+        <h2 class="text-base font-semibold">
+          {{ t("workload.database.backups.title") }}
+        </h2>
         <p class="text-xs text-muted-foreground">
-          Scheduled snapshots that upload to a saved storage provider.
-          Credentials live on the provider — never duplicated here.
+          {{ t("workload.database.backups.description") }}
         </p>
       </div>
 
@@ -867,20 +897,20 @@ const currentProviderLabel = computed(() => {
         @click="openDialog"
       >
         <Icon name="lucide:plus" class="mr-2 h-3.5 w-3.5" />
-        Create Backup
+        {{ t("workload.database.backups.create") }}
       </Button>
     </div>
 
     <SharedEmptyState
       v-if="!loading && !hasProviders"
       icon="lucide:cloud-off"
-      title="No storage providers configured"
-      description="Add an S3-compatible destination under Settings → Connections to enable database backups."
+      :title="t('workload.database.backups.noProviders')"
+      :description="t('workload.database.backups.noProvidersDescription')"
     >
       <NuxtLink to="/settings/connections">
         <Button size="sm" variant="outline">
           <Icon name="lucide:external-link" class="mr-2 h-3.5 w-3.5" />
-          Go to Connections
+          {{ t("workload.database.backups.goToConnections") }}
         </Button>
       </NuxtLink>
     </SharedEmptyState>
@@ -888,8 +918,8 @@ const currentProviderLabel = computed(() => {
     <SharedEmptyState
       v-else-if="!loading && !isConfigured"
       icon="lucide:database-backup"
-      title="No backup configured"
-      description="Use the Create Backup button above to pick a storage provider and schedule. Snapshots upload on the cron you choose."
+      :title="t('workload.database.backups.emptyTitle')"
+      :description="t('workload.database.backups.emptyDescription')"
     />
 
     <Card v-else-if="!loading && isConfigured">
@@ -899,7 +929,7 @@ const currentProviderLabel = computed(() => {
             name="lucide:database-backup"
             class="h-4 w-4 text-muted-foreground"
           />
-          Backup Configuration
+          {{ t("workload.database.backups.configuration") }}
           <span
             class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
             :class="
@@ -908,7 +938,11 @@ const currentProviderLabel = computed(() => {
                 : 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300'
             "
           >
-            {{ backup!.enabled ? "Active" : "Paused" }}
+            {{
+              backup!.enabled
+                ? t("workload.database.backups.active")
+                : t("workload.database.backups.paused")
+            }}
           </span>
           <span
             v-if="liveStep"
@@ -919,58 +953,76 @@ const currentProviderLabel = computed(() => {
           </span>
         </CardTitle>
         <CardDescription class="text-xs">
-          Snapshots upload to the linked storage provider on the cron schedule.
-          Run a backup now, view past runs, or edit the schedule with the
-          buttons below.
+          {{ t("workload.database.backups.configurationDescription") }}
         </CardDescription>
       </CardHeader>
 
       <CardContent class="p-4 pt-0">
         <dl class="grid gap-x-6 gap-y-2 text-xs sm:grid-cols-[140px_1fr]">
-          <dt class="text-muted-foreground">Storage provider</dt>
+          <dt class="text-muted-foreground">
+            {{ t("workload.database.backups.storageProvider") }}
+          </dt>
           <dd class="font-medium">{{ currentProviderLabel }}</dd>
-          <dt class="text-muted-foreground">Database</dt>
+          <dt class="text-muted-foreground">
+            {{ t("workload.database.connection.database") }}
+          </dt>
           <dd class="break-all font-mono text-[11px]">
             {{ backup!.database_name || props.database.name }}
             <span
               v-if="!backup!.database_name"
               class="ml-1 text-muted-foreground"
             >
-              (default)
+              {{ t("workload.database.backups.default") }}
             </span>
           </dd>
-          <dt class="text-muted-foreground">Path</dt>
+          <dt class="text-muted-foreground">{{ t("workload.fields.path") }}</dt>
           <dd class="break-all font-mono text-[11px]">
-            {{ backup!.path || "(bucket root)" }}
+            {{ backup!.path || t("workload.database.backups.bucketRoot") }}
           </dd>
-          <dt class="text-muted-foreground">Schedule</dt>
+          <dt class="text-muted-foreground">
+            {{ t("workload.database.backups.schedule") }}
+          </dt>
           <dd>
             <SharedCronSchedule
               :expression="backup!.cron_schedule"
               time-zone="UTC"
             />
           </dd>
-          <dt class="text-muted-foreground">Retention</dt>
-          <dd>{{ backup!.retention }} runs</dd>
-          <dt class="text-muted-foreground">Notifications</dt>
+          <dt class="text-muted-foreground">
+            {{ t("workload.database.backups.retention") }}
+          </dt>
+          <dd>
+            {{
+              t("workload.database.backups.runCount", {
+                count: backup!.retention,
+              })
+            }}
+          </dd>
+          <dt class="text-muted-foreground">
+            {{ t("workload.database.backups.notifications") }}
+          </dt>
           <dd class="space-x-2">
-            <span v-if="backup!.notify_on_failure" class="text-[11px]"
-              >on failure</span
-            >
-            <span v-if="backup!.notify_on_success" class="text-[11px]"
-              >on success</span
-            >
+            <span v-if="backup!.notify_on_failure" class="text-[11px]">{{
+              t("workload.database.backups.onFailure")
+            }}</span>
+            <span v-if="backup!.notify_on_success" class="text-[11px]">{{
+              t("workload.database.backups.onSuccess")
+            }}</span>
             <span
               v-if="!backup!.notify_on_failure && !backup!.notify_on_success"
               class="text-[11px] text-muted-foreground"
             >
-              none
+              {{ t("workload.database.backups.none") }}
             </span>
           </dd>
-          <dt class="text-muted-foreground">Recent runs</dt>
+          <dt class="text-muted-foreground">
+            {{ t("workload.database.backups.recentRuns") }}
+          </dt>
           <dd>
             <span class="text-xs">
-              {{ runs.length }} {{ runs.length === 1 ? "run" : "runs" }}
+              {{
+                t("workload.database.backups.runCount", { count: runs.length })
+              }}
             </span>
             <button
               v-if="runs.length > 0"
@@ -978,7 +1030,7 @@ const currentProviderLabel = computed(() => {
               class="ml-2 text-[11px] text-primary underline-offset-2 hover:underline"
               @click="historySheetOpen = true"
             >
-              View history
+              {{ t("workload.database.backups.viewHistory") }}
             </button>
           </dd>
         </dl>
@@ -989,15 +1041,15 @@ const currentProviderLabel = computed(() => {
               :name="runningNow ? 'lucide:loader-2' : 'lucide:play'"
               :class="['mr-1.5 h-3.5 w-3.5', runningNow && 'animate-spin']"
             />
-            Run now
+            {{ t("workload.database.backups.runNow") }}
           </Button>
           <Button size="sm" variant="outline" @click="historySheetOpen = true">
             <Icon name="lucide:history" class="mr-1.5 h-3.5 w-3.5" />
-            View History
+            {{ t("workload.database.backups.viewHistory") }}
           </Button>
           <Button size="sm" variant="outline" @click="openDialog">
             <Icon name="lucide:pencil" class="mr-1.5 h-3.5 w-3.5" />
-            Edit
+            {{ t("workload.actions.edit") }}
           </Button>
           <Button
             size="sm"
@@ -1010,7 +1062,7 @@ const currentProviderLabel = computed(() => {
               :name="deleting ? 'lucide:loader-2' : 'lucide:trash-2'"
               :class="['mr-1.5 h-3.5 w-3.5', deleting && 'animate-spin']"
             />
-            Delete
+            {{ t("workload.actions.delete") }}
           </Button>
         </div>
       </CardContent>
@@ -1022,19 +1074,20 @@ const currentProviderLabel = computed(() => {
           <DialogTitle class="text-base">
             {{
               isEditing
-                ? "Edit Backup Configuration"
-                : "Create Backup Configuration"
+                ? t("workload.database.backups.editConfiguration")
+                : t("workload.database.backups.createConfiguration")
             }}
           </DialogTitle>
           <DialogDescription class="text-xs">
-            Configure scheduled backups for this database. Snapshots upload to
-            your selected storage provider.
+            {{ t("workload.database.backups.formDescription") }}
           </DialogDescription>
         </DialogHeader>
 
         <form class="grid gap-3 py-1" @submit.prevent="saveConfig">
           <div class="space-y-1">
-            <Label for="bk-provider" class="text-xs">Storage Provider</Label>
+            <Label for="bk-provider" class="text-xs">
+              {{ t("workload.database.backups.storageProvider") }}
+            </Label>
             <Select
               :model-value="storageProviderId?.toString() || ''"
               @update:model-value="
@@ -1042,7 +1095,9 @@ const currentProviderLabel = computed(() => {
               "
             >
               <SelectTrigger id="bk-provider" class="h-9 text-sm">
-                <SelectValue placeholder="Select storage provider" />
+                <SelectValue
+                  :placeholder="t('workload.database.backups.selectProvider')"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -1055,15 +1110,16 @@ const currentProviderLabel = computed(() => {
               </SelectContent>
             </Select>
             <p class="text-[11px] text-muted-foreground">
-              S3 / R2 / B2 / MinIO connections from
-              <strong>Settings → Connections</strong>.
+              {{ t("workload.database.backups.providerHelp") }}
             </p>
           </div>
 
           <div class="space-y-1">
             <Label for="bk-dbname" class="text-xs">
-              Database Name
-              <span class="text-muted-foreground">(optional)</span>
+              {{ t("workload.database.backups.databaseName") }}
+              <span class="text-muted-foreground">
+                {{ t("workload.database.backups.optional") }}
+              </span>
             </Label>
             <Input
               id="bk-dbname"
@@ -1073,35 +1129,40 @@ const currentProviderLabel = computed(() => {
               autocomplete="off"
             />
             <p class="text-[11px] text-muted-foreground">
-              Which database inside the engine to back up. Leave empty to back
-              up the database created with this row (<span class="font-mono">{{
-                props.database.name
-              }}</span
-              >). Set this if you've manually created additional databases on
-              the engine and want to target one of them instead.
+              {{
+                t("workload.database.backups.databaseNameHelp", {
+                  name: props.database.name,
+                })
+              }}
             </p>
           </div>
 
           <div class="space-y-1">
-            <Label for="bk-path" class="text-xs">Backup Path</Label>
+            <Label for="bk-path" class="text-xs">
+              {{ t("workload.database.backups.backupPath") }}
+            </Label>
             <Input
               id="bk-path"
               v-model="path"
               class="h-9 text-sm"
-              placeholder="e.g. prod/databases"
+              :placeholder="t('workload.database.backups.pathPlaceholder')"
               autocomplete="off"
             />
             <p class="text-[11px] text-muted-foreground">
-              Sub-folder under the provider's bucket. Empty = bucket root.
+              {{ t("workload.database.backups.pathHelp") }}
             </p>
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
             <div class="space-y-1">
-              <Label class="text-xs">Schedule Preset</Label>
+              <Label class="text-xs">
+                {{ t("workload.database.backups.schedulePreset") }}
+              </Label>
               <Select @update:model-value="(v) => applyPreset(String(v))">
                 <SelectTrigger class="h-9 text-sm">
-                  <SelectValue placeholder="Select preset" />
+                  <SelectValue
+                    :placeholder="t('workload.database.backups.selectPreset')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -1116,7 +1177,9 @@ const currentProviderLabel = computed(() => {
             </div>
 
             <div class="space-y-1">
-              <Label for="bk-cron" class="text-xs">Cron Expression</Label>
+              <Label for="bk-cron" class="text-xs">
+                {{ t("workload.database.backups.cronExpression") }}
+              </Label>
               <Input
                 id="bk-cron"
                 v-model="cronSchedule"
@@ -1129,9 +1192,9 @@ const currentProviderLabel = computed(() => {
 
           <div class="space-y-1">
             <Label for="bk-retention" class="text-xs">
-              Retention
+              {{ t("workload.database.backups.retention") }}
               <span class="text-muted-foreground">
-                (number of backups to keep)
+                {{ t("workload.database.backups.retentionHelp") }}
               </span>
             </Label>
             <Input
@@ -1145,14 +1208,16 @@ const currentProviderLabel = computed(() => {
 
           <div class="grid gap-3 sm:grid-cols-2">
             <div class="space-y-1.5">
-              <Label class="text-xs">Notifications</Label>
+              <Label class="text-xs">
+                {{ t("workload.database.backups.notifications") }}
+              </Label>
               <div class="flex items-center gap-2">
                 <Checkbox
                   id="bk-notify-failure"
                   v-model:checked="notifyOnFailure"
                 />
                 <Label for="bk-notify-failure" class="text-xs font-normal">
-                  Notify on failure
+                  {{ t("workload.database.backups.notifyFailure") }}
                 </Label>
               </div>
               <div class="flex items-center gap-2">
@@ -1161,21 +1226,21 @@ const currentProviderLabel = computed(() => {
                   v-model:checked="notifyOnSuccess"
                 />
                 <Label for="bk-notify-success" class="text-xs font-normal">
-                  Notify on success
+                  {{ t("workload.database.backups.notifySuccess") }}
                 </Label>
               </div>
             </div>
 
             <div class="space-y-1.5">
-              <Label class="text-xs">Status</Label>
+              <Label class="text-xs">{{ t("workload.fields.status") }}</Label>
               <div class="flex items-center gap-2">
                 <Checkbox id="bk-enabled" v-model:checked="enabled" />
                 <Label for="bk-enabled" class="text-xs font-normal">
-                  Enable backup
+                  {{ t("workload.database.backups.enable") }}
                 </Label>
               </div>
               <p class="text-[11px] text-muted-foreground">
-                Off keeps the config but pauses the scheduler.
+                {{ t("workload.database.backups.enableHelp") }}
               </p>
             </div>
           </div>
@@ -1189,7 +1254,7 @@ const currentProviderLabel = computed(() => {
             :disabled="saving"
             @click="dialogOpen = false"
           >
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button size="sm" :disabled="!canSubmit" @click="saveConfig">
             <Icon
@@ -1197,7 +1262,11 @@ const currentProviderLabel = computed(() => {
               name="lucide:loader-2"
               class="mr-2 h-3.5 w-3.5 animate-spin"
             />
-            {{ isEditing ? "Update Backup" : "Create Backup" }}
+            {{
+              isEditing
+                ? t("workload.database.backups.update")
+                : t("workload.database.backups.create")
+            }}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -1206,10 +1275,13 @@ const currentProviderLabel = computed(() => {
     <Sheet v-model:open="historySheetOpen">
       <SheetContent class="sm:max-w-lg">
         <SheetHeader>
-          <SheetTitle>Backup History</SheetTitle>
+          <SheetTitle>{{ t("workload.database.backups.history") }}</SheetTitle>
           <SheetDescription>
-            Past backup runs for <strong>{{ props.database.name }}</strong
-            >, most recent first.
+            {{
+              t("workload.database.backups.historyDescription", {
+                name: props.database.name,
+              })
+            }}
           </SheetDescription>
         </SheetHeader>
 
@@ -1222,9 +1294,11 @@ const currentProviderLabel = computed(() => {
               name="lucide:history"
               class="mb-4 h-10 w-10 text-muted-foreground"
             />
-            <p class="text-sm text-muted-foreground">No backup runs yet</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.database.backups.noRuns") }}
+            </p>
             <p class="mt-1 text-xs text-muted-foreground">
-              Use the Actions menu → Run now to trigger one.
+              {{ t("workload.database.backups.noRunsDescription") }}
             </p>
           </div>
 
@@ -1261,7 +1335,9 @@ const currentProviderLabel = computed(() => {
               </div>
 
               <div class="flex items-center justify-between text-xs">
-                <span class="text-muted-foreground">Size</span>
+                <span class="text-muted-foreground">
+                  {{ t("workload.database.backups.size") }}
+                </span>
                 <span class="font-medium">{{ formatBytes(r.size_bytes) }}</span>
               </div>
 
@@ -1291,7 +1367,7 @@ const currentProviderLabel = computed(() => {
                   @click="openRunLogs(r)"
                 >
                   <Icon name="lucide:scroll-text" class="mr-1.5 h-3 w-3" />
-                  View Logs
+                  {{ t("workload.deployments.viewLogs") }}
                 </Button>
                 <Button
                   v-if="r.status === 'success' && r.object_key"
@@ -1301,7 +1377,7 @@ const currentProviderLabel = computed(() => {
                   @click="openRestoreDialog(r)"
                 >
                   <Icon name="lucide:rotate-ccw" class="mr-1.5 h-3 w-3" />
-                  Restore
+                  {{ t("workload.database.restore.restore") }}
                 </Button>
               </div>
             </div>
@@ -1321,9 +1397,9 @@ const currentProviderLabel = computed(() => {
         class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-3xl flex flex-col overflow-hidden outline-none"
       >
         <SheetHeader class="shrink-0">
-          <SheetTitle>Backup Logs</SheetTitle>
+          <SheetTitle>{{ t("workload.database.backups.logs") }}</SheetTitle>
           <SheetDescription>
-            Dump &amp; upload output for this backup run.
+            {{ t("workload.database.backups.logsDescription") }}
           </SheetDescription>
         </SheetHeader>
         <div class="mt-4 flex flex-1 flex-col min-h-0">
@@ -1343,7 +1419,9 @@ const currentProviderLabel = computed(() => {
           >
             <div class="max-w-lg space-y-2 text-destructive">
               <Icon name="lucide:circle-alert" class="mx-auto h-5 w-5" />
-              <p class="text-sm font-medium">Backup output unavailable</p>
+              <p class="text-sm font-medium">
+                {{ t("workload.database.backups.outputUnavailable") }}
+              </p>
               <p class="whitespace-pre-wrap break-words text-xs">
                 {{ logSheetError }}
               </p>
@@ -1354,7 +1432,7 @@ const currentProviderLabel = computed(() => {
             class="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground"
           >
             <Icon name="lucide:loader-2" class="h-4 w-4 animate-spin" />
-            Starting backup… waiting for output.
+            {{ t("workload.database.backups.starting") }}
           </div>
         </div>
       </SheetContent>

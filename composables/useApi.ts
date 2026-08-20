@@ -1,3 +1,5 @@
+import { useLocalePreference } from "~/composables/useLocalePreference";
+
 const ACCESS_TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "auth_refresh_token";
 const TEAM_ID_KEY = "current_team_id";
@@ -23,6 +25,7 @@ export interface PaginatedData<T> {
 
 export interface ApiErrorResponse {
   success: false;
+  code?: string;
   message: string;
   errors?: Record<string, string[]>;
 }
@@ -49,9 +52,15 @@ const redirectToLogin = () => {
   }, 1000);
 };
 
+const hasInvalidTeamContext = (
+  data: { code?: string; message?: string } | undefined,
+): boolean =>
+  data?.code === "team.context_required" || data?.code === "team.not_member";
+
 export const useApi = () => {
   const config = useRuntimeConfig();
   const baseURL = config.public.apiBase as string;
+  const { getEffectiveLocale } = useLocalePreference();
 
   const getCookieValue = (key: string): string | null => {
     if (import.meta.server) return null;
@@ -124,6 +133,11 @@ export const useApi = () => {
           method: "POST",
           baseURL,
           body: { refresh_token: refreshToken },
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+            "Accept-Language": getEffectiveLocale(),
+          },
         });
 
         const newAccessToken = response.data.access_token;
@@ -157,6 +171,7 @@ export const useApi = () => {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        "Accept-Language": getEffectiveLocale(),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(teamId ? { "X-Team-ID": teamId } : {}),
         ...options.headers,
@@ -168,7 +183,7 @@ export const useApi = () => {
     } catch (error: unknown) {
       const errorResponse = error as {
         response?: { status?: number };
-        data?: { message?: string };
+        data?: { code?: string; message?: string };
       };
 
       if (errorResponse?.response?.status === 401 && getRefreshToken()) {
@@ -180,23 +195,16 @@ export const useApi = () => {
             headers: {
               ...fetchOptions.headers,
               Authorization: `Bearer ${newToken}`,
+              "Accept-Language": getEffectiveLocale(),
             },
           });
         }
       }
 
-      if (import.meta.client) {
-        const status = errorResponse?.response?.status;
-        const message = errorResponse?.data?.message || "";
-
-        if (
-          (status === 400 && message.includes("X-Team-ID")) ||
-          (status === 403 && message.includes("not a member"))
-        ) {
-          clearCurrentTeamId();
-          navigateTo("/servers");
-          throw error;
-        }
+      if (hasInvalidTeamContext(errorResponse?.data)) {
+        clearCurrentTeamId();
+        navigateTo("/servers");
+        throw error;
       }
 
       throw error;
@@ -241,6 +249,7 @@ export const useApi = () => {
     getCurrentTeamId,
     setCurrentTeamId,
     clearCurrentTeamId,
+    getEffectiveLocale,
 
     fetch: apiFetch,
     get,
@@ -265,8 +274,13 @@ export function useApiQuery<T>(
     default?: () => T;
   } = {},
 ) {
-  const { getAccessToken, getCurrentTeamId, clearTokens, clearCurrentTeamId } =
-    useApi();
+  const {
+    getAccessToken,
+    getCurrentTeamId,
+    clearTokens,
+    clearCurrentTeamId,
+    getEffectiveLocale,
+  } = useApi();
   const config = useRuntimeConfig();
   const token = getAccessToken();
   const teamId = getCurrentTeamId();
@@ -282,6 +296,7 @@ export function useApiQuery<T>(
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      "Accept-Language": getEffectiveLocale(),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(teamId ? { "X-Team-ID": teamId } : {}),
       ...options.headers,
@@ -292,11 +307,9 @@ export function useApiQuery<T>(
         redirectToLogin();
       }
 
-      const message = (response._data as { message?: string })?.message || "";
-      if (
-        (response.status === 400 && message.includes("X-Team-ID")) ||
-        (response.status === 403 && message.includes("not a member"))
-      ) {
+      const data = response._data as
+        { code?: string; message?: string } | undefined;
+      if (hasInvalidTeamContext(data)) {
         clearCurrentTeamId();
         navigateTo("/servers");
       }

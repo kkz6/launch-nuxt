@@ -34,6 +34,8 @@ import {
 } from "~/components/ui/tooltip";
 import type { ActionDef } from "~/types/data-table";
 
+const { t } = useI18n();
+
 // Map backend icon hints to Lucide components. Falls back to a label-only
 // pill when unknown — better than a blank icon box.
 const ICONS: Record<string, any> = {
@@ -133,7 +135,7 @@ function dropdownVariantClass(variant: string): string {
       <Button
         variant="ghost"
         size="icon-sm"
-        aria-label="Row actions"
+        :aria-label="t('data.rowActions')"
         @click.stop
       >
         <MoreVertical class="h-4 w-4" />

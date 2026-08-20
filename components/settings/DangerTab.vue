@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
-import { Label } from '~/components/ui/label'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
+import { Label } from "~/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -10,7 +10,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from '~/components/ui/select'
+} from "~/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,162 +20,185 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '~/components/ui/alert-dialog'
-import { formatDistanceToNow } from 'date-fns'
-import type { Server } from '~/types'
+} from "~/components/ui/alert-dialog";
+import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
+import type { Server } from "~/types";
 
 interface ArchivedServer {
-  id: string
-  name: string
-  public_ipv4: string
-  provider: string
-  archived_at: string
+  id: string;
+  name: string;
+  public_ipv4: string;
+  provider: string;
+  archived_at: string;
 }
 
-const activeServers = ref<Server[]>([])
-const archivedServers = ref<ArchivedServer[]>([])
-const selectedServerId = ref('')
-const selectedServerSiteCount = ref(0)
-const isLoadingServers = ref(true)
-const isLoadingArchived = ref(true)
-const archiveLoading = ref(false)
-const showArchiveConfirm = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const activeServers = ref<Server[]>([]);
+const { locale, t } = useI18n();
+const dateLocale = computed(() => (locale.value === "ja" ? ja : enUS));
+const archivedServers = ref<ArchivedServer[]>([]);
+const selectedServerId = ref("");
+const selectedServerSiteCount = ref(0);
+const isLoadingServers = ref(true);
+const isLoadingArchived = ref(true);
+const archiveLoading = ref(false);
+const showArchiveConfirm = ref(false);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const providerLabels: Record<string, string> = {
-  aws: 'AWS',
-  digitalocean: 'DigitalOcean',
-  linode: 'Linode',
-  vultr: 'Vultr',
-  hetzner: 'Hetzner',
-  custom_server: 'Custom Server',
-}
+  aws: "AWS",
+  digitalocean: "DigitalOcean",
+  linode: "Linode",
+  vultr: "Vultr",
+  hetzner: "Hetzner",
+  custom_server: "settings.danger.customServer",
+};
+
+const providerLabel = (provider: string) => {
+  const label = providerLabels[provider];
+  if (!label) return provider;
+  return label.startsWith("settings.") ? t(label) : label;
+};
 
 const selectedServer = computed(() => {
-  return activeServers.value.find((s) => s.id === selectedServerId.value)
-})
+  return activeServers.value.find((s) => s.id === selectedServerId.value);
+});
 
 const fetchActiveServers = async () => {
-  isLoadingServers.value = true
+  isLoadingServers.value = true;
   try {
-    const response = await $api<{ data: Server[] }>('/servers')
-    activeServers.value = response.data
+    const response = await $api<{ data: Server[] }>("/servers");
+    activeServers.value = response.data;
   } catch {
     // Silent fail
   } finally {
-    isLoadingServers.value = false
+    isLoadingServers.value = false;
   }
-}
+};
 
 const fetchArchivedServers = async () => {
-  isLoadingArchived.value = true
+  isLoadingArchived.value = true;
   try {
-    const response = await $api<{ data: ArchivedServer[] }>('/servers/archived')
-    archivedServers.value = response.data
+    const response = await $api<{ data: ArchivedServer[] }>(
+      "/servers/archived",
+    );
+    archivedServers.value = response.data;
   } catch {
-    toast.error('Failed to load archived servers')
+    toast.error(t("settings.danger.loadArchivedFailed"));
   } finally {
-    isLoadingArchived.value = false
+    isLoadingArchived.value = false;
   }
-}
+};
 
 watch(selectedServerId, async (id) => {
   if (!id) {
-    selectedServerSiteCount.value = 0
-    return
+    selectedServerSiteCount.value = 0;
+    return;
   }
   try {
-    const data = await $api<{ data: { count: number } }>(`/servers/${id}/site-count`)
-    selectedServerSiteCount.value = data.data?.count || 0
+    const data = await $api<{ data: { count: number } }>(
+      `/servers/${id}/site-count`,
+    );
+    selectedServerSiteCount.value = data.data?.count || 0;
   } catch {
-    selectedServerSiteCount.value = 0
+    selectedServerSiteCount.value = 0;
   }
-})
+});
 
 const archiveServer = async () => {
-  if (!selectedServerId.value) return
+  if (!selectedServerId.value) return;
 
-  archiveLoading.value = true
+  archiveLoading.value = true;
   try {
     await $api(`/servers/${selectedServerId.value}/archive`, {
-      method: 'POST',
-    })
-    toast.success('Server is being archived. Access will be revoked shortly.')
-    showArchiveConfirm.value = false
+      method: "POST",
+    });
+    toast.success(t("settings.danger.archiveStarted"));
+    showArchiveConfirm.value = false;
 
     // Move server from active to archived list
-    const server = selectedServer.value
+    const server = selectedServer.value;
     if (server) {
-      activeServers.value = activeServers.value.filter((s) => s.id !== server.id)
+      activeServers.value = activeServers.value.filter(
+        (s) => s.id !== server.id,
+      );
       archivedServers.value.unshift({
         id: server.id,
         name: server.name,
         public_ipv4: server.public_ipv4,
         provider: server.provider,
         archived_at: new Date().toISOString(),
-      })
+      });
     }
-    selectedServerId.value = ''
-    selectedServerSiteCount.value = 0
+    selectedServerId.value = "";
+    selectedServerSiteCount.value = 0;
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Unable to archive server')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("settings.danger.archiveFailed"));
   } finally {
-    archiveLoading.value = false
+    archiveLoading.value = false;
   }
-}
+};
 
 const restoreServer = async (server: ArchivedServer) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Restore Server',
-    description: `Are you sure you want to restore "${server.name}"?`,
-    confirmText: 'Restore',
-    cancelText: 'Cancel',
-  })
+    title: t("settings.danger.restoreTitle"),
+    description: t("settings.danger.restoreDescription", { name: server.name }),
+    confirmText: t("settings.danger.restore"),
+    cancelText: t("settings.danger.cancel"),
+  });
 
   if (result.ok) {
     try {
-      await $api(`/servers/${server.id}/restore`, { method: 'POST' })
-      archivedServers.value = archivedServers.value.filter((s) => s.id !== server.id)
-      toast.success('Server restored')
-      fetchActiveServers()
+      await $api(`/servers/${server.id}/restore`, { method: "POST" });
+      archivedServers.value = archivedServers.value.filter(
+        (s) => s.id !== server.id,
+      );
+      toast.success(t("settings.danger.restored"));
+      fetchActiveServers();
     } catch {
-      toast.error('Failed to restore server')
+      toast.error(t("settings.danger.restoreFailed"));
     }
   }
-}
+};
 
 const deleteServer = async (server: ArchivedServer) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete Server Permanently',
-    description: `Are you sure you want to permanently delete "${server.name}"? This action cannot be undone.`,
-    confirmText: 'Delete Permanently',
-    cancelText: 'Cancel',
+    title: t("settings.danger.deletePermanentlyTitle"),
+    description: t("settings.danger.deletePermanentlyDescription", {
+      name: server.name,
+    }),
+    confirmText: t("settings.danger.deletePermanently"),
+    cancelText: t("settings.danger.cancel"),
     destructive: true,
-  })
+  });
 
   if (result.ok) {
     try {
-      await $api(`/servers/${server.id}`, { method: 'DELETE' })
-      archivedServers.value = archivedServers.value.filter((s) => s.id !== server.id)
-      toast.success('Server deleted permanently')
+      await $api(`/servers/${server.id}`, { method: "DELETE" });
+      archivedServers.value = archivedServers.value.filter(
+        (s) => s.id !== server.id,
+      );
+      toast.success(t("settings.danger.deletedPermanently"));
     } catch {
-      toast.error('Failed to delete server')
+      toast.error(t("settings.danger.deleteFailed"));
     }
   }
-}
+};
 
 // Role gating — archiving / deleting servers is admin/owner only.
-const { canDelete } = useCan()
+const { canDelete } = useCan();
 
 onMounted(() => {
-  fetchActiveServers()
-  fetchArchivedServers()
-})
+  fetchActiveServers();
+  fetchArchivedServers();
+});
 </script>
 
 <template>
@@ -185,8 +208,7 @@ onMounted(() => {
   >
     <Icon name="lucide:lock" class="mt-0.5 h-4 w-4 shrink-0" />
     <p>
-      Only team admins and owners can archive or delete servers. Ask a
-      team admin if you need a server removed.
+      {{ t("settings.danger.permissionRequired") }}
     </p>
   </div>
 
@@ -195,23 +217,26 @@ onMounted(() => {
 
     <!-- Archive a Server Section -->
     <div class="px-6 pb-6">
-      <h3 class="mb-1 text-base font-semibold">Archive a Server</h3>
+      <h3 class="mb-1 text-base font-semibold">
+        {{ t("settings.danger.archiveTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        Archive a server to remove access from the application while preserving
-        the server data. You can restore it later.
+        {{ t("settings.danger.archiveDescription") }}
       </p>
 
       <div class="space-y-4">
         <div class="space-y-2">
-          <Label>Server</Label>
+          <Label>{{ t("settings.danger.server") }}</Label>
           <Select v-model="selectedServerId">
             <SelectTrigger>
-              <SelectValue placeholder="Select a server to archive" />
+              <SelectValue :placeholder="t('settings.danger.selectServer')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <template v-if="isLoadingServers">
-                  <SelectLabel class="text-muted-foreground">Loading servers...</SelectLabel>
+                  <SelectLabel class="text-muted-foreground">{{
+                    t("settings.danger.loadingServers")
+                  }}</SelectLabel>
                 </template>
                 <template v-else-if="activeServers.length > 0">
                   <SelectItem
@@ -223,21 +248,34 @@ onMounted(() => {
                   </SelectItem>
                 </template>
                 <template v-else>
-                  <SelectLabel class="text-muted-foreground">No servers available</SelectLabel>
+                  <SelectLabel class="text-muted-foreground">{{
+                    t("settings.danger.noServers")
+                  }}</SelectLabel>
                 </template>
               </SelectGroup>
             </SelectContent>
           </Select>
         </div>
 
-        <div v-if="selectedServerId && selectedServerSiteCount > 0" class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
+        <div
+          v-if="selectedServerId && selectedServerSiteCount > 0"
+          class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50"
+        >
           <div class="space-y-1">
             <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
-              Server has active sites
+              {{ t("settings.danger.activeSitesTitle") }}
             </p>
             <p class="text-sm text-blue-700 dark:text-blue-300">
-              This server has {{ selectedServerSiteCount }} active site{{ selectedServerSiteCount !== 1 ? 's' : '' }}.
-              Archiving will not affect the sites, but you won't be able to manage them through the dashboard.
+              {{
+                t("settings.danger.activeSitesDescription", {
+                  count: selectedServerSiteCount,
+                  unit: t(
+                    selectedServerSiteCount === 1
+                      ? "settings.danger.site"
+                      : "settings.danger.sites",
+                  ),
+                })
+              }}
             </p>
           </div>
         </div>
@@ -249,34 +287,58 @@ onMounted(() => {
             class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
             @click="showArchiveConfirm = true"
           >
-            Archive Server
+            {{ t("settings.danger.archiveServer") }}
           </Button>
           <AlertDialogContent class="max-w-lg">
             <AlertDialogHeader>
-              <AlertDialogTitle>Archive Server</AlertDialogTitle>
+              <AlertDialogTitle>{{
+                t("settings.danger.archiveServer")
+              }}</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to archive "{{ selectedServer?.name }}"?
+                {{
+                  t("settings.danger.archiveConfirm", {
+                    name: selectedServer?.name,
+                  })
+                }}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div class="space-y-4 py-2">
               <p class="text-sm text-muted-foreground">
-                This will revoke access keys and remove the server from your dashboard.
+                {{ t("settings.danger.archiveImpact") }}
                 <template v-if="selectedServerSiteCount > 0">
-                  The {{ selectedServerSiteCount }} active site{{ selectedServerSiteCount !== 1 ? 's' : '' }} will continue running
-                  but cannot be managed.
+                  {{
+                    t("settings.danger.archiveSitesImpact", {
+                      count: selectedServerSiteCount,
+                      unit: t(
+                        selectedServerSiteCount === 1
+                          ? "settings.danger.site"
+                          : "settings.danger.sites",
+                      ),
+                    })
+                  }}
                 </template>
-                You can restore it later from the archived servers list below.
+                {{ t("settings.danger.restoreLater") }}
               </p>
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{{
+                t("settings.danger.cancel")
+              }}</AlertDialogCancel>
               <AlertDialogAction
                 :disabled="archiveLoading"
                 class="border-orange-500/50 bg-orange-50 text-orange-600 hover:bg-orange-100 hover:text-orange-700 dark:border-orange-500/30 dark:bg-orange-950/50 dark:text-orange-400 dark:hover:bg-orange-900/50 dark:hover:text-orange-300"
                 @click="archiveServer"
               >
-                <Icon v-if="archiveLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-                {{ archiveLoading ? 'Archiving...' : 'Yes, archive server' }}
+                <Icon
+                  v-if="archiveLoading"
+                  name="lucide:loader-2"
+                  class="mr-2 h-4 w-4 animate-spin"
+                />
+                {{
+                  archiveLoading
+                    ? t("settings.danger.archiving")
+                    : t("settings.danger.confirmArchive")
+                }}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -286,20 +348,30 @@ onMounted(() => {
 
     <!-- Archived Servers Section -->
     <div class="px-6 pt-6">
-      <h3 class="mb-1 text-base font-semibold">Archived Servers</h3>
+      <h3 class="mb-1 text-base font-semibold">
+        {{ t("settings.danger.archivedTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        View and manage your archived servers. Restore them or delete permanently.
+        {{ t("settings.danger.archivedDescription") }}
       </p>
 
-      <div v-if="isLoadingArchived" class="flex items-center justify-center py-4">
-        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+      <div
+        v-if="isLoadingArchived"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
       </div>
 
       <template v-else>
         <div v-if="archivedServers.length === 0" class="rounded-lg border p-4">
           <div class="flex flex-col items-center gap-2 py-2">
             <Icon name="lucide:archive" class="h-8 w-8 text-muted-foreground" />
-            <p class="text-sm text-muted-foreground">No archived servers</p>
+            <p class="text-sm text-muted-foreground">
+              {{ t("settings.danger.noneArchived") }}
+            </p>
           </div>
         </div>
 
@@ -312,12 +384,23 @@ onMounted(() => {
             <div class="space-y-0.5">
               <div class="flex items-center gap-2">
                 <span class="text-sm font-medium">{{ server.name }}</span>
-                <span class="text-xs text-muted-foreground">{{ server.public_ipv4 }}</span>
+                <span class="text-xs text-muted-foreground">{{
+                  server.public_ipv4
+                }}</span>
               </div>
-              <div class="flex items-center gap-2 text-xs text-muted-foreground">
-                <span>{{ providerLabels[server.provider] || server.provider }}</span>
+              <div
+                class="flex items-center gap-2 text-xs text-muted-foreground"
+              >
+                <span>{{ providerLabel(server.provider) }}</span>
                 <span>-</span>
-                <span>Archived {{ formatDistanceToNow(new Date(server.archived_at), { addSuffix: true }) }}</span>
+                <span>{{
+                  t("settings.danger.archivedAt", {
+                    time: formatDistanceToNow(new Date(server.archived_at), {
+                      addSuffix: true,
+                      locale: dateLocale,
+                    }),
+                  })
+                }}</span>
               </div>
             </div>
             <div class="flex items-center gap-1">

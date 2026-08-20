@@ -9,9 +9,11 @@ definePageMeta({
   middleware: "auth",
 });
 
-useHead({
-  title: "Email Verification",
-});
+const { t } = useI18n();
+
+useHead(() => ({
+  title: t("auth.verifyEmail.pageTitle"),
+}));
 
 const { logout } = useAuth();
 
@@ -25,9 +27,9 @@ const handleResend = async () => {
   try {
     await authService.resendVerification();
     status.value = "verification-link-sent";
-    toast.success("Verification link sent!");
+    toast.success(t("auth.verifyEmail.linkSent"));
   } catch {
-    toast.error("Failed to send verification link");
+    toast.error(t("auth.errors.verificationSendFailed"));
   } finally {
     loading.value = false;
   }
@@ -43,8 +45,7 @@ const handleLogout = async () => {
     <Alert v-if="status === 'verification-link-sent'" class="mb-6">
       <Icon name="lucide:info" class="h-4 w-4" />
       <AlertDescription>
-        A new verification link has been sent to the email address you
-        provided during registration.
+        {{ t("auth.verifyEmail.newLinkSent") }}
       </AlertDescription>
     </Alert>
 
@@ -53,12 +54,10 @@ const handleLogout = async () => {
     </div>
 
     <h3 class="mb-2 text-lg font-semibold text-foreground">
-      Email Verification
+      {{ t("auth.verifyEmail.heading") }}
     </h3>
     <p class="mb-8 text-sm text-muted-foreground">
-      Thanks for signing up! Before getting started, could you verify your
-      email address by clicking on the link we just emailed to you? If you
-      didn't receive the email, we will gladly send you another.
+      {{ t("auth.verifyEmail.description") }}
     </p>
 
     <div class="space-y-4">
@@ -73,7 +72,11 @@ const handleLogout = async () => {
           name="lucide:loader-2"
           class="mr-2 h-4 w-4 animate-spin"
         />
-        {{ loading ? 'Sending...' : 'Resend Verification Email' }}
+        {{
+          loading
+            ? t("auth.actions.sending")
+            : t("auth.actions.resendVerification")
+        }}
       </Button>
 
       <Button
@@ -82,7 +85,7 @@ const handleLogout = async () => {
         class="w-full"
         @click="handleLogout"
       >
-        Log Out
+        {{ t("auth.actions.logOut") }}
       </Button>
     </div>
   </div>

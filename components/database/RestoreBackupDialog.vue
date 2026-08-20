@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
 import { toast } from "vue-sonner";
 import {
   Dialog,
@@ -39,6 +40,8 @@ interface Props {
 
 const props = defineProps<Props>();
 const open = defineModel<boolean>("open", { default: false });
+const { t } = useI18n();
+const { effectiveLocale } = useLocalePreference();
 
 // All same-engine candidates on the same server — populated lazily
 // the first time the dialog opens.
@@ -75,7 +78,7 @@ const loadCandidates = async () => {
     );
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to load candidate databases");
+    toast.error(e.data?.message || t("workload.database.restore.loadFailed"));
     // Fall back to just the source so the user can still restore in-
     // place even if the listing fails.
     candidates.value = [props.sourceDatabase];
@@ -87,10 +90,14 @@ const loadCandidates = async () => {
 // Show "Backup taken X ago" so the user has time context without
 // needing to read the raw timestamp.
 const runTakenAgo = computed(() => {
-  const ts = props.run?.finished_at || props.run?.started_at || props.run?.created_at;
-  if (!ts) return "an unknown time ago";
+  const ts =
+    props.run?.finished_at || props.run?.started_at || props.run?.created_at;
+  if (!ts) return t("workload.database.restore.unknownTime");
   try {
-    return formatDistanceToNow(new Date(ts), { addSuffix: true });
+    return formatDistanceToNow(new Date(ts), {
+      addSuffix: true,
+      locale: effectiveLocale.value === "ja" ? ja : enUS,
+    });
   } catch {
     return ts;
   }
@@ -99,20 +106,22 @@ const runTakenAgo = computed(() => {
 // Whether the user picked a different target than the source. Drives
 // the extra warning copy + the button label change.
 const isCrossDatabase = computed(
-  () => selectedTargetId.value !== "" && selectedTargetId.value !== props.sourceDatabase.id,
+  () =>
+    selectedTargetId.value !== "" &&
+    selectedTargetId.value !== props.sourceDatabase.id,
 );
 
-const selectedTarget = computed(() =>
-  candidates.value.find((d) => d.id === selectedTargetId.value) || null,
+const selectedTarget = computed(
+  () => candidates.value.find((d) => d.id === selectedTargetId.value) || null,
 );
 
 const handleRestore = async () => {
   if (!props.run) {
-    toast.error("No backup run selected");
+    toast.error(t("workload.database.restore.noRun"));
     return;
   }
   if (!selectedTargetId.value) {
-    toast.error("Select a target database");
+    toast.error(t("workload.database.restore.selectTarget"));
     return;
   }
   restoring.value = true;
@@ -133,13 +142,17 @@ const handleRestore = async () => {
     );
     toast.success(
       isCrossDatabase.value
-        ? `Restored snapshot into ${selectedTarget.value?.name ?? "target"}`
-        : "Database restored from snapshot",
+        ? t("workload.database.restore.restoredInto", {
+            name:
+              selectedTarget.value?.name ??
+              t("workload.database.restore.targetFallback"),
+          })
+        : t("workload.database.restore.restored"),
     );
     open.value = false;
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Restore failed");
+    toast.error(e.data?.message || t("workload.database.restore.failed"));
   } finally {
     restoring.value = false;
   }
@@ -150,10 +163,11 @@ const handleRestore = async () => {
   <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle class="text-base">Restore Backup</DialogTitle>
+        <DialogTitle class="text-base">
+          {{ t("workload.database.restore.title") }}
+        </DialogTitle>
         <DialogDescription class="text-xs">
-          Replay this snapshot into a database. The target's current
-          contents will be replaced — this can't be undone.
+          {{ t("workload.database.restore.description") }}
         </DialogDescription>
       </DialogHeader>
 
@@ -163,12 +177,11 @@ const handleRestore = async () => {
         the trigger. Shows object key (truncated, font-mono) +
         when it was taken.
       -->
-      <div
-        v-if="run"
-        class="rounded-md border bg-muted/40 p-3 text-xs"
-      >
+      <div v-if="run" class="rounded-md border bg-muted/40 p-3 text-xs">
         <div class="mb-1 flex items-center justify-between gap-2">
-          <span class="font-medium text-foreground">Snapshot</span>
+          <span class="font-medium text-foreground">
+            {{ t("workload.database.restore.snapshot") }}
+          </span>
           <span class="text-muted-foreground">{{ runTakenAgo }}</span>
         </div>
         <code
@@ -187,27 +200,27 @@ const handleRestore = async () => {
         the common case (restore in place).
       -->
       <div class="space-y-1.5">
-        <Label for="restore-target" class="text-xs">Restore into</Label>
+        <Label for="restore-target" class="text-xs">
+          {{ t("workload.database.restore.restoreInto") }}
+        </Label>
         <Select
           :model-value="selectedTargetId"
           @update:model-value="(v) => (selectedTargetId = String(v))"
         >
           <SelectTrigger id="restore-target" class="h-9 text-sm">
-            <SelectValue placeholder="Select target database" />
+            <SelectValue
+              :placeholder="t('workload.database.restore.selectTarget')"
+            />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem
-              v-for="d in candidates"
-              :key="d.id"
-              :value="d.id"
-            >
+            <SelectItem v-for="d in candidates" :key="d.id" :value="d.id">
               <span class="flex items-center gap-2">
                 <span class="font-medium">{{ d.name }}</span>
                 <span
                   v-if="d.id === sourceDatabase.id"
                   class="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground"
                 >
-                  source
+                  {{ t("workload.database.restore.source") }}
                 </span>
               </span>
             </SelectItem>
@@ -216,13 +229,16 @@ const handleRestore = async () => {
               value="__empty__"
               disabled
             >
-              No same-engine databases on this server
+              {{ t("workload.database.restore.noCandidates") }}
             </SelectItem>
           </SelectContent>
         </Select>
         <p class="text-[11px] text-muted-foreground">
-          Only {{ sourceDatabase.engine }} databases on this server are
-          listed. Defaults to the source.
+          {{
+            t("workload.database.restore.engineOnly", {
+              engine: sourceDatabase.engine,
+            })
+          }}
         </p>
       </div>
 
@@ -237,22 +253,25 @@ const handleRestore = async () => {
         class="rounded-md border border-rose-500/30 bg-rose-500/5 p-3 text-xs text-rose-700 dark:text-rose-400"
       >
         <p class="flex items-start gap-2">
-          <Icon name="lucide:alert-triangle" class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <Icon
+            name="lucide:alert-triangle"
+            class="mt-0.5 h-3.5 w-3.5 shrink-0"
+          />
           <span>
             <template v-if="isCrossDatabase">
-              This will <strong>replace</strong> the contents of
-              <code class="font-mono">{{ selectedTarget?.name }}</code>
-              with the snapshot from
-              <code class="font-mono">{{ sourceDatabase.name }}</code>.
-              Any data currently in
-              <code class="font-mono">{{ selectedTarget?.name }}</code>
-              will be lost.
+              {{
+                t("workload.database.restore.crossWarning", {
+                  target: selectedTarget?.name,
+                  source: sourceDatabase.name,
+                })
+              }}
             </template>
             <template v-else>
-              This will <strong>replace</strong> the current contents
-              of <code class="font-mono">{{ sourceDatabase.name }}</code>
-              with the snapshot's data. Any changes since the snapshot
-              was taken will be lost.
+              {{
+                t("workload.database.restore.sameWarning", {
+                  name: sourceDatabase.name,
+                })
+              }}
             </template>
           </span>
         </p>
@@ -266,7 +285,7 @@ const handleRestore = async () => {
           :disabled="restoring"
           @click="open = false"
         >
-          Cancel
+          {{ t("workload.actions.cancel") }}
         </Button>
         <Button
           size="sm"
@@ -279,12 +298,12 @@ const handleRestore = async () => {
             name="lucide:loader-2"
             class="mr-2 h-3.5 w-3.5 animate-spin"
           />
-          <Icon
-            v-else
-            name="lucide:rotate-ccw"
-            class="mr-2 h-3.5 w-3.5"
-          />
-          {{ isCrossDatabase ? "Restore into target" : "Restore" }}
+          <Icon v-else name="lucide:rotate-ccw" class="mr-2 h-3.5 w-3.5" />
+          {{
+            isCrossDatabase
+              ? t("workload.database.restore.intoTarget")
+              : t("workload.database.restore.restore")
+          }}
         </Button>
       </DialogFooter>
     </DialogContent>

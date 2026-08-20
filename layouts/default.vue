@@ -8,6 +8,7 @@ defineProps<{
 
 const { isAuthenticated, isInitialized } = useAuth();
 const { isImpersonating, impersonatedName, stop } = useImpersonation();
+const { t } = useI18n();
 const colorMode = useColorMode();
 
 const isExiting = ref(false);
@@ -58,7 +59,7 @@ const showAuthedShell = computed(
       >
         <span class="flex items-center gap-2">
           <Icon name="lucide:eye" class="h-4 w-4" />
-          Viewing as <strong>{{ impersonatedName }}</strong> (read-only)
+          {{ t("common.impersonation.viewingAs", { name: impersonatedName }) }}
         </span>
         <button
           type="button"
@@ -72,7 +73,7 @@ const showAuthedShell = computed(
             class="h-3.5 w-3.5 animate-spin"
           />
           <Icon v-else name="lucide:log-out" class="h-3.5 w-3.5" />
-          Exit
+          {{ t("common.impersonation.exit") }}
         </button>
       </div>
       <LayoutPlatformUpdateBanner />

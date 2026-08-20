@@ -19,6 +19,7 @@ interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   (e: "updated"): void;
 }>();
@@ -89,47 +90,46 @@ const status = computed<Status>(() => {
   if (installBroken.value) {
     return {
       kind: "broken",
-      label: "App access lost",
+      label: t("workload.githubActions.status.accessLost"),
       icon: "lucide:shield-alert",
       iconClass: "text-red-600 dark:text-red-400",
       badgeClass:
         "bg-red-500/10 ring-1 ring-inset ring-red-500/40 text-red-700 dark:text-red-300",
-      subtitle:
-        "Reinstall the Launch GitHub App to restore workflow syncing and builds.",
+      subtitle: t("workload.githubActions.status.accessLostSubtitle"),
     };
   }
   if (!props.compose.gha_build_ready) {
     return {
       kind: "setting-up",
-      label: "Setting up",
+      label: t("workload.githubActions.status.settingUp"),
       icon: "lucide:loader-2",
       iconClass: "animate-spin text-amber-600 dark:text-amber-400",
       badgeClass:
         "bg-amber-500/10 ring-1 ring-inset ring-amber-500/40 text-amber-800 dark:text-amber-300",
-      subtitle:
-        "Builds run on GitHub Actions. Launch publishes a workflow into your repo that builds each service image and triggers a deploy.",
+      subtitle: t("workload.githubActions.status.composeSettingUpSubtitle"),
     };
   }
   if (!sc.value.gha_workflow_sha) {
     return {
       kind: "incomplete",
-      label: "Setup incomplete",
+      label: t("workload.githubActions.status.incomplete"),
       icon: "lucide:alert-triangle",
       iconClass: "text-amber-600 dark:text-amber-400",
       badgeClass:
         "bg-amber-500/10 ring-1 ring-inset ring-amber-500/40 text-amber-800 dark:text-amber-300",
-      subtitle:
-        "Builds run on GitHub Actions. The workflow file isn't recorded in Launch yet — re-sync below.",
+      subtitle: t("workload.githubActions.status.incompleteSubtitle"),
     };
   }
   return {
     kind: "ready",
-    label: "Ready",
+    label: t("workload.githubActions.status.ready"),
     icon: "lucide:check-circle-2",
     iconClass: "text-emerald-600 dark:text-emerald-400",
     badgeClass:
       "bg-emerald-500/10 ring-1 ring-inset ring-emerald-500/40 text-emerald-800 dark:text-emerald-300",
-    subtitle: `Builds run on GitHub Actions. Each push to ${branch.value} builds the per-service images, publishes to GHCR, and triggers a redeploy.`,
+    subtitle: t("workload.githubActions.status.composeReadySubtitle", {
+      branch: branch.value,
+    }),
   };
 });
 
@@ -147,7 +147,7 @@ const fetchBuildSecrets = async () => {
     );
     buildSecrets.value = res.data;
   } catch {
-    toast.error("Failed to load build secrets");
+    toast.error(t("workload.environment.buildSecretsLoadFailed"));
   } finally {
     isLoadingBuildSecrets.value = false;
   }
@@ -189,9 +189,9 @@ const isRotating = ref(false);
 const isResyncing = ref(false);
 const isDisabling = ref(false);
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const rotateToken = async () => {
   isRotating.value = true;
@@ -201,12 +201,12 @@ const rotateToken = async () => {
       props.compose.project_id,
       props.compose.id,
     );
-    toast.success(
-      "Token rotation queued — the new value will land in GitHub Actions shortly.",
-    );
+    toast.success(t("workload.githubActions.tokenRotationQueued"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to queue token rotation");
+    toast.error(
+      e.data?.message || t("workload.githubActions.tokenRotationFailed"),
+    );
   } finally {
     isRotating.value = false;
   }
@@ -220,10 +220,10 @@ const resyncWorkflow = async () => {
       props.compose.project_id,
       props.compose.id,
     );
-    toast.success("Workflow re-sync queued");
+    toast.success(t("workload.githubActions.resyncQueued"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to queue workflow re-sync");
+    toast.error(e.data?.message || t("workload.githubActions.resyncFailed"));
   } finally {
     isResyncing.value = false;
   }
@@ -252,14 +252,16 @@ const setAutoDeploy = async (enabled: boolean) => {
     );
     toast.success(
       enabled
-        ? "Auto-deploy on — pushes to the branch will deploy"
-        : "Auto-deploy off — deploys are manual",
+        ? t("workload.githubActions.autoDeployOn")
+        : t("workload.githubActions.autoDeployOff"),
     );
     emit("updated");
   } catch (err: unknown) {
     autoDeploy.value = prev;
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update auto-deploy");
+    toast.error(
+      e.data?.message || t("workload.githubActions.autoDeployFailed"),
+    );
   } finally {
     isTogglingAutoDeploy.value = false;
   }
@@ -268,11 +270,10 @@ const setAutoDeploy = async (enabled: boolean) => {
 const disableGHA = async () => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Disable GitHub Actions builds?",
-    description:
-      "Future deploys will use the server-side build path again. The workflow file in your repository is left in place — delete it manually if you want.",
-    confirmText: "Disable",
-    cancelText: "Keep enabled",
+    title: t("workload.githubActions.disableTitle"),
+    description: t("workload.githubActions.disableDescription"),
+    confirmText: t("workload.actions.disable"),
+    cancelText: t("workload.githubActions.keepEnabled"),
     destructive: true,
   });
   if (!result.ok) return;
@@ -283,11 +284,11 @@ const disableGHA = async () => {
       props.compose.project_id,
       props.compose.id,
     );
-    toast.success("GitHub Actions builds disabled for this stack.");
+    toast.success(t("workload.githubActions.disabledCompose"));
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to disable GitHub Actions builds");
+    toast.error(e.data?.message || t("workload.githubActions.disableFailed"));
   } finally {
     isDisabling.value = false;
   }
@@ -329,12 +330,10 @@ useDockerComposeEvents(teamId, (data, event) => {
         />
         <div class="min-w-0 space-y-1">
           <h3 class="text-sm font-semibold text-red-700 dark:text-red-300">
-            GitHub App access was lost
+            {{ t("workload.githubActions.accessLostTitle") }}
           </h3>
           <p class="text-xs text-red-700/80 dark:text-red-300/80">
-            The Launch GitHub App was uninstalled or its permissions
-            changed. We can't sync your workflow or push deploy tokens
-            until it's reinstalled.
+            {{ t("workload.githubActions.accessLostDescription") }}
           </p>
         </div>
       </div>
@@ -344,22 +343,30 @@ useDockerComposeEvents(teamId, (data, event) => {
           variant="outline"
           class="border-red-500/40 bg-white/60 text-red-700 hover:bg-red-500/10 hover:text-red-700 dark:bg-black/20 dark:text-red-300 dark:hover:text-red-200"
         >
-          Open installations
+          {{ t("workload.githubActions.openInstallations") }}
           <Icon name="lucide:external-link" class="ml-1.5 h-3 w-3 opacity-70" />
         </Button>
       </NuxtLink>
     </div>
 
     <!-- Page header with inline status chip + optional CTA. -->
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <div
+      class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
+    >
       <div class="min-w-0 space-y-1">
         <div class="flex flex-wrap items-center gap-2">
-          <h2 class="text-lg font-semibold">GitHub Actions builds</h2>
+          <h2 class="text-lg font-semibold">
+            {{ t("workload.githubActions.buildsTitle") }}
+          </h2>
           <span
             class="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium"
             :class="status.badgeClass"
           >
-            <Icon :name="status.icon" class="h-3 w-3" :class="status.iconClass" />
+            <Icon
+              :name="status.icon"
+              class="h-3 w-3"
+              :class="status.iconClass"
+            />
             {{ status.label }}
           </span>
         </div>
@@ -373,7 +380,7 @@ useDockerComposeEvents(teamId, (data, event) => {
       >
         <Button size="sm" variant="outline">
           <Icon name="lucide:play-circle" class="mr-1.5 h-3.5 w-3.5" />
-          View workflow runs
+          {{ t("workload.githubActions.viewRuns") }}
           <Icon name="lucide:external-link" class="ml-1.5 h-3 w-3 opacity-70" />
         </Button>
       </NuxtLink>
@@ -382,15 +389,23 @@ useDockerComposeEvents(teamId, (data, event) => {
     <!-- Configuration -->
     <section class="space-y-3">
       <div class="flex items-baseline justify-between gap-3 border-b pb-2">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Configuration
+        <h3
+          class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          {{ t("workload.githubActions.configuration") }}
         </h3>
-        <span class="text-[10px] uppercase tracking-wider text-muted-foreground/60">
-          Read only
+        <span
+          class="text-[10px] uppercase tracking-wider text-muted-foreground/60"
+        >
+          {{ t("workload.githubActions.readOnly") }}
         </span>
       </div>
-      <dl class="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[160px_1fr]">
-        <dt class="text-xs uppercase tracking-wide text-muted-foreground">Repository</dt>
+      <dl
+        class="grid grid-cols-1 gap-x-6 gap-y-2.5 text-sm sm:grid-cols-[160px_1fr]"
+      >
+        <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+          {{ t("workload.fields.repository") }}
+        </dt>
         <dd class="font-mono">
           <NuxtLink
             v-if="repoSlug"
@@ -404,10 +419,14 @@ useDockerComposeEvents(teamId, (data, event) => {
           <span v-else class="text-muted-foreground">—</span>
         </dd>
 
-        <dt class="text-xs uppercase tracking-wide text-muted-foreground">Branch</dt>
+        <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+          {{ t("workload.fields.branch") }}
+        </dt>
         <dd class="font-mono">{{ branch }}</dd>
 
-        <dt class="text-xs uppercase tracking-wide text-muted-foreground">Workflow file</dt>
+        <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+          {{ t("workload.githubActions.workflowFile") }}
+        </dt>
         <dd>
           <NuxtLink
             v-if="workflowURL"
@@ -422,20 +441,22 @@ useDockerComposeEvents(teamId, (data, event) => {
           <span
             v-if="sc.gha_workflow_sha"
             class="ml-2 inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground"
-            title="Commit SHA of the workflow file Launch committed to your repository"
+            :title="t('workload.githubActions.workflowShaHelp')"
           >
             <Icon name="lucide:git-commit" class="h-3 w-3" />
             {{ sc.gha_workflow_sha.slice(0, 7) }}
           </span>
         </dd>
 
-        <dt class="text-xs uppercase tracking-wide text-muted-foreground">Image namespace</dt>
+        <dt class="text-xs uppercase tracking-wide text-muted-foreground">
+          {{ t("workload.githubActions.imageNamespace") }}
+        </dt>
         <dd class="flex items-center gap-1.5 font-mono">
           {{ sc.gha_image_repository || "—" }}
           <span
             v-if="sc.gha_image_repository"
             class="inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-muted text-muted-foreground"
-            title="Each service in your compose file builds to a tag under this prefix. Launch only accepts deploy notifications whose image refs start here — even if your deploy token leaked, an attacker couldn't redirect us to other images."
+            :title="t('workload.githubActions.composeImagePrefixHelp')"
           >
             <Icon name="lucide:info" class="h-3 w-3" />
           </span>
@@ -452,48 +473,54 @@ useDockerComposeEvents(teamId, (data, event) => {
     -->
     <section class="space-y-3">
       <div class="border-b pb-2">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Build-time secrets
+        <h3
+          class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          {{ t("workload.githubActions.buildSecretsTitle") }}
         </h3>
       </div>
       <p class="text-sm text-muted-foreground">
-        Values mounted into <span class="font-mono">docker build</span>
-        via <span class="font-mono">--mount=type=secret</span>. One
-        secret here is available to every service in the stack that
-        references it from its <span class="font-mono">Dockerfile</span>.
-        Different from runtime env vars (those live on the Environment
-        tab and are only visible to <span class="font-mono">docker run</span>).
+        {{ t("workload.githubActions.composeBuildSecretsDescription") }}
       </p>
       <SharedBuildSecretsEditor
         :secrets="buildSecrets"
         :loading="isLoadingBuildSecrets"
-        owner-label="stack"
+        :owner-label="t('workload.githubActions.stack')"
         github-actions
         :on-create="onCreateBuildSecret"
         :on-update="onUpdateBuildSecret"
         :on-delete="onDeleteBuildSecret"
-        @update:secrets="(v) => (buildSecrets = v as unknown as DockerBuildSecret[])"
+        @update:secrets="
+          (v) => (buildSecrets = v as unknown as DockerBuildSecret[])
+        "
       />
     </section>
 
     <!-- Maintenance -->
     <section class="space-y-3">
       <div class="border-b pb-2">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Maintenance
+        <h3
+          class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          {{ t("workload.githubActions.maintenance") }}
         </h3>
       </div>
       <ul class="divide-y">
-        <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <li
+          class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div class="min-w-0 flex-1 space-y-0.5">
             <div class="flex items-center gap-2 text-sm font-medium">
-              <Icon name="lucide:git-branch" class="h-3.5 w-3.5 text-muted-foreground" />
-              Deploy automatically on push
+              <Icon
+                name="lucide:git-branch"
+                class="h-3.5 w-3.5 text-muted-foreground"
+              />
+              {{ t("workload.githubActions.autoDeployTitle") }}
             </div>
             <p class="text-xs text-muted-foreground">
-              When on, a push to <span class="font-mono">{{ branch }}</span>
-              triggers a build &amp; deploy via GitHub Actions. When off,
-              deploys are manual (the Deploy button only).
+              {{ t("workload.githubActions.autoDeployBeforeBranch") }}
+              <span class="font-mono">{{ branch }}</span>
+              {{ t("workload.githubActions.autoDeployAfterBranch") }}
             </p>
           </div>
           <Switch
@@ -503,17 +530,21 @@ useDockerComposeEvents(teamId, (data, event) => {
             @update:model-value="setAutoDeploy"
           />
         </li>
-        <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <li
+          class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div class="min-w-0 flex-1 space-y-0.5">
             <div class="flex items-center gap-2 text-sm font-medium">
-              <Icon name="lucide:refresh-cw" class="h-3.5 w-3.5 text-muted-foreground" />
-              Re-sync workflow file
+              <Icon
+                name="lucide:refresh-cw"
+                class="h-3.5 w-3.5 text-muted-foreground"
+              />
+              {{ t("workload.githubActions.resyncFileTitle") }}
             </div>
             <p class="text-xs text-muted-foreground">
-              Re-render <span class="font-mono">launch-deploy.yml</span>
-              from the current template and commit it back over the
-              file in your repo. Run after you change a build setting
-              in Launch.
+              {{ t("workload.githubActions.resyncFileBefore") }}
+              <span class="font-mono">launch-deploy.yml</span>
+              {{ t("workload.githubActions.resyncFileAfter") }}
             </p>
           </div>
           <Button
@@ -529,26 +560,31 @@ useDockerComposeEvents(teamId, (data, event) => {
               class="mr-1.5 h-3.5 w-3.5 animate-spin"
             />
             <Icon v-else name="lucide:refresh-cw" class="mr-1.5 h-3.5 w-3.5" />
-            Re-sync
+            {{ t("workload.githubActions.resyncShort") }}
           </Button>
         </li>
-        <li class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <li
+          class="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div class="min-w-0 flex-1 space-y-0.5">
             <div class="flex items-center gap-2 text-sm font-medium">
-              <Icon name="lucide:key-round" class="h-3.5 w-3.5 text-muted-foreground" />
-              Rotate deploy token
+              <Icon
+                name="lucide:key-round"
+                class="h-3.5 w-3.5 text-muted-foreground"
+              />
+              {{ t("workload.githubActions.rotateToken") }}
             </div>
             <p class="text-xs text-muted-foreground">
-              Mint a new token and replace
-              <span class="font-mono">LAUNCH_DEPLOY_TOKEN</span> on
-              your repo. The next workflow run picks it up.
+              {{ t("workload.githubActions.rotateBeforeToken") }}
+              <span class="font-mono">LAUNCH_DEPLOY_TOKEN</span>
+              {{ t("workload.githubActions.rotateAfterToken") }}
               <NuxtLink
                 v-if="repoSettingsSecretsURL"
                 :to="repoSettingsSecretsURL"
                 target="_blank"
                 class="ml-1 inline-flex items-center gap-0.5 underline hover:no-underline"
               >
-                View secrets
+                {{ t("workload.githubActions.viewSecrets") }}
                 <Icon name="lucide:external-link" class="h-3 w-3 opacity-70" />
               </NuxtLink>
             </p>
@@ -559,7 +595,7 @@ useDockerComposeEvents(teamId, (data, event) => {
             :disabled="isRotating || !compose.gha_build_ready"
             :title="
               !compose.gha_build_ready
-                ? 'Available once the workflow is live'
+                ? t('workload.githubActions.availableWhenLive')
                 : ''
             "
             class="shrink-0"
@@ -571,7 +607,7 @@ useDockerComposeEvents(teamId, (data, event) => {
               class="mr-1.5 h-3.5 w-3.5 animate-spin"
             />
             <Icon v-else name="lucide:key-round" class="mr-1.5 h-3.5 w-3.5" />
-            Rotate
+            {{ t("workload.githubActions.rotate") }}
           </Button>
         </li>
       </ul>
@@ -580,17 +616,23 @@ useDockerComposeEvents(teamId, (data, event) => {
     <!-- Danger zone (boxed) -->
     <div class="rounded-lg border border-red-500/30 bg-red-500/5">
       <div class="border-b border-red-500/20 px-4 py-2.5">
-        <h3 class="text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-400">
-          Danger zone
+        <h3
+          class="text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-400"
+        >
+          {{ t("workload.danger.title") }}
         </h3>
       </div>
-      <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+      >
         <div class="min-w-0 space-y-1">
-          <div class="text-sm font-medium">Disable GitHub Actions builds</div>
+          <div class="text-sm font-medium">
+            {{ t("workload.githubActions.disableBuilds") }}
+          </div>
           <p class="text-xs text-muted-foreground">
-            Switch this stack back to server-side builds. The
-            <span class="font-mono">launch-deploy.yml</span> file stays
-            in your repo — delete it manually if you no longer want it.
+            {{ t("workload.githubActions.disableComposeBeforeFile") }}
+            <span class="font-mono">launch-deploy.yml</span>
+            {{ t("workload.githubActions.disableAfterFile") }}
           </p>
         </div>
         <Button
@@ -606,7 +648,7 @@ useDockerComposeEvents(teamId, (data, event) => {
             class="mr-1.5 h-3.5 w-3.5 animate-spin"
           />
           <Icon v-else name="lucide:power-off" class="mr-1.5 h-3.5 w-3.5" />
-          Disable
+          {{ t("workload.actions.disable") }}
         </Button>
       </div>
     </div>

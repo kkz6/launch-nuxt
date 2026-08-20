@@ -26,6 +26,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 const emit = defineEmits<{ created: []; updated: [] }>();
+const { t } = useI18n();
 
 const open = defineModel<boolean>("open", { default: false });
 const isLoading = ref(false);
@@ -50,12 +51,18 @@ watch(open, (isOpen) => {
 
 const validate = () => {
   errors.value = {};
-  if (!name.value.trim()) errors.value.name = "Name is required";
-  if (!username.value.trim()) errors.value.username = "Username is required";
+  if (!name.value.trim())
+    errors.value.name = t("settings.connectionDialogs.validation.nameRequired");
+  if (!username.value.trim())
+    errors.value.username = t(
+      "settings.connectionDialogs.validation.usernameRequired",
+    );
   // Create mode → password required. Edit mode → empty = keep
   // existing (no rotation), so it's optional.
   if (!props.credential && !password.value) {
-    errors.value.password = "Password is required";
+    errors.value.password = t(
+      "settings.connectionDialogs.validation.passwordRequired",
+    );
   }
   return Object.keys(errors.value).length === 0;
 };
@@ -73,7 +80,7 @@ const submit = async () => {
         username: username.value.trim(),
         ...(password.value ? { password: password.value } : {}),
       });
-      toast.success("Registry credential updated");
+      toast.success(t("settings.connectionDialogs.registry.updated"));
       emit("updated");
     } else {
       await dockerService.registryCredentials.create({
@@ -82,14 +89,16 @@ const submit = async () => {
         username: username.value.trim(),
         password: password.value,
       });
-      toast.success("Registry credential saved");
+      toast.success(t("settings.connectionDialogs.registry.saved"));
       emit("created");
     }
     open.value = false;
     resetForm();
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to save credential");
+    toast.error(
+      e.data?.message || t("settings.connectionDialogs.registry.saveFailed"),
+    );
   } finally {
     isLoading.value = false;
   }
@@ -107,19 +116,26 @@ const submit = async () => {
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>
-          {{ credential ? "Edit Registry Credential" : "Add Registry Credential" }}
+          {{
+            credential
+              ? t("settings.connectionDialogs.registry.editTitle")
+              : t("settings.connectionDialogs.registry.addTitle")
+          }}
         </DialogTitle>
         <DialogDescription>
-          Used by application + compose deploys to
-          <code class="font-mono text-xs">docker login</code> before
-          pulling private images. Username + password are encrypted at
-          rest.
+          {{
+            t("settings.connectionDialogs.registry.descriptionBeforeCommand")
+          }}
+          <code class="font-mono text-xs">docker login</code>
+          {{ t("settings.connectionDialogs.registry.descriptionAfterCommand") }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="grid gap-4" @submit.prevent="submit">
         <div class="space-y-1.5">
-          <Label for="reg-cred-name">Name</Label>
+          <Label for="reg-cred-name">{{
+            t("settings.connectionDialogs.name")
+          }}</Label>
           <Input
             id="reg-cred-name"
             v-model="name"
@@ -127,7 +143,7 @@ const submit = async () => {
             autocomplete="off"
           />
           <p class="text-[11px] text-muted-foreground">
-            Display label shown in the picker dropdown.
+            {{ t("settings.connectionDialogs.registry.nameHelp") }}
           </p>
           <p v-if="errors.name" class="text-sm text-destructive">
             {{ errors.name }}
@@ -135,7 +151,9 @@ const submit = async () => {
         </div>
 
         <div class="space-y-1.5">
-          <Label for="reg-cred-url">Registry URL</Label>
+          <Label for="reg-cred-url">{{
+            t("settings.connectionDialogs.registry.url")
+          }}</Label>
           <Input
             id="reg-cred-url"
             v-model="registryUrl"
@@ -143,17 +161,15 @@ const submit = async () => {
             autocomplete="off"
           />
           <p class="text-[11px] text-muted-foreground">
-            Leave empty for Docker Hub.
+            {{ t("settings.connectionDialogs.registry.urlHelp") }}
           </p>
         </div>
 
         <div class="space-y-1.5">
-          <Label for="reg-cred-user">Username</Label>
-          <Input
-            id="reg-cred-user"
-            v-model="username"
-            autocomplete="off"
-          />
+          <Label for="reg-cred-user">{{
+            t("settings.connectionDialogs.username")
+          }}</Label>
+          <Input id="reg-cred-user" v-model="username" autocomplete="off" />
           <p v-if="errors.username" class="text-sm text-destructive">
             {{ errors.username }}
           </p>
@@ -161,9 +177,12 @@ const submit = async () => {
 
         <div class="space-y-1.5">
           <Label for="reg-cred-pass">
-            Password / Access Token
-            <span v-if="credential" class="text-[11px] font-normal text-muted-foreground">
-              (leave blank to keep current)
+            {{ t("settings.connectionDialogs.registry.passwordOrToken") }}
+            <span
+              v-if="credential"
+              class="text-[11px] font-normal text-muted-foreground"
+            >
+              {{ t("settings.connectionDialogs.registry.keepCurrent") }}
             </span>
           </Label>
           <Input
@@ -180,7 +199,7 @@ const submit = async () => {
 
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">
-            Cancel
+            {{ t("settings.connectionDialogs.cancel") }}
           </Button>
           <Button type="submit" :disabled="isLoading">
             <Icon
@@ -188,7 +207,11 @@ const submit = async () => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            {{ credential ? "Save Changes" : "Add Registry" }}
+            {{
+              credential
+                ? t("settings.connectionDialogs.saveChanges")
+                : t("settings.connectionDialogs.registry.add")
+            }}
           </Button>
         </DialogFooter>
       </form>

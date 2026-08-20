@@ -16,9 +16,11 @@ definePageMeta({
   middleware: "auth",
 });
 
-useHead({
-  title: "Onboarding",
-});
+const { t } = useI18n();
+
+useHead(() => ({
+  title: t("public.onboarding.pageTitle"),
+}));
 
 const { fetchUser } = useAuth();
 const router = useRouter();
@@ -52,56 +54,55 @@ const onboardingData = ref<OnboardingData>({
 
 const isLoadingData = ref(true);
 
-const stepDefinitions: Omit<OnboardingStep, "completed">[] = [
+const stepDefinitions = computed<Omit<OnboardingStep, "completed">[]>(() => [
   {
     id: "server-provider",
-    title: "Server service provider",
-    description: "Connect your cloud provider to deploy servers",
+    title: t("public.onboarding.steps.serverProvider.title"),
+    description: t("public.onboarding.steps.serverProvider.description"),
     icon: Server,
     completedKey: "hasServerProvider",
     settingsTab: "connections",
   },
   {
     id: "git-provider",
-    title: "Git provider",
-    description: "Link your GitHub, GitLab or Bitbucket account",
+    title: t("public.onboarding.steps.gitProvider.title"),
+    description: t("public.onboarding.steps.gitProvider.description"),
     icon: GitBranch,
     completedKey: "hasSourceControl",
     settingsTab: "connections",
   },
   {
     id: "domain-provider",
-    title: "Domain provider",
-    description: "Configure DNS management for your domains",
+    title: t("public.onboarding.steps.domainProvider.title"),
+    description: t("public.onboarding.steps.domainProvider.description"),
     icon: Globe,
     completedKey: "hasDomainProvider",
     href: "/dns",
   },
   {
     id: "storage-provider",
-    title: "Storage Provider",
-    description: "Set up backup and file storage solutions",
+    title: t("public.onboarding.steps.storageProvider.title"),
+    description: t("public.onboarding.steps.storageProvider.description"),
     icon: Database,
     completedKey: "hasStorageProvider",
     settingsTab: "connections",
   },
   {
     id: "notifications",
-    title: "Notifications",
-    description: "Configure alerts and notification preferences",
+    title: t("public.onboarding.steps.notifications.title"),
+    description: t("public.onboarding.steps.notifications.description"),
     icon: Bell,
     completedKey: "hasNotificationChannel",
     settingsTab: "notifications",
   },
-];
+]);
 
 const steps = computed(() =>
-  stepDefinitions.map((step) => ({
+  stepDefinitions.value.map((step) => ({
     ...step,
     completed: onboardingData.value[step.completedKey],
-  }))
+  })),
 );
-
 
 const handleStepClick = (step: OnboardingStep & { completed: boolean }) => {
   if (step.settingsTab) {
@@ -161,7 +162,9 @@ onMounted(() => {
   <div class="pb-10">
     <div class="mb-6">
       <div class="flex items-center justify-between">
-        <h1 class="text-xl font-semibold">Onboarding</h1>
+        <h1 class="text-xl font-semibold">
+          {{ t("public.onboarding.heading") }}
+        </h1>
         <Button
           variant="ghost"
           size="sm"
@@ -170,11 +173,11 @@ onMounted(() => {
           @click="handleSkip"
         >
           <FastForward class="h-4 w-4" />
-          Skip for now
+          {{ t("public.onboarding.skip") }}
         </Button>
       </div>
       <p class="mt-1 text-sm text-muted-foreground">
-        Complete these steps to get the best experience
+        {{ t("public.onboarding.description") }}
       </p>
     </div>
 
@@ -186,45 +189,47 @@ onMounted(() => {
     </div>
 
     <div v-else class="rounded-lg border bg-card">
-        <div
-          v-for="(step, index) in steps"
-          :key="step.id"
-          class="group flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50"
-          :class="{ 'border-b': index < steps.length - 1 }"
-          @click="handleStepClick(step)"
-        >
-          <div class="flex items-center gap-3">
-            <div
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded transition-colors"
-              :class="step.completed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'"
-            >
-              <CheckCircle
-                v-if="step.completed"
-                class="h-4 w-4 text-green-600 dark:text-green-400"
-              />
-              <component
-                :is="step.icon"
-                v-else
-                class="h-4 w-4 text-muted-foreground"
-              />
-            </div>
-            <div class="min-w-0">
-              <span
-                class="text-sm font-medium"
-                :class="step.completed ? 'text-muted-foreground' : ''"
-              >
-                {{ step.title }}
-              </span>
-              <p class="text-xs text-muted-foreground">
-                {{ step.description }}
-              </p>
-            </div>
+      <div
+        v-for="(step, index) in steps"
+        :key="step.id"
+        class="group flex cursor-pointer items-center justify-between px-4 py-3 transition-colors hover:bg-muted/50"
+        :class="{ 'border-b': index < steps.length - 1 }"
+        @click="handleStepClick(step)"
+      >
+        <div class="flex items-center gap-3">
+          <div
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded transition-colors"
+            :class="
+              step.completed ? 'bg-green-100 dark:bg-green-900/30' : 'bg-muted'
+            "
+          >
+            <CheckCircle
+              v-if="step.completed"
+              class="h-4 w-4 text-green-600 dark:text-green-400"
+            />
+            <component
+              :is="step.icon"
+              v-else
+              class="h-4 w-4 text-muted-foreground"
+            />
           </div>
-          <Icon
-            name="lucide:chevron-right"
-            class="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-          />
+          <div class="min-w-0">
+            <span
+              class="text-sm font-medium"
+              :class="step.completed ? 'text-muted-foreground' : ''"
+            >
+              {{ step.title }}
+            </span>
+            <p class="text-xs text-muted-foreground">
+              {{ step.description }}
+            </p>
+          </div>
         </div>
+        <Icon
+          name="lucide:chevron-right"
+          class="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+        />
+      </div>
     </div>
   </div>
 </template>

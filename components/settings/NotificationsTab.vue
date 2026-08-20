@@ -1,71 +1,73 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Switch } from '~/components/ui/switch'
-import { Label } from '~/components/ui/label'
-import { Button } from '~/components/ui/button'
+import { toast } from "vue-sonner";
+import { Switch } from "~/components/ui/switch";
+import { Label } from "~/components/ui/label";
+import { Button } from "~/components/ui/button";
 
 interface NotificationChannel {
-  id: string
-  provider: string
-  label: string
+  id: string;
+  provider: string;
+  label: string;
   data?: {
-    email?: string
-    webhook_url?: string
-  }
-  connected: boolean
-  is_default: boolean
-  created_at: string
+    email?: string;
+    webhook_url?: string;
+  };
+  connected: boolean;
+  is_default: boolean;
+  created_at: string;
 }
 
 interface NotificationSettings {
-  email_server_created: boolean
-  email_server_deleted: boolean
-  email_deployment_success: boolean
-  email_deployment_failed: boolean
-  email_backup_success: boolean
-  email_backup_failed: boolean
+  email_server_created: boolean;
+  email_server_deleted: boolean;
+  email_deployment_success: boolean;
+  email_deployment_failed: boolean;
+  email_backup_success: boolean;
+  email_backup_failed: boolean;
 }
 
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
+const { t } = useI18n();
 
 // Notification channels
-const channels = ref<NotificationChannel[]>([])
-const isChannelsLoading = ref(true)
-const editingChannel = ref<NotificationChannel | null>(null)
-const isEditOpen = ref(false)
+const channels = ref<NotificationChannel[]>([]);
+const isChannelsLoading = ref(true);
+const editingChannel = ref<NotificationChannel | null>(null);
+const isEditOpen = ref(false);
 
 const openEditDialog = (channel: NotificationChannel) => {
-  editingChannel.value = channel
-  isEditOpen.value = true
-}
+  editingChannel.value = channel;
+  isEditOpen.value = true;
+};
 
-const channelLabels: Record<string, string> = {
-  slack: 'Slack',
-  discord: 'Discord',
-  telegram: 'Telegram',
-  email: 'Email',
-}
+const channelLabel = (provider: string) => {
+  const key = `settings.notifications.providers.${provider}`;
+  const translated = t(key);
+  return translated === key ? provider : translated;
+};
 
 const channelIcons: Record<string, string> = {
-  slack: 'simple-icons:slack',
-  discord: 'simple-icons:discord',
-  telegram: 'simple-icons:telegram',
-  email: 'lucide:mail',
-}
+  slack: "simple-icons:slack",
+  discord: "simple-icons:discord",
+  telegram: "simple-icons:telegram",
+  email: "lucide:mail",
+};
 
 const channelIconColors: Record<string, string> = {
-  slack: 'text-[#4A154B] dark:text-[#E01E5A]',
-  discord: 'text-[#5865F2]',
-  telegram: 'text-[#26A5E4]',
-  email: 'text-rose-600 dark:text-rose-400',
-}
+  slack: "text-[#4A154B] dark:text-[#E01E5A]",
+  discord: "text-[#5865F2]",
+  telegram: "text-[#26A5E4]",
+  email: "text-rose-600 dark:text-rose-400",
+};
 
 const channelBgColors: Record<string, string> = {
-  slack: 'bg-[#4A154B]/10 dark:bg-[#4A154B]/30',
-  discord: 'bg-[#5865F2]/10 dark:bg-[#5865F2]/20',
-  telegram: 'bg-[#26A5E4]/10 dark:bg-[#26A5E4]/20',
-  email: 'bg-rose-500/10 dark:bg-rose-500/20',
-}
+  slack: "bg-[#4A154B]/10 dark:bg-[#4A154B]/30",
+  discord: "bg-[#5865F2]/10 dark:bg-[#5865F2]/20",
+  telegram: "bg-[#26A5E4]/10 dark:bg-[#26A5E4]/20",
+  email: "bg-rose-500/10 dark:bg-rose-500/20",
+};
 
 // Notification settings
 const settings = ref<NotificationSettings>({
@@ -75,132 +77,147 @@ const settings = ref<NotificationSettings>({
   email_deployment_failed: true,
   email_backup_success: false,
   email_backup_failed: true,
-})
-const isSettingsLoading = ref(true)
+});
+const isSettingsLoading = ref(true);
 
 const getChannelDetail = (channel: NotificationChannel): string => {
-  if (channel.provider === 'email' && channel.data?.email) {
-    return channel.data.email
+  if (channel.provider === "email" && channel.data?.email) {
+    return channel.data.email;
   }
-  if (['slack', 'discord'].includes(channel.provider) && channel.data?.webhook_url) {
-    return 'Webhook connected'
+  if (
+    ["slack", "discord"].includes(channel.provider) &&
+    channel.data?.webhook_url
+  ) {
+    return t("settings.notifications.webhookConnected");
   }
-  return channelLabels[channel.provider] || channel.provider
-}
+  return channelLabel(channel.provider);
+};
 
 interface NotificationChannelsResponse {
   data: {
-    channels: NotificationChannel[]
-  }
+    channels: NotificationChannel[];
+  };
 }
 
 const fetchChannels = async () => {
   try {
-    const response = await $api<NotificationChannelsResponse>('/settings/notifications')
-    channels.value = response.data.channels || []
+    const response = await $api<NotificationChannelsResponse>(
+      "/settings/notifications",
+    );
+    channels.value = response.data.channels || [];
   } catch {
-    channels.value = []
+    channels.value = [];
   } finally {
-    isChannelsLoading.value = false
+    isChannelsLoading.value = false;
   }
-}
+};
 
 const fetchSettings = async () => {
   try {
-    const response = await $api<{ data: NotificationSettings }>('/settings/notification-preferences')
-    settings.value = response.data
+    const response = await $api<{ data: NotificationSettings }>(
+      "/settings/notification-preferences",
+    );
+    settings.value = response.data;
   } catch {
     // Use defaults
   } finally {
-    isSettingsLoading.value = false
+    isSettingsLoading.value = false;
   }
-}
+};
 
 const saveSettings = async () => {
   try {
-    await $api('/settings/notification-preferences', {
-      method: 'PUT',
+    await $api("/settings/notification-preferences", {
+      method: "PUT",
       body: settings.value,
-    })
-    toast.success('Notification settings saved')
+    });
+    toast.success(t("settings.notifications.settingsSaved"));
   } catch {
-    toast.error('Failed to save settings')
+    toast.error(t("settings.notifications.settingsSaveFailed"));
   }
-}
+};
 
-const testingChannelId = ref<string | null>(null)
+const testingChannelId = ref<string | null>(null);
 
 const testChannel = async (channel: NotificationChannel) => {
-  testingChannelId.value = channel.id
+  testingChannelId.value = channel.id;
   try {
-    await $api(`/settings/notifications/${channel.id}/test`, { method: 'POST' })
-    toast.success('Test notification sent!')
+    await $api(`/settings/notifications/${channel.id}/test`, {
+      method: "POST",
+    });
+    toast.success(t("settings.notifications.testSent"));
   } catch {
-    toast.error('Failed to send test notification')
+    toast.error(t("settings.notifications.testFailed"));
   } finally {
-    testingChannelId.value = null
+    testingChannelId.value = null;
   }
-}
+};
 
 const deleteChannel = async (channel: NotificationChannel) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete Notification Channel',
-    description: `Are you sure you want to delete "${channel.label}"?`,
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
+    title: t("settings.notifications.deleteTitle"),
+    description: t("settings.notifications.deleteDescription", {
+      label: channel.label,
+    }),
+    confirmText: t("settings.notifications.delete"),
+    cancelText: t("settings.notifications.cancel"),
     destructive: true,
-  })
+  });
 
   if (result.ok) {
     try {
-      await $api(`/settings/notifications/${channel.id}`, { method: 'DELETE' })
-      channels.value = channels.value.filter((c) => c.id !== channel.id)
-      toast.success('Notification channel deleted')
+      await $api(`/settings/notifications/${channel.id}`, { method: "DELETE" });
+      channels.value = channels.value.filter((c) => c.id !== channel.id);
+      toast.success(t("settings.notifications.deleted"));
     } catch {
-      toast.error('Failed to delete notification channel')
+      toast.error(t("settings.notifications.deleteFailed"));
     }
   }
-}
+};
 
-const notificationOptions = [
+const notificationOptions = computed(() => [
   {
-    key: 'email_server_created',
-    label: 'Server Created',
-    description: 'Receive a notification when a new server is created',
+    key: "email_server_created",
+    label: t("settings.notifications.options.serverCreated"),
+    description: t("settings.notifications.options.serverCreatedDescription"),
   },
   {
-    key: 'email_server_deleted',
-    label: 'Server Deleted',
-    description: 'Receive a notification when a server is deleted',
+    key: "email_server_deleted",
+    label: t("settings.notifications.options.serverDeleted"),
+    description: t("settings.notifications.options.serverDeletedDescription"),
   },
   {
-    key: 'email_deployment_success',
-    label: 'Deployment Success',
-    description: 'Receive a notification when a deployment succeeds',
+    key: "email_deployment_success",
+    label: t("settings.notifications.options.deploymentSuccess"),
+    description: t(
+      "settings.notifications.options.deploymentSuccessDescription",
+    ),
   },
   {
-    key: 'email_deployment_failed',
-    label: 'Deployment Failed',
-    description: 'Receive a notification when a deployment fails',
+    key: "email_deployment_failed",
+    label: t("settings.notifications.options.deploymentFailed"),
+    description: t(
+      "settings.notifications.options.deploymentFailedDescription",
+    ),
   },
   {
-    key: 'email_backup_success',
-    label: 'Backup Success',
-    description: 'Receive a notification when a backup succeeds',
+    key: "email_backup_success",
+    label: t("settings.notifications.options.backupSuccess"),
+    description: t("settings.notifications.options.backupSuccessDescription"),
   },
   {
-    key: 'email_backup_failed',
-    label: 'Backup Failed',
-    description: 'Receive a notification when a backup fails',
+    key: "email_backup_failed",
+    label: t("settings.notifications.options.backupFailed"),
+    description: t("settings.notifications.options.backupFailedDescription"),
   },
-]
+]);
 
 onMounted(() => {
-  fetchChannels()
-  fetchSettings()
-})
+  fetchChannels();
+  fetchSettings();
+});
 </script>
 
 <template>
@@ -211,16 +228,27 @@ onMounted(() => {
     <div class="px-6 pb-6">
       <div class="mb-4 flex items-center justify-between">
         <div>
-          <h3 class="text-base font-semibold">Notification Channels</h3>
+          <h3 class="text-base font-semibold">
+            {{ t("settings.notifications.channelsTitle") }}
+          </h3>
           <p class="text-sm text-muted-foreground">
-            Receive notifications via Slack, Discord, Telegram, or Email.
+            {{ t("settings.notifications.channelsDescription") }}
           </p>
         </div>
-        <SettingsAddNotificationChannel v-if="channels.length > 0" @created="fetchChannels" />
+        <SettingsAddNotificationChannel
+          v-if="channels.length > 0"
+          @created="fetchChannels"
+        />
       </div>
 
-      <div v-if="isChannelsLoading" class="flex items-center justify-center py-4">
-        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+      <div
+        v-if="isChannelsLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
       </div>
 
       <template v-else>
@@ -228,8 +256,10 @@ onMounted(() => {
           <div class="flex flex-col items-center gap-3 py-4">
             <Icon name="lucide:bell" class="h-10 w-10 text-muted-foreground" />
             <div class="text-center">
-              <p class="font-medium">No notification channels</p>
-              <p class="text-sm text-muted-foreground">Connect a channel to receive alerts</p>
+              <p class="font-medium">{{ t("settings.notifications.none") }}</p>
+              <p class="text-sm text-muted-foreground">
+                {{ t("settings.notifications.noneDescription") }}
+              </p>
             </div>
             <SettingsAddNotificationChannel @created="fetchChannels" />
           </div>
@@ -248,7 +278,9 @@ onMounted(() => {
               <Icon
                 :name="channelIcons[channel.provider] || 'lucide:bell'"
                 class="h-4 w-4"
-                :class="channelIconColors[channel.provider] || 'text-muted-foreground'"
+                :class="
+                  channelIconColors[channel.provider] || 'text-muted-foreground'
+                "
               />
             </div>
             <div class="flex-1 min-w-0">
@@ -259,7 +291,7 @@ onMounted(() => {
                   class="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
                 >
                   <span class="h-1 w-1 rounded-full bg-emerald-500" />
-                  Connected
+                  {{ t("settings.notifications.connected") }}
                 </span>
               </div>
               <p class="truncate text-xs text-muted-foreground">
@@ -279,7 +311,11 @@ onMounted(() => {
                   name="lucide:loader-2"
                   class="h-3.5 w-3.5 animate-spin text-muted-foreground"
                 />
-                <Icon v-else name="lucide:send" class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                <Icon
+                  v-else
+                  name="lucide:send"
+                  class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                />
               </Button>
               <Button
                 variant="ghost"
@@ -287,7 +323,10 @@ onMounted(() => {
                 class="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                 @click="openEditDialog(channel)"
               >
-                <Icon name="lucide:pencil" class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground" />
+                <Icon
+                  name="lucide:pencil"
+                  class="h-3.5 w-3.5 text-muted-foreground hover:text-foreground"
+                />
               </Button>
               <Button
                 variant="ghost"
@@ -295,7 +334,10 @@ onMounted(() => {
                 class="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
                 @click="deleteChannel(channel)"
               >
-                <Icon name="lucide:trash-2" class="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                <Icon
+                  name="lucide:trash-2"
+                  class="h-3.5 w-3.5 text-muted-foreground hover:text-destructive"
+                />
               </Button>
             </div>
           </div>
@@ -305,13 +347,21 @@ onMounted(() => {
 
     <!-- Email Notifications Section -->
     <div class="px-6 pt-6">
-      <h3 class="mb-1 text-base font-semibold">Email Notifications</h3>
+      <h3 class="mb-1 text-base font-semibold">
+        {{ t("settings.notifications.emailTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        All members of your team receive these notifications.
+        {{ t("settings.notifications.emailDescription") }}
       </p>
 
-      <div v-if="isSettingsLoading" class="flex items-center justify-center py-4">
-        <Icon name="lucide:loader-2" class="h-5 w-5 animate-spin text-muted-foreground" />
+      <div
+        v-if="isSettingsLoading"
+        class="flex items-center justify-center py-4"
+      >
+        <Icon
+          name="lucide:loader-2"
+          class="h-5 w-5 animate-spin text-muted-foreground"
+        />
       </div>
 
       <div v-else class="space-y-3">

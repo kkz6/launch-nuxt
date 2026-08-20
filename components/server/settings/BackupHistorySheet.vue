@@ -1,123 +1,141 @@
 <script setup lang="ts">
-import { formatDistanceToNow } from 'date-fns'
-import { Badge } from '~/components/ui/badge'
-import { Button } from '~/components/ui/button'
-import { ScrollArea } from '~/components/ui/scroll-area'
+import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
+import { Badge } from "~/components/ui/badge";
+import { Button } from "~/components/ui/button";
+import { ScrollArea } from "~/components/ui/scroll-area";
 import {
   Sheet,
   SheetContent,
   SheetDescription,
   SheetHeader,
   SheetTitle,
-} from '~/components/ui/sheet'
+} from "~/components/ui/sheet";
 
 interface BackupJob {
-  id: string
-  backup_id: string
-  storage_provider_id: string
-  status: 'pending' | 'running' | 'finished' | 'failed'
-  size: number
-  size_in_mb: number
-  error?: string
+  id: string;
+  backup_id: string;
+  storage_provider_id: string;
+  status: "pending" | "running" | "finished" | "failed";
+  size: number;
+  size_in_mb: number;
+  error?: string;
   // task_id links the job to the server-tasks row driving the live log
   // console (ServerLogViewer entity="task"). Present once the worker
   // has created the task; absent on legacy/pending rows.
-  task_id?: string | null
-  created_at: string
-  updated_at: string
+  task_id?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface Backup {
-  id: string
-  path: string
-  databases: string[]
-  jobs: BackupJob[]
+  id: string;
+  path: string;
+  databases: string[];
+  jobs: BackupJob[];
 }
 
 interface Props {
-  backup: Backup
+  backup: Backup;
   // serverId is needed by the live log viewer (the WS endpoint takes
   // it as a query param). Required for the View Logs affordance.
-  serverId: string
+  serverId: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t, locale } = useI18n();
 
 // Live log console state. Set when the user clicks View Logs on a row;
 // drives both the inline Sheet below and the bumped key for forced
 // remount when the same task's run finishes (fast runs may attach
 // during a transition, missing the log file).
-const logSheetOpen = ref(false)
-const logSheetTaskId = ref('')
-const logRefreshNonce = ref(0)
+const logSheetOpen = ref(false);
+const logSheetTaskId = ref("");
+const logRefreshNonce = ref(0);
 
 const openRunLogs = (job: BackupJob) => {
-  if (!job.task_id) return
-  logSheetTaskId.value = job.task_id
-  logSheetOpen.value = true
-}
+  if (!job.task_id) return;
+  logSheetTaskId.value = job.task_id;
+  logSheetOpen.value = true;
+};
 
-const open = defineModel<boolean>('open', { required: true })
+const open = defineModel<boolean>("open", { required: true });
 
-const statusConfig: Record<string, { icon: string; label: string; class: string }> = {
+const statusConfig = computed<
+  Record<string, { icon: string; label: string; class: string }>
+>(() => ({
   pending: {
-    icon: 'lucide:clock',
-    label: 'Pending',
-    class: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+    icon: "lucide:clock",
+    label: t("server.settings.backupHistory.pending"),
+    class:
+      "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   },
   running: {
-    icon: 'lucide:loader-2',
-    label: 'Running',
-    class: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+    icon: "lucide:loader-2",
+    label: t("server.settings.backupHistory.running"),
+    class: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
   },
   finished: {
-    icon: 'lucide:check-circle-2',
-    label: 'Finished',
-    class: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+    icon: "lucide:check-circle-2",
+    label: t("server.settings.backupHistory.finished"),
+    class:
+      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   },
   failed: {
-    icon: 'lucide:alert-circle',
-    label: 'Failed',
-    class: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+    icon: "lucide:alert-circle",
+    label: t("server.settings.backupHistory.failed"),
+    class: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   },
-}
+}));
 
 const formatSize = (bytes: number | null): string => {
-  if (bytes === null || bytes === 0) return '-'
-  const mb = bytes / 1024 / 1024
+  if (bytes === null || bytes === 0) return "-";
+  const mb = bytes / 1024 / 1024;
   if (mb < 1) {
-    const kb = bytes / 1024
-    return `${kb.toFixed(2)} KB`
+    const kb = bytes / 1024;
+    return `${kb.toFixed(2)} KB`;
   }
   if (mb >= 1024) {
-    const gb = mb / 1024
-    return `${gb.toFixed(2)} GB`
+    const gb = mb / 1024;
+    return `${gb.toFixed(2)} GB`;
   }
-  return `${mb.toFixed(2)} MB`
-}
+  return `${mb.toFixed(2)} MB`;
+};
 
 const getBackupName = computed(() => {
   if (props.backup.databases && props.backup.databases.length > 0) {
-    return `Database backup`
+    return t("server.settings.backupHistory.databaseBackup");
   }
-  return props.backup.path || 'Files backup'
-})
+  return props.backup.path || t("server.settings.backupHistory.filesBackup");
+});
 </script>
 
 <template>
   <Sheet v-model:open="open">
     <SheetContent class="sm:max-w-lg">
       <SheetHeader>
-        <SheetTitle>Backup History</SheetTitle>
+        <SheetTitle>{{ t("server.settings.backupHistory.title") }}</SheetTitle>
         <SheetDescription>
-          Backup history for {{ getBackupName }}
+          {{
+            t("server.settings.backupHistory.description", {
+              name: getBackupName,
+            })
+          }}
         </SheetDescription>
       </SheetHeader>
 
       <ScrollArea class="mt-4 h-[calc(100vh-120px)] pr-4">
-        <div v-if="backup.jobs.length === 0" class="flex flex-col items-center justify-center py-12 text-center">
-          <Icon name="lucide:history" class="mb-4 h-12 w-12 text-muted-foreground" />
-          <p class="text-muted-foreground">No backup history yet</p>
+        <div
+          v-if="backup.jobs.length === 0"
+          class="flex flex-col items-center justify-center py-12 text-center"
+        >
+          <Icon
+            name="lucide:history"
+            class="mb-4 h-12 w-12 text-muted-foreground"
+          />
+          <p class="text-muted-foreground">
+            {{ t("server.settings.backupHistory.empty") }}
+          </p>
         </div>
 
         <div v-else class="space-y-3">
@@ -130,21 +148,34 @@ const getBackupName = computed(() => {
               <Badge :class="['gap-1', statusConfig[job.status].class]">
                 <Icon
                   :name="statusConfig[job.status].icon"
-                  :class="['h-3 w-3', job.status === 'running' && 'animate-spin']"
+                  :class="[
+                    'h-3 w-3',
+                    job.status === 'running' && 'animate-spin',
+                  ]"
                 />
                 {{ statusConfig[job.status].label }}
               </Badge>
               <span class="text-xs text-muted-foreground">
-                {{ formatDistanceToNow(new Date(job.created_at), { addSuffix: true }) }}
+                {{
+                  formatDistanceToNow(new Date(job.created_at), {
+                    addSuffix: true,
+                    locale: locale === "ja" ? ja : enUS,
+                  })
+                }}
               </span>
             </div>
 
             <div class="flex items-center justify-between text-sm">
-              <span class="text-muted-foreground">Size:</span>
+              <span class="text-muted-foreground"
+                >{{ t("server.settings.backupHistory.size") }}:</span
+              >
               <span class="font-medium">{{ formatSize(job.size) }}</span>
             </div>
 
-            <div v-if="job.error" class="mt-2 break-all rounded bg-destructive/10 p-2 font-mono text-xs text-destructive">
+            <div
+              v-if="job.error"
+              class="mt-2 break-all rounded bg-destructive/10 p-2 font-mono text-xs text-destructive"
+            >
               {{ job.error }}
             </div>
 
@@ -162,7 +193,7 @@ const getBackupName = computed(() => {
                 @click="openRunLogs(job)"
               >
                 <Icon name="lucide:scroll-text" class="mr-1.5 h-3 w-3" />
-                View Logs
+                {{ t("server.pending.viewLogs") }}
               </Button>
             </div>
           </div>
@@ -182,9 +213,11 @@ const getBackupName = computed(() => {
       class="!inset-y-auto !top-16 !bottom-4 !right-3 !h-[calc(100vh-5rem)] w-full rounded-lg border sm:max-w-3xl flex flex-col overflow-hidden outline-none"
     >
       <SheetHeader class="shrink-0">
-        <SheetTitle>Backup Logs</SheetTitle>
+        <SheetTitle>{{
+          t("server.settings.backupHistory.logsTitle")
+        }}</SheetTitle>
         <SheetDescription>
-          Tar &amp; upload output for this backup run.
+          {{ t("server.settings.backupHistory.logsDescription") }}
         </SheetDescription>
       </SheetHeader>
       <div class="mt-4 flex flex-1 flex-col min-h-0">

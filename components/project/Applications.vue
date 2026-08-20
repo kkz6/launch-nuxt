@@ -10,6 +10,7 @@ interface Props {
   projectId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const apps = ref<DockerApplication[]>([]);
 const isLoading = ref(true);
@@ -23,9 +24,9 @@ const createSheetOpen = useState<boolean>(
   () => false,
 );
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchApps = async () => {
   isLoading.value = true;
@@ -36,7 +37,7 @@ const fetchApps = async () => {
     );
     apps.value = res.data;
   } catch {
-    toast.error("Failed to load applications");
+    toast.error(t("workload.project.applications.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -52,20 +53,22 @@ const onCreated = (app: DockerApplication) => {
 const deleteApp = async (app: DockerApplication) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Delete Application",
+    title: t("workload.application.delete.title"),
     description:
       app.status === "running"
-        ? `"${app.name}" is currently running. Deleting it will stop and remove the container.`
-        : `Are you sure you want to delete "${app.name}"?`,
-    confirmText: "Delete",
-    cancelText: "Cancel",
+        ? t("workload.application.delete.runningDescription", {
+            name: app.name,
+          })
+        : t("workload.application.delete.description", { name: app.name }),
+    confirmText: t("workload.actions.delete"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
     inputVerificationText: app.name,
-    helpText: "Type the application name to confirm:",
+    helpText: t("workload.application.delete.confirmHelp"),
     // Same opt-in volume cleanup as the app-detail Advanced delete.
     // Off by default — only the user's explicit tick wipes data.
     checkbox: {
-      label: "Also delete attached named volumes (data will be lost)",
+      label: t("workload.application.delete.volumesLabel"),
       checked: false,
     },
   });
@@ -79,10 +82,14 @@ const deleteApp = async (app: DockerApplication) => {
       { removeVolumes },
     );
     apps.value = apps.value.filter((a) => a.id !== app.id);
-    toast.success(removeVolumes ? "Application + volumes deleted" : "Application deleted");
+    toast.success(
+      removeVolumes
+        ? t("workload.application.delete.successWithVolumes")
+        : t("workload.application.delete.success"),
+    );
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to delete application");
+    toast.error(e.data?.message || t("workload.application.delete.failed"));
   }
 };
 
@@ -98,7 +105,7 @@ const sourceSummary = (app: DockerApplication): string => {
       return repo ?? "git";
     }
     case "dockerfile":
-      return "Custom Dockerfile";
+      return t("workload.sources.customDockerfile");
   }
 };
 
@@ -146,17 +153,19 @@ const lastDeployFallback = (app: DockerApplication): string | null => {
   // "Deleting" wins over every other subtext — when the operator
   // clicked Delete they want clear feedback that the row is in
   // flight; the deploy history is irrelevant during that window.
-  if (app.status === "deleting") return "Deleting…";
+  if (app.status === "deleting") return t("workload.status.deleting");
   // The deployed-timestamp branch is handled in the template (it
   // needs the live SharedDateTooltip component, not a string).
   if (app.last_deployed_at) return null;
   // `building` is the in-flight state on the row while the worker is
   // running the deploy task. There's no separate "deploying" enum
   // value even though the team-channel event is named that.
-  if (app.status === "building") return "Deploying…";
-  if (app.status === "failed") return "Last deploy failed";
-  return "Never deployed";
+  if (app.status === "building") return t("workload.status.deploying");
+  if (app.status === "failed") return t("workload.status.lastDeployFailed");
+  return t("workload.status.neverDeployed");
 };
+
+const statusLabel = (status: string) => t(`workload.status.${status}`, status);
 
 // WS keeps the list live across deploy lifecycle. The backend
 // broadcasts deploying / deployed / failed with the application's
@@ -186,10 +195,11 @@ onMounted(fetchApps);
       first-time discovery.
     -->
     <div class="mb-6">
-      <h2 class="text-xl font-semibold">Applications</h2>
+      <h2 class="text-xl font-semibold">
+        {{ t("workload.project.applications.title") }}
+      </h2>
       <p class="mt-1 text-sm text-muted-foreground">
-        Single-container workloads. Deploy from a public image, a git
-        repo, or a pasted Dockerfile.
+        {{ t("workload.project.applications.description") }}
       </p>
     </div>
 
@@ -205,14 +215,15 @@ onMounted(fetchApps);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:box" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No applications yet</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("workload.project.applications.emptyTitle") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Register your first application to start deploying containers in
-        this project.
+        {{ t("workload.project.applications.emptyDescription") }}
       </p>
       <Button v-if="canEdit" class="mt-6" @click="createSheetOpen = true">
         <Icon name="lucide:plus" class="mr-2 h-4 w-4" />
-        New Application
+        {{ t("workload.project.applications.new") }}
       </Button>
     </div>
 
@@ -253,7 +264,7 @@ onMounted(fetchApps);
                 <span
                   v-if="app.build_location === 'github_actions'"
                   class="inline-flex shrink-0 items-center gap-1 rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                  title="Builds run in GitHub Actions"
+                  :title="t('workload.githubActions.buildsRunThere')"
                 >
                   <Icon name="simple-icons:github" class="h-3 w-3" />
                   GHA
@@ -274,12 +285,14 @@ onMounted(fetchApps);
             </Button>
           </div>
 
-          <div class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm">
+          <div
+            class="relative mt-auto flex min-h-7 items-center justify-between pt-4 text-sm"
+          >
             <span
               class="rounded-full px-2 py-0.5 text-xs font-medium capitalize"
               :class="statusColor(app.status)"
             >
-              {{ app.status }}
+              {{ statusLabel(app.status) }}
             </span>
             <!--
               Right-side timestamp text. The old version showed both
@@ -304,7 +317,7 @@ onMounted(fetchApps);
               v-if="app.status !== 'deleting' && app.last_deployed_at"
               class="flex items-center gap-1 text-xs text-muted-foreground"
             >
-              <span>Deployed</span>
+              <span>{{ t("workload.status.deployed") }}</span>
               <SharedDateTooltip :date="app.last_deployed_at" />
             </span>
             <span v-else class="text-xs text-muted-foreground">

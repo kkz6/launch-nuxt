@@ -7,10 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import {
-  dockerService,
-  type DockerCompose,
-} from "~/services/dockerService";
+import { dockerService, type DockerCompose } from "~/services/dockerService";
 import type { Server } from "~/types";
 
 definePageMeta({
@@ -20,6 +17,7 @@ definePageMeta({
 
 const route = useRoute();
 const router = useRouter();
+const { t } = useI18n();
 const serverId = computed(() => route.params.id as string);
 const projectId = computed(() => route.params.projectId as string);
 const composeId = computed(() => route.params.composeId as string);
@@ -42,17 +40,27 @@ const isDeploying = ref(false);
 // `gha` only renders for github_actions-backed stacks — see
 // pages/.../applications/[applicationId]/index.vue for the same
 // pattern. Hidden for server-built stacks to keep the chrome clean.
-const SUBTABS = [
-  { value: "general", label: "General", icon: "lucide:info" },
-  { value: "deployments", label: "Deployments", icon: "lucide:git-branch" },
-  { value: "environment", label: "Environment", icon: "lucide:key" },
-  { value: "domains", label: "Domains", icon: "lucide:globe" },
-  { value: "volumes", label: "Volumes", icon: "lucide:hard-drive" },
-  { value: "gha", label: "GitHub Actions", icon: "simple-icons:github" },
-  { value: "logs", label: "Logs", icon: "lucide:scroll" },
-  { value: "advanced", label: "Advanced", icon: "lucide:sliders-horizontal" },
+const SUBTAB_DEFINITIONS = [
+  { value: "general", labelKey: "general", icon: "lucide:info" },
+  { value: "deployments", labelKey: "deployments", icon: "lucide:git-branch" },
+  { value: "environment", labelKey: "environment", icon: "lucide:key" },
+  { value: "domains", labelKey: "domains", icon: "lucide:globe" },
+  { value: "volumes", labelKey: "volumes", icon: "lucide:hard-drive" },
+  { value: "gha", labelKey: "githubActions", icon: "simple-icons:github" },
+  { value: "logs", labelKey: "logs", icon: "lucide:scroll" },
+  {
+    value: "advanced",
+    labelKey: "advanced",
+    icon: "lucide:sliders-horizontal",
+  },
 ] as const;
-type SubTabId = (typeof SUBTABS)[number]["value"];
+type SubTabId = (typeof SUBTAB_DEFINITIONS)[number]["value"];
+const SUBTABS = computed(() =>
+  SUBTAB_DEFINITIONS.map(({ labelKey, ...subtab }) => ({
+    ...subtab,
+    label: t(`server.workloadTabs.${labelKey}`),
+  })),
+);
 
 // Kept for parity with the application/database detail pages — every
 // subtab in the SUBTABS list is "ready" here because unready ones
@@ -70,7 +78,7 @@ const READY_SUBTABS: Record<string, boolean> = {
 
 // Read straight from the URL — navbar subtab links are the source of
 // truth. setSubTab updates the URL; the computed reacts.
-const validIds = SUBTABS.map((s) => s.value);
+const validIds = SUBTAB_DEFINITIONS.map((s) => s.value);
 const subTab = computed<SubTabId>(() => {
   const q = route.query.subtab as string | undefined;
   return q && (validIds as readonly string[]).includes(q)
@@ -92,7 +100,7 @@ const fetchCompose = async () => {
     compose.value = res.data;
     useHead({ title: compose.value.name });
   } catch {
-    toast.error("Compose stack not found");
+    toast.error(t("server.workload.composeNotFound"));
     navigateTo(
       `/servers/${serverId.value}/projects/${projectId.value}?tab=compose`,
     );
@@ -111,10 +119,10 @@ const quickDeploy = async () => {
       compose.value.id,
     );
     setSubTab("deployments");
-    toast.success("Deployment started");
+    toast.success(t("server.workload.deploymentStarted"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to start deployment");
+    toast.error(e.data?.message || t("server.workload.deploymentStartFailed"));
   } finally {
     isDeploying.value = false;
   }
@@ -193,10 +201,7 @@ const statusBadge = computed(() => {
       moved to Advanced, so no @updated emit is needed here. Mirrors
       application + database General which take the same shape.
     -->
-    <ComposeGeneral
-      v-else-if="subTab === 'general'"
-      :compose="compose"
-    />
+    <ComposeGeneral v-else-if="subTab === 'general'" :compose="compose" />
 
     <ComposeDeployments
       v-else-if="subTab === 'deployments'"
@@ -208,15 +213,9 @@ const statusBadge = computed(() => {
       :compose="compose"
     />
 
-    <ComposeDomains
-      v-else-if="subTab === 'domains'"
-      :compose="compose"
-    />
+    <ComposeDomains v-else-if="subTab === 'domains'" :compose="compose" />
 
-    <ComposeVolumes
-      v-else-if="subTab === 'volumes'"
-      :compose="compose"
-    />
+    <ComposeVolumes v-else-if="subTab === 'volumes'" :compose="compose" />
 
     <ComposeGHA
       v-else-if="subTab === 'gha'"
@@ -230,13 +229,15 @@ const statusBadge = computed(() => {
       v-else-if="subTab === 'advanced'"
       :compose="compose"
       @updated="fetchCompose"
-      @deleted="navigateTo(`/servers/${serverId}/projects/${projectId}?tab=compose`)"
+      @deleted="
+        navigateTo(`/servers/${serverId}/projects/${projectId}?tab=compose`)
+      "
     />
 
     <ServerDockerComingSoon
       v-else-if="!READY_SUBTABS[subTab]"
       :title="SUBTABS.find((s) => s.value === subTab)?.label ?? subTab"
-      description="Compose subtab is per-service which needs its own design pass — landing in a future slice."
+      :description="t('server.workload.composeComingSoon')"
       :icon="SUBTABS.find((s) => s.value === subTab)?.icon ?? 'lucide:hammer'"
     />
 
@@ -261,11 +262,13 @@ const statusBadge = computed(() => {
         <DialogHeader>
           <DialogTitle>docker-compose.yml</DialogTitle>
           <DialogDescription>
-            Applied on every deploy. Edit + redeploy via the Advanced tab.
+            {{ t("server.workload.yamlDescription") }}
           </DialogDescription>
         </DialogHeader>
         <div
-          v-if="compose?.compose_source_type === 'raw_yaml' && compose?.raw_yaml"
+          v-if="
+            compose?.compose_source_type === 'raw_yaml' && compose?.raw_yaml
+          "
         >
           <SharedCodeEditor
             :model-value="compose.raw_yaml"
@@ -279,9 +282,9 @@ const statusBadge = computed(() => {
           v-else
           class="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground"
         >
-          This stack pulls its <code class="font-mono">docker-compose.yml</code>
-          from a git source — the file isn't stored on launchctl. Inspect
-          it in the source repository or on the server's deploy directory.
+          {{ t("server.workload.gitYamlBefore") }}
+          <code class="font-mono">docker-compose.yml</code>
+          {{ t("server.workload.gitYamlAfter") }}
         </div>
       </DialogContent>
     </Dialog>

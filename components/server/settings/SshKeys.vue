@@ -1,54 +1,59 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
-import type { SSHKey } from '~/types'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
+import type { SSHKey } from "~/types";
 
 interface Props {
-  serverId: string
+  serverId: string;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
-const sshKeys = ref<SSHKey[]>([])
-const isLoading = ref(true)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const sshKeys = ref<SSHKey[]>([]);
+const isLoading = ref(true);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchKeys = async () => {
   try {
-    const data = await $api<{ data: SSHKey[] }>(`/servers/${props.serverId}/ssh-keys`)
-    sshKeys.value = data.data
+    const data = await $api<{ data: SSHKey[] }>(
+      `/servers/${props.serverId}/ssh-keys`,
+    );
+    sshKeys.value = data.data;
   } catch {
-    toast.error('Failed to load SSH keys')
+    toast.error(t("server.sshKeys.loadFailed"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const deleteKey = async (key: SSHKey) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete SSH Key',
-    description: `Are you sure you want to remove "${key.name}" from this server?`,
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
+    title: t("server.sshKeys.deleteTitle"),
+    description: t("server.sshKeys.deleteDescription", { name: key.name }),
+    confirmText: t("server.common.delete"),
+    cancelText: t("server.common.cancel"),
     destructive: true,
-  })
+  });
 
   if (result.ok) {
     try {
       await $api(`/servers/${props.serverId}/ssh-keys/${key.id}`, {
-        method: 'DELETE',
-      })
-      sshKeys.value = sshKeys.value.filter((k) => k.id !== key.id)
-      toast.success('SSH key removed')
+        method: "DELETE",
+      });
+      sshKeys.value = sshKeys.value.filter((k) => k.id !== key.id);
+      toast.success(t("server.sshKeys.removeSuccess"));
     } catch {
-      toast.error('Failed to remove SSH key')
+      toast.error(t("server.sshKeys.removeFailed"));
     }
   }
-}
+};
 
-onMounted(fetchKeys)
+onMounted(fetchKeys);
 </script>
 
 <template>
@@ -56,26 +61,40 @@ onMounted(fetchKeys)
     <SharedConfirmationDialog ref="confirmationDialog" />
 
     <div>
-      <h3 class="text-lg font-medium">SSH Keys</h3>
-      <p class="text-sm text-muted-foreground">Manage SSH keys that can access this server</p>
+      <h3 class="text-lg font-medium">{{ t("server.sshKeys.title") }}</h3>
+      <p class="text-sm text-muted-foreground">
+        {{ t("server.sshKeys.description") }}
+      </p>
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <template v-else>
       <SharedDataTable
         :data="sshKeys"
         :columns="[
-          { key: 'name', label: 'Name', width: '30%' },
-          { key: 'fingerprint', label: 'Fingerprint', width: '40%' },
-          { key: 'created_at', label: 'Added', width: '20%' },
+          { key: 'name', label: t('server.common.name'), width: '30%' },
+          {
+            key: 'fingerprint',
+            label: t('server.sshKeys.fingerprint'),
+            width: '40%',
+          },
+          { key: 'created_at', label: t('server.sshKeys.added'), width: '20%' },
         ]"
         :actions="[
-          { label: 'Remove', icon: 'lucide:trash-2', onClick: deleteKey, destructive: true },
+          {
+            label: t('server.common.remove'),
+            icon: 'lucide:trash-2',
+            onClick: deleteKey,
+            destructive: true,
+          },
         ]"
-        empty-title="No SSH keys found"
+        :empty-title="t('server.sshKeys.empty')"
         empty-icon="lucide:key"
       >
         <template #empty>

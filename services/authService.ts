@@ -1,5 +1,6 @@
 import type { User, LoginCredentials, RegisterData, UserSession } from '~/types'
 import type { ApiResponse } from '~/composables/useApi'
+import type { LocalePreference } from '~/types/locale'
 
 export interface LoginResponse {
   two_factor_required: boolean
@@ -74,6 +75,15 @@ export const authService = {
   updateProfile: (data: { name?: string; email?: string; timezone?: string }) => {
     const { put } = useApi()
     return put<ApiResponse<User>>('/auth/profile', data)
+  },
+
+  /**
+   * Save the user's language preference. `auto` clears the stored locale on
+   * the backend while preserving automatic detection as an explicit choice.
+   */
+  updateLocale: (locale: LocalePreference) => {
+    const { patch } = useApi()
+    return patch<ApiResponse<User>>('/auth/locale', { locale })
   },
 
   /**

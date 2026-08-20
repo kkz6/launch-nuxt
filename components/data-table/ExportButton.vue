@@ -8,6 +8,8 @@ import {
 import { Button } from "~/components/ui/button";
 import type { ExportDef } from "~/types/data-table";
 
+const { t } = useI18n();
+
 defineProps<{
   exports: ExportDef[];
 }>();
@@ -36,7 +38,7 @@ const emit = defineEmits<{
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" y1="15" x2="12" y2="3" />
         </svg>
-        Export
+        {{ t("data.export") }}
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>

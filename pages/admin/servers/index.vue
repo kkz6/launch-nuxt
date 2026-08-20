@@ -6,14 +6,20 @@ definePageMeta({
   middleware: ["auth", "staff"],
 });
 
+const { locale, t } = useI18n();
+
 useHead({
-  title: "Admin — Servers",
+  title: () => t("admin.serversList.pageTitle"),
 });
 
-setBreadcrumbs([
-  { label: "Admin", to: "/admin/overview" },
-  { label: "Servers" },
-]);
+const applyBreadcrumb = (): void => {
+  setBreadcrumbs([
+    { label: t("admin.common.admin"), to: "/admin/overview" },
+    { label: t("admin.common.servers") },
+  ]);
+};
+applyBreadcrumb();
+watch(locale, applyBreadcrumb);
 
 const openServer = (row: { id: string }): void => {
   navigateTo(`/admin/servers/${row.id}`);
@@ -23,7 +29,7 @@ const openServer = (row: { id: string }): void => {
 <template>
   <div class="space-y-6 pb-10">
     <p class="text-sm text-muted-foreground">
-      All servers across teams. Select a server for details and ownership.
+      {{ t("admin.serversList.description") }}
     </p>
 
     <DataTable endpoint="/admin/servers/table" @row-click="openServer" />

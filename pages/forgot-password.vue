@@ -9,9 +9,11 @@ definePageMeta({
   middleware: "guest",
 });
 
-useHead({
-  title: "Forgot Password",
-});
+const { t } = useI18n();
+
+useHead(() => ({
+  title: t("auth.forgotPassword.pageTitle"),
+}));
 
 const { forgotPassword, isLoading } = useAuth();
 
@@ -25,7 +27,7 @@ const handleSubmit = async () => {
 
   try {
     await forgotPassword(email.value);
-    status.value = "We have emailed your password reset link!";
+    status.value = t("auth.forgotPassword.sent");
     email.value = "";
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
@@ -36,11 +38,11 @@ const handleSubmit = async () => {
         errors.value = { email: fetchError.data.errors.email[0] };
       } else {
         errors.value = {
-          email: fetchError.data?.message || "An error occurred",
+          email: fetchError.data?.message || t("auth.errors.genericShort"),
         };
       }
     } else {
-      errors.value = { email: "An error occurred. Please try again." };
+      errors.value = { email: t("auth.errors.generic") };
     }
   }
 };
@@ -53,21 +55,23 @@ const handleSubmit = async () => {
     </div>
 
     <Alert v-if="status" class="mb-6 flex items-start gap-3">
-      <Icon name="lucide:circle-check" class="h-4 w-4 mt-0.5 shrink-0 text-green-600" />
+      <Icon
+        name="lucide:circle-check"
+        class="h-4 w-4 mt-0.5 shrink-0 text-green-600"
+      />
       <AlertDescription>{{ status }}</AlertDescription>
     </Alert>
 
     <h3 class="mb-2 text-lg font-semibold text-foreground">
-      Forgot your password?
+      {{ t("auth.forgotPassword.heading") }}
     </h3>
     <p class="mb-8 text-sm text-muted-foreground">
-      No problem. Just let us know your email address and we will email you a
-      password reset link that will allow you to choose a new one.
+      {{ t("auth.forgotPassword.description") }}
     </p>
 
     <form class="space-y-4" @submit.prevent="handleSubmit">
       <div class="space-y-2">
-        <Label for="email">Email</Label>
+        <Label for="email">{{ t("auth.fields.email") }}</Label>
         <Input
           id="email"
           v-model="email"
@@ -87,17 +91,21 @@ const handleSubmit = async () => {
           name="lucide:loader-2"
           class="mr-2 h-4 w-4 animate-spin"
         />
-        {{ isLoading ? 'Sending...' : 'Email Password Reset Link' }}
+        {{
+          isLoading
+            ? t("auth.actions.sending")
+            : t("auth.actions.sendResetLink")
+        }}
       </Button>
     </form>
 
     <p class="mt-6 text-sm text-muted-foreground">
-      Remember your password?
+      {{ t("auth.forgotPassword.remembered") }}
       <NuxtLink
         to="/login"
         class="font-medium text-primary hover:text-primary/90"
       >
-        Back to login
+        {{ t("auth.actions.backToLogin") }}
       </NuxtLink>
     </p>
   </div>

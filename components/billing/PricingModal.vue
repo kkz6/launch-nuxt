@@ -1,54 +1,90 @@
 <script setup lang="ts">
-import { Button } from '~/components/ui/button'
-import { Badge } from '~/components/ui/badge'
+import { Button } from "~/components/ui/button";
+import { Badge } from "~/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '~/components/ui/dialog'
+} from "~/components/ui/dialog";
 
 interface PlanOption {
-  id: string
-  name: string
-  description?: string
-  monthly_pricing: number
-  features: string[]
-  recommended?: boolean
+  id: string;
+  name: string;
+  description?: string;
+  monthly_pricing: number;
+  features: string[];
+  recommended?: boolean;
 }
 
 interface Props {
-  plans: PlanOption[]
-  currentPlanId?: string
+  plans: PlanOption[];
+  currentPlanId?: string;
 }
 
-const props = defineProps<Props>()
+defineProps<Props>();
+const { locale, t } = useI18n();
 
 const emit = defineEmits<{
-  selectPlan: [planId: string]
-}>()
+  selectPlan: [planId: string];
+}>();
 
-const isOpen = defineModel<boolean>('isOpen', { required: true })
-const isLoading = ref<string | null>(null)
+const isOpen = defineModel<boolean>("isOpen", { required: true });
+const isLoading = ref<string | null>(null);
 
 // Format price from cents to dollars
 const formatPrice = (cents: number) => {
-  const dollars = cents / 100
-  return dollars % 1 === 0 ? dollars.toString() : dollars.toFixed(2)
-}
+  return new Intl.NumberFormat(locale.value, {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(cents / 100);
+};
 
 const handleSelectPlan = (planId: string) => {
-  isLoading.value = planId
-  emit('selectPlan', planId)
-}
+  isLoading.value = planId;
+  emit("selectPlan", planId);
+};
 
 const resetLoading = () => {
-  isLoading.value = null
-}
+  isLoading.value = null;
+};
 
-defineExpose({ resetLoading })
+defineExpose({ resetLoading });
 
-const currentPlan = computed(() => props.plans.find(p => p.id === props.currentPlanId))
+const knownPlanIds = new Set(["hobby", "compact", "turbo"]);
+const localizedPlanName = (plan: PlanOption) =>
+  knownPlanIds.has(plan.id)
+    ? t(`settings.billing.plans.${plan.id}.name`)
+    : plan.name;
+
+const planFeatureKeys: Record<string, string[]> = {
+  hobby: ["oneServer", "oneSite", "fiveDeployments", "oneTeamMember"],
+  compact: [
+    "threeServers",
+    "tenSites",
+    "fiveDeployments",
+    "oneTeamMember",
+    "backups",
+    "monitoring",
+  ],
+  turbo: [
+    "tenServers",
+    "twentySites",
+    "fiveDeployments",
+    "oneTeamMember",
+    "backups",
+    "monitoring",
+  ],
+};
+
+const localizedPlanFeatures = (plan: PlanOption): string[] => {
+  const keys = planFeatureKeys[plan.id];
+  return keys
+    ? keys.map((key) => t(`settings.billing.planFeatures.${key}`))
+    : plan.features;
+};
 </script>
 
 <template>
@@ -58,10 +94,10 @@ const currentPlan = computed(() => props.plans.find(p => p.id === props.currentP
       <div class="border-b px-6 py-6 text-center">
         <DialogHeader>
           <DialogTitle class="text-xl font-semibold">
-            Choose your plan
+            {{ t("settings.billing.pricingTitle") }}
           </DialogTitle>
           <p class="mt-1.5 text-sm text-muted-foreground">
-            Select the plan that best fits your needs
+            {{ t("settings.billing.pricingDescription") }}
           </p>
         </DialogHeader>
       </div>
@@ -84,21 +120,32 @@ const currentPlan = computed(() => props.plans.find(p => p.id === props.currentP
             v-if="plan.recommended"
             class="absolute -top-3 left-1/2 -translate-x-1/2"
           >
-            <span class="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-primary to-primary/80 px-3 py-1 text-xs font-semibold text-primary-foreground shadow-lg shadow-primary/25">
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-primary to-primary/80 px-3 py-1 text-xs font-semibold text-primary-foreground shadow-lg shadow-primary/25"
+            >
               <Icon name="lucide:sparkles" class="h-3 w-3" />
-              Popular
+              {{ t("settings.billing.popular") }}
             </span>
           </div>
 
           <!-- Plan Header -->
           <div class="mb-4 pt-2 text-center">
             <div class="flex items-center justify-center gap-2">
-              <h3 class="text-lg font-semibold">{{ plan.name }}</h3>
-              <Badge v-if="plan.id === currentPlanId" variant="secondary" class="text-xs">
-                Current
+              <h3 class="text-lg font-semibold">
+                {{ localizedPlanName(plan) }}
+              </h3>
+              <Badge
+                v-if="plan.id === currentPlanId"
+                variant="secondary"
+                class="text-xs"
+              >
+                {{ t("settings.billing.current") }}
               </Badge>
             </div>
-            <p v-if="plan.description" class="mt-1 text-sm text-muted-foreground">
+            <p
+              v-if="plan.description"
+              class="mt-1 text-sm text-muted-foreground"
+            >
               {{ plan.description }}
             </p>
           </div>
@@ -106,23 +153,29 @@ const currentPlan = computed(() => props.plans.find(p => p.id === props.currentP
           <!-- Price -->
           <div class="mb-5 text-center">
             <div class="flex items-baseline justify-center">
-              <span class="text-sm font-medium text-muted-foreground">$</span>
               <span class="text-4xl font-bold tracking-tight">
                 {{ formatPrice(plan.monthly_pricing) }}
               </span>
-              <span class="ml-1 text-sm text-muted-foreground">/mo</span>
+              <span class="ml-1 text-sm text-muted-foreground">{{
+                t("settings.billing.perMonthShort")
+              }}</span>
             </div>
           </div>
 
           <!-- Features -->
           <ul class="mb-5 flex-1 space-y-2.5">
             <li
-              v-for="(feature, index) in plan.features"
+              v-for="(feature, index) in localizedPlanFeatures(plan)"
               :key="index"
               class="flex items-start gap-2 text-sm"
             >
-              <div class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-                <Icon name="lucide:check" class="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
+              <div
+                class="mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30"
+              >
+                <Icon
+                  name="lucide:check"
+                  class="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400"
+                />
               </div>
               <span class="text-muted-foreground">{{ feature }}</span>
             </li>
@@ -144,13 +197,13 @@ const currentPlan = computed(() => props.plans.find(p => p.id === props.currentP
               class="mr-2 h-4 w-4 animate-spin"
             />
             <template v-if="plan.id === currentPlanId">
-              Current Plan
+              {{ t("settings.billing.currentPlan") }}
             </template>
             <template v-else-if="currentPlanId">
-              Switch Plan
+              {{ t("settings.billing.switchPlan") }}
             </template>
             <template v-else>
-              Get Started
+              {{ t("settings.billing.getStarted") }}
             </template>
           </Button>
         </div>
@@ -159,7 +212,7 @@ const currentPlan = computed(() => props.plans.find(p => p.id === props.currentP
       <!-- Footer -->
       <div class="border-t bg-muted/30 px-6 py-4 text-center">
         <p class="text-xs text-muted-foreground">
-          All plans include a 14-day free trial. Cancel anytime.
+          {{ t("settings.billing.trialNote") }}
         </p>
       </div>
     </DialogContent>

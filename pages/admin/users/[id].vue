@@ -35,6 +35,19 @@ definePageMeta({
 
 const route = useRoute();
 const userId = route.params.id as string;
+const { locale, t, te } = useI18n();
+const { getSiteTypeLabel } = useStableMetadataLabels();
+
+const tlsSettingLabel = (value: string): string => {
+  const keys: Record<string, string> = {
+    auto: "site.ssl.automatic",
+    off: "site.ssl.disabled",
+    stored: "site.ssl.stored",
+    custom: "site.ssl.custom",
+  };
+  const key = keys[value];
+  return key ? t(key) : value;
+};
 
 const { user: currentUser } = useAuth();
 const isSuperAdmin = computed(
@@ -49,21 +62,38 @@ const isLoading = ref(true);
 const notFound = ref(false);
 const busy = ref<"suspend" | "unsuspend" | "delete" | "spectate" | null>(null);
 
-useHead({ title: () => `Admin — ${user.value?.name ?? "User"}` });
+useHead({
+  title: () =>
+    t("admin.userDetail.pageTitle", {
+      name: user.value?.name ?? t("admin.common.user"),
+    }),
+});
 
 function applyBreadcrumb(): void {
   setBreadcrumbs([
-    { label: "Admin", to: "/admin/overview" },
-    { label: "Users", to: "/admin" },
-    { label: user.value?.name || "User" },
+    { label: t("admin.common.admin"), to: "/admin/overview" },
+    { label: t("admin.common.users"), to: "/admin" },
+    { label: user.value?.name || t("admin.common.user") },
   ]);
 }
 applyBreadcrumb();
+watch(locale, applyBreadcrumb);
 
 const isSuspended = computed(() => user.value?.status === "suspended");
 const statusVariant = computed(() =>
   isSuspended.value ? "destructive" : "green",
 );
+const userStatusLabel = computed(() => {
+  const status = user.value?.status || "active";
+  const key = `admin.statuses.user.${status}`;
+  return te(key) ? t(key) : status.replace(/_/g, " ");
+});
+const staffRoleLabel = computed(() => {
+  const role = user.value?.staff_role;
+  if (!role) return "";
+  const key = `admin.statuses.staffRole.${role}`;
+  return te(key) ? t(key) : role.replace(/_/g, " ");
+});
 
 const initials = computed(() =>
   (user.value?.name || "?")
@@ -80,13 +110,26 @@ const activeSubs = computed(
       .length ?? 0,
 );
 
+const formatNumber = (value: number): string =>
+  value.toLocaleString(locale.value);
+
+const serverStatusText = (status: string): string => {
+  const key = `admin.statuses.server.${status}`;
+  return te(key) ? t(key) : status.replace(/_/g, " ");
+};
+
 // Subscription → badge mapping (matches the teams chips elsewhere).
 function subBadge(team: AdminTeam): {
   variant: "green" | "blue" | "orange" | "secondary";
   label: string;
 } {
   const sub = team.subscription;
-  if (!sub) return { variant: "secondary", label: "free" };
+  if (!sub) {
+    return {
+      variant: "secondary",
+      label: t("admin.statuses.subscription.free"),
+    };
+  }
   return statusBadge(sub.status, sub.trial_ends_at);
 }
 
@@ -101,21 +144,37 @@ function statusBadge(
 } {
   switch (status) {
     case "active":
-      return { variant: "green", label: "active" };
+      return {
+        variant: "green",
+        label: t("admin.statuses.subscription.active"),
+      };
     case "on_trial": {
       const days = trialEndsAt
         ? differenceInCalendarDays(new Date(trialEndsAt), new Date())
         : null;
       return {
         variant: "blue",
-        label: days !== null ? `trial · ${days}d` : "trial",
+        label:
+          days !== null
+            ? t("admin.statuses.subscription.trialDays", {
+                days: formatNumber(days),
+              })
+            : t("admin.statuses.subscription.trial"),
       };
     }
     case "past_due":
     case "unpaid":
-      return { variant: "orange", label: status.replace("_", " ") };
+      return {
+        variant: "orange",
+        label: t(`admin.statuses.subscription.${status}`),
+      };
     default:
-      return { variant: "secondary", label: status };
+      return {
+        variant: "secondary",
+        label: te(`admin.statuses.subscription.${status}`)
+          ? t(`admin.statuses.subscription.${status}`)
+          : status.replace(/_/g, " "),
+      };
   }
 }
 
@@ -125,9 +184,17 @@ function serverBadge(server: AdminServerSummary): {
   label: string;
 } {
   if (server.status === "running" && server.connected) {
-    return { variant: "green", label: server.status };
+    return {
+      variant: "green",
+      label: t("admin.statuses.server.running"),
+    };
   }
-  return { variant: "secondary", label: server.status };
+  return {
+    variant: "secondary",
+    label: te(`admin.statuses.server.${server.status}`)
+      ? t(`admin.statuses.server.${server.status}`)
+      : server.status.replace(/_/g, " "),
+  };
 }
 
 // Lazy-loaded resource tabs. Each fetches on first activation and caches.
@@ -170,7 +237,11 @@ async function loadTab(tab: TabKey): Promise<void> {
     }
     loaded.value[tab] = true;
   } catch {
-    toast.error(`Failed to load ${tab}`);
+    toast.error(
+      t("admin.userDetail.loadTabFailed", {
+        resource: t(`admin.userDetail.tabs.${tab}`),
+      }),
+    );
   } finally {
     loadingTab.value[tab] = false;
   }
@@ -193,7 +264,7 @@ async function load(): Promise<void> {
     if (err.status === 404 || err.statusCode === 404) {
       notFound.value = true;
     } else {
-      toast.error("Failed to load user");
+      toast.error(t("admin.userDetail.loadFailed"));
     }
   } finally {
     isLoading.value = false;
@@ -209,10 +280,10 @@ async function suspend(): Promise<void> {
   busy.value = "suspend";
   try {
     await adminService.suspendUser(userId);
-    toast.success("User suspended");
+    toast.success(t("admin.userDetail.suspended"));
     await load();
   } catch (error: unknown) {
-    actionError(error, "Failed to suspend user");
+    actionError(error, t("admin.userDetail.suspendFailed"));
   } finally {
     busy.value = null;
   }
@@ -222,10 +293,10 @@ async function unsuspend(): Promise<void> {
   busy.value = "unsuspend";
   try {
     await adminService.unsuspendUser(userId);
-    toast.success("User unsuspended");
+    toast.success(t("admin.userDetail.unsuspended"));
     await load();
   } catch (error: unknown) {
-    actionError(error, "Failed to unsuspend user");
+    actionError(error, t("admin.userDetail.unsuspendFailed"));
   } finally {
     busy.value = null;
   }
@@ -235,10 +306,10 @@ async function remove(): Promise<void> {
   busy.value = "delete";
   try {
     await adminService.deleteUser(userId);
-    toast.success("User deleted");
+    toast.success(t("admin.userDetail.deleted"));
     navigateTo("/admin");
   } catch (error: unknown) {
-    actionError(error, "Failed to delete user");
+    actionError(error, t("admin.userDetail.deleteFailed"));
     busy.value = null;
   }
 }
@@ -246,9 +317,9 @@ async function remove(): Promise<void> {
 async function spectate(): Promise<void> {
   busy.value = "spectate";
   try {
-    await start(userId, "Staff support session");
+    await start(userId, t("admin.userDetail.supportSessionReason"));
   } catch (error: unknown) {
-    actionError(error, "Failed to start spectate session");
+    actionError(error, t("admin.userDetail.spectateFailed"));
     busy.value = null;
   }
 }
@@ -270,9 +341,11 @@ onMounted(load);
       class="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-16"
     >
       <Icon name="lucide:user-x" class="h-10 w-10 text-muted-foreground" />
-      <p class="text-sm text-muted-foreground">This user no longer exists.</p>
+      <p class="text-sm text-muted-foreground">
+        {{ t("admin.userDetail.notFound") }}
+      </p>
       <Button variant="outline" size="sm" @click="navigateTo('/admin')">
-        Back to users
+        {{ t("admin.userDetail.backToUsers") }}
       </Button>
     </div>
 
@@ -293,14 +366,14 @@ onMounted(load);
             </h1>
             <div class="flex flex-wrap items-center gap-2">
               <Badge :variant="statusVariant" class="capitalize">
-                {{ user.status }}
+                {{ userStatusLabel }}
               </Badge>
               <span
                 v-if="user.staff_role"
                 class="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
               >
                 <Icon name="lucide:shield" class="h-3.5 w-3.5" />
-                {{ user.staff_role }}
+                {{ staffRoleLabel }}
               </span>
             </div>
             <p class="break-all text-sm text-muted-foreground">
@@ -311,15 +384,21 @@ onMounted(load);
 
         <dl class="space-y-2.5 border-t pt-4 text-sm">
           <div class="flex items-center justify-between gap-3">
-            <dt class="text-muted-foreground">Teams</dt>
-            <dd class="font-medium">{{ user.teams.length }}</dd>
+            <dt class="text-muted-foreground">
+              {{ t("admin.userDetail.tabs.teams") }}
+            </dt>
+            <dd class="font-medium">{{ formatNumber(user.teams.length) }}</dd>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <dt class="text-muted-foreground">Active subs</dt>
-            <dd class="font-medium">{{ activeSubs }}</dd>
+            <dt class="text-muted-foreground">
+              {{ t("admin.userDetail.activeSubscriptionsShort") }}
+            </dt>
+            <dd class="font-medium">{{ formatNumber(activeSubs) }}</dd>
           </div>
           <div class="flex items-center justify-between gap-3">
-            <dt class="text-muted-foreground">Joined</dt>
+            <dt class="text-muted-foreground">
+              {{ t("admin.userDetail.joined") }}
+            </dt>
             <dd class="font-medium">
               <SharedDateTooltip
                 v-if="user.created_at"
@@ -343,7 +422,7 @@ onMounted(load);
               class="h-4 w-4"
               :class="{ 'animate-spin': busy === 'spectate' }"
             />
-            Spectate
+            {{ t("admin.userDetail.spectate") }}
           </Button>
 
           <template v-if="isSuperAdmin && !isSelf">
@@ -360,7 +439,7 @@ onMounted(load);
                 class="h-4 w-4"
                 :class="{ 'animate-spin': busy === 'suspend' }"
               />
-              Suspend
+              {{ t("admin.userDetail.suspend") }}
             </Button>
             <Button
               v-else
@@ -379,7 +458,7 @@ onMounted(load);
                 class="h-4 w-4"
                 :class="{ 'animate-spin': busy === 'unsuspend' }"
               />
-              Unsuspend
+              {{ t("admin.userDetail.unsuspend") }}
             </Button>
 
             <AlertDialog>
@@ -391,24 +470,31 @@ onMounted(load);
                   :disabled="busy === 'delete'"
                 >
                   <Icon name="lucide:trash-2" class="h-4 w-4" />
-                  Delete
+                  {{ t("admin.common.delete") }}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete this user?</AlertDialogTitle>
+                  <AlertDialogTitle>
+                    {{ t("admin.userDetail.deleteTitle") }}
+                  </AlertDialogTitle>
                   <AlertDialogDescription>
-                    Permanently deletes {{ user.name }} and all their data. Only
-                    allowed if they never had a paying subscription.
+                    {{
+                      t("admin.userDetail.deleteDescription", {
+                        name: user.name,
+                      })
+                    }}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>
+                    {{ t("admin.common.cancel") }}
+                  </AlertDialogCancel>
                   <AlertDialogAction
                     class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     @click="remove"
                   >
-                    Delete user
+                    {{ t("admin.userDetail.deleteUser") }}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -422,36 +508,36 @@ onMounted(load);
         <Tabs :model-value="activeTab" @update:model-value="onTabChange">
           <TabsList>
             <TabsTrigger value="teams">
-              Teams
+              {{ t("admin.userDetail.tabs.teams") }}
               <span class="ml-1.5 text-xs text-muted-foreground">
-                {{ user.teams.length }}
+                {{ formatNumber(user.teams.length) }}
               </span>
             </TabsTrigger>
             <TabsTrigger value="subscriptions">
-              Subscriptions
+              {{ t("admin.userDetail.tabs.subscriptions") }}
               <span
                 v-if="loaded.subscriptions"
                 class="ml-1.5 text-xs text-muted-foreground"
               >
-                {{ subscriptions.length }}
+                {{ formatNumber(subscriptions.length) }}
               </span>
             </TabsTrigger>
             <TabsTrigger value="servers">
-              Servers
+              {{ t("admin.userDetail.tabs.servers") }}
               <span
                 v-if="loaded.servers"
                 class="ml-1.5 text-xs text-muted-foreground"
               >
-                {{ servers.length }}
+                {{ formatNumber(servers.length) }}
               </span>
             </TabsTrigger>
             <TabsTrigger value="sites">
-              Sites
+              {{ t("admin.userDetail.tabs.sites") }}
               <span
                 v-if="loaded.sites"
                 class="ml-1.5 text-xs text-muted-foreground"
               >
-                {{ sites.length }}
+                {{ formatNumber(sites.length) }}
               </span>
             </TabsTrigger>
           </TabsList>
@@ -480,7 +566,11 @@ onMounted(load);
                   <div>
                     <p class="text-sm font-medium">{{ team.name }}</p>
                     <p class="text-xs text-muted-foreground">
-                      {{ team.personal_team ? "Personal team" : "Team" }}
+                      {{
+                        team.personal_team
+                          ? t("admin.userDetail.personalTeam")
+                          : t("admin.userDetail.team")
+                      }}
                     </p>
                   </div>
                 </div>
@@ -498,7 +588,7 @@ onMounted(load);
                 class="h-8 w-8 text-muted-foreground/50"
               />
               <p class="text-sm text-muted-foreground">
-                This user does not own any teams.
+                {{ t("admin.userDetail.noTeams") }}
               </p>
             </div>
           </TabsContent>
@@ -535,14 +625,16 @@ onMounted(load);
                       <template
                         v-if="sub.status === 'on_trial' && sub.trial_ends_at"
                       >
-                        trial ends
+                        {{ t("admin.userDetail.trialEnds") }}
                         <SharedDateTooltip :date="sub.trial_ends_at" />
                       </template>
                       <template v-else-if="sub.ends_at">
-                        ends <SharedDateTooltip :date="sub.ends_at" />
+                        {{ t("admin.userDetail.ends") }}
+                        <SharedDateTooltip :date="sub.ends_at" />
                       </template>
                       <template v-else-if="sub.renews_at">
-                        renews <SharedDateTooltip :date="sub.renews_at" />
+                        {{ t("admin.userDetail.renews") }}
+                        <SharedDateTooltip :date="sub.renews_at" />
                       </template>
                       <template v-if="sub.card_last_four">
                         · •••• {{ sub.card_last_four }}
@@ -566,7 +658,7 @@ onMounted(load);
                 class="h-8 w-8 text-muted-foreground/50"
               />
               <p class="text-sm text-muted-foreground">
-                This user has no subscriptions.
+                {{ t("admin.userDetail.noSubscriptions") }}
               </p>
             </div>
           </TabsContent>
@@ -602,7 +694,7 @@ onMounted(load);
                     <p class="text-sm font-medium">{{ server.name }}</p>
                     <p class="text-xs capitalize text-muted-foreground">
                       {{ server.provider.replace("_", " ") }} ·
-                      {{ server.status }}
+                      {{ serverStatusText(server.status) }}
                     </p>
                   </div>
                 </div>
@@ -620,7 +712,7 @@ onMounted(load);
                 class="h-8 w-8 text-muted-foreground/50"
               />
               <p class="text-sm text-muted-foreground">
-                This user does not own any servers.
+                {{ t("admin.userDetail.noServers") }}
               </p>
             </div>
           </TabsContent>
@@ -654,16 +746,20 @@ onMounted(load);
                   <div>
                     <p class="text-sm font-medium">{{ site.address }}</p>
                     <p class="text-xs text-muted-foreground">
-                      on {{ site.server_name }}
+                      {{
+                        t("admin.userDetail.onServer", {
+                          server: site.server_name,
+                        })
+                      }}
                     </p>
                   </div>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <Badge variant="secondary" class="capitalize">
-                    {{ site.type }}
+                    {{ getSiteTypeLabel(site.type, site.type) }}
                   </Badge>
                   <Badge variant="outline" class="uppercase">
-                    {{ site.tls_setting }}
+                    {{ tlsSettingLabel(site.tls_setting) }}
                   </Badge>
                 </div>
               </div>
@@ -677,7 +773,7 @@ onMounted(load);
                 class="h-8 w-8 text-muted-foreground/50"
               />
               <p class="text-sm text-muted-foreground">
-                This user does not have any sites.
+                {{ t("admin.userDetail.noSites") }}
               </p>
             </div>
           </TabsContent>

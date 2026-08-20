@@ -10,6 +10,7 @@ interface Props {
   database: DockerDatabase;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // User-added env vars on a managed database. Sit alongside the
 // auto-generated engine credentials (POSTGRES_USER etc); both end
@@ -29,7 +30,7 @@ const fetchVars = async () => {
     );
     vars.value = res.data;
   } catch {
-    toast.error("Failed to load database env vars");
+    toast.error(t("workload.environment.databaseLoadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -95,9 +96,9 @@ const onRestart = async () => {
     :show-project-hint="true"
     :is-running="database.status === 'running'"
     :on-restart="onRestart"
-    restart-label="Restart"
-    title="Environment"
-    description="Extra runtime env vars layered on top of the engine credentials. Save, then Restart to apply (recreates the container, keeps your data). Note: engine credential vars like POSTGRES_PASSWORD only apply on first init — Restart can't change them."
+    :restart-label="t('workload.deployments.action.restart')"
+    :title="t('workload.environment.title')"
+    :description="t('workload.environment.databaseDescription')"
     :on-create="onCreate"
     :on-update="onUpdate"
     :on-delete="onDelete"

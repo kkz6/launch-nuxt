@@ -19,6 +19,8 @@ import DateFilterInput from "./DateFilterInput.vue";
 import BooleanFilterInput from "./BooleanFilterInput.vue";
 import SetFilterInput from "./SetFilterInput.vue";
 
+const { t } = useI18n();
+
 defineProps<{
   filter: FilterDef;
   clause: string;
@@ -31,7 +33,11 @@ const emit = defineEmits<{
 }>();
 
 function formatClause(c: string): string {
-  return c.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase());
+  const key = `data.clauses.${c}`;
+  const translated = t(key);
+  return translated === key
+    ? c.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase())
+    : translated;
 }
 </script>
 <template>

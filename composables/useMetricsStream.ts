@@ -52,6 +52,7 @@ export interface MetricsData {
 interface MetricsEvent {
   event: "connected" | "error" | "metrics" | "system_info";
   message?: string;
+  data?: { message?: string };
   timestamp?: string;
   cpu?: number;
   load?: [number, number, number];
@@ -91,8 +92,10 @@ interface MetricsStreamState {
 
 export const useMetricsStream = (serverId: MaybeRef<string>) => {
   const config = useRuntimeConfig();
+  const { t } = useI18n();
   const { token } = useAuth();
   const { getCurrentTeamId } = useApi();
+  const { effectiveLocale, getEffectiveLocale } = useLocalePreference();
 
   const state = reactive({
     metrics: null,
@@ -213,7 +216,7 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
       reconnectAttempts.value >= maxReconnectAttempts
     ) {
       if (reconnectAttempts.value >= maxReconnectAttempts) {
-        error.value = "Max reconnection attempts reached";
+        error.value = t("shared.webSocket.maxReconnect");
         connectionStatus.value = "error";
       }
       return;
@@ -242,7 +245,7 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
 
     const serverIdValue = toValue(serverId);
     if (!serverIdValue || !token.value) {
-      error.value = "Missing server ID or authentication token";
+      error.value = t("shared.webSocket.missingServerOrAuth");
       connectionStatus.value = "error";
       return;
     }
@@ -261,7 +264,14 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
 
     const wsBase = config.public.wsBase as string;
     const teamId = getCurrentTeamId();
-    const wsUrl = `${wsBase}/metrics/stream?serverId=${serverIdValue}&token=${token.value}&interval_ms=${STREAM_INTERVAL_MS}${teamId ? `&team_id=${teamId}` : ""}`;
+    const params = new URLSearchParams({
+      serverId: serverIdValue,
+      token: token.value,
+      interval_ms: String(STREAM_INTERVAL_MS),
+      locale: getEffectiveLocale(),
+    });
+    if (teamId) params.set("team_id", teamId);
+    const wsUrl = `${wsBase}/metrics/stream?${params.toString()}`;
 
     console.log("[MetricsStream] Connecting...");
 
@@ -294,7 +304,10 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
           };
         } else if (data.event === "error") {
           console.error("[MetricsStream] Error:", data.message);
-          error.value = data.message || "Unknown error";
+          error.value =
+            data.data?.message ||
+            data.message ||
+            t("shared.webSocket.unknownError");
           connectionStatus.value = "error";
         } else if (data.event === "metrics") {
           const metricsData: MetricsData = {
@@ -338,7 +351,7 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
 
     ws.value.onerror = (err) => {
       console.error("[MetricsStream] WebSocket error:", err);
-      error.value = "Connection error";
+      error.value = t("shared.webSocket.connectionError");
     };
   };
 
@@ -366,6 +379,13 @@ export const useMetricsStream = (serverId: MaybeRef<string>) => {
     history.value = [];
     metrics.value = null;
   };
+
+  watch(effectiveLocale, (nextLocale, previousLocale) => {
+    if (nextLocale !== previousLocale && ws.value) {
+      disconnect();
+      connect();
+    }
+  });
 
   tryOnUnmounted(() => {
     if (metricsAnimationFrame !== null) {

@@ -1,11 +1,12 @@
 <script lang="ts" setup>
-import type { HTMLAttributes } from "vue"
-import { MoreHorizontal } from "lucide-vue-next"
-import { cn } from '~/utils'
+import type { HTMLAttributes } from "vue";
+import { MoreHorizontal } from "lucide-vue-next";
+import { cn } from "~/utils";
 
 const props = defineProps<{
-  class?: HTMLAttributes["class"]
-}>()
+  class?: HTMLAttributes["class"];
+}>();
+const { t } = useI18n();
 </script>
 
 <template>
@@ -17,6 +18,6 @@ const props = defineProps<{
     <slot>
       <MoreHorizontal class="h-4 w-4" />
     </slot>
-    <span class="sr-only">More</span>
+    <span class="sr-only">{{ t("common.ui.more") }}</span>
   </span>
 </template>

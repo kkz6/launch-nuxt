@@ -8,10 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import {
-  dockerService,
-  type DockerDatabase,
-} from "~/services/dockerService";
+import { dockerService, type DockerDatabase } from "~/services/dockerService";
 
 interface Props {
   database: DockerDatabase;
@@ -20,6 +17,7 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   deleted: [];
 }>();
+const { t } = useI18n();
 
 // Role gating — the Danger Zone (rebuild / delete) is admin/owner only.
 const { canDelete } = useCan();
@@ -61,9 +59,8 @@ const deleteLoading = ref(false);
 watch(
   () => props.database,
   (db) => {
-    restartPolicy.value =
-      ((db.build_config?.restart_policy as RestartPolicy) ||
-        "unless-stopped") as RestartPolicy;
+    restartPolicy.value = ((db.build_config?.restart_policy as RestartPolicy) ||
+      "unless-stopped") as RestartPolicy;
     cpuLimit.value = (db.build_config?.cpu_limit as string) || "";
     memoryLimit.value = (db.build_config?.memory_limit as string) || "";
     cpuReservation.value = (db.build_config?.cpu_reservation as string) || "";
@@ -91,10 +88,10 @@ const saveRuntime = async () => {
         memory_reservation: memoryReservation.value.trim(),
       },
     );
-    toast.success("Container runtime update queued");
+    toast.success(t("workload.database.advanced.runtimeQueued"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update container runtime");
+    toast.error(e.data?.message || t("workload.runtime.saveFailed"));
   } finally {
     runtimeSaving.value = false;
   }
@@ -106,25 +103,31 @@ const copyVolumeName = async () => {
   if (!props.database.volume_name) return;
   try {
     await navigator.clipboard.writeText(props.database.volume_name);
-    toast.success("Volume name copied to clipboard");
+    toast.success(t("workload.database.advanced.volumeCopied"));
   } catch {
-    toast.error("Couldn't access clipboard");
+    toast.error(
+      t("workload.copy.failed", {
+        label: t("workload.database.advanced.volumeName"),
+      }),
+    );
   }
 };
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const rebuildDatabase = async () => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Rebuild Database",
-    description: `This will permanently delete all data in "${props.database.name}" and recreate the container from scratch with the same image and credentials. There is no undo.`,
-    confirmText: "Rebuild Database",
-    cancelText: "Cancel",
+    title: t("workload.database.advanced.rebuildTitle"),
+    description: t("workload.database.advanced.rebuildConfirmation", {
+      name: props.database.name,
+    }),
+    confirmText: t("workload.database.advanced.rebuildTitle"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
-    helpText: "Type the database name to confirm rebuild:",
+    helpText: t("workload.database.advanced.rebuildHelp"),
     inputVerificationText: props.database.name,
   });
   if (!result.ok) return;
@@ -136,10 +139,12 @@ const rebuildDatabase = async () => {
       props.database.project_id,
       props.database.id,
     );
-    toast.success("Database rebuild queued");
+    toast.success(t("workload.database.advanced.rebuildQueued"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Unable to rebuild database");
+    toast.error(
+      e.data?.message || t("workload.database.advanced.rebuildFailed"),
+    );
   } finally {
     rebuildLoading.value = false;
   }
@@ -148,15 +153,19 @@ const rebuildDatabase = async () => {
 const deleteDatabase = async () => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Delete Database",
+    title: t("workload.database.delete.title"),
     description:
       props.database.status === "running"
-        ? `"${props.database.name}" is currently running. Deleting it will stop and remove the container. The data volume is preserved unless you tick the box below.`
-        : `Are you sure you want to delete "${props.database.name}"? The data volume is preserved unless you tick the box below.`,
-    confirmText: "Delete Database",
-    cancelText: "Cancel",
+        ? t("workload.database.advanced.deleteRunningDescription", {
+            name: props.database.name,
+          })
+        : t("workload.database.advanced.deleteStoppedDescription", {
+            name: props.database.name,
+          }),
+    confirmText: t("workload.database.delete.title"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
-    helpText: "Type the database name to confirm deletion:",
+    helpText: t("workload.database.delete.confirmHelp"),
     inputVerificationText: props.database.name,
     // Opt-in data wipe. Off by default — the launch-db-<id>-data
     // volume survives unless the user explicitly ticks the box. When
@@ -164,7 +173,7 @@ const deleteDatabase = async () => {
     // for the deterministic data volume name after the container is
     // gone.
     checkbox: {
-      label: "Also delete the data volume (database state will be lost)",
+      label: t("workload.database.delete.volumeLabel"),
       checked: false,
     },
   });
@@ -181,13 +190,13 @@ const deleteDatabase = async () => {
     );
     toast.success(
       removeVolumes
-        ? "Database + data volume deletion queued"
-        : "Database deletion queued (data volume preserved)",
+        ? t("workload.database.delete.queuedWithVolume")
+        : t("workload.database.delete.queuedPreserved"),
     );
     emit("deleted");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Unable to delete database");
+    toast.error(e.data?.message || t("workload.database.delete.failed"));
   } finally {
     deleteLoading.value = false;
   }
@@ -215,12 +224,14 @@ const deleteDatabase = async () => {
     <Card>
       <CardHeader class="p-4">
         <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:hard-drive" class="h-4 w-4 text-muted-foreground" />
-          Storage
+          <Icon
+            name="lucide:hard-drive"
+            class="h-4 w-4 text-muted-foreground"
+          />
+          {{ t("workload.database.advanced.storage") }}
         </CardTitle>
         <CardDescription class="text-xs">
-          Named volume bound at the engine's data directory so data
-          survives recreates. Use Rebuild Database below to wipe it.
+          {{ t("workload.database.advanced.storageDescription") }}
         </CardDescription>
       </CardHeader>
 
@@ -230,8 +241,11 @@ const deleteDatabase = async () => {
           class="space-y-2.5 rounded-md border bg-muted/30 p-3"
         >
           <div class="flex items-center justify-between">
-            <Badge variant="secondary" class="h-5 font-mono text-[10px] uppercase">
-              Volume
+            <Badge
+              variant="secondary"
+              class="h-5 font-mono text-[10px] uppercase"
+            >
+              {{ t("workload.database.advanced.volume") }}
             </Badge>
             <button
               type="button"
@@ -239,22 +253,26 @@ const deleteDatabase = async () => {
               @click="copyVolumeName"
             >
               <Icon name="lucide:copy" class="h-3 w-3" />
-              Copy name
+              {{ t("workload.database.advanced.copyName") }}
             </button>
           </div>
           <dl class="grid gap-1.5 text-xs sm:grid-cols-[100px_1fr]">
-            <dt class="text-muted-foreground">Volume name</dt>
+            <dt class="text-muted-foreground">
+              {{ t("workload.database.advanced.volumeName") }}
+            </dt>
             <dd class="break-all font-mono text-[11px]">
               {{ props.database.volume_name }}
             </dd>
-            <dt class="text-muted-foreground">Mount path</dt>
+            <dt class="text-muted-foreground">
+              {{ t("workload.fields.mountPath") }}
+            </dt>
             <dd class="break-all font-mono text-[11px]">
               {{ props.database.data_path }}
             </dd>
           </dl>
         </div>
         <p v-else class="text-xs text-muted-foreground">
-          No data volume metadata available for this engine.
+          {{ t("workload.database.advanced.noVolumeMetadata") }}
         </p>
       </CardContent>
     </Card>
@@ -263,75 +281,101 @@ const deleteDatabase = async () => {
     <Card>
       <CardHeader class="p-4">
         <CardTitle class="flex items-center gap-2 text-sm font-semibold">
-          <Icon name="lucide:sliders-horizontal" class="h-4 w-4 text-muted-foreground" />
-          Container Runtime
+          <Icon
+            name="lucide:sliders-horizontal"
+            class="h-4 w-4 text-muted-foreground"
+          />
+          {{ t("workload.runtime.title") }}
         </CardTitle>
         <CardDescription class="text-xs">
-          Resource caps + reservations and the restart policy. Applied
-          live via <code>docker update</code> — no recreate.
+          {{ t("workload.database.advanced.runtimeDescriptionBefore") }}
+          <code>docker update</code
+          >{{ t("workload.database.advanced.runtimeDescriptionAfter") }}
         </CardDescription>
       </CardHeader>
 
       <CardContent class="space-y-4 p-4 pt-0">
         <!-- Resources block -->
         <div class="space-y-2">
-          <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Resources
+          <div
+            class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            {{ t("workload.runtime.resources") }}
           </div>
           <div class="grid gap-3 sm:grid-cols-2">
             <div class="space-y-1">
-              <Label for="db-memory-limit" class="text-xs">Memory Limit</Label>
+              <Label for="db-memory-limit" class="text-xs">
+                {{ t("workload.runtime.memoryLimit") }}
+              </Label>
               <Input
                 id="db-memory-limit"
                 v-model="memoryLimit"
                 class="h-9 text-sm"
-                placeholder="e.g. 512m, 1g"
+                :placeholder="
+                  t('workload.database.advanced.memoryLimitPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-[11px] text-muted-foreground">
-                Hard ceiling (<code>-m</code>). Empty = unlimited.
+                {{ t("workload.runtime.memoryLimitBefore") }}<code>-m</code
+                >{{ t("workload.runtime.memoryLimitAfter") }}
               </p>
             </div>
 
             <div class="space-y-1">
-              <Label for="db-memory-reservation" class="text-xs">Memory Reservation</Label>
+              <Label for="db-memory-reservation" class="text-xs">
+                {{ t("workload.runtime.memoryReservation") }}
+              </Label>
               <Input
                 id="db-memory-reservation"
                 v-model="memoryReservation"
                 class="h-9 text-sm"
-                placeholder="e.g. 256m"
+                :placeholder="
+                  t('workload.database.advanced.memoryReservationPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-[11px] text-muted-foreground">
-                Soft floor (<code>--memory-reservation</code>).
+                {{ t("workload.runtime.memoryReservationBefore")
+                }}<code>--memory-reservation</code
+                >{{ t("workload.punctuation.period") }}
               </p>
             </div>
 
             <div class="space-y-1">
-              <Label for="db-cpu-limit" class="text-xs">CPU Limit</Label>
+              <Label for="db-cpu-limit" class="text-xs">
+                {{ t("workload.runtime.cpuLimit") }}
+              </Label>
               <Input
                 id="db-cpu-limit"
                 v-model="cpuLimit"
                 class="h-9 text-sm"
-                placeholder="e.g. 0.5, 2"
+                :placeholder="
+                  t('workload.database.advanced.cpuLimitPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-[11px] text-muted-foreground">
-                CPUs (<code>--cpus</code>). Empty = unlimited.
+                {{ t("workload.runtime.cpuLimitBefore") }}<code>--cpus</code
+                >{{ t("workload.runtime.cpuLimitAfter") }}
               </p>
             </div>
 
             <div class="space-y-1">
-              <Label for="db-cpu-reservation" class="text-xs">CPU Reservation</Label>
+              <Label for="db-cpu-reservation" class="text-xs">
+                {{ t("workload.runtime.cpuReservation") }}
+              </Label>
               <Input
                 id="db-cpu-reservation"
                 v-model="cpuReservation"
                 class="h-9 text-sm"
-                placeholder="e.g. 1024"
+                :placeholder="
+                  t('workload.database.advanced.cpuReservationPlaceholder')
+                "
                 autocomplete="off"
               />
               <p class="text-[11px] text-muted-foreground">
-                CPU shares (1024 = baseline).
+                {{ t("workload.runtime.cpuReservationHelp") }}
               </p>
             </div>
           </div>
@@ -339,8 +383,10 @@ const deleteDatabase = async () => {
 
         <!-- Restart policy block -->
         <div class="space-y-2">
-          <div class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Restart Policy
+          <div
+            class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+          >
+            {{ t("workload.runtime.restartPolicy") }}
           </div>
           <div class="space-y-1 sm:max-w-md">
             <Select v-model="restartPolicy">
@@ -349,16 +395,21 @@ const deleteDatabase = async () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="unless-stopped">
-                  Unless stopped (default)
+                  {{ t("workload.runtime.unlessStopped") }}
                 </SelectItem>
-                <SelectItem value="always">Always</SelectItem>
-                <SelectItem value="on-failure">On failure</SelectItem>
-                <SelectItem value="no">No</SelectItem>
+                <SelectItem value="always">{{
+                  t("workload.runtime.always")
+                }}</SelectItem>
+                <SelectItem value="on-failure">{{
+                  t("workload.runtime.onFailure")
+                }}</SelectItem>
+                <SelectItem value="no">{{
+                  t("workload.runtime.no")
+                }}</SelectItem>
               </SelectContent>
             </Select>
             <p class="text-[11px] text-muted-foreground">
-              Whether the container restarts after the docker daemon
-              (or host) reboots.
+              {{ t("workload.runtime.restartHelp") }}
             </p>
           </div>
         </div>
@@ -371,7 +422,7 @@ const deleteDatabase = async () => {
             name="lucide:loader-2"
             class="mr-2 h-3.5 w-3.5 animate-spin"
           />
-          Save
+          {{ t("workload.actions.save") }}
         </Button>
       </CardFooter>
     </Card>
@@ -386,24 +437,28 @@ const deleteDatabase = async () => {
     -->
     <Card v-if="canDelete" class="border-destructive/40">
       <CardHeader class="p-4">
-        <CardTitle class="flex items-center gap-2 text-sm font-semibold text-destructive">
+        <CardTitle
+          class="flex items-center gap-2 text-sm font-semibold text-destructive"
+        >
           <Icon name="lucide:alert-triangle" class="h-4 w-4" />
-          Danger Zone
+          {{ t("workload.danger.title") }}
         </CardTitle>
         <CardDescription class="text-xs">
-          Destructive actions. Both require typing the database name
-          to confirm.
+          {{ t("workload.database.advanced.dangerDescription") }}
         </CardDescription>
       </CardHeader>
 
       <CardContent class="space-y-0 divide-y p-4 pt-0">
         <!-- Rebuild row -->
-        <div class="flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          class="flex flex-col gap-2 py-3 first:pt-0 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div class="min-w-0 space-y-0.5">
-            <p class="text-sm font-medium">Rebuild Database</p>
+            <p class="text-sm font-medium">
+              {{ t("workload.database.advanced.rebuildTitle") }}
+            </p>
             <p class="text-xs text-muted-foreground">
-              Wipes the data volume and recreates the container with
-              the same image + credentials. All data is lost.
+              {{ t("workload.database.advanced.rebuildDescription") }}
             </p>
           </div>
           <Button
@@ -419,17 +474,20 @@ const deleteDatabase = async () => {
               class="mr-2 h-3.5 w-3.5 animate-spin"
             />
             <Icon v-else name="lucide:refresh-ccw" class="mr-2 h-3.5 w-3.5" />
-            Rebuild
+            {{ t("workload.database.advanced.rebuild") }}
           </Button>
         </div>
 
         <!-- Delete row -->
-        <div class="flex flex-col gap-2 py-3 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          class="flex flex-col gap-2 py-3 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+        >
           <div class="min-w-0 space-y-0.5">
-            <p class="text-sm font-medium">Delete Database</p>
+            <p class="text-sm font-medium">
+              {{ t("workload.database.delete.title") }}
+            </p>
             <p class="text-xs text-muted-foreground">
-              Permanently delete this database. The data volume is
-              preserved on the host until cleaned up manually.
+              {{ t("workload.database.advanced.deleteDescription") }}
             </p>
           </div>
           <Button
@@ -445,7 +503,7 @@ const deleteDatabase = async () => {
               class="mr-2 h-3.5 w-3.5 animate-spin"
             />
             <Icon v-else name="lucide:trash-2" class="mr-2 h-3.5 w-3.5" />
-            Delete
+            {{ t("workload.actions.delete") }}
           </Button>
         </div>
       </CardContent>

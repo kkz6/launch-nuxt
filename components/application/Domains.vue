@@ -15,6 +15,7 @@ interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Two dialog modes share the same component (matches Redirects /
 // Schedules / Volumes): create vs. edit. selectedDomain drives which.
@@ -24,9 +25,9 @@ const isLoading = ref(true);
 const selectedDomain = ref<DockerDomain | null>(null);
 const isEditDialogOpen = ref(false);
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchDomains = async (silent = false) => {
   if (!silent) isLoading.value = true;
@@ -38,7 +39,7 @@ const fetchDomains = async (silent = false) => {
     );
     domains.value = res.data;
   } catch {
-    if (!silent) toast.error("Failed to load domains");
+    if (!silent) toast.error(t("workload.domains.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -71,20 +72,20 @@ const validateDns = async (d: DockerDomain) => {
     );
     const v = res.data;
     if (v.ok) {
-      toast.success(v.message || "DNS resolves to the docker server");
+      toast.success(v.message || t("workload.domains.dnsResolves"));
     } else if (v.proxied) {
       // Not necessarily a misconfiguration, so a neutral tone.
-      toast.info(v.message || "Domain is proxied through Cloudflare", {
+      toast.info(v.message || t("workload.domains.proxied"), {
         duration: 8000,
       });
     } else {
-      toast.warning(v.message || "DNS does not point at this server", {
+      toast.warning(v.message || t("workload.domains.dnsMismatch"), {
         duration: 6000,
       });
     }
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to validate DNS");
+    toast.error(e.data?.message || t("workload.domains.validateFailed"));
   } finally {
     const next = new Set(validatingDns.value);
     next.delete(d.id);
@@ -111,10 +112,12 @@ const retryCertificate = (d: DockerDomain) =>
 const removeDomain = async (d: DockerDomain) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Remove Domain",
-    description: `Remove "${d.host}" from this application? Traefik will stop routing requests for this host.`,
-    confirmText: "Remove",
-    cancelText: "Cancel",
+    title: t("workload.domains.removeTitle"),
+    description: t("workload.domains.removeApplicationDescription", {
+      host: d.host,
+    }),
+    confirmText: t("workload.actions.remove"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
   });
   if (!result.ok) return;
@@ -126,10 +129,10 @@ const removeDomain = async (d: DockerDomain) => {
       d.id,
     );
     domains.value = domains.value.filter((x) => x.id !== d.id);
-    toast.success("Domain removed");
+    toast.success(t("workload.domains.removed"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to remove domain");
+    toast.error(e.data?.message || t("workload.domains.removeFailed"));
   }
 };
 
@@ -158,10 +161,11 @@ onMounted(fetchDomains);
 
     <div class="mb-6 flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold">Domains</h2>
+        <h2 class="text-xl font-semibold">
+          {{ t("workload.domains.title") }}
+        </h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Public hostnames routed to this application by Traefik. HTTPS
-          domains are served with Let's Encrypt certificates.
+          {{ t("workload.domains.applicationDescription") }}
         </p>
       </div>
       <ApplicationCreateDomain
@@ -183,10 +187,11 @@ onMounted(fetchDomains);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:globe" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No domains yet</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("workload.domains.emptyTitle") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Point a DNS A record at the docker server's public IP, then add
-        the hostname here. Traefik handles the certificate.
+        {{ t("workload.domains.applicationEmptyDescription") }}
       </p>
       <div class="mt-6">
         <ApplicationCreateDomain
@@ -209,11 +214,11 @@ onMounted(fetchDomains);
           class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground"
         >
           <tr>
-            <th class="px-4 py-3">URL</th>
-            <th class="px-4 py-3">Port</th>
-            <th class="px-4 py-3">HTTPS</th>
-            <th class="px-4 py-3">Cert</th>
-            <th class="px-4 py-3">DNS</th>
+            <th class="px-4 py-3">{{ t("workload.domains.url") }}</th>
+            <th class="px-4 py-3">{{ t("workload.fields.port") }}</th>
+            <th class="px-4 py-3">{{ t("workload.domains.https") }}</th>
+            <th class="px-4 py-3">{{ t("workload.domains.certificate") }}</th>
+            <th class="px-4 py-3">{{ t("workload.domains.dns") }}</th>
             <th class="px-4 py-3" />
           </tr>
         </thead>
@@ -247,15 +252,20 @@ onMounted(fetchDomains);
                 class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] text-muted-foreground"
               >
                 <span v-if="d.path">
-                  Path: <code class="font-mono">{{ d.path }}</code>
+                  {{ t("workload.fields.path") }}:
+                  <code class="font-mono">{{ d.path }}</code>
                 </span>
                 <span
-                  v-if="d.path && (d.strip_path || (d.internal_path && d.internal_path !== '/'))"
+                  v-if="
+                    d.path &&
+                    (d.strip_path ||
+                      (d.internal_path && d.internal_path !== '/'))
+                  "
                 >
                   ·
                 </span>
                 <span v-if="d.internal_path && d.internal_path !== '/'">
-                  Internal:
+                  {{ t("workload.domains.internal") }}:
                   <code class="font-mono">{{ d.internal_path }}</code>
                 </span>
                 <span
@@ -265,7 +275,9 @@ onMounted(fetchDomains);
                 >
                   ·
                 </span>
-                <span v-if="d.strip_path">strip path</span>
+                <span v-if="d.strip_path">{{
+                  t("workload.domains.stripPath")
+                }}</span>
               </p>
             </td>
 
@@ -282,7 +294,11 @@ onMounted(fetchDomains);
                     : 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300'
                 "
               >
-                {{ d.https ? "Enabled" : "Disabled" }}
+                {{
+                  d.https
+                    ? t("workload.status.enabled")
+                    : t("workload.status.disabled")
+                }}
               </span>
             </td>
 
@@ -316,7 +332,7 @@ onMounted(fetchDomains);
                     validatingDns.has(d.id) && 'animate-spin',
                   ]"
                 />
-                Validate
+                {{ t("workload.domains.validate") }}
               </button>
             </td>
 
@@ -324,7 +340,7 @@ onMounted(fetchDomains);
               <Button
                 variant="ghost"
                 size="icon"
-                title="Edit domain"
+                :title="t('workload.domains.editTitle')"
                 @click="editDomain(d)"
               >
                 <Icon name="lucide:pencil" class="h-4 w-4" />
@@ -332,7 +348,7 @@ onMounted(fetchDomains);
               <Button
                 variant="ghost"
                 size="icon"
-                title="Remove domain"
+                :title="t('workload.domains.removeTitle')"
                 class="hover:bg-destructive/90 hover:text-white"
                 @click="removeDomain(d)"
               >

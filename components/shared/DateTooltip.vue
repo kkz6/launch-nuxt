@@ -13,6 +13,8 @@ interface Props {
 
 const props = defineProps<Props>();
 const slots = useSlots();
+const { locale } = useI18n();
+const localeTag = computed(() => (locale.value === "ja" ? "ja-JP" : "en-US"));
 
 function tolerantParse(raw: string | Date): Date | null {
   if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
@@ -58,28 +60,28 @@ const relativeDate = computed<string>(() => {
   const months = Math.floor(days / 30);
   const years = Math.floor(days / 365);
 
-  const fmt = (n: number, unit: string) => {
-    const label = `${n} ${unit}${n === 1 ? "" : "s"}`;
-    return future ? `in ${label}` : `${label} ago`;
+  const formatter = new Intl.RelativeTimeFormat(localeTag.value, {
+    numeric: "auto",
+  });
+  const format = (value: number, unit: Intl.RelativeTimeFormatUnit) => {
+    const signedValue = future ? value : -value;
+    return formatter.format(signedValue, unit);
   };
 
-  if (secs < 5) return future ? "in a moment" : "just now";
-  if (secs < 60) return fmt(secs, "second");
-  if (mins < 60) return fmt(mins, "minute");
-  if (hours < 24) return fmt(hours, "hour");
-  if (days < 7) return fmt(days, "day");
-  if (days < 30) return fmt(weeks, "week");
-  if (months < 12) {
-    if (days < 45) return future ? "in about 1 month" : "about 1 month ago";
-    return fmt(months, "month");
-  }
-  return fmt(years, "year");
+  if (secs < 5) return formatter.format(0, "second");
+  if (secs < 60) return format(secs, "second");
+  if (mins < 60) return format(mins, "minute");
+  if (hours < 24) return format(hours, "hour");
+  if (days < 7) return format(days, "day");
+  if (days < 30) return format(weeks, "week");
+  if (months < 12) return format(Math.max(months, 1), "month");
+  return format(years, "year");
 });
 
 const fullDate = computed<string>(() => {
   const d = parsed.value;
   if (!d) return "—";
-  return d.toLocaleString(undefined, {
+  return d.toLocaleString(localeTag.value, {
     weekday: "short",
     year: "numeric",
     month: "short",

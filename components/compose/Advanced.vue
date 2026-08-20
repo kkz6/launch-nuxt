@@ -3,19 +3,14 @@ import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import {
-  Alert,
-  AlertDescription,
-} from "~/components/ui/alert";
-import {
-  dockerService,
-  type DockerCompose,
-} from "~/services/dockerService";
+import { Alert, AlertDescription } from "~/components/ui/alert";
+import { dockerService, type DockerCompose } from "~/services/dockerService";
 
 interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   updated: [];
   deleted: [];
@@ -42,7 +37,7 @@ watch(
 const saveSettings = async () => {
   const trimmed = name.value.trim();
   if (!trimmed) {
-    toast.error("Stack name is required");
+    toast.error(t("workload.compose.advanced.nameRequired"));
     return;
   }
   isSaving.value = true;
@@ -53,11 +48,11 @@ const saveSettings = async () => {
       props.compose.id,
       { name: trimmed },
     );
-    toast.success("Compose stack updated");
+    toast.success(t("workload.compose.advanced.updated"));
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update compose stack");
+    toast.error(e.data?.message || t("workload.compose.advanced.updateFailed"));
   } finally {
     isSaving.value = false;
   }
@@ -119,13 +114,15 @@ const saveRunCommand = async () => {
     );
     toast.success(
       runCommand.value.trim()
-        ? "Run command updated"
-        : "Run command cleared — using default on next deploy",
+        ? t("workload.compose.advanced.runCommandUpdated")
+        : t("workload.compose.advanced.runCommandCleared"),
     );
     emit("updated");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update run command");
+    toast.error(
+      e.data?.message || t("workload.compose.advanced.runCommandFailed"),
+    );
   } finally {
     isSavingRunCommand.value = false;
   }
@@ -144,9 +141,9 @@ const saveRunCommand = async () => {
 //   - Reset to inline YAML from a git source (or vice versa)
 
 const deleteLoading = ref(false);
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 // --- Traefik dynamic-config card -----------------------------------
 //
@@ -209,12 +206,10 @@ const saveTraefikConfig = async () => {
     traefikContentOnDisk.value = res.data.content;
     traefikFilename.value = res.data.filename;
     traefikEditing.value = false;
-    toast.success(
-      "Traefik config saved — Traefik picks it up automatically.",
-    );
+    toast.success(t("workload.traefik.saved"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to save Traefik config");
+    toast.error(e.data?.message || t("workload.traefik.saveFailed"));
   } finally {
     traefikSaving.value = false;
   }
@@ -225,19 +220,21 @@ onMounted(fetchTraefikConfig);
 const deleteCompose = async () => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Delete Compose Stack",
-    description: `Are you sure you want to delete "${props.compose.name}"? The stack's containers will be torn down on the server.`,
-    confirmText: "Delete Stack",
-    cancelText: "Cancel",
+    title: t("workload.compose.delete.title"),
+    description: t("workload.compose.advanced.deleteConfirmation", {
+      name: props.compose.name,
+    }),
+    confirmText: t("workload.compose.advanced.deleteStack"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
-    helpText: "Type the stack name to confirm deletion:",
+    helpText: t("workload.compose.delete.confirmHelp"),
     inputVerificationText: props.compose.name,
     // Opt-in volume cleanup. Off by default so a misclicked Delete
     // preserves persistent data; the user has to explicitly tick the
     // box to wipe state. Backend toggles `docker compose down` ↔
     // `docker compose down -v` on this flag.
     checkbox: {
-      label: "Also delete named volumes (data will be lost)",
+      label: t("workload.compose.advanced.deleteVolumes"),
       checked: false,
     },
   });
@@ -254,13 +251,13 @@ const deleteCompose = async () => {
     );
     toast.success(
       removeVolumes
-        ? "Compose stack + volumes deletion queued"
-        : "Compose stack deletion queued (volumes preserved)",
+        ? t("workload.compose.advanced.deleteQueuedWithVolumes")
+        : t("workload.compose.advanced.deleteQueuedPreserved"),
     );
     emit("deleted");
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Unable to delete compose stack");
+    toast.error(e.data?.message || t("workload.compose.delete.failed"));
   } finally {
     deleteLoading.value = false;
   }
@@ -286,26 +283,30 @@ const deleteCompose = async () => {
           <Icon name="lucide:tag" class="h-4 w-4 text-zinc-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <h3 class="text-base font-semibold">General</h3>
+          <h3 class="text-base font-semibold">
+            {{ t("workload.compose.advanced.general") }}
+          </h3>
           <p class="mt-0.5 text-sm text-muted-foreground">
-            Rename the stack. Source + compose body are immutable from
-            this page — reconfigure by recreating the stack.
+            {{ t("workload.compose.advanced.generalDescription") }}
           </p>
         </div>
       </div>
 
       <div class="mt-5 space-y-4">
         <div class="space-y-2">
-          <Label for="compose-name">Stack Name</Label>
+          <Label for="compose-name">
+            {{ t("workload.compose.general.stackName") }}
+          </Label>
           <Input
             id="compose-name"
             v-model="name"
-            placeholder="e.g. monitoring, db-stack"
+            :placeholder="t('workload.compose.create.namePlaceholder')"
             autocomplete="off"
           />
           <p class="text-xs text-muted-foreground">
-            Used as the <code class="font-mono">docker-compose</code>
-            project name on the host.
+            {{ t("workload.compose.advanced.stackNameBefore") }}
+            <code class="font-mono">docker-compose</code
+            >{{ t("workload.compose.advanced.stackNameAfter") }}
           </p>
         </div>
 
@@ -316,7 +317,7 @@ const deleteCompose = async () => {
             class="mr-2 h-4 w-4 animate-spin"
           />
           <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
-          Save Changes
+          {{ t("workload.actions.saveChanges") }}
         </Button>
       </div>
     </div>
@@ -337,10 +338,13 @@ const deleteCompose = async () => {
           <Icon name="lucide:terminal" class="h-4 w-4 text-indigo-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <h3 class="text-base font-semibold">Run Command</h3>
+          <h3 class="text-base font-semibold">
+            {{ t("workload.compose.advanced.runCommand") }}
+          </h3>
           <p class="mt-0.5 text-sm text-muted-foreground">
-            Override the custom command the deploy script runs after
-            <code class="font-mono text-xs">docker</code>.
+            {{ t("workload.compose.advanced.runCommandDescriptionBefore") }}
+            <code class="font-mono text-xs">docker</code
+            >{{ t("workload.punctuation.period") }}
           </p>
         </div>
       </div>
@@ -354,15 +358,15 @@ const deleteCompose = async () => {
             class="h-4 w-4 text-amber-600 dark:text-amber-400"
           />
           <AlertDescription class="text-sm">
-            Modifying the default command may affect deployment
-            stability, impacting logs and monitoring. Proceed
-            carefully and test thoroughly. By default, the command
-            starts with <strong>docker</strong>.
+            {{ t("workload.compose.advanced.runCommandWarningBefore") }}
+            <strong>docker</strong>{{ t("workload.punctuation.period") }}
           </AlertDescription>
         </Alert>
 
         <div class="space-y-2">
-          <Label for="compose-run-command">Command</Label>
+          <Label for="compose-run-command">
+            {{ t("workload.compose.advanced.command") }}
+          </Label>
           <Input
             id="compose-run-command"
             v-model="runCommand"
@@ -373,10 +377,12 @@ const deleteCompose = async () => {
           />
           <p class="text-xs text-muted-foreground">
             <template v-if="defaultRunCommand">
-              Default Command (<code class="font-mono">docker {{ defaultRunCommand }}</code>)
+              {{ t("workload.compose.advanced.defaultCommandBefore")
+              }}<code class="font-mono">docker {{ defaultRunCommand }}</code
+              >{{ t("workload.compose.advanced.defaultCommandAfter") }}
             </template>
             <template v-else>
-              Leave blank to use the default deploy command.
+              {{ t("workload.compose.advanced.defaultCommandHelp") }}
             </template>
           </p>
         </div>
@@ -389,7 +395,7 @@ const deleteCompose = async () => {
               class="mr-2 h-4 w-4 animate-spin"
             />
             <Icon v-else name="lucide:save" class="mr-2 h-4 w-4" />
-            Save
+            {{ t("workload.actions.save") }}
           </Button>
         </div>
       </div>
@@ -413,9 +419,7 @@ const deleteCompose = async () => {
         <div class="min-w-0 flex-1">
           <h3 class="text-base font-semibold">Traefik</h3>
           <p class="mt-0.5 text-sm text-muted-foreground">
-            Modify the traefik config, in rare cases you may need to
-            add specific config, be careful because modifying
-            incorrectly can break traefik and your application.
+            {{ t("workload.traefik.composeDescription") }}
             <span
               v-if="traefikFilename"
               class="ml-1 inline-flex items-center gap-1 rounded bg-muted/50 px-1.5 py-0.5 font-mono text-xs"
@@ -443,9 +447,7 @@ const deleteCompose = async () => {
             class="flex h-32 flex-col items-center justify-center rounded-md border border-dashed text-center text-xs text-muted-foreground"
           >
             <Icon name="lucide:route-off" class="mb-2 h-5 w-5" />
-            No Traefik config on this server yet. Add a domain on the
-            Domains tab and the platform will write the file — or hit
-            Modify to write it yourself.
+            {{ t("workload.compose.advanced.traefikEmpty") }}
           </div>
         </div>
         <div v-else class="relative">
@@ -456,7 +458,7 @@ const deleteCompose = async () => {
             @click="beginModifyTraefik"
           >
             <Icon name="lucide:pencil" class="mr-2 h-3.5 w-3.5" />
-            Modify
+            {{ t("workload.traefik.modify") }}
           </Button>
           <SharedCodeEditor
             v-model="traefikContent"
@@ -479,7 +481,7 @@ const deleteCompose = async () => {
           :disabled="traefikSaving"
           @click="cancelModifyTraefik"
         >
-          Cancel
+          {{ t("workload.actions.cancel") }}
         </Button>
         <Button
           size="sm"
@@ -491,7 +493,7 @@ const deleteCompose = async () => {
             name="lucide:loader-2"
             class="mr-2 h-3.5 w-3.5 animate-spin"
           />
-          Save
+          {{ t("workload.actions.save") }}
         </Button>
       </div>
     </div>
@@ -505,11 +507,11 @@ const deleteCompose = async () => {
       v-if="canDelete"
       class="rounded-lg border border-destructive/30 bg-destructive/[0.03] p-6"
     >
-      <h3 class="text-base font-semibold text-destructive">Danger Zone</h3>
+      <h3 class="text-base font-semibold text-destructive">
+        {{ t("workload.danger.title") }}
+      </h3>
       <p class="mt-1 text-sm text-muted-foreground">
-        Permanently delete this compose stack. Every container the stack
-        runs is torn down on the server. Named volumes survive unless
-        you opt in via the checkbox in the confirmation.
+        {{ t("workload.compose.advanced.dangerDescription") }}
       </p>
 
       <Button
@@ -524,7 +526,7 @@ const deleteCompose = async () => {
           class="mr-2 h-4 w-4 animate-spin"
         />
         <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
-        Delete Stack
+        {{ t("workload.compose.advanced.deleteStack") }}
       </Button>
     </div>
   </div>

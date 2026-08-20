@@ -1,14 +1,14 @@
 <script setup lang="ts">
 interface NavItem {
-  title: string
-  path: string
-  items?: NavItem[]
+  title: string;
+  path: string;
+  items?: NavItem[];
 }
 
-withDefaults(defineProps<{ items: NavItem[]; depth?: number }>(), { depth: 0 })
+withDefaults(defineProps<{ items: NavItem[]; depth?: number }>(), { depth: 0 });
 
-const route = useRoute()
-const isActive = (path: string) => route.path === path
+const route = useRoute();
+const isActive = (path: string) => route.path === path;
 </script>
 
 <template>

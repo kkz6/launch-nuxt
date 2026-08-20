@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Toaster } from '~/components/ui/sonner'
+import { Toaster } from "~/components/ui/sonner";
 
 defineProps<{
-  title?: string
-}>()
+  title?: string;
+}>();
 </script>
 
 <template>

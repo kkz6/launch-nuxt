@@ -10,6 +10,8 @@ import {
 import { Button } from "~/components/ui/button";
 import type { ActionDef, ExportDef } from "~/types/data-table";
 
+const { t } = useI18n();
+
 defineProps<{
   actions: ActionDef[];
   exports: ExportDef[];
@@ -25,11 +27,13 @@ const emit = defineEmits<{
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
       <Button variant="outline" class="bg-card shadow-none">
-        Actions ({{ selectedCount }})
+        {{ t("data.actions") }} ({{ selectedCount }})
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent>
-      <DropdownMenuLabel v-if="actions.length">Actions</DropdownMenuLabel>
+      <DropdownMenuLabel v-if="actions.length">{{
+        t("data.actions")
+      }}</DropdownMenuLabel>
       <DropdownMenuItem
         v-for="action in actions"
         :key="action.name"
@@ -38,7 +42,9 @@ const emit = defineEmits<{
         {{ action.label }}
       </DropdownMenuItem>
       <DropdownMenuSeparator v-if="actions.length && exports.length" />
-      <DropdownMenuLabel v-if="exports.length">Export</DropdownMenuLabel>
+      <DropdownMenuLabel v-if="exports.length">{{
+        t("data.export")
+      }}</DropdownMenuLabel>
       <DropdownMenuItem
         v-for="exp in exports"
         :key="exp.name"

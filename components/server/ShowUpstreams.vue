@@ -1,85 +1,120 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { useLoadBalancerEvents } from '~/composables/useChannelEvents'
-import type { LoadBalancerUpstream, Server } from '~/types'
-import { serverService } from '~/services/serverService'
+import { toast } from "vue-sonner";
+import { useLoadBalancerEvents } from "~/composables/useChannelEvents";
+import type { LoadBalancerUpstream, Server } from "~/types";
+import { serverService } from "~/services/serverService";
 
 interface Props {
-  server: Server
+  server: Server;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
+const { t } = useI18n();
 
-const upstreams = ref<LoadBalancerUpstream[]>([])
-const isLoading = ref(true)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const upstreams = ref<LoadBalancerUpstream[]>([]);
+const isLoading = ref(true);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
-const { user } = useAuth()
-const teamId = computed(() => user.value?.current_team_id?.toString() || '')
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
 // Debounced refetch for WebSocket events
-let upstreamFetchTimeout: ReturnType<typeof setTimeout> | null = null
+let upstreamFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 
 useLoadBalancerEvents(teamId, (data) => {
   if (data.server_id === props.server.id) {
-    if (upstreamFetchTimeout) clearTimeout(upstreamFetchTimeout)
-    upstreamFetchTimeout = setTimeout(() => fetchUpstreams(), 300)
+    if (upstreamFetchTimeout) clearTimeout(upstreamFetchTimeout);
+    upstreamFetchTimeout = setTimeout(() => fetchUpstreams(), 300);
   }
-})
+});
 
 const fetchUpstreams = async () => {
   try {
-    const response = await serverService.loadBalancer.upstreams.list(props.server.id)
-    upstreams.value = response.data
+    const response = await serverService.loadBalancer.upstreams.list(
+      props.server.id,
+    );
+    upstreams.value = response.data;
   } catch {
-    toast.error('Failed to load upstreams')
+    toast.error(t("server.upstreams.loadFailed"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const deleteUpstream = async (upstream: LoadBalancerUpstream) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete Upstream',
-    description: `Are you sure you want to delete "${upstream.name}"? This will remove all backends and restore their original Caddyfile configurations.`,
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
+    title: t("server.upstreams.deleteTitle"),
+    description: t("server.upstreams.deleteDescription", {
+      name: upstream.name,
+    }),
+    confirmText: t("server.common.delete"),
+    cancelText: t("server.common.cancel"),
     destructive: true,
-  })
+  });
 
   if (result.ok) {
     try {
-      await serverService.loadBalancer.upstreams.delete(props.server.id, upstream.id)
-      upstreams.value = upstreams.value.filter((u) => u.id !== upstream.id)
-      toast.success('Upstream deleted')
+      await serverService.loadBalancer.upstreams.delete(
+        props.server.id,
+        upstream.id,
+      );
+      upstreams.value = upstreams.value.filter((u) => u.id !== upstream.id);
+      toast.success(t("server.upstreams.deleteSuccess"));
     } catch {
-      toast.error('Failed to delete upstream')
+      toast.error(t("server.upstreams.deleteFailed"));
     }
   }
-}
+};
 
 const getHealthBadge = (upstream: LoadBalancerUpstream) => {
   if (!upstream.backends || upstream.backends.length === 0) {
-    return { label: 'No backends', class: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' }
+    return {
+      label: t("server.upstreams.noBackends"),
+      class:
+        "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+    };
   }
 
-  const healthy = upstream.backends.filter((b) => b.health_status === 'healthy' && !b.is_down).length
-  const total = upstream.backends.length
+  const healthy = upstream.backends.filter(
+    (b) => b.health_status === "healthy" && !b.is_down,
+  ).length;
+  const total = upstream.backends.length;
 
   if (healthy === total) {
-    return { label: `${healthy}/${total} healthy`, class: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' }
+    return {
+      label: t("server.upstreams.healthyCount", { healthy, total }),
+      class:
+        "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400",
+    };
   }
 
   if (healthy === 0) {
-    return { label: `${healthy}/${total} healthy`, class: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' }
+    return {
+      label: t("server.upstreams.healthyCount", { healthy, total }),
+      class: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+    };
   }
 
-  return { label: `${healthy}/${total} healthy`, class: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' }
-}
+  return {
+    label: t("server.upstreams.healthyCount", { healthy, total }),
+    class:
+      "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
+  };
+};
 
-onMounted(fetchUpstreams)
+const formatBackendCount = (count: number) =>
+  t(
+    count === 1
+      ? "server.upstreams.backendCount"
+      : "server.upstreams.backendsCount",
+    { count },
+  );
+
+onMounted(fetchUpstreams);
 </script>
 
 <template>
@@ -88,9 +123,9 @@ onMounted(fetchUpstreams)
 
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 class="text-lg font-semibold">Load Balancer Upstreams</h3>
+        <h3 class="text-lg font-semibold">{{ t("server.upstreams.title") }}</h3>
         <p class="text-sm text-muted-foreground">
-          Manage upstream configurations and their backend servers
+          {{ t("server.upstreams.description") }}
         </p>
       </div>
       <ServerCreateUpstream
@@ -101,18 +136,32 @@ onMounted(fetchUpstreams)
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <template v-else>
       <!-- Empty state -->
-      <div v-if="upstreams.length === 0" class="flex flex-col items-center justify-center rounded-lg border border-dashed py-12">
-        <Icon name="lucide:network" class="mb-3 h-10 w-10 text-muted-foreground/50" />
-        <h4 class="mb-1 text-sm font-medium">No upstreams configured</h4>
+      <div
+        v-if="upstreams.length === 0"
+        class="flex flex-col items-center justify-center rounded-lg border border-dashed py-12"
+      >
+        <Icon
+          name="lucide:network"
+          class="mb-3 h-10 w-10 text-muted-foreground/50"
+        />
+        <h4 class="mb-1 text-sm font-medium">
+          {{ t("server.upstreams.empty") }}
+        </h4>
         <p class="mb-4 text-sm text-muted-foreground">
-          Create an upstream to start load balancing traffic across your servers
+          {{ t("server.upstreams.emptyDescription") }}
         </p>
-        <ServerCreateUpstream :server-id="server.id" @created="fetchUpstreams" />
+        <ServerCreateUpstream
+          :server-id="server.id"
+          @created="fetchUpstreams"
+        />
       </div>
 
       <!-- Upstream cards -->
@@ -125,7 +174,9 @@ onMounted(fetchUpstreams)
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
-                <h4 class="truncate text-sm font-semibold">{{ upstream.name }}</h4>
+                <h4 class="truncate text-sm font-semibold">
+                  {{ upstream.name }}
+                </h4>
                 <span
                   class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                   :class="getHealthBadge(upstream).class"
@@ -133,27 +184,43 @@ onMounted(fetchUpstreams)
                   {{ getHealthBadge(upstream).label }}
                 </span>
               </div>
-              <p class="mt-1 text-sm text-muted-foreground">{{ upstream.address }}</p>
-              <div class="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              <p class="mt-1 text-sm text-muted-foreground">
+                {{ upstream.address }}
+              </p>
+              <div
+                class="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground"
+              >
                 <span class="flex items-center gap-1">
                   <Icon name="lucide:shuffle" class="h-3.5 w-3.5" />
                   {{ upstream.lb_policy_label }}
                 </span>
                 <span class="flex items-center gap-1">
                   <Icon name="lucide:server" class="h-3.5 w-3.5" />
-                  {{ upstream.backends?.length || 0 }} backend{{ (upstream.backends?.length || 0) !== 1 ? 's' : '' }}
+                  {{ formatBackendCount(upstream.backends?.length || 0) }}
                 </span>
-                <span v-if="upstream.health_check_path" class="flex items-center gap-1">
+                <span
+                  v-if="upstream.health_check_path"
+                  class="flex items-center gap-1"
+                >
                   <Icon name="lucide:heart-pulse" class="h-3.5 w-3.5" />
                   {{ upstream.health_check_path }}
                 </span>
-                <span v-if="upstream.installed_at" class="flex items-center gap-1">
-                  <Icon name="lucide:check-circle" class="h-3.5 w-3.5 text-emerald-500" />
-                  Installed
+                <span
+                  v-if="upstream.installed_at"
+                  class="flex items-center gap-1"
+                >
+                  <Icon
+                    name="lucide:check-circle"
+                    class="h-3.5 w-3.5 text-emerald-500"
+                  />
+                  {{ t("server.upstreams.installed") }}
                 </span>
                 <span v-else class="flex items-center gap-1">
-                  <Icon name="lucide:clock" class="h-3.5 w-3.5 text-amber-500" />
-                  Pending
+                  <Icon
+                    name="lucide:clock"
+                    class="h-3.5 w-3.5 text-amber-500"
+                  />
+                  {{ t("server.upstreams.pending") }}
                 </span>
               </div>
             </div>
@@ -180,7 +247,10 @@ onMounted(fetchUpstreams)
           </div>
 
           <!-- Backend list preview -->
-          <div v-if="upstream.backends && upstream.backends.length > 0" class="mt-3 border-t pt-3">
+          <div
+            v-if="upstream.backends && upstream.backends.length > 0"
+            class="mt-3 border-t pt-3"
+          >
             <div class="flex flex-wrap gap-2">
               <div
                 v-for="backend in upstream.backends"
@@ -199,8 +269,12 @@ onMounted(fetchUpstreams)
                           : 'bg-amber-500',
                   ]"
                 />
-                <span class="text-muted-foreground">{{ backend.server_id.slice(0, 8) }}:{{ backend.port }}</span>
-                <span v-if="backend.is_down" class="text-muted-foreground/60">(down)</span>
+                <span class="text-muted-foreground"
+                  >{{ backend.server_id.slice(0, 8) }}:{{ backend.port }}</span
+                >
+                <span v-if="backend.is_down" class="text-muted-foreground/60">{{
+                  t("server.upstreams.down")
+                }}</span>
               </div>
             </div>
           </div>

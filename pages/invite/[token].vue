@@ -9,9 +9,11 @@ definePageMeta({
   layout: "guest",
 });
 
-useHead({
-  title: "Complete Your Invitation",
-});
+const { t } = useI18n();
+
+useHead(() => ({
+  title: t("auth.invitation.pageTitle"),
+}));
 
 const route = useRoute();
 const { setTokens } = useApi();
@@ -45,7 +47,7 @@ onMounted(async () => {
     teamName.value = response.data.team_name;
     userExists.value = response.data.user_exists;
   } catch {
-    toast.error("Invalid or expired invitation");
+    toast.error(t("auth.errors.invalidInvitation"));
     navigateTo("/login");
   } finally {
     invitationLoading.value = false;
@@ -78,12 +80,14 @@ const handleSubmit = async () => {
     });
 
     setTokens(response.data.access_token, response.data.refresh_token);
-    setUser(response.data.user);
+    await setUser(response.data.user);
 
     toast.success(
       userExists.value
-        ? `You've joined ${teamName.value || "the team"}`
-        : "Account created successfully",
+        ? t("auth.invitation.joined", {
+            team: teamName.value || t("auth.invitation.defaultTeam"),
+          })
+        : t("auth.register.created"),
     );
     navigateTo("/dashboard");
   } catch (error: unknown) {
@@ -99,11 +103,11 @@ const handleSubmit = async () => {
         errors.value = errs;
       } else {
         errors.value = {
-          password: fetchError.data?.message || "An error occurred",
+          password: fetchError.data?.message || t("auth.errors.genericShort"),
         };
       }
     } else {
-      errors.value = { password: "An error occurred. Please try again." };
+      errors.value = { password: t("auth.errors.generic") };
     }
   } finally {
     loading.value = false;
@@ -126,41 +130,39 @@ const handleSubmit = async () => {
       </div>
 
       <h3 class="mb-2 text-lg font-semibold text-foreground">
-        {{ userExists ? "Join the team" : "Complete Your Invitation" }}
+        {{
+          userExists
+            ? t("auth.invitation.joinHeading")
+            : t("auth.invitation.completeHeading")
+        }}
       </h3>
       <p class="mb-8 text-sm text-muted-foreground">
-        <template v-if="userExists">
-          You already have an account. Enter your password to join
-          <span class="font-medium text-foreground">{{
-            teamName || "the team"
-          }}</span
-          >.
-        </template>
-        <template v-else>
-          You've been invited to join
-          <span class="font-medium text-foreground">{{
-            teamName || "the team"
-          }}</span
-          >. Please complete your account setup.
-        </template>
+        {{
+          t(
+            userExists
+              ? "auth.invitation.existingDescription"
+              : "auth.invitation.newDescription",
+            { team: teamName || t("auth.invitation.defaultTeam") },
+          )
+        }}
       </p>
       <p class="-mt-6 mb-8 text-xs text-muted-foreground">
-        Team code: {{ teamId.slice(-6) }}
+        {{ t("auth.invitation.teamCode", { code: teamId.slice(-6) }) }}
       </p>
 
       <form class="space-y-4" @submit.prevent="handleSubmit">
         <div class="space-y-2">
-          <Label for="email">Email</Label>
+          <Label for="email">{{ t("auth.fields.email") }}</Label>
           <Input id="email" v-model="email" type="email" disabled />
         </div>
 
         <div v-if="!userExists" class="space-y-2">
-          <Label for="name">Full Name</Label>
+          <Label for="name">{{ t("auth.fields.fullName") }}</Label>
           <Input
             id="name"
             v-model="name"
             type="text"
-            placeholder="Enter your full name"
+            :placeholder="t('auth.invitation.fullNamePlaceholder')"
             required
           />
           <p v-if="errors.name" class="text-sm text-destructive">
@@ -169,13 +171,15 @@ const handleSubmit = async () => {
         </div>
 
         <div class="space-y-2">
-          <Label for="password">Password</Label>
+          <Label for="password">{{ t("auth.fields.password") }}</Label>
           <Input
             id="password"
             v-model="password"
             type="password"
             :placeholder="
-              userExists ? 'Enter your password' : 'Choose a secure password'
+              userExists
+                ? t('auth.invitation.existingPasswordPlaceholder')
+                : t('auth.invitation.newPasswordPlaceholder')
             "
             :autocomplete="userExists ? 'current-password' : 'new-password'"
             required
@@ -186,12 +190,14 @@ const handleSubmit = async () => {
         </div>
 
         <div v-if="!userExists" class="space-y-2">
-          <Label for="password_confirmation">Confirm Password</Label>
+          <Label for="password_confirmation">{{
+            t("auth.fields.confirmPassword")
+          }}</Label>
           <Input
             id="password_confirmation"
             v-model="passwordConfirmation"
             type="password"
-            placeholder="Confirm your password"
+            :placeholder="t('auth.invitation.confirmPasswordPlaceholder')"
             autocomplete="new-password"
             required
           />
@@ -210,10 +216,18 @@ const handleSubmit = async () => {
             class="mr-2 h-4 w-4 animate-spin"
           />
           <template v-if="loading">
-            {{ userExists ? "Joining..." : "Creating Account..." }}
+            {{
+              userExists
+                ? t("auth.actions.joining")
+                : t("auth.actions.creatingAccount")
+            }}
           </template>
           <template v-else>
-            {{ userExists ? "Join Team" : "Complete Registration" }}
+            {{
+              userExists
+                ? t("auth.actions.joinTeam")
+                : t("auth.actions.completeRegistration")
+            }}
           </template>
         </Button>
       </form>

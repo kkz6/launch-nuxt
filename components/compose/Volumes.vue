@@ -11,6 +11,7 @@ interface Props {
   compose: DockerCompose;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Compose Volumes mirrors application Volumes — same row component
 // shape, same three flavours. The only meaningful behavioural
@@ -28,9 +29,9 @@ const props = defineProps<Props>();
 const volumes = ref<DockerVolume[]>([]);
 const isLoading = ref(true);
 
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchVolumes = async () => {
   isLoading.value = true;
@@ -42,7 +43,7 @@ const fetchVolumes = async () => {
     );
     volumes.value = res.data;
   } catch {
-    toast.error("Failed to load volumes");
+    toast.error(t("workload.volumes.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -56,21 +57,23 @@ const removeVolume = async (v: DockerVolume) => {
   if (!confirmationDialog.value) return;
   const kind =
     v.type === "file"
-      ? "file mount"
+      ? t("workload.volumes.fileMount")
       : v.type === "bind"
-        ? "bind mount"
-        : "volume";
+        ? t("workload.volumes.bindMount")
+        : t("workload.volumes.volume");
   const result = await confirmationDialog.value.show({
-    title: `Remove ${kind}`,
-    description: `Remove "${v.name}" from this stack? ${
-      v.type === "volume"
-        ? "The underlying docker named volume is NOT deleted."
-        : v.type === "bind"
-          ? "The host directory is left in place."
-          : "The on-host config file under ${STACK_DIR}/files/ is regenerated on next deploy from the remaining rows; this row's file will disappear when you redeploy."
-    }`,
-    confirmText: "Remove",
-    cancelText: "Cancel",
+    title: t("workload.volumes.removeTitle", { kind }),
+    description: t("workload.volumes.removeDescription", {
+      name: v.name,
+      detail:
+        v.type === "volume"
+          ? t("workload.volumes.namedVolumePreserved")
+          : v.type === "bind"
+            ? t("workload.volumes.hostDirectoryPreserved")
+            : t("workload.volumes.composeConfigFileRemoval"),
+    }),
+    confirmText: t("workload.actions.remove"),
+    cancelText: t("workload.actions.cancel"),
     destructive: true,
   });
   if (!result.ok) return;
@@ -82,31 +85,31 @@ const removeVolume = async (v: DockerVolume) => {
       v.id,
     );
     volumes.value = volumes.value.filter((x) => x.id !== v.id);
-    toast.success("Mount removed");
+    toast.success(t("workload.volumes.removed"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to remove mount");
+    toast.error(e.data?.message || t("workload.volumes.removeFailed"));
   }
 };
 
 // Legacy "named" type → "volume" for display; backend coerces on
 // create but rows persisted before the rename still carry the old
 // string.
-const typeLabel = (t: DockerVolumeType): string => {
-  switch (t) {
+const typeLabel = (mountType: DockerVolumeType): string => {
+  switch (mountType) {
     case "bind":
-      return "bind";
+      return t("workload.volumes.bind");
     case "file":
-      return "file";
+      return t("workload.volumes.file");
     case "volume":
     case "named":
     default:
-      return "volume";
+      return t("workload.volumes.volume");
   }
 };
 
-const typeBadgeClass = (t: DockerVolumeType): string => {
-  switch (t) {
+const typeBadgeClass = (mountType: DockerVolumeType): string => {
+  switch (mountType) {
     case "bind":
       return "bg-blue-500/15 text-blue-700 dark:text-blue-400";
     case "file":
@@ -133,15 +136,15 @@ onMounted(fetchVolumes);
 
     <div class="flex items-center justify-between">
       <div>
-        <h2 class="text-xl font-semibold">Volumes / Mounts</h2>
+        <h2 class="text-xl font-semibold">
+          {{ t("workload.volumes.title") }}
+        </h2>
         <p class="mt-1 text-sm text-muted-foreground">
-          Three flavours: <span class="font-medium">bind</span> /
-          <span class="font-medium">volume</span> rows are informational
-          for compose — you reference them yourself in the YAML.
-          <span class="font-medium">file</span> rows are materialized
-          under <code class="font-mono text-xs">${{ '{STACK_DIR}' }}/files/</code>
-          before deploy so the YAML can mount them via
-          <code class="font-mono text-xs">./files/&lt;file_path&gt;</code>.
+          {{ t("workload.volumes.composeDescriptionBeforeStack") }}
+          <code class="font-mono text-xs">${{ "{STACK_DIR}" }}/files/</code>
+          {{ t("workload.volumes.composeDescriptionBeforeFiles") }}
+          <code class="font-mono text-xs">./files/&lt;file_path&gt;</code
+          >{{ t("workload.punctuation.period") }}
         </p>
       </div>
       <ComposeCreateVolume
@@ -163,11 +166,11 @@ onMounted(fetchVolumes);
       class="flex flex-col items-center justify-center rounded-lg border border-dashed py-16"
     >
       <Icon name="lucide:hard-drive" class="h-12 w-12 text-muted-foreground" />
-      <h3 class="mt-4 text-lg font-medium">No mounts yet</h3>
+      <h3 class="mt-4 text-lg font-medium">
+        {{ t("workload.volumes.emptyTitle") }}
+      </h3>
       <p class="mt-1 max-w-md text-center text-sm text-muted-foreground">
-        Track bind paths or named volumes the stack uses (so the team
-        has them documented), or add file mounts the platform will
-        write next to your compose file before deploy.
+        {{ t("workload.volumes.composeEmptyDescription") }}
       </p>
       <div class="mt-6">
         <ComposeCreateVolume :compose="compose" @created="onCreated" />
@@ -180,11 +183,11 @@ onMounted(fetchVolumes);
           class="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground"
         >
           <tr>
-            <th class="px-4 py-3">Type</th>
-            <th class="px-4 py-3">Name</th>
-            <th class="px-4 py-3">Source</th>
-            <th class="px-4 py-3">Mount path</th>
-            <th class="px-4 py-3"></th>
+            <th class="px-4 py-3">{{ t("workload.fields.type") }}</th>
+            <th class="px-4 py-3">{{ t("workload.fields.name") }}</th>
+            <th class="px-4 py-3">{{ t("workload.fields.source") }}</th>
+            <th class="px-4 py-3">{{ t("workload.fields.mountPath") }}</th>
+            <th class="px-4 py-3" />
           </tr>
         </thead>
         <tbody>
@@ -211,12 +214,8 @@ onMounted(fetchVolumes);
     </div>
 
     <p class="text-xs text-muted-foreground">
-      <Icon
-        name="lucide:info"
-        class="-mt-0.5 mr-1 inline-block h-3 w-3"
-      />
-      File-mount changes apply on the next deploy; bind/volume rows
-      are documentation — wire them into your compose YAML manually.
+      <Icon name="lucide:info" class="-mt-0.5 mr-1 inline-block h-3 w-3" />
+      {{ t("workload.volumes.composeApplyHelp") }}
     </p>
   </div>
 </template>

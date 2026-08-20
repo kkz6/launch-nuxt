@@ -5,6 +5,7 @@ interface Props {
   database: DockerDatabase;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // General is now a clean info-card grid (engine / version / ports /
 // image / container). The Connection card moved into the navbar
@@ -75,8 +76,7 @@ const internalPort = computed(() => engineInfo.value.defaultPort);
 // computed value (`launch-db-<project>-<db>`) and fall back to a
 // best-effort guess if the field is missing on older rows.
 const containerName = computed(
-  () =>
-    props.database.container_name || `launch-db-${props.database.name}`,
+  () => props.database.container_name || `launch-db-${props.database.name}`,
 );
 </script>
 
@@ -104,7 +104,9 @@ const containerName = computed(
           />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Engine</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.fields.engine") }}
+          </p>
           <p class="text-sm font-medium text-foreground">
             {{ engineInfo.label }}
           </p>
@@ -119,7 +121,9 @@ const containerName = computed(
           <Icon name="lucide:tag" class="h-5 w-5 text-violet-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Version</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.fields.version") }}
+          </p>
           <p class="text-sm font-medium text-foreground">
             {{ database.engine_version }}
           </p>
@@ -134,7 +138,9 @@ const containerName = computed(
           <Icon name="lucide:plug-zap" class="h-5 w-5 text-blue-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Internal Port</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.fields.internalPort") }}
+          </p>
           <p class="font-mono text-sm font-medium text-foreground">
             {{ internalPort }}
           </p>
@@ -158,9 +164,14 @@ const containerName = computed(
           />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">External Port</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.database.general.externalPort") }}
+          </p>
           <p class="font-mono text-sm font-medium text-foreground">
-            {{ database.external_port ?? "Not exposed" }}
+            {{
+              database.external_port ??
+              t("workload.database.general.notExposed")
+            }}
           </p>
         </div>
       </div>
@@ -175,7 +186,9 @@ const containerName = computed(
           <Icon name="simple-icons:docker" class="h-5 w-5 text-zinc-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Image</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.fields.image") }}
+          </p>
           <p class="truncate font-mono text-sm font-medium text-foreground">
             {{ database.image_tag || "—" }}
           </p>
@@ -192,13 +205,14 @@ const containerName = computed(
           <Icon name="lucide:container" class="h-5 w-5 text-orange-500" />
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm text-muted-foreground">Container</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("workload.database.general.container") }}
+          </p>
           <p class="truncate font-mono text-xs font-medium text-foreground">
             {{ containerName }}
           </p>
         </div>
       </div>
     </div>
-
   </div>
 </template>

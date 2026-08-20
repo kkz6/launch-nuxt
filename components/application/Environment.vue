@@ -11,6 +11,7 @@ interface Props {
   application: DockerApplication;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 // Build secrets only apply when there's a build step (git / dockerfile
 // source). Pre-built image apps never build, so the section is hidden.
@@ -35,7 +36,7 @@ const fetchVars = async () => {
     );
     vars.value = res.data;
   } catch {
-    toast.error("Failed to load env vars");
+    toast.error(t("workload.environment.applicationLoadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -43,7 +44,11 @@ const fetchVars = async () => {
 
 onMounted(fetchVars);
 
-const onCreate = async (data: { key: string; value: string; is_secret?: boolean }) => {
+const onCreate = async (data: {
+  key: string;
+  value: string;
+  is_secret?: boolean;
+}) => {
   const res = await dockerService.applications.createEnvVar(
     props.application.server_id,
     props.application.project_id,
@@ -110,7 +115,7 @@ const fetchBuildSecrets = async () => {
     );
     buildSecrets.value = res.data;
   } catch {
-    toast.error("Failed to load build secrets");
+    toast.error(t("workload.environment.buildSecretsLoadFailed"));
   } finally {
     isLoadingBuildSecrets.value = false;
   }
@@ -162,10 +167,10 @@ const resyncWorkflow = async () => {
       props.application.project_id,
       props.application.id,
     );
-    toast.success("Workflow re-sync queued");
+    toast.success(t("workload.githubActions.resyncQueued"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to queue workflow re-sync");
+    toast.error(e.data?.message || t("workload.githubActions.resyncFailed"));
   } finally {
     isResyncing.value = false;
   }
@@ -177,11 +182,11 @@ const resyncWorkflow = async () => {
     <!-- Tab header — same title/subtitle pattern as Deployments,
          Redirects, Schedulers, etc. -->
     <div>
-      <h3 class="text-lg font-semibold">Environment</h3>
+      <h3 class="text-lg font-semibold">
+        {{ t("workload.environment.title") }}
+      </h3>
       <p class="text-sm text-muted-foreground">
-        Variables and secrets for this application, split by when they
-        apply — runtime values are passed to the running container,
-        build-time values are available only while the image builds.
+        {{ t("workload.environment.applicationDescription") }}
       </p>
     </div>
 
@@ -202,13 +207,22 @@ const resyncWorkflow = async () => {
           <Icon name="lucide:refresh-cw" class="h-4 w-4" />
         </div>
         <div class="min-w-0 space-y-0.5">
-          <h4 class="text-[13px] font-semibold text-amber-800 dark:text-amber-300">
-            Workflow out of sync
+          <h4
+            class="text-[13px] font-semibold text-amber-800 dark:text-amber-300"
+          >
+            {{ t("workload.githubActions.outOfSync") }}
           </h4>
-          <p class="text-[13px] leading-relaxed text-amber-700/80 dark:text-amber-300/70">
-            <span class="tabular-nums">{{ application.gha_pending_changes || 0 }}</span>
-            pending {{ (application.gha_pending_changes || 0) === 1 ? "change" : "changes" }} —
-            re-sync to push your build secrets and update the committed workflow file.
+          <p
+            class="text-[13px] leading-relaxed text-amber-700/80 dark:text-amber-300/70"
+          >
+            <span class="tabular-nums">{{
+              application.gha_pending_changes || 0
+            }}</span>
+            {{
+              t("workload.githubActions.pendingChanges", {
+                count: application.gha_pending_changes || 0,
+              })
+            }}
           </p>
         </div>
       </div>
@@ -223,7 +237,7 @@ const resyncWorkflow = async () => {
           :name="isResyncing ? 'lucide:loader-2' : 'lucide:refresh-cw'"
           :class="['mr-1.5 h-4 w-4', isResyncing && 'animate-spin']"
         />
-        Re-sync workflow
+        {{ t("workload.githubActions.resync") }}
       </Button>
     </div>
 
@@ -234,9 +248,9 @@ const resyncWorkflow = async () => {
       :show-project-hint="true"
       :is-running="application.status === 'running'"
       :on-restart="onRestart"
-      restart-label="Reload"
-      title="Runtime environment"
-      description="Env vars passed to the container as -e KEY=VALUE — available while it runs. Save, then Deploy to recreate the container with the new values. Reload only restarts the existing container."
+      :restart-label="t('workload.actions.reload')"
+      :title="t('workload.environment.runtimeTitle')"
+      :description="t('workload.environment.runtimeDescription')"
       :on-create="onCreate"
       :on-update="onUpdate"
       :on-delete="onDelete"
@@ -251,12 +265,14 @@ const resyncWorkflow = async () => {
       <SharedBuildSecretsEditor
         :secrets="buildSecrets"
         :loading="isLoadingBuildSecrets"
-        owner-label="application"
+        :owner-label="t('workload.kind.application')"
         :github-actions="isGHA"
         :on-create="onCreateBuildSecret"
         :on-update="onUpdateBuildSecret"
         :on-delete="onDeleteBuildSecret"
-        @update:secrets="(v) => (buildSecrets = v as unknown as DockerBuildSecret[])"
+        @update:secrets="
+          (v) => (buildSecrets = v as unknown as DockerBuildSecret[])
+        "
       />
     </section>
   </div>

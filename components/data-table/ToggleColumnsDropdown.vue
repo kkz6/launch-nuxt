@@ -8,6 +8,8 @@ import {
 import { Button } from "~/components/ui/button";
 import type { ColumnDef } from "~/types/data-table";
 
+const { t } = useI18n();
+
 defineProps<{
   columns: ColumnDef[];
   visibleColumns: string[];
@@ -43,7 +45,7 @@ function isVisible(col: ColumnDef, visibleColumns: string[]): boolean {
           <rect width="6" height="6" x="15" y="15" rx="1" />
           <rect width="6" height="6" x="3" y="3" rx="1" />
         </svg>
-        Columns
+        {{ t("data.columns") }}
       </Button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">

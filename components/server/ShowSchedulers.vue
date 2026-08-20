@@ -1,104 +1,109 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
+import { toast } from "vue-sonner";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '~/components/ui/dialog'
-import type { Cron, Server } from '~/types'
+} from "~/components/ui/dialog";
+import type { Cron, Server } from "~/types";
 
 interface Props {
-  server: Server
+  server: Server;
 }
 
-const props = defineProps<Props>()
-const serverId = computed(() => props.server.id)
+const props = defineProps<Props>();
+const { t } = useI18n();
+const serverId = computed(() => props.server.id);
 
-const schedulers = ref<Cron[]>([])
-const isLoading = ref(true)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const schedulers = ref<Cron[]>([]);
+const isLoading = ref(true);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 // Log viewer state
-const selectedSchedulerForLogs = ref<Cron | null>(null)
-const isLogDialogOpen = ref(false)
+const selectedSchedulerForLogs = ref<Cron | null>(null);
+const isLogDialogOpen = ref(false);
 
 // Edit dialog state
-const selectedSchedulerForEdit = ref<Cron | null>(null)
-const isEditDialogOpen = ref(false)
+const selectedSchedulerForEdit = ref<Cron | null>(null);
+const isEditDialogOpen = ref(false);
 
 const viewLogs = (cron: Cron) => {
-  selectedSchedulerForLogs.value = cron
-  isLogDialogOpen.value = true
-}
+  selectedSchedulerForLogs.value = cron;
+  isLogDialogOpen.value = true;
+};
 
 const editScheduler = (cron: Cron) => {
-  selectedSchedulerForEdit.value = cron
-  isEditDialogOpen.value = true
-}
+  selectedSchedulerForEdit.value = cron;
+  isEditDialogOpen.value = true;
+};
 
 const fetchData = async () => {
   try {
-    const data = await $api<{ data: Cron[] }>(`/servers/${serverId.value}/crons`)
-    schedulers.value = data.data
+    const data = await $api<{ data: Cron[] }>(
+      `/servers/${serverId.value}/crons`,
+    );
+    schedulers.value = data.data;
   } catch {
-    toast.error('Failed to load schedulers')
+    toast.error(t("server.schedulers.loadFailed"));
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-}
+};
 
 const deleteScheduler = async (cron: Cron) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete Scheduler',
-    description: 'This action cannot be undone. This will permanently delete the scheduled task from your server.',
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
+    title: t("server.schedulers.deleteTitle"),
+    description: t("server.schedulers.deleteDescription"),
+    confirmText: t("server.common.delete"),
+    cancelText: t("server.common.cancel"),
     destructive: true,
-    helpText: 'Type the command to confirm deletion:',
+    helpText: t("server.schedulers.deleteHelp"),
     inputVerificationText: cron.command,
-  })
+  });
 
   if (result.ok) {
     try {
       await $api(`/servers/${serverId.value}/crons/${cron.id}`, {
-        method: 'DELETE',
-      })
-      schedulers.value = schedulers.value.filter((s) => s.id !== cron.id)
-      toast.success('Scheduler deleted successfully')
+        method: "DELETE",
+      });
+      schedulers.value = schedulers.value.filter((s) => s.id !== cron.id);
+      toast.success(t("server.schedulers.deleteSuccess"));
     } catch {
-      toast.error('Failed to delete scheduler')
+      toast.error(t("server.schedulers.deleteFailed"));
     }
   } else {
-    toast.info('Cancelled')
+    toast.info(t("server.common.cancelled"));
   }
-}
+};
 
 const handleSchedulerUpdated = () => {
-  isEditDialogOpen.value = false
-  selectedSchedulerForEdit.value = null
-  fetchData()
-}
+  isEditDialogOpen.value = false;
+  selectedSchedulerForEdit.value = null;
+  fetchData();
+};
 
 // Clean up selected scheduler when dialog closes
 watch(isEditDialogOpen, (open) => {
   if (!open) {
-    selectedSchedulerForEdit.value = null
+    selectedSchedulerForEdit.value = null;
   }
-})
+});
 
 // Debounced refetch for WebSocket events
-let cronFetchTimeout: ReturnType<typeof setTimeout> | null = null
+let cronFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-useServerModelEvents('cron', serverId.value, () => {
-  if (cronFetchTimeout) clearTimeout(cronFetchTimeout)
-  cronFetchTimeout = setTimeout(() => fetchData(), 300)
-})
+useServerModelEvents("cron", serverId.value, () => {
+  if (cronFetchTimeout) clearTimeout(cronFetchTimeout);
+  cronFetchTimeout = setTimeout(() => fetchData(), 300);
+});
 
-onMounted(fetchData)
+onMounted(fetchData);
 </script>
 
 <template>
@@ -107,10 +112,16 @@ onMounted(fetchData)
 
     <!-- Log Viewer Dialog -->
     <Dialog v-model:open="isLogDialogOpen">
-      <DialogContent class="h-[85vh] sm:max-w-7xl flex flex-col overflow-hidden">
+      <DialogContent
+        class="h-[85vh] sm:max-w-7xl flex flex-col overflow-hidden"
+      >
         <DialogHeader class="shrink-0">
-          <DialogTitle class="text-xl">Scheduler Logs</DialogTitle>
-          <DialogDescription>{{ selectedSchedulerForLogs?.command }}</DialogDescription>
+          <DialogTitle class="text-xl">{{
+            t("server.schedulers.logs")
+          }}</DialogTitle>
+          <DialogDescription>{{
+            selectedSchedulerForLogs?.command
+          }}</DialogDescription>
         </DialogHeader>
         <div class="flex flex-col flex-1 min-h-0 pt-2.5">
           <ServerLogViewer
@@ -137,32 +148,69 @@ onMounted(fetchData)
 
     <div class="mb-4 flex items-start justify-between gap-4">
       <div>
-        <h3 class="text-lg font-semibold">Schedulers</h3>
-        <p class="text-sm text-muted-foreground">Manage cron jobs on this server</p>
+        <h3 class="text-lg font-semibold">
+          {{ t("server.schedulers.title") }}
+        </h3>
+        <p class="text-sm text-muted-foreground">
+          {{ t("server.schedulers.description") }}
+        </p>
       </div>
-      <ServerCreateScheduler v-if="schedulers.length > 0" :server="server" @created="fetchData" />
+      <ServerCreateScheduler
+        v-if="schedulers.length > 0"
+        :server="server"
+        @created="fetchData"
+      />
     </div>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
-      <Icon name="lucide:loader-2" class="h-6 w-6 animate-spin text-muted-foreground" />
+      <Icon
+        name="lucide:loader-2"
+        class="h-6 w-6 animate-spin text-muted-foreground"
+      />
     </div>
 
     <template v-else>
       <SharedDataTable
         :data="schedulers"
         :columns="[
-          { key: 'command', label: 'Command', width: '25%' },
-          { key: 'user', label: 'User', width: '15%' },
-          { key: 'frequency', label: 'Frequency', width: '20%' },
-          { key: 'status', label: 'Status', width: '15%' },
-          { key: 'installed_at', label: 'Installed', width: '15%', type: 'relative-date' },
+          {
+            key: 'command',
+            label: t('server.schedulers.command'),
+            width: '25%',
+          },
+          { key: 'user', label: t('server.schedulers.user'), width: '15%' },
+          {
+            key: 'frequency',
+            label: t('server.schedulers.frequency'),
+            width: '20%',
+          },
+          { key: 'status', label: t('server.schedulers.status'), width: '15%' },
+          {
+            key: 'installed_at',
+            label: t('server.schedulers.installed'),
+            width: '15%',
+            type: 'relative-date',
+          },
         ]"
         :actions="[
-          { label: 'View Logs', icon: 'lucide:scroll-text', onClick: viewLogs },
-          { label: 'Edit', icon: 'lucide:pencil', onClick: editScheduler },
-          { label: 'Delete', icon: 'lucide:trash-2', onClick: deleteScheduler, destructive: true },
+          {
+            label: t('server.schedulers.viewLogs'),
+            icon: 'lucide:scroll-text',
+            onClick: viewLogs,
+          },
+          {
+            label: t('server.common.edit'),
+            icon: 'lucide:pencil',
+            onClick: editScheduler,
+          },
+          {
+            label: t('server.common.delete'),
+            icon: 'lucide:trash-2',
+            onClick: deleteScheduler,
+            destructive: true,
+          },
         ]"
-        empty-title="No scheduled tasks found"
+        :empty-title="t('server.schedulers.empty')"
         empty-icon="lucide:clock"
       >
         <template #empty>

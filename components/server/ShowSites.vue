@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
 import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
 import type { Server, Site } from "~/types";
 
 interface Props {
@@ -10,21 +11,25 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+const { t, locale } = useI18n();
+const dateFnsLocale = computed(() => (locale.value === "ja" ? ja : enUS));
 const emit = defineEmits<{
-  deleted: []
+  deleted: [];
 }>();
 
 const isDeleting = ref<string | null>(null);
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const deleteSite = async (site: Site) => {
   if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete Site',
-    description: `Are you sure you want to delete "${site.address}"? This action cannot be undone.`,
-    confirmText: 'Delete',
-    cancelText: 'Cancel',
+    title: t("server.sites.deleteTitle"),
+    description: t("server.sites.deleteDescription", { address: site.address }),
+    confirmText: t("server.common.delete"),
+    cancelText: t("server.common.cancel"),
     destructive: true,
   });
 
@@ -33,29 +38,31 @@ const deleteSite = async (site: Site) => {
   isDeleting.value = site.id;
   try {
     await $api(`/servers/${props.server.id}/sites/${site.id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     // Immediately update the local site to show "Uninstalling" status
     site.uninstallation_requested_at = new Date().toISOString();
     site.uninstallation_failed_at = null;
-    toast.success('Site deletion initiated');
+    toast.success(t("server.sites.deleteStarted"));
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || 'Failed to delete site');
+    toast.error(err.data?.message || t("server.sites.deleteFailed"));
   } finally {
     isDeleting.value = null;
   }
 };
 
 const getSiteTypeIcon = (type: string): string => {
-  const t = type?.toLowerCase() || "";
-  if (t.includes("laravel")) return "simple-icons:laravel";
-  if (t.includes("wordpress")) return "simple-icons:wordpress";
-  if (t.includes("nuxt")) return "simple-icons:nuxtdotjs";
-  if (t.includes("next")) return "simple-icons:nextdotjs";
-  if (t.includes("node")) return "simple-icons:nodedotjs";
-  if (t.includes("python") || t.includes("django")) return "simple-icons:python";
-  if (t.includes("ruby") || t.includes("rails")) return "simple-icons:ruby";
+  const normalizedType = type?.toLowerCase() || "";
+  if (normalizedType.includes("laravel")) return "simple-icons:laravel";
+  if (normalizedType.includes("wordpress")) return "simple-icons:wordpress";
+  if (normalizedType.includes("nuxt")) return "simple-icons:nuxtdotjs";
+  if (normalizedType.includes("next")) return "simple-icons:nextdotjs";
+  if (normalizedType.includes("node")) return "simple-icons:nodedotjs";
+  if (normalizedType.includes("python") || normalizedType.includes("django"))
+    return "simple-icons:python";
+  if (normalizedType.includes("ruby") || normalizedType.includes("rails"))
+    return "simple-icons:ruby";
   return "simple-icons:php";
 };
 
@@ -63,7 +70,7 @@ const getSiteTypeLabel = (type: string): string => {
   const types: Record<string, string> = {
     laravel: "Laravel",
     wordpress: "WordPress",
-    generic: "Generic PHP",
+    generic: t("server.sites.genericPhp"),
     nuxt: "Nuxt",
     nextjs: "Next.js",
     nodejs: "Node.js",
@@ -102,18 +109,18 @@ const getStatusColor = (site: Site): string => {
 
 const getStatusLabel = (site: Site): { text: string; loading: boolean } => {
   if (site.uninstallation_requested_at && !site.uninstallation_failed_at) {
-    return { text: "Uninstalling", loading: true };
+    return { text: t("server.sites.uninstalling"), loading: true };
   }
   if (site.uninstallation_failed_at) {
-    return { text: "Uninstallation failed", loading: false };
+    return { text: t("server.sites.uninstallationFailed"), loading: false };
   }
   if (site.installation_failed_at) {
-    return { text: "Installation failed", loading: false };
+    return { text: t("server.sites.installationFailed"), loading: false };
   }
   if (site.installed_at) {
-    return { text: "Installed", loading: false };
+    return { text: t("server.sites.installed"), loading: false };
   }
-  return { text: "Installing", loading: true };
+  return { text: t("server.sites.installing"), loading: true };
 };
 
 const isAccessible = (site: Site) => {
@@ -125,7 +132,10 @@ const { cacheSite } = useNavbarCache();
 
 const formatDate = (date: string): string => {
   try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
+    return formatDistanceToNow(new Date(date), {
+      addSuffix: true,
+      locale: dateFnsLocale.value,
+    });
   } catch {
     return "";
   }
@@ -149,8 +159,10 @@ const formatDate = (date: string): string => {
     >
       <Icon name="lucide:globe" class="h-16 w-16 text-muted-foreground" />
       <div class="text-center">
-        <p class="font-medium">No sites found</p>
-        <p class="text-sm text-muted-foreground">Click on Add Site to get started</p>
+        <p class="font-medium">{{ t("server.sites.empty") }}</p>
+        <p class="text-sm text-muted-foreground">
+          {{ t("server.sites.emptyDescription") }}
+        </p>
       </div>
     </div>
 
@@ -158,7 +170,9 @@ const formatDate = (date: string): string => {
       <NuxtLink
         v-for="site in sites"
         :key="site.id"
-        :to="isAccessible(site) ? `/servers/${server.id}/sites/${site.id}` : '#'"
+        :to="
+          isAccessible(site) ? `/servers/${server.id}/sites/${site.id}` : '#'
+        "
         class="group"
         :class="{ 'pointer-events-none': !isAccessible(site) }"
         @click="cacheSite(site)"
@@ -171,7 +185,10 @@ const formatDate = (date: string): string => {
         >
           <!-- Delete button for failed or uninstalling sites -->
           <button
-            v-if="(site.installation_failed_at || site.uninstallation_failed_at) && !site.uninstallation_requested_at"
+            v-if="
+              (site.installation_failed_at || site.uninstallation_failed_at) &&
+              !site.uninstallation_requested_at
+            "
             type="button"
             class="pointer-events-auto absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             :disabled="isDeleting === site.id"
@@ -227,7 +244,9 @@ const formatDate = (date: string): string => {
               <span
                 :class="[
                   getStatusLabel(site).loading ? 'text-muted-foreground' : '',
-                  site.installation_failed_at || site.uninstallation_failed_at ? 'text-destructive' : ''
+                  site.installation_failed_at || site.uninstallation_failed_at
+                    ? 'text-destructive'
+                    : '',
                 ]"
               >
                 {{ getStatusLabel(site).text }}

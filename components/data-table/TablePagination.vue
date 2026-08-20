@@ -10,6 +10,8 @@ import {
 } from "~/components/ui/select";
 import type { PaginationData } from "~/types/data-table";
 
+const { t } = useI18n();
+
 const props = defineProps<{
   pagination: PaginationData;
   perPageOptions: number[];
@@ -41,8 +43,13 @@ const pages = computed(() => {
   <div class="flex items-center justify-between px-1 pt-4 pb-1">
     <div class="text-sm text-muted-foreground">
       <template v-if="pagination.total > 0">
-        Showing {{ pagination.from }} to {{ pagination.to }} of
-        {{ pagination.total }}
+        {{
+          t("data.pagination.showing", {
+            from: pagination.from,
+            to: pagination.to,
+            total: pagination.total,
+          })
+        }}
       </template>
     </div>
 
@@ -60,7 +67,7 @@ const pages = computed(() => {
             :key="opt"
             :value="String(opt)"
           >
-            {{ opt }} per page
+            {{ t("data.pagination.perPage", { count: opt }) }}
           </SelectItem>
         </SelectContent>
       </Select>
@@ -73,7 +80,7 @@ const pages = computed(() => {
           :disabled="pagination.currentPage <= 1"
           @click="emit('page', pagination.currentPage - 1)"
         >
-          Prev
+          {{ t("data.pagination.prev") }}
         </Button>
         <template v-for="p in pages" :key="p">
           <span v-if="p === '...'" class="px-2 text-sm text-muted-foreground"
@@ -100,7 +107,7 @@ const pages = computed(() => {
           :disabled="pagination.currentPage >= pagination.lastPage"
           @click="emit('page', pagination.currentPage + 1)"
         >
-          Next
+          {{ t("data.pagination.next") }}
         </Button>
       </div>
 
@@ -112,7 +119,7 @@ const pages = computed(() => {
           :disabled="pagination.currentPage <= 1"
           @click="emit('page', pagination.currentPage - 1)"
         >
-          Previous
+          {{ t("data.pagination.previous") }}
         </Button>
         <Button
           variant="outline"
@@ -124,7 +131,7 @@ const pages = computed(() => {
           "
           @click="emit('page', pagination.currentPage + 1)"
         >
-          Next
+          {{ t("data.pagination.next") }}
         </Button>
       </div>
     </div>

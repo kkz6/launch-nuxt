@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { Button } from '~/components/ui/button'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
+import { toast } from "vue-sonner";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -11,63 +11,71 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from '~/components/ui/select'
-import type { Server } from '~/types'
+} from "~/components/ui/select";
+import type { Server } from "~/types";
 
-const servers = ref<Server[]>([])
-const selectedServerId = ref('')
-const auditEmail = ref('')
-const auditLoading = ref(false)
-const isLoadingServers = ref(true)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const servers = ref<Server[]>([]);
+const { t } = useI18n();
+const selectedServerId = ref("");
+const auditEmail = ref("");
+const auditLoading = ref(false);
+const isLoadingServers = ref(true);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 const fetchServers = async () => {
-  isLoadingServers.value = true
+  isLoadingServers.value = true;
   try {
-    const response = await $api<{ data: Server[] }>('/servers')
-    servers.value = response.data.filter((s: Server) => s.connected)
+    const response = await $api<{ data: Server[] }>("/servers");
+    servers.value = response.data.filter((s: Server) => s.connected);
   } catch {
     // Silent fail - select will show empty state
   } finally {
-    isLoadingServers.value = false
+    isLoadingServers.value = false;
   }
-}
+};
 
 const runVulnerabilityAudit = async () => {
   if (!selectedServerId.value) {
-    toast.error('Please select a server')
-    return
+    toast.error(t("settings.security.selectServerRequired"));
+    return;
   }
 
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
-  const server = servers.value.find((s) => s.id === selectedServerId.value)
+  const server = servers.value.find((s) => s.id === selectedServerId.value);
   const result = await confirmationDialog.value.show({
-    title: 'Start Security Audit',
-    description: `This will run a comprehensive security audit on "${server?.name || 'the selected server'}". The results will be sent to your email when completed.`,
-    confirmText: 'Start Audit',
-    cancelText: 'Cancel',
-  })
+    title: t("settings.security.startAuditTitle"),
+    description: t("settings.security.startAuditDescription", {
+      server: server?.name || t("settings.security.selectedServer"),
+    }),
+    confirmText: t("settings.security.startAudit"),
+    cancelText: t("settings.security.cancel"),
+  });
 
-  if (!result.ok) return
+  if (!result.ok) return;
 
-  auditLoading.value = true
+  auditLoading.value = true;
   try {
-    const response = await $api<{ message: string }>(`/servers/${selectedServerId.value}/vulnerability-audit`, {
-      method: 'POST',
-      body: auditEmail.value ? { email: auditEmail.value } : {},
-    })
-    toast.success(response.message || 'Vulnerability audit has been queued successfully')
-    auditEmail.value = ''
+    const response = await $api<{ message: string }>(
+      `/servers/${selectedServerId.value}/vulnerability-audit`,
+      {
+        method: "POST",
+        body: auditEmail.value ? { email: auditEmail.value } : {},
+      },
+    );
+    toast.success(response.message || t("settings.security.auditQueued"));
+    auditEmail.value = "";
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to start vulnerability audit')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("settings.security.auditFailed"));
   } finally {
-    auditLoading.value = false
+    auditLoading.value = false;
   }
-}
+};
 
-onMounted(fetchServers)
+onMounted(fetchServers);
 </script>
 
 <template>
@@ -76,36 +84,44 @@ onMounted(fetchServers)
 
     <!-- Active Sessions Section -->
     <div class="px-6 pb-6">
-      <h3 class="mb-1 text-base font-semibold">Active Sessions</h3>
+      <h3 class="mb-1 text-base font-semibold">
+        {{ t("settings.security.activeSessionsTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        Manage your active sessions across devices. Revoke access to devices you no longer use.
+        {{ t("settings.security.activeSessionsDescription") }}
       </p>
       <SettingsSessions />
     </div>
 
     <!-- Passkeys Section -->
     <div class="px-6 py-6">
-      <h3 class="mb-1 text-base font-semibold">Passkeys</h3>
+      <h3 class="mb-1 text-base font-semibold">
+        {{ t("settings.security.passkeysTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        Use passkeys for passwordless authentication.
+        {{ t("settings.security.passkeysDescription") }}
       </p>
       <SettingsPasskeys />
     </div>
 
     <!-- Two-Factor Authentication Section -->
     <div class="px-6 py-6">
-      <h3 class="mb-1 text-base font-semibold">Two-Factor Authentication</h3>
+      <h3 class="mb-1 text-base font-semibold">
+        {{ t("settings.security.twoFactorTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        Add an extra layer of security to your account.
+        {{ t("settings.security.twoFactorDescription") }}
       </p>
       <SettingsTwoFactor />
     </div>
 
     <!-- Personal Access Tokens Section -->
     <div class="px-6 py-6">
-      <h3 class="mb-1 text-base font-semibold">Personal Access Tokens</h3>
+      <h3 class="mb-1 text-base font-semibold">
+        {{ t("settings.security.tokensTitle") }}
+      </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        Tokens for CLI and API authentication. Treat them like passwords.
+        {{ t("settings.security.tokensDescription") }}
       </p>
       <SettingsPersonalAccessTokens />
     </div>
@@ -114,24 +130,25 @@ onMounted(fetchServers)
     <div class="px-6 pt-6">
       <h3 class="mb-1 flex items-center gap-2 text-base font-semibold">
         <Icon name="lucide:shield" class="h-4 w-4" />
-        Server Security Audit
+        {{ t("settings.security.auditTitle") }}
       </h3>
       <p class="mb-4 text-sm text-muted-foreground">
-        Run a comprehensive security audit on a server to identify potential
-        vulnerabilities and security issues.
+        {{ t("settings.security.auditDescription") }}
       </p>
 
       <form class="space-y-4" @submit.prevent="runVulnerabilityAudit">
         <div class="space-y-2">
-          <Label>Server</Label>
+          <Label>{{ t("settings.security.server") }}</Label>
           <Select v-model="selectedServerId">
             <SelectTrigger>
-              <SelectValue placeholder="Select a server" />
+              <SelectValue :placeholder="t('settings.security.selectServer')" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
                 <template v-if="isLoadingServers">
-                  <SelectLabel class="text-muted-foreground">Loading servers...</SelectLabel>
+                  <SelectLabel class="text-muted-foreground">{{
+                    t("settings.security.loadingServers")
+                  }}</SelectLabel>
                 </template>
                 <template v-else-if="servers.length > 0">
                   <SelectItem
@@ -143,7 +160,9 @@ onMounted(fetchServers)
                   </SelectItem>
                 </template>
                 <template v-else>
-                  <SelectLabel class="text-muted-foreground">No connected servers</SelectLabel>
+                  <SelectLabel class="text-muted-foreground">{{
+                    t("settings.security.noConnectedServers")
+                  }}</SelectLabel>
                 </template>
               </SelectGroup>
             </SelectContent>
@@ -151,35 +170,49 @@ onMounted(fetchServers)
         </div>
 
         <div class="space-y-2">
-          <Label for="audit-email">Email Address (Optional)</Label>
+          <Label for="audit-email">{{
+            t("settings.security.emailOptional")
+          }}</Label>
           <Input
             id="audit-email"
             v-model="auditEmail"
             type="email"
-            placeholder="Leave empty to use your account email"
+            :placeholder="t('settings.security.emailPlaceholder')"
           />
         </div>
 
-        <div class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50">
+        <div
+          class="flex items-start gap-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/50"
+        >
           <div class="space-y-1">
             <p class="text-sm font-medium text-blue-800 dark:text-blue-200">
-              What will be audited?
+              {{ t("settings.security.auditedTitle") }}
             </p>
-            <ul class="list-inside list-disc space-y-1 text-sm text-blue-700 dark:text-blue-300">
-              <li>Security updates and patches</li>
-              <li>SSH configuration and security settings</li>
-              <li>User accounts and password policies</li>
-              <li>Network security and firewall settings</li>
-              <li>File permissions and SUID/SGID files</li>
-              <li>Running services and processes</li>
-              <li>System logs for security events</li>
+            <ul
+              class="list-inside list-disc space-y-1 text-sm text-blue-700 dark:text-blue-300"
+            >
+              <li>{{ t("settings.security.auditItems.updates") }}</li>
+              <li>{{ t("settings.security.auditItems.ssh") }}</li>
+              <li>{{ t("settings.security.auditItems.accounts") }}</li>
+              <li>{{ t("settings.security.auditItems.network") }}</li>
+              <li>{{ t("settings.security.auditItems.permissions") }}</li>
+              <li>{{ t("settings.security.auditItems.services") }}</li>
+              <li>{{ t("settings.security.auditItems.logs") }}</li>
             </ul>
           </div>
         </div>
 
         <Button type="submit" :disabled="auditLoading || !selectedServerId">
-          <Icon v-if="auditLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          {{ auditLoading ? 'Running Security Audit...' : 'Start Security Audit' }}
+          <Icon
+            v-if="auditLoading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          {{
+            auditLoading
+              ? t("settings.security.runningAudit")
+              : t("settings.security.startSecurityAudit")
+          }}
         </Button>
       </form>
     </div>

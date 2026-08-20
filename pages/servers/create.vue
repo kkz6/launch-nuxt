@@ -30,12 +30,12 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
+import { useStableMetadataLabels } from "~/composables/useStableMetadataLabels";
 import type { SSHKey, ConnectedServerProvider } from "~/types";
 import {
   serverService,
   serverProviderService,
   sshKeyService,
-  type CreateServerOptions,
 } from "~/services/serverService";
 
 definePageMeta({
@@ -43,9 +43,9 @@ definePageMeta({
   middleware: "auth",
 });
 
-useHead({
-  title: "Create Server",
-});
+const { t } = useI18n();
+const { getServerTypeLabel } = useStableMetadataLabels();
+useHead(() => ({ title: t("server.create.title") }));
 
 const { open: openSettings } = useSettingsSheet();
 
@@ -78,31 +78,33 @@ const sshKeys = ref<SSHKey[]>([]);
 const plans = ref<Record<string, CloudServiceConfig>>({});
 const canCreateServer = ref(true);
 
-const serviceProviders: Record<string, string> = {
+const serviceProviders = computed<Record<string, string>>(() => ({
   digitalocean: "DigitalOcean",
   hetzner: "Hetzner",
   linode: "Linode",
   vultr: "Vultr",
   aws: "AWS",
-  custom_server: "Custom Server",
-};
+  custom_server: t("server.create.customServer"),
+}));
 
-const schema = toTypedSchema(
-  z.object({
-    name: z.string().min(1, "Server name is required").max(255),
-    service_provider: z.string().min(1, "Provider is required"),
-    server_provider_id: z.string().optional(),
-    region: z.string().optional(),
-    plan: z.string().optional(),
-    type: z.string().default("php"),
-    operating_system: z.string().default("ubuntu_24"),
-    database: z.string().default("mysql80"),
-    php: z.string().default("php83"),
-    ssh_keys: z.array(z.string()).default([]),
-    ip: z.string().optional(),
-    port: z.string().default("22"),
-    install_agent: z.boolean().default(true),
-  })
+const schema = computed(() =>
+  toTypedSchema(
+    z.object({
+      name: z.string().min(1, t("server.create.nameRequired")).max(255),
+      service_provider: z.string().min(1, t("server.create.providerRequired")),
+      server_provider_id: z.string().optional(),
+      region: z.string().optional(),
+      plan: z.string().optional(),
+      type: z.string().default("php"),
+      operating_system: z.string().default("ubuntu_24"),
+      database: z.string().default("mysql80"),
+      php: z.string().default("php83"),
+      ssh_keys: z.array(z.string()).default([]),
+      ip: z.string().optional(),
+      port: z.string().default("22"),
+      install_agent: z.boolean().default(true),
+    }),
+  ),
 );
 
 const { handleSubmit, setFieldValue, values, errors } = useForm({
@@ -143,12 +145,12 @@ const setStringField = (field: FormFields, value: unknown) => {
 
 const installAgent = computed({
   get: () => values.install_agent ?? true,
-  set: (val: boolean) => setFieldValue('install_agent', val),
+  set: (val: boolean) => setFieldValue("install_agent", val),
 });
 
 const filteredProviders = computed(() => {
   return serverProviders.value.filter(
-    (p) => p.provider === values.service_provider
+    (p) => p.provider === values.service_provider,
   );
 });
 
@@ -181,13 +183,23 @@ const fetchOptions = async () => {
     serverProviders.value = providersData.data;
     sshKeys.value = sshData.data;
   } catch {
-    toast.error("Failed to load server options");
+    toast.error(t("server.create.optionsLoadFailed"));
   } finally {
     isLoadingOptions.value = false;
   }
 };
 
 const typeRules = computed(() => getServerTypeRules(values.type));
+const serverTypeDescription = computed(() => {
+  const keys: Record<string, string> = {
+    php: "phpDescription",
+    database: "databaseDescription",
+    loadbalancer: "loadBalancerDescription",
+    docker: "dockerDescription",
+  };
+  const key = values.type ? keys[values.type] : undefined;
+  return key ? t(`server.create.${key}`) : "";
+});
 
 const onSubmit = handleSubmit(async (data) => {
   isLoading.value = true;
@@ -201,7 +213,7 @@ const onSubmit = handleSubmit(async (data) => {
       php: rules.showsPhp ? data.php : "none",
     };
     const response = await serverService.create(payload);
-    toast.success("Server creation initiated");
+    toast.success(t("server.create.creationStarted"));
     navigateTo(`/servers/${response.data.id}`);
   } catch (error: unknown) {
     const err = error as {
@@ -212,7 +224,7 @@ const onSubmit = handleSubmit(async (data) => {
         toast.error(messages[0]);
       });
     } else {
-      toast.error(err.data?.message || "Failed to create server");
+      toast.error(err.data?.message || t("server.create.creationFailed"));
     }
   } finally {
     isLoading.value = false;
@@ -228,20 +240,24 @@ onMounted(fetchOptions);
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink as-child>
-            <NuxtLink to="/servers">Servers</NuxtLink>
+            <NuxtLink to="/servers">{{
+              t("server.create.serversBreadcrumb")
+            }}</NuxtLink>
           </BreadcrumbLink>
         </BreadcrumbItem>
         <BreadcrumbSeparator />
         <BreadcrumbItem>
-          <BreadcrumbLink>Create Server</BreadcrumbLink>
+          <BreadcrumbLink>{{ t("server.create.title") }}</BreadcrumbLink>
         </BreadcrumbItem>
       </BreadcrumbList>
     </Breadcrumb>
 
     <div>
-      <h1 class="text-3xl font-bold tracking-tight">Create Server</h1>
+      <h1 class="text-3xl font-bold tracking-tight">
+        {{ t("server.create.title") }}
+      </h1>
       <p class="text-muted-foreground">
-        Deploy a new server to your infrastructure
+        {{ t("server.create.description") }}
       </p>
     </div>
 
@@ -256,8 +272,10 @@ onMounted(fetchOptions);
       <!-- Provider Selection -->
       <Card>
         <CardHeader>
-          <CardTitle>Cloud Provider</CardTitle>
-          <CardDescription>Select your server provider</CardDescription>
+          <CardTitle>{{ t("server.create.cloudProvider") }}</CardTitle>
+          <CardDescription>{{
+            t("server.create.cloudProviderDescription")
+          }}</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs
@@ -281,10 +299,10 @@ onMounted(fetchOptions);
       <!-- Cloud Provider Account -->
       <Card v-if="values.service_provider !== 'custom_server'">
         <CardHeader>
-          <CardTitle>Provider Account</CardTitle>
-          <CardDescription
-            >Select your connected provider account</CardDescription
-          >
+          <CardTitle>{{ t("server.create.providerAccount") }}</CardTitle>
+          <CardDescription>{{
+            t("server.create.providerAccountDescription")
+          }}</CardDescription>
         </CardHeader>
         <CardContent>
           <Select
@@ -292,7 +310,9 @@ onMounted(fetchOptions);
             @update:model-value="setStringField('server_provider_id', $event)"
           >
             <SelectTrigger>
-              <SelectValue placeholder="Select provider account" />
+              <SelectValue
+                :placeholder="t('server.create.selectProviderAccount')"
+              />
             </SelectTrigger>
             <SelectContent>
               <SelectItem
@@ -310,13 +330,13 @@ onMounted(fetchOptions);
             v-if="filteredProviders.length === 0"
             class="mt-2 text-sm text-muted-foreground"
           >
-            No provider accounts connected.
+            {{ t("server.create.noProviderAccounts") }}
             <button
               type="button"
               class="text-primary hover:underline"
               @click="openSettings('connections')"
             >
-              Connect a provider
+              {{ t("server.create.connectProvider") }}
             </button>
           </p>
         </CardContent>
@@ -325,14 +345,14 @@ onMounted(fetchOptions);
       <!-- Custom Server Details -->
       <Card v-if="values.service_provider === 'custom_server'">
         <CardHeader>
-          <CardTitle>Server Connection</CardTitle>
-          <CardDescription
-            >Enter your server's connection details</CardDescription
-          >
+          <CardTitle>{{ t("server.create.serverConnection") }}</CardTitle>
+          <CardDescription>{{
+            t("server.create.serverConnectionDescription")
+          }}</CardDescription>
         </CardHeader>
         <CardContent class="grid gap-4 md:grid-cols-2">
           <div class="space-y-2">
-            <Label for="ip">IP Address</Label>
+            <Label for="ip">{{ t("server.create.ipAddress") }}</Label>
             <Input
               id="ip"
               :model-value="values.ip"
@@ -341,7 +361,7 @@ onMounted(fetchOptions);
             />
           </div>
           <div class="space-y-2">
-            <Label for="port">SSH Port</Label>
+            <Label for="port">{{ t("server.create.sshPort") }}</Label>
             <Input
               id="port"
               :model-value="values.port"
@@ -355,12 +375,14 @@ onMounted(fetchOptions);
       <!-- Server Details -->
       <Card>
         <CardHeader>
-          <CardTitle>Server Details</CardTitle>
-          <CardDescription>Configure your server settings</CardDescription>
+          <CardTitle>{{ t("server.create.serverDetails") }}</CardTitle>
+          <CardDescription>{{
+            t("server.create.serverDetailsDescription")
+          }}</CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
           <div class="space-y-2">
-            <Label for="name">Server Name</Label>
+            <Label for="name">{{ t("server.create.serverName") }}</Label>
             <Input
               id="name"
               :model-value="values.name"
@@ -377,13 +399,13 @@ onMounted(fetchOptions);
             class="grid gap-4 md:grid-cols-2"
           >
             <div class="space-y-2">
-              <Label for="plan">Server Size</Label>
+              <Label for="plan">{{ t("server.create.serverSize") }}</Label>
               <Select
                 :model-value="values.plan"
                 @update:model-value="setStringField('plan', $event)"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select size" />
+                  <SelectValue :placeholder="t('server.create.selectSize')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -398,13 +420,13 @@ onMounted(fetchOptions);
             </div>
 
             <div class="space-y-2">
-              <Label for="region">Region</Label>
+              <Label for="region">{{ t("server.create.region") }}</Label>
               <Select
                 :model-value="values.region"
                 @update:model-value="setStringField('region', $event)"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select region" />
+                  <SelectValue :placeholder="t('server.create.selectRegion')" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -420,13 +442,13 @@ onMounted(fetchOptions);
           </div>
 
           <div class="space-y-2">
-            <Label for="type">Server Type</Label>
+            <Label for="type">{{ t("server.create.serverType") }}</Label>
             <Select
               :model-value="values.type"
               @update:model-value="setStringField('type', $event)"
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select type" />
+                <SelectValue :placeholder="t('server.create.selectType')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -434,7 +456,7 @@ onMounted(fetchOptions);
                   :key="key"
                   :value="key"
                 >
-                  {{ label }}
+                  {{ getServerTypeLabel(String(key), label) }}
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -445,21 +467,25 @@ onMounted(fetchOptions);
       <!-- Software Stack -->
       <Card>
         <CardHeader>
-          <CardTitle>Software Stack</CardTitle>
-          <CardDescription>Configure the software to install</CardDescription>
+          <CardTitle>{{ t("server.create.softwareStack") }}</CardTitle>
+          <CardDescription>{{
+            t("server.create.softwareStackDescription")
+          }}</CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">
           <div class="grid gap-4 md:grid-cols-2">
             <div class="space-y-2">
-              <Label for="operating_system">Operating System</Label>
+              <Label for="operating_system">{{
+                t("server.create.operatingSystem")
+              }}</Label>
               <Select
                 :model-value="values.operating_system"
-                @update:model-value="
-                  setStringField('operating_system', $event)
-                "
+                @update:model-value="setStringField('operating_system', $event)"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select OS" />
+                  <SelectValue
+                    :placeholder="t('server.create.selectOperatingSystem')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -474,13 +500,15 @@ onMounted(fetchOptions);
             </div>
 
             <div v-if="typeRules.showsPhp" class="space-y-2">
-              <Label for="php">PHP Version</Label>
+              <Label for="php">{{ t("server.create.phpVersion") }}</Label>
               <Select
                 :model-value="values.php"
                 @update:model-value="setStringField('php', $event)"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select PHP version" />
+                  <SelectValue
+                    :placeholder="t('server.create.selectPhpVersion')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -495,13 +523,15 @@ onMounted(fetchOptions);
             </div>
 
             <div v-if="typeRules.showsDatabase" class="space-y-2">
-              <Label for="database">Database</Label>
+              <Label for="database">{{ t("server.create.database") }}</Label>
               <Select
                 :model-value="values.database"
                 @update:model-value="setStringField('database', $event)"
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select database" />
+                  <SelectValue
+                    :placeholder="t('server.create.selectDatabase')"
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem
@@ -511,7 +541,9 @@ onMounted(fetchOptions);
                   >
                     {{ label }}
                   </SelectItem>
-                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="none">{{
+                    t("server.common.none")
+                  }}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -520,19 +552,17 @@ onMounted(fetchOptions);
               v-if="!typeRules.showsPhp && !typeRules.showsDatabase"
               class="col-span-full text-sm text-muted-foreground"
             >
-              {{ typeRules.description }}
+              {{ serverTypeDescription }}
             </p>
           </div>
 
           <Separator />
 
-          <div
-            class="flex items-center justify-between rounded-lg border p-4"
-          >
+          <div class="flex items-center justify-between rounded-lg border p-4">
             <div class="space-y-0.5">
-              <Label>Install Launch Agent</Label>
+              <Label>{{ t("server.create.installAgent") }}</Label>
               <p class="text-sm text-muted-foreground">
-                Required for backups, monitoring, and advanced features
+                {{ t("server.create.installAgentDescription") }}
               </p>
             </div>
             <Switch v-model="installAgent" />
@@ -542,12 +572,8 @@ onMounted(fetchOptions);
 
       <!-- Submit -->
       <div class="flex justify-end gap-4">
-        <Button
-          type="button"
-          variant="outline"
-          @click="navigateTo('/servers')"
-        >
-          Cancel
+        <Button type="button" variant="outline" @click="navigateTo('/servers')">
+          {{ t("server.common.cancel") }}
         </Button>
         <Button type="submit" :disabled="isLoading || !canCreateServer">
           <Icon
@@ -555,7 +581,7 @@ onMounted(fetchOptions);
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
-          Create Server
+          {{ t("server.create.title") }}
         </Button>
       </div>
     </form>

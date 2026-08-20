@@ -25,6 +25,7 @@ interface Props {
   teamId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const data = ref<DockerDeploymentGhaSteps | null>(null);
 const loading = ref(true);
@@ -110,8 +111,26 @@ const stepVisual = (step: DockerDeploymentGhaStep): StepVisual => {
 };
 
 const jobStatusLabel = (job: DockerDeploymentGhaJob): string => {
-  if (job.status === "completed") return job.conclusion || "completed";
-  return job.status;
+  if (job.status === "completed") {
+    return statusLabel(job.conclusion || "completed");
+  }
+  return statusLabel(job.status);
+};
+
+const statusLabel = (status: string): string => {
+  const key = status.toLowerCase().replaceAll("-", "_");
+  const labels: Record<string, string> = {
+    pending: t("shared.githubActions.status.pending"),
+    queued: t("shared.githubActions.status.queued"),
+    in_progress: t("shared.githubActions.status.inProgress"),
+    completed: t("shared.githubActions.status.completed"),
+    success: t("shared.githubActions.status.success"),
+    failure: t("shared.githubActions.status.failure"),
+    cancelled: t("shared.githubActions.status.cancelled"),
+    timed_out: t("shared.githubActions.status.timedOut"),
+    skipped: t("shared.githubActions.status.skipped"),
+  };
+  return labels[key] ?? status.replaceAll("_", " ");
 };
 
 const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
@@ -120,10 +139,10 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
     new Date(step.completed_at).getTime() - new Date(step.started_at).getTime();
   if (ms < 0) return "";
   const secs = Math.round(ms / 1000);
-  if (secs < 60) return `${secs}s`;
+  if (secs < 60) return t("shared.githubActions.seconds", { count: secs });
   const m = Math.floor(secs / 60);
   const s = secs % 60;
-  return `${m}m ${s}s`;
+  return t("shared.githubActions.minutesSeconds", { minutes: m, seconds: s });
 };
 </script>
 
@@ -145,7 +164,7 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
               runStatus === 'queued' || runStatus === 'pending',
           }"
         >
-          {{ runStatus.replace("_", " ") }}
+          {{ statusLabel(runStatus) }}
         </span>
       </div>
       <a
@@ -155,7 +174,7 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
         rel="noopener noreferrer"
         class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
       >
-        View run
+        {{ t("shared.githubActions.viewRun") }}
         <Icon name="lucide:external-link" class="size-3" />
       </a>
     </div>
@@ -166,7 +185,7 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
       class="flex items-center gap-2 py-6 text-sm text-muted-foreground"
     >
       <Icon name="lucide:loader-circle" class="size-4 animate-spin" />
-      Loading steps…
+      {{ t("shared.githubActions.loading") }}
     </div>
 
     <!-- Errored -->
@@ -175,9 +194,9 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
       class="flex items-center gap-2 py-6 text-sm text-muted-foreground"
     >
       <Icon name="lucide:triangle-alert" class="size-4" />
-      Couldn't load the workflow steps.
+      {{ t("shared.githubActions.loadFailed") }}
       <button class="underline hover:text-foreground" @click="fetchSteps">
-        Retry
+        {{ t("shared.githubActions.retry") }}
       </button>
     </div>
 
@@ -188,7 +207,7 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
     >
       <div class="flex items-center gap-2">
         <Icon name="lucide:loader-circle" class="size-4 animate-spin" />
-        Waiting for workflow steps…
+        {{ t("shared.githubActions.waiting") }}
       </div>
       <a
         v-if="runUrl"
@@ -197,7 +216,7 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
         rel="noopener noreferrer"
         class="inline-flex items-center gap-1 text-foreground underline"
       >
-        View the run on GitHub
+        {{ t("shared.githubActions.viewOnGitHub") }}
         <Icon name="lucide:external-link" class="size-3" />
       </a>
     </div>
@@ -207,7 +226,7 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
       v-else-if="emptyState === 'unavailable'"
       class="flex flex-col gap-3 py-6 text-sm text-muted-foreground"
     >
-      <p>Step details aren't available for this deployment.</p>
+      <p>{{ t("shared.githubActions.unavailable") }}</p>
       <a
         v-if="runUrl"
         :href="runUrl"
@@ -215,7 +234,7 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
         rel="noopener noreferrer"
         class="inline-flex items-center gap-1 text-foreground underline"
       >
-        View the run on GitHub
+        {{ t("shared.githubActions.viewOnGitHub") }}
         <Icon name="lucide:external-link" class="size-3" />
       </a>
     </div>

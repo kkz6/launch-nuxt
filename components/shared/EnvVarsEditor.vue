@@ -40,15 +40,19 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   loading: false,
-  title: "Environment",
-  description:
-    "Env vars passed to the container. Changes take effect on the next deploy.",
   showProjectHint: false,
   isRunning: false,
   onRestart: undefined,
-  restartLabel: "Restart",
   onSetBulk: undefined,
 });
+
+const { t } = useI18n();
+const resolvedTitle = computed(
+  () => props.title || t("shared.envVars.defaultTitle"),
+);
+const resolvedDescription = computed(
+  () => props.description || t("shared.envVars.defaultDescription"),
+);
 
 const emit = defineEmits<{
   "update:vars": [EnvVarRow[]];
@@ -142,7 +146,7 @@ const saveEdit = async (v: EnvVarRow) => {
     }
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update env var");
+    toast.error(e.data?.message || t("shared.envVars.updateFailed"));
     return;
   }
   cancelEdit(v.id);
@@ -151,21 +155,21 @@ const saveEdit = async (v: EnvVarRow) => {
 
 const copyValue = async (v: EnvVarRow) => {
   if (!v.value) {
-    toast.error("Nothing to copy");
+    toast.error(t("shared.envVars.nothingToCopy"));
     return;
   }
   try {
     await copy(v.value);
-    toast.success(`${v.key} copied`);
+    toast.success(t("shared.envVars.copied", { key: v.key }));
   } catch {
-    toast.error("Clipboard write failed");
+    toast.error(t("shared.envVars.clipboardFailed"));
   }
 };
 
 const addVar = async () => {
   const key = newVar.key.trim();
   if (!key) {
-    toast.error("Key is required");
+    toast.error(t("shared.envVars.keyRequired"));
     return;
   }
   isSaving.value = true;
@@ -177,10 +181,10 @@ const addVar = async () => {
     });
     emit("update:vars", sortVars([...props.vars, created]));
     closeAddForm();
-    toast.success("Env var added");
+    toast.success(t("shared.envVars.added"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to add env var");
+    toast.error(e.data?.message || t("shared.envVars.addFailed"));
     return;
   } finally {
     isSaving.value = false;
@@ -197,23 +201,24 @@ const toggleSecret = async (v: EnvVarRow) => {
       revealed.value = { ...revealed.value };
     }
     toast.success(
-      updated.is_secret
-        ? `${v.key} is now masked`
-        : `${v.key} is no longer masked`,
+      t(
+        updated.is_secret ? "shared.envVars.masked" : "shared.envVars.unmasked",
+        { key: v.key },
+      ),
     );
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to update env var");
+    toast.error(e.data?.message || t("shared.envVars.updateFailed"));
   }
 };
 
 const removeVar = async (v: EnvVarRow) => {
   if (!confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
-    title: "Remove Env Var",
-    description: `Remove ${v.key}?`,
-    confirmText: "Remove",
-    cancelText: "Cancel",
+    title: t("shared.envVars.removeTitle"),
+    description: t("shared.envVars.removeDescription", { key: v.key }),
+    confirmText: t("shared.envVars.remove"),
+    cancelText: t("common.cancel"),
     destructive: true,
   });
   if (!result.ok) return;
@@ -223,10 +228,10 @@ const removeVar = async (v: EnvVarRow) => {
       "update:vars",
       props.vars.filter((x) => x.id !== v.id),
     );
-    toast.success("Env var removed");
+    toast.success(t("shared.envVars.removed"));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to remove env var");
+    toast.error(e.data?.message || t("shared.envVars.removeFailed"));
     return;
   }
   await promptRestart();
@@ -252,21 +257,24 @@ const openBulkDialog = () => {
 const submitBulk = async () => {
   const { rows, duplicates } = parsedBulk.value;
   if (rows.length === 0) {
-    toast.error("No valid KEY=VALUE lines found");
+    toast.error(t("shared.envVars.noValidLines"));
     return;
   }
 
   if (bulkMode.value === "replace") {
     if (!props.onSetBulk) {
-      toast.error("Replace-all isn't supported here. Use Append.");
+      toast.error(t("shared.envVars.replaceUnsupported"));
       return;
     }
     if (!confirmationDialog.value) return;
     const result = await confirmationDialog.value.show({
-      title: "Replace env vars",
-      description: `This replaces ALL ${props.vars.length} existing env var(s) with ${rows.length} new one(s). Sure?`,
-      confirmText: "Replace",
-      cancelText: "Cancel",
+      title: t("shared.envVars.replaceTitle"),
+      description: t("shared.envVars.replaceDescription", {
+        existing: props.vars.length,
+        replacement: rows.length,
+      }),
+      confirmText: t("shared.envVars.replace"),
+      cancelText: t("common.cancel"),
       destructive: true,
     });
     if (!result.ok) return;
@@ -276,10 +284,10 @@ const submitBulk = async () => {
       emit("update:vars", sortVars(next));
       bulkOpen.value = false;
       bulkText.value = "";
-      toast.success(`Saved ${next.length} env var(s)`);
+      toast.success(t("shared.envVars.savedCount", { count: next.length }));
     } catch (err: unknown) {
       const e = err as { data?: { message?: string } };
-      toast.error(e.data?.message || "Failed to save env vars");
+      toast.error(e.data?.message || t("shared.envVars.saveFailed"));
       return;
     } finally {
       isSaving.value = false;
@@ -291,7 +299,7 @@ const submitBulk = async () => {
   const existingKeys = new Set(props.vars.map((v) => v.key));
   const toAdd = rows.filter((r) => !existingKeys.has(r.key));
   if (toAdd.length === 0) {
-    toast.error(`All ${rows.length} key(s) already exist`);
+    toast.error(t("shared.envVars.allExist", { count: rows.length }));
     return;
   }
   isSaving.value = true;
@@ -304,16 +312,29 @@ const submitBulk = async () => {
       created++;
     } catch (err: unknown) {
       const e = err as { data?: { message?: string } };
-      errs.push(`${row.key}: ${e.data?.message || "failed"}`);
+      errs.push(
+        `${row.key}: ${e.data?.message || t("shared.envVars.itemFailed")}`,
+      );
     }
   }
   emit("update:vars", sortVars([...props.vars, ...newRows]));
   if (created > 0) {
-    const skipped = duplicates > 0 ? ` (skipped ${duplicates} duplicate)` : "";
-    toast.success(`Added ${created} env var(s)${skipped}`);
+    toast.success(
+      duplicates > 0
+        ? t("shared.envVars.addedCountWithSkipped", {
+            count: created,
+            skipped: duplicates,
+          })
+        : t("shared.envVars.addedCount", { count: created }),
+    );
   }
   if (errs.length > 0) {
-    toast.error(`${errs.length} failed: ${errs.slice(0, 3).join("; ")}`);
+    toast.error(
+      t("shared.envVars.bulkFailed", {
+        count: errs.length,
+        errors: errs.slice(0, 3).join("; "),
+      }),
+    );
   }
   if (errs.length === 0) {
     bulkOpen.value = false;
@@ -350,12 +371,12 @@ const sortVars = (vars: EnvVarRow[]) =>
 const promptRestart = async () => {
   if (!props.isRunning || !props.onRestart || !confirmationDialog.value) return;
 
-  const label = props.restartLabel || "Restart";
+  const label = props.restartLabel || t("shared.envVars.restart");
   const result = await confirmationDialog.value.show({
-    title: `${label} to apply changes?`,
-    description: `Environment variables saved. The running container is still using the old values — ${label.toLowerCase()} it to pick up the changes?`,
+    title: t("shared.envVars.restartTitle", { action: label }),
+    description: t("shared.envVars.restartDescription", { action: label }),
     confirmText: label,
-    cancelText: "Not now",
+    cancelText: t("shared.envVars.notNow"),
   });
 
   if (!result.ok) return;
@@ -363,10 +384,12 @@ const promptRestart = async () => {
   isRestarting.value = true;
   try {
     await props.onRestart();
-    toast.success(`${label} triggered — new env will be active shortly`);
+    toast.success(t("shared.envVars.restartTriggered", { action: label }));
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || `Failed to ${label.toLowerCase()}`);
+    toast.error(
+      e.data?.message || t("shared.envVars.restartFailed", { action: label }),
+    );
   } finally {
     isRestarting.value = false;
   }
@@ -375,8 +398,8 @@ const promptRestart = async () => {
 const resolvedEmptyDescription = computed(() => {
   if (props.emptyDescription) return props.emptyDescription;
   return props.showProjectHint
-    ? "Add per-container config like DATABASE_URL or NODE_ENV. Already have a .env file? Use Paste .env above."
-    : "Add shared config that any workload under this project can reference via ${{project.KEY}}.";
+    ? t("shared.envVars.emptyWorkload")
+    : t("shared.envVars.emptyProject", { reference: "${{project.KEY}}" });
 });
 </script>
 
@@ -387,19 +410,21 @@ const resolvedEmptyDescription = computed(() => {
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0 space-y-1">
         <div class="flex flex-wrap items-center gap-2.5">
-          <h3 class="text-base font-semibold tracking-tight">{{ title }}</h3>
+          <h3 class="text-base font-semibold tracking-tight">
+            {{ resolvedTitle }}
+          </h3>
           <span
             class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border/70 bg-muted/50 px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
-            title="Values are encrypted at rest with AES-256-GCM in the Launch database. They reach the container at deploy time via a 0600 env file on the host (tmpfs) — never as cleartext command-line args."
+            :title="t('shared.envVars.encryptionTitle')"
           >
             <Icon name="lucide:shield-check" class="h-3 w-3" />
-            Encrypted at rest
+            {{ t("shared.envVars.encryptedAtRest") }}
           </span>
         </div>
         <p
           class="max-w-prose text-[13px] leading-relaxed text-muted-foreground"
         >
-          {{ description }}
+          {{ resolvedDescription }}
         </p>
       </div>
       <div class="flex shrink-0 gap-2">
@@ -407,8 +432,8 @@ const resolvedEmptyDescription = computed(() => {
           size="icon-sm"
           variant="outline"
           class="press"
-          title="Add multiple (paste .env)"
-          aria-label="Add multiple env vars from a .env-style paste"
+          :title="t('shared.envVars.pasteTitle')"
+          :aria-label="t('shared.envVars.pasteAria')"
           @click="openBulkDialog"
         >
           <Icon name="lucide:clipboard-paste" class="h-4 w-4" />
@@ -418,8 +443,12 @@ const resolvedEmptyDescription = computed(() => {
           size="icon-sm"
           :variant="showAddForm ? 'outline' : 'default'"
           class="press"
-          :title="showAddForm ? 'Close' : 'Add var'"
-          :aria-label="showAddForm ? 'Close' : 'Add var'"
+          :title="
+            showAddForm ? t('shared.envVars.close') : t('shared.envVars.addVar')
+          "
+          :aria-label="
+            showAddForm ? t('shared.envVars.close') : t('shared.envVars.addVar')
+          "
           @click="showAddForm ? closeAddForm() : (showAddForm = true)"
         >
           <Icon
@@ -439,17 +468,20 @@ const resolvedEmptyDescription = computed(() => {
         name="lucide:info"
         class="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground/70"
       />
-      <p>
-        Reference a project-level variable with
-        <code
-          v-pre
-          class="rounded bg-foreground/[0.06] px-1.5 py-0.5 font-mono text-[12px] text-foreground"
-          >${{ project.KEY }}</code
-        >
-        — resolved at deploy time. Credentials a build step needs go in
-        <span class="font-medium text-foreground">Build-time secrets</span>
-        below.
-      </p>
+      <I18nT keypath="shared.envVars.projectHint" tag="p">
+        <template #reference>
+          <code
+            v-pre
+            class="rounded bg-foreground/[0.06] px-1.5 py-0.5 font-mono text-[12px] text-foreground"
+            >${{ project.KEY }}</code
+          >
+        </template>
+        <template #secrets>
+          <span class="font-medium text-foreground">
+            {{ t("shared.envVars.buildSecrets") }}
+          </span>
+        </template>
+      </I18nT>
     </div>
 
     <Transition name="env-add-form">
@@ -460,7 +492,9 @@ const resolvedEmptyDescription = computed(() => {
       >
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div class="space-y-1">
-            <Label for="env-key" class="text-xs">Key</Label>
+            <Label for="env-key" class="text-xs">
+              {{ t("shared.envVars.key") }}
+            </Label>
             <Input
               id="env-key"
               v-model="newVar.key"
@@ -472,7 +506,9 @@ const resolvedEmptyDescription = computed(() => {
             />
           </div>
           <div class="space-y-1">
-            <Label for="env-value" class="text-xs">Value</Label>
+            <Label for="env-value" class="text-xs">
+              {{ t("shared.envVars.value") }}
+            </Label>
             <Input
               id="env-value"
               v-model="newVar.value"
@@ -491,7 +527,7 @@ const resolvedEmptyDescription = computed(() => {
               type="checkbox"
               class="h-3.5 w-3.5 rounded border-input accent-primary"
             />
-            Treat as secret (mask in list)
+            {{ t("shared.envVars.treatAsSecret") }}
           </label>
           <div class="flex gap-2">
             <Button
@@ -501,7 +537,7 @@ const resolvedEmptyDescription = computed(() => {
               :disabled="isSaving"
               @click="closeAddForm"
             >
-              Cancel
+              {{ t("common.cancel") }}
             </Button>
             <Button type="submit" size="sm" :disabled="isSaving">
               <Icon
@@ -509,7 +545,7 @@ const resolvedEmptyDescription = computed(() => {
                 name="lucide:loader-2"
                 class="mr-2 h-3.5 w-3.5 animate-spin"
               />
-              Add
+              {{ t("shared.envVars.add") }}
             </Button>
           </div>
         </div>
@@ -536,7 +572,7 @@ const resolvedEmptyDescription = computed(() => {
           <Icon name="lucide:key" class="h-5 w-5 text-muted-foreground/70" />
         </div>
         <h3 class="mt-3.5 text-[15px] font-semibold tracking-tight">
-          No env vars yet
+          {{ t("shared.envVars.emptyTitle") }}
         </h3>
         <p
           class="mt-1.5 max-w-md text-[13px] leading-relaxed text-muted-foreground"
@@ -549,9 +585,9 @@ const resolvedEmptyDescription = computed(() => {
         <div
           class="grid grid-cols-[220px_1fr_168px] gap-2 border-b border-border/50 bg-muted/30 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wider text-muted-foreground"
         >
-          <div>Key</div>
-          <div>Value</div>
-          <div class="text-right">Actions</div>
+          <div>{{ t("shared.envVars.key") }}</div>
+          <div>{{ t("shared.envVars.value") }}</div>
+          <div class="text-right">{{ t("shared.envVars.actions") }}</div>
         </div>
 
         <div
@@ -573,12 +609,16 @@ const resolvedEmptyDescription = computed(() => {
               "
               :title="
                 v.is_secret
-                  ? 'Click to stop masking this value (it will be visible to your team)'
-                  : 'Click to mask this value (treat as secret)'
+                  ? t('shared.envVars.unmaskTitle')
+                  : t('shared.envVars.maskTitle')
               "
               @click="toggleSecret(v)"
             >
-              {{ v.is_secret ? "secret" : "plain" }}
+              {{
+                v.is_secret
+                  ? t("shared.envVars.secret")
+                  : t("shared.envVars.plain")
+              }}
             </button>
           </div>
 
@@ -595,7 +635,7 @@ const resolvedEmptyDescription = computed(() => {
                 class="h-9 w-full font-mono text-xs"
                 :placeholder="
                   v.is_secret && !revealed[v.id]
-                    ? '(leave blank to keep current)'
+                    ? t('shared.envVars.leaveBlank')
                     : ''
                 "
                 autocomplete="off"
@@ -611,7 +651,7 @@ const resolvedEmptyDescription = computed(() => {
                   type="checkbox"
                   class="h-3 w-3 rounded border-input accent-primary"
                 />
-                Treat as secret (mask in list)
+                {{ t("shared.envVars.treatAsSecret") }}
               </label>
             </div>
 
@@ -620,8 +660,8 @@ const resolvedEmptyDescription = computed(() => {
               type="button"
               :title="
                 v.is_secret && !revealed[v.id]
-                  ? 'Click to edit (value hidden)'
-                  : 'Click to edit'
+                  ? t('shared.envVars.clickEditHidden')
+                  : t('shared.envVars.clickEdit')
               "
               class="group/value -mx-1 flex w-full max-w-full items-center gap-1.5 rounded px-1 py-1 text-left transition-colors hover:bg-muted/60"
               @click="startEdit(v)"
@@ -629,7 +669,7 @@ const resolvedEmptyDescription = computed(() => {
               <span
                 v-if="v.is_secret && !revealed[v.id]"
                 class="select-none truncate font-mono text-xs tracking-widest text-muted-foreground"
-                aria-label="Value hidden"
+                :aria-label="t('shared.envVars.valueHidden')"
               >
                 ••••••••
               </span>
@@ -637,7 +677,7 @@ const resolvedEmptyDescription = computed(() => {
                 v-else
                 class="truncate font-mono text-xs text-muted-foreground group-hover/value:text-foreground"
               >
-                {{ v.value || "(empty)" }}
+                {{ v.value || t("shared.envVars.emptyValue") }}
               </span>
               <Icon
                 name="lucide:pencil"
@@ -651,8 +691,8 @@ const resolvedEmptyDescription = computed(() => {
               <Button
                 variant="default"
                 size="icon-sm"
-                title="Save changes"
-                aria-label="Save changes"
+                :title="t('shared.envVars.saveChanges')"
+                :aria-label="t('shared.envVars.saveChanges')"
                 @click="saveEdit(v)"
               >
                 <Icon name="lucide:check" class="h-3.5 w-3.5" />
@@ -660,8 +700,8 @@ const resolvedEmptyDescription = computed(() => {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Cancel edit"
-                aria-label="Cancel edit"
+                :title="t('shared.envVars.cancelEdit')"
+                :aria-label="t('shared.envVars.cancelEdit')"
                 @click="cancelEdit(v.id)"
               >
                 <Icon name="lucide:x" class="h-3.5 w-3.5" />
@@ -673,8 +713,16 @@ const resolvedEmptyDescription = computed(() => {
                 v-if="v.is_secret"
                 variant="ghost"
                 size="icon-sm"
-                :title="revealed[v.id] ? 'Hide value' : 'Reveal value'"
-                :aria-label="revealed[v.id] ? 'Hide value' : 'Reveal value'"
+                :title="
+                  revealed[v.id]
+                    ? t('shared.envVars.hideValue')
+                    : t('shared.envVars.revealValue')
+                "
+                :aria-label="
+                  revealed[v.id]
+                    ? t('shared.envVars.hideValue')
+                    : t('shared.envVars.revealValue')
+                "
                 @click="toggleReveal(v)"
               >
                 <Icon
@@ -685,8 +733,8 @@ const resolvedEmptyDescription = computed(() => {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Copy value"
-                aria-label="Copy value"
+                :title="t('shared.envVars.copyValue')"
+                :aria-label="t('shared.envVars.copyValue')"
                 :disabled="!v.value"
                 @click="copyValue(v)"
               >
@@ -695,8 +743,8 @@ const resolvedEmptyDescription = computed(() => {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Edit"
-                aria-label="Edit"
+                :title="t('shared.envVars.edit')"
+                :aria-label="t('shared.envVars.edit')"
                 @click="startEdit(v)"
               >
                 <Icon name="lucide:pencil" class="h-3.5 w-3.5" />
@@ -704,8 +752,8 @@ const resolvedEmptyDescription = computed(() => {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                title="Remove env var"
-                aria-label="Remove env var"
+                :title="t('shared.envVars.removeTitle')"
+                :aria-label="t('shared.envVars.removeTitle')"
                 class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 @click="removeVar(v)"
               >
@@ -719,17 +767,17 @@ const resolvedEmptyDescription = computed(() => {
 
     <p class="text-[11px] text-muted-foreground">
       <Icon name="lucide:info" class="-mt-0.5 mr-1 inline-block h-3 w-3" />
-      Changes don't update the running container until you redeploy / restart.
+      {{ t("shared.envVars.runningHint") }}
     </p>
 
     <Dialog v-model:open="bulkOpen">
       <DialogContent class="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle class="text-base">Add multiple env vars</DialogTitle>
+          <DialogTitle class="text-base">
+            {{ t("shared.envVars.bulkTitle") }}
+          </DialogTitle>
           <DialogDescription class="text-xs">
-            Paste a <code>.env</code>-style block. Comments (<code>#</code>) and
-            blank lines are skipped; <code>export FOO=bar</code> prefixes are
-            tolerated.
+            {{ t("shared.envVars.bulkDescription") }}
           </DialogDescription>
         </DialogHeader>
 
@@ -763,19 +811,25 @@ LOG_LEVEL=info"
               ]"
             />
             <span>
-              Found
-              <strong>{{ parsedBulk.rows.length }}</strong>
-              valid entr{{ parsedBulk.rows.length === 1 ? "y" : "ies" }}
+              {{
+                t("shared.envVars.validEntries", {
+                  count: parsedBulk.rows.length,
+                })
+              }}
               <template v-if="parsedBulk.duplicates > 0">
-                · <strong>{{ parsedBulk.duplicates }}</strong>
-                will be skipped (duplicate of an existing key)
+                ·
+                {{
+                  t("shared.envVars.duplicatesSkipped", {
+                    count: parsedBulk.duplicates,
+                  })
+                }}
               </template>
             </span>
           </div>
         </div>
 
         <div v-if="onSetBulk" class="space-y-2">
-          <Label class="text-xs">When applying</Label>
+          <Label class="text-xs">{{ t("shared.envVars.whenApplying") }}</Label>
           <div class="flex gap-4">
             <label class="flex cursor-pointer items-center gap-2 text-xs">
               <input
@@ -784,7 +838,7 @@ LOG_LEVEL=info"
                 value="append"
                 class="h-3.5 w-3.5 accent-primary"
               />
-              Append (skip duplicates)
+              {{ t("shared.envVars.append") }}
             </label>
             <label class="flex cursor-pointer items-center gap-2 text-xs">
               <input
@@ -793,9 +847,9 @@ LOG_LEVEL=info"
                 value="replace"
                 class="h-3.5 w-3.5 accent-primary"
               />
-              Replace all
+              {{ t("shared.envVars.replaceAll") }}
               <span class="text-[10px] text-muted-foreground">
-                (destructive)
+                {{ t("shared.envVars.destructive") }}
               </span>
             </label>
           </div>
@@ -809,7 +863,7 @@ LOG_LEVEL=info"
             :disabled="isSaving"
             @click="bulkOpen = false"
           >
-            Cancel
+            {{ t("common.cancel") }}
           </Button>
           <Button
             size="sm"
@@ -821,7 +875,11 @@ LOG_LEVEL=info"
               name="lucide:loader-2"
               class="mr-2 h-3.5 w-3.5 animate-spin"
             />
-            {{ bulkMode === "replace" ? "Replace all" : "Add" }}
+            {{
+              bulkMode === "replace"
+                ? t("shared.envVars.replaceAll")
+                : t("shared.envVars.add")
+            }}
             {{
               parsedBulk.rows.length > 0 ? `(${parsedBulk.rows.length})` : ""
             }}

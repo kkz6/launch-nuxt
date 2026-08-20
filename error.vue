@@ -1,25 +1,32 @@
 <script setup lang="ts">
-import { Button } from '~/components/ui/button'
+import { Button } from "~/components/ui/button";
 
 const props = defineProps<{
   error: {
-    statusCode: number
-    statusMessage?: string
-    message?: string
-  }
-}>()
+    statusCode: number;
+    statusMessage?: string;
+    message?: string;
+  };
+}>();
 
-useHead({ title: props.error.statusCode === 404 ? 'Page Not Found' : 'Error' })
+const { t } = useI18n();
 
-const is404 = computed(() => props.error.statusCode === 404)
+useHead(() => ({
+  title:
+    props.error.statusCode === 404
+      ? t("public.error.pageNotFoundTitle")
+      : t("public.error.errorTitle"),
+}));
+
+const is404 = computed(() => props.error.statusCode === 404);
 
 const handleGoBack = () => {
   if (window.history.length > 1) {
-    window.history.back()
+    window.history.back();
   } else {
-    clearError({ redirect: '/' })
+    clearError({ redirect: "/" });
   }
-}
+};
 </script>
 
 <template>
@@ -31,7 +38,9 @@ const handleGoBack = () => {
       </p>
 
       <!-- Icon -->
-      <div class="mt-2 mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+      <div
+        class="mt-2 mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted"
+      >
         <Icon
           v-if="is404"
           name="lucide:map-pin-off"
@@ -46,14 +55,20 @@ const handleGoBack = () => {
 
       <!-- Message -->
       <h1 class="text-xl font-semibold">
-        {{ is404 ? 'Page not found' : 'Something went wrong' }}
+        {{
+          is404
+            ? t("public.error.notFoundHeading")
+            : t("public.error.genericHeading")
+        }}
       </h1>
       <p class="mt-2 text-sm text-muted-foreground">
         <template v-if="is404">
-          The page you're looking for doesn't exist or has been moved.
+          {{ t("public.error.notFoundDescription") }}
         </template>
         <template v-else>
-          {{ error.statusMessage || error.message || 'An unexpected error occurred.' }}
+          {{
+            error.statusMessage || error.message || t("public.error.unexpected")
+          }}
         </template>
       </p>
 
@@ -61,11 +76,11 @@ const handleGoBack = () => {
       <div class="mt-8 flex items-center gap-3">
         <Button variant="outline" @click="handleGoBack">
           <Icon name="lucide:arrow-left" class="mr-1.5 h-4 w-4" />
-          Go Back
+          {{ t("public.error.goBack") }}
         </Button>
         <Button @click="clearError({ redirect: '/' })">
           <Icon name="lucide:home" class="mr-1.5 h-4 w-4" />
-          Home
+          {{ t("public.error.home") }}
         </Button>
       </div>
     </div>

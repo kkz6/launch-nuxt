@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
+import { enUS, ja } from "date-fns/locale";
 import { toast } from "vue-sonner";
 import type { AdminOverview } from "~/types";
 import { adminService } from "~/services/adminService";
@@ -18,13 +19,19 @@ definePageMeta({
   middleware: ["auth", "staff"],
 });
 
-setBreadcrumbs([
-  { label: "Admin", to: "/admin/overview" },
-  { label: "Overview" },
-]);
+const { locale, t } = useI18n();
+
+const applyBreadcrumb = (): void => {
+  setBreadcrumbs([
+    { label: t("admin.common.admin"), to: "/admin/overview" },
+    { label: t("admin.common.overview") },
+  ]);
+};
+applyBreadcrumb();
+watch(locale, applyBreadcrumb);
 
 useHead({
-  title: "Admin — Overview",
+  title: () => t("admin.overview.pageTitle"),
 });
 
 const overview = ref<AdminOverview | null>(null);
@@ -37,7 +44,7 @@ const fetchOverview = async () => {
     overview.value = response.data;
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || "Failed to load overview");
+    toast.error(err.data?.message || t("admin.overview.loadFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -46,7 +53,7 @@ const fetchOverview = async () => {
 const currency = computed(() => overview.value?.currency || "USD");
 
 const formatMoney = (cents: number): string => {
-  return (cents / 100).toLocaleString(undefined, {
+  return (cents / 100).toLocaleString(locale.value, {
     style: "currency",
     currency: currency.value,
   });
@@ -55,11 +62,17 @@ const formatMoney = (cents: number): string => {
 const formatDate = (date?: string | null): string => {
   if (!date) return "";
   try {
-    return formatDistanceToNow(new Date(date), { addSuffix: true });
+    return formatDistanceToNow(new Date(date), {
+      addSuffix: true,
+      locale: locale.value === "ja" ? ja : enUS,
+    });
   } catch {
     return "";
   }
 };
+
+const formatNumber = (value: number): string =>
+  value.toLocaleString(locale.value);
 
 const revenueDelta = computed(() => {
   if (!overview.value) return null;
@@ -90,7 +103,7 @@ onMounted(() => fetchOverview());
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              MRR
+              {{ t("admin.overview.mrr") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -103,7 +116,7 @@ onMounted(() => fetchOverview());
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Total Revenue
+              {{ t("admin.overview.totalRevenue") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -116,12 +129,12 @@ onMounted(() => fetchOverview());
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Active Subscriptions
+              {{ t("admin.overview.activeSubscriptions") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-2xl font-bold">
-              {{ overview.active_subscriptions }}
+              {{ formatNumber(overview.active_subscriptions) }}
             </p>
           </CardContent>
         </Card>
@@ -129,12 +142,12 @@ onMounted(() => fetchOverview());
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              On Trial
+              {{ t("admin.overview.onTrial") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-2xl font-bold">
-              {{ overview.trial_subscriptions }}
+              {{ formatNumber(overview.trial_subscriptions) }}
             </p>
           </CardContent>
         </Card>
@@ -145,12 +158,12 @@ onMounted(() => fetchOverview());
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              New this month
+              {{ t("admin.overview.newThisMonth") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-xl font-semibold text-emerald-600">
-              +{{ overview.new_subscriptions_mtd }}
+              +{{ formatNumber(overview.new_subscriptions_mtd) }}
             </p>
           </CardContent>
         </Card>
@@ -158,12 +171,12 @@ onMounted(() => fetchOverview());
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Cancelled this month
+              {{ t("admin.overview.cancelledThisMonth") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p class="text-xl font-semibold text-destructive">
-              -{{ overview.cancelled_mtd }}
+              -{{ formatNumber(overview.cancelled_mtd) }}
             </p>
           </CardContent>
         </Card>
@@ -171,7 +184,7 @@ onMounted(() => fetchOverview());
         <Card>
           <CardHeader class="pb-2">
             <CardTitle class="text-sm font-medium text-muted-foreground">
-              Revenue this month
+              {{ t("admin.overview.revenueThisMonth") }}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -194,11 +207,15 @@ onMounted(() => fetchOverview());
                   "
                   class="h-3 w-3"
                 />
-                {{ revenueDelta.pct }}%
+                {{ formatNumber(revenueDelta.pct) }}%
               </span>
             </div>
             <p class="mt-1 text-xs text-muted-foreground">
-              vs {{ formatMoney(overview.revenue_last_month_cents) }} last month
+              {{
+                t("admin.overview.versusLastMonth", {
+                  amount: formatMoney(overview.revenue_last_month_cents),
+                })
+              }}
             </p>
           </CardContent>
         </Card>
@@ -207,7 +224,9 @@ onMounted(() => fetchOverview());
       <!-- Revenue trend -->
       <Card>
         <CardHeader>
-          <CardTitle class="text-base">Revenue trend</CardTitle>
+          <CardTitle class="text-base">
+            {{ t("admin.overview.revenueTrend") }}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <AdminRevenueTrendChart
@@ -216,7 +235,7 @@ onMounted(() => fetchOverview());
             :currency="currency"
           />
           <p v-else class="py-6 text-center text-sm text-muted-foreground">
-            No revenue data yet.
+            {{ t("admin.overview.noRevenue") }}
           </p>
         </CardContent>
       </Card>
@@ -224,15 +243,21 @@ onMounted(() => fetchOverview());
       <!-- Recent payments -->
       <Card>
         <CardHeader>
-          <CardTitle class="text-base">Recent payments</CardTitle>
+          <CardTitle class="text-base">
+            {{ t("admin.overview.recentPayments") }}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Team</TableHead>
-                <TableHead class="text-right">Amount</TableHead>
-                <TableHead class="text-right">Date</TableHead>
+                <TableHead>{{ t("admin.overview.team") }}</TableHead>
+                <TableHead class="text-right">
+                  {{ t("admin.overview.amount") }}
+                </TableHead>
+                <TableHead class="text-right">
+                  {{ t("admin.overview.date") }}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -243,7 +268,7 @@ onMounted(() => fetchOverview());
                 <TableCell class="font-medium">{{ p.team_name }}</TableCell>
                 <TableCell class="text-right">
                   {{
-                    (p.total / 100).toLocaleString(undefined, {
+                    (p.total / 100).toLocaleString(locale, {
                       style: "currency",
                       currency: p.currency || currency,
                     })
@@ -258,7 +283,7 @@ onMounted(() => fetchOverview());
                   colspan="3"
                   class="py-8 text-center text-muted-foreground"
                 >
-                  No payments yet.
+                  {{ t("admin.overview.noPayments") }}
                 </TableCell>
               </TableRow>
             </TableBody>

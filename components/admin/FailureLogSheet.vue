@@ -31,6 +31,8 @@ const props = defineProps<{
   failure: FailureRow | null;
 }>();
 
+const { t, te } = useI18n();
+
 const emit = defineEmits<{
   "update:open": [value: boolean];
 }>();
@@ -43,12 +45,16 @@ const isOpen = computed({
 // The kind cell arrives as a mapped badge ({value,variant}); fall back to a
 // humanised kind_raw for the header label.
 const kindLabel = computed<string>(() => {
+  const raw = props.failure?.kind_raw;
+  if (raw) {
+    const key = `admin.failureLog.kinds.${raw}`;
+    return te(key) ? t(key) : raw.replace(/_/g, " ");
+  }
   const k = props.failure?.kind;
   if (k && typeof k === "object" && "value" in k) {
     return String((k as { value?: unknown }).value ?? "");
   }
-  const raw = props.failure?.kind_raw;
-  return raw ? raw.replace(/_/g, " ") : "";
+  return "";
 });
 
 // The table only carries a truncated detail; fetch the full output lazily when
@@ -81,9 +87,9 @@ async function copyLog(): Promise<void> {
   try {
     await navigator.clipboard.writeText(cleanLog.value);
     copied.value = true;
-    toast.success("Log copied to clipboard");
+    toast.success(t("admin.failureLog.copiedToast"));
   } catch {
-    toast.error("Could not copy log");
+    toast.error(t("admin.failureLog.copyFailed"));
   }
 }
 
@@ -110,7 +116,9 @@ watch(
             <Badge v-if="kindLabel" variant="secondary" class="capitalize">
               {{ kindLabel }}
             </Badge>
-            <span class="truncate">{{ failure?.title || "Failure log" }}</span>
+            <span class="truncate">{{
+              failure?.title || t("admin.failureLog.title")
+            }}</span>
           </SheetTitle>
           <SheetDescription
             class="flex flex-wrap items-center gap-x-2 gap-y-0.5"
@@ -138,7 +146,9 @@ watch(
             :name="copied ? 'lucide:check' : 'lucide:copy'"
             class="mr-1.5 h-4 w-4"
           />
-          {{ copied ? "Copied" : "Copy log" }}
+          {{
+            copied ? t("admin.failureLog.copied") : t("admin.failureLog.copy")
+          }}
         </Button>
       </SheetHeader>
 
@@ -150,7 +160,7 @@ watch(
           class="absolute right-2 top-2 flex items-center gap-1.5 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground"
         >
           <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
-          Loading full log…
+          {{ t("admin.failureLog.loading") }}
         </div>
         <pre
           v-if="cleanLog"
@@ -158,7 +168,7 @@ watch(
           >{{ cleanLog }}</pre
         >
         <p v-else class="p-4 text-sm text-muted-foreground">
-          No log output was captured for this failure.
+          {{ t("admin.failureLog.empty") }}
         </p>
       </div>
     </SheetContent>

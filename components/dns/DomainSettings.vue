@@ -1,50 +1,58 @@
 <script setup lang="ts">
-import { toast } from 'vue-sonner'
-import { useForm } from 'vee-validate'
-import { toTypedSchema } from '@vee-validate/zod'
-import * as z from 'zod'
-import { Button } from '~/components/ui/button'
-import { Separator } from '~/components/ui/separator'
+import { toast } from "vue-sonner";
+import { useForm } from "vee-validate";
+import { toTypedSchema } from "@vee-validate/zod";
+import * as z from "zod";
+import { Button } from "~/components/ui/button";
+import { Separator } from "~/components/ui/separator";
 import {
   FormControl,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
-} from '~/components/ui/form'
-import { Input } from '~/components/ui/input'
+} from "~/components/ui/form";
+import { Input } from "~/components/ui/input";
 
 interface Domain {
-  id: string
-  label: string
-  address: string
+  id: string;
+  label: string;
+  address: string;
   provider?: {
-    provider: string
-    provider_label: string
-  }
+    provider: string;
+    provider_label: string;
+  };
 }
 
 interface Props {
-  domain: Domain
+  domain: Domain;
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  updated: []
-  deleted: []
-}>()
+  updated: [];
+  deleted: [];
+}>();
 
-const isLoading = ref(false)
-const syncLoading = ref(false)
-const deleteLoading = ref(false)
-const confirmationDialog = ref<InstanceType<typeof import('~/components/shared/ConfirmationDialog.vue').default> | null>(null)
+const { t } = useI18n();
 
-const domainSchema = toTypedSchema(
-  z.object({
-    label: z.string().min(1, 'Label is required'),
-  })
-)
+const isLoading = ref(false);
+const syncLoading = ref(false);
+const deleteLoading = ref(false);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
+
+const domainSchema = computed(() =>
+  toTypedSchema(
+    z.object({
+      label: z
+        .string()
+        .min(1, t("operations.dns.settings.validation.labelRequired")),
+    }),
+  ),
+);
 
 const { handleSubmit, setFieldError } = useForm({
   validationSchema: domainSchema,
@@ -52,101 +60,107 @@ const { handleSubmit, setFieldError } = useForm({
   initialValues: {
     label: props.domain.label,
   },
-})
+});
 
 const onSubmit = handleSubmit(async (values) => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Update Domain',
-    description: 'Are you sure you want to update this domain?',
-    confirmText: 'Update',
-    cancelText: 'Cancel',
-  })
+    title: t("operations.dns.settings.updateTitle"),
+    description: t("operations.dns.settings.updateDescription"),
+    confirmText: t("operations.dns.common.update"),
+    cancelText: t("operations.dns.common.cancel"),
+  });
 
-  if (!result.ok) return
+  if (!result.ok) return;
 
-  isLoading.value = true
+  isLoading.value = true;
 
   try {
     await $api(`/dns/domains/${props.domain.id}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: values,
-    })
-    toast.success('Domain updated')
-    emit('updated')
+    });
+    toast.success(t("operations.dns.settings.updateSuccess"));
+    emit("updated");
   } catch (error: unknown) {
-    const err = error as { data?: { errors?: Record<string, string[]>; message?: string } }
+    const err = error as {
+      data?: { errors?: Record<string, string[]>; message?: string };
+    };
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        setFieldError(field as keyof typeof values, messages[0])
+        setFieldError(field as keyof typeof values, messages[0]);
       }
     } else {
-      toast.error(err.data?.message || 'Failed to update domain')
+      toast.error(
+        err.data?.message || t("operations.dns.settings.updateError"),
+      );
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
-})
+});
 
 const syncRecords = async () => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Sync DNS Records',
-    description: 'This will fetch the latest DNS records from your provider and update the local cache. Any local changes that were not pushed will be overwritten.',
-    confirmText: 'Sync Records',
-    cancelText: 'Cancel',
-  })
+    title: t("operations.dns.settings.syncTitle"),
+    description: t("operations.dns.settings.syncConfirmationDescription"),
+    confirmText: t("operations.dns.settings.syncButton"),
+    cancelText: t("operations.dns.common.cancel"),
+  });
 
-  if (!result.ok) return
+  if (!result.ok) return;
 
-  syncLoading.value = true
+  syncLoading.value = true;
 
   try {
     await $api(`/dns/domains/${props.domain.id}/sync`, {
-      method: 'POST',
-    })
-    toast.success('DNS records synced successfully')
-    emit('updated')
+      method: "POST",
+    });
+    toast.success(t("operations.dns.settings.syncSuccess"));
+    emit("updated");
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to sync DNS records')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("operations.dns.settings.syncError"));
   } finally {
-    syncLoading.value = false
+    syncLoading.value = false;
   }
-}
+};
 
 const deleteDomain = async () => {
-  if (!confirmationDialog.value) return
+  if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: 'Delete Domain',
-    description: `Are you sure you want to delete "${props.domain.address}"? This will remove the domain from your dashboard but will not delete the actual DNS records from your provider.`,
-    confirmText: 'Delete Domain',
-    cancelText: 'Cancel',
+    title: t("operations.dns.settings.deleteTitle"),
+    description: t("operations.dns.settings.deleteDescription", {
+      domain: props.domain.address,
+    }),
+    confirmText: t("operations.dns.settings.deleteButton"),
+    cancelText: t("operations.dns.common.cancel"),
     destructive: true,
-    helpText: 'Type the domain address to confirm deletion:',
+    helpText: t("operations.dns.settings.deleteHelp"),
     inputVerificationText: props.domain.address,
-  })
+  });
 
-  if (!result.ok) return
+  if (!result.ok) return;
 
-  deleteLoading.value = true
+  deleteLoading.value = true;
 
   try {
     await $api(`/dns/domains/${props.domain.id}`, {
-      method: 'DELETE',
-    })
-    toast.success('Domain deleted')
-    emit('deleted')
+      method: "DELETE",
+    });
+    toast.success(t("operations.dns.settings.deleteSuccess"));
+    emit("deleted");
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } }
-    toast.error(err.data?.message || 'Failed to delete domain')
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("operations.dns.settings.deleteError"));
   } finally {
-    deleteLoading.value = false
+    deleteLoading.value = false;
   }
-}
+};
 </script>
 
 <template>
@@ -157,7 +171,9 @@ const deleteDomain = async () => {
       <form class="space-y-4" @submit.prevent="onSubmit">
         <FormField v-slot="{ componentField }" name="label">
           <FormItem>
-            <FormLabel>Domain Label</FormLabel>
+            <FormLabel>{{
+              t("operations.dns.settings.domainLabel")
+            }}</FormLabel>
             <FormControl>
               <Input v-bind="componentField" />
             </FormControl>
@@ -166,8 +182,12 @@ const deleteDomain = async () => {
         </FormField>
 
         <Button type="submit" :disabled="isLoading">
-          <Icon v-if="isLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
-          Update Settings
+          <Icon
+            v-if="isLoading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
+          {{ t("operations.dns.settings.updateSettings") }}
         </Button>
       </form>
 
@@ -175,15 +195,25 @@ const deleteDomain = async () => {
 
       <div class="space-y-4 pt-2">
         <div>
-          <h3 class="text-lg font-medium">Sync DNS Records</h3>
+          <h3 class="text-lg font-medium">
+            {{ t("operations.dns.settings.syncTitle") }}
+          </h3>
           <p class="text-sm text-muted-foreground">
-            Fetch the latest DNS records from your provider. This will update your local cache with the current state of your DNS records.
+            {{ t("operations.dns.settings.syncDescription") }}
           </p>
         </div>
         <Button variant="outline" :disabled="syncLoading" @click="syncRecords">
-          <Icon v-if="syncLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+          <Icon
+            v-if="syncLoading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
           <Icon v-else name="lucide:refresh-cw" class="mr-2 h-4 w-4" />
-          {{ syncLoading ? 'Syncing...' : 'Sync Records' }}
+          {{
+            syncLoading
+              ? t("operations.dns.settings.syncing")
+              : t("operations.dns.settings.syncButton")
+          }}
         </Button>
       </div>
 
@@ -191,16 +221,25 @@ const deleteDomain = async () => {
 
       <div class="space-y-4 pt-2">
         <div>
-          <h3 class="text-lg font-medium text-destructive">Danger Zone</h3>
+          <h3 class="text-lg font-medium text-destructive">
+            {{ t("operations.dns.settings.dangerZone") }}
+          </h3>
           <p class="text-sm text-muted-foreground">
-            Removing this domain will not delete the actual DNS records from your provider.
-            You will need to delete those records manually if needed.
+            {{ t("operations.dns.settings.dangerDescription") }}
           </p>
         </div>
-        <Button variant="destructive" :disabled="deleteLoading" @click="deleteDomain">
-          <Icon v-if="deleteLoading" name="lucide:loader-2" class="mr-2 h-4 w-4 animate-spin" />
+        <Button
+          variant="destructive"
+          :disabled="deleteLoading"
+          @click="deleteDomain"
+        >
+          <Icon
+            v-if="deleteLoading"
+            name="lucide:loader-2"
+            class="mr-2 h-4 w-4 animate-spin"
+          />
           <Icon v-else name="lucide:trash-2" class="mr-2 h-4 w-4" />
-          Delete Domain
+          {{ t("operations.dns.settings.deleteButton") }}
         </Button>
       </div>
     </div>

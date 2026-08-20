@@ -44,6 +44,37 @@ const namedSchedules: Record<string, string> = {
   monthly: "On the 1st of every month at 12:00 AM",
 };
 
+const japaneseWeekdayNames = [
+  "日曜日",
+  "月曜日",
+  "火曜日",
+  "水曜日",
+  "木曜日",
+  "金曜日",
+  "土曜日",
+] as const;
+
+const japaneseNamedSchedules: Record<string, string> = {
+  "@yearly": "毎年1月1日 00:00",
+  "@annually": "毎年1月1日 00:00",
+  "@monthly": "毎月1日 00:00",
+  "@weekly": "毎週日曜日 00:00",
+  "@daily": "毎日 00:00",
+  "@midnight": "毎日 00:00",
+  "@hourly": "毎時",
+  "@reboot": "サーバー起動時",
+  every_minute: "毎分",
+  every_5_minutes: "5分ごと",
+  every_15_minutes: "15分ごと",
+  every_30_minutes: "30分ごと",
+  hourly: "毎時",
+  daily: "毎日 00:00",
+  daily_2am: "毎日 02:00",
+  daily_3am: "毎日 03:00",
+  weekly: "毎週日曜日 00:00",
+  monthly: "毎月1日 00:00",
+};
+
 const parseNumber = (value: string, min: number, max: number) => {
   if (!/^\d+$/.test(value)) return null;
   const parsed = Number(value);
@@ -88,10 +119,106 @@ const describeWeekdays = (field: string): string | null => {
   return `Every ${joinNames(weekdays.map((value) => weekdayNames[value!]))}`;
 };
 
+const describeJapaneseWeekdays = (field: string): string | null => {
+  if (field === "*") return "毎日";
+  if (field === "1-5") return "月曜日から金曜日";
+  if (field === "0,6" || field === "6,0" || field === "6,7") {
+    return "毎週土曜日と日曜日";
+  }
+
+  const weekdays = field.split(",").map(parseWeekday);
+  if (weekdays.some((value) => value === null)) return null;
+  return `毎週${weekdays
+    .map((value) => japaneseWeekdayNames[value!])
+    .join("、")}`;
+};
+
+const describeJapaneseCronExpression = (normalized: string): string => {
+  if (!normalized) return "スケジュールが設定されていません";
+
+  const named = japaneseNamedSchedules[normalized.toLowerCase()];
+  if (named) return named;
+
+  const fields = normalized.split(" ");
+  if (fields.length !== 5) return "カスタムスケジュールで実行されます";
+
+  const [minuteField, hourField, dayField, monthField, weekdayField] = fields;
+  if (normalized === "* * * * *") return "毎分";
+
+  const minuteStep = minuteField.match(/^\*\/(\d+)$/);
+  if (
+    minuteStep &&
+    hourField === "*" &&
+    dayField === "*" &&
+    monthField === "*" &&
+    weekdayField === "*"
+  ) {
+    const interval = parseNumber(minuteStep[1], 1, 59);
+    return interval
+      ? `${interval}分ごと`
+      : "カスタムスケジュールで実行されます";
+  }
+
+  const minute = parseNumber(minuteField, 0, 59);
+  if (
+    minute !== null &&
+    hourField === "*" &&
+    dayField === "*" &&
+    monthField === "*" &&
+    weekdayField === "*"
+  ) {
+    return minute === 0 ? "毎時" : `毎時${minute}分`;
+  }
+
+  const hourStep = hourField.match(/^\*\/(\d+)$/);
+  if (
+    minute !== null &&
+    hourStep &&
+    dayField === "*" &&
+    monthField === "*" &&
+    weekdayField === "*"
+  ) {
+    const interval = parseNumber(hourStep[1], 1, 23);
+    if (!interval) return "カスタムスケジュールで実行されます";
+    return minute === 0
+      ? `${interval}時間ごと`
+      : `${interval}時間ごとの${minute}分`;
+  }
+
+  const hour = parseNumber(hourField, 0, 23);
+  if (minute === null || hour === null) {
+    return "カスタムスケジュールで実行されます";
+  }
+  const time = `${hour.toString().padStart(2, "0")}:${minute
+    .toString()
+    .padStart(2, "0")}`;
+
+  if (dayField === "*" && monthField === "*") {
+    const weekdays = describeJapaneseWeekdays(weekdayField);
+    return weekdays
+      ? `${weekdays} ${time}`
+      : "カスタムスケジュールで実行されます";
+  }
+
+  const day = parseNumber(dayField, 1, 31);
+  if (day !== null && weekdayField === "*") {
+    if (monthField === "*") return `毎月${day}日 ${time}`;
+
+    const month = parseNumber(monthField, 1, 12);
+    if (month !== null) return `毎年${month}月${day}日 ${time}`;
+  }
+
+  return "カスタムスケジュールで実行されます";
+};
+
 export const describeCronExpression = (
   expression: string | null | undefined,
+  requestedLocale = "en",
 ): string => {
   const normalized = expression?.trim().replace(/\s+/g, " ") ?? "";
+  if (requestedLocale.toLowerCase().startsWith("ja")) {
+    return describeJapaneseCronExpression(normalized);
+  }
   if (!normalized) return "No schedule configured";
 
   const named = namedSchedules[normalized.toLowerCase()];
@@ -124,9 +251,7 @@ export const describeCronExpression = (
     monthField === "*" &&
     weekdayField === "*"
   ) {
-    return minute === 0
-      ? "Every hour"
-      : `Every hour at ${minute} minutes past`;
+    return minute === 0 ? "Every hour" : `Every hour at ${minute} minutes past`;
   }
 
   const hourStep = hourField.match(/^\*\/(\d+)$/);

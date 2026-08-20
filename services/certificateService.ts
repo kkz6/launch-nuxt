@@ -73,6 +73,7 @@ export const certificateService = {
     },
   ) => {
     const { getAccessToken, getCurrentTeamId, baseURL } = useApi();
+    const { getEffectiveLocale } = useLocalePreference();
     const token = getAccessToken();
     const teamId = getCurrentTeamId();
     const res = await $fetch.raw<ApiResponse<StoredCertificate>>(
@@ -83,6 +84,7 @@ export const certificateService = {
         body,
         headers: {
           Accept: "application/json",
+          "Accept-Language": getEffectiveLocale(),
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...(teamId ? { "X-Team-ID": teamId } : {}),

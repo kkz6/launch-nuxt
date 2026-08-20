@@ -25,6 +25,7 @@ interface Props {
   schedule?: DockerSchedule;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 
 const emit = defineEmits<{
   created: [];
@@ -35,29 +36,29 @@ const emit = defineEmits<{
 const open = defineModel<boolean>("open", { default: false });
 const isLoading = ref(false);
 const errors = ref<Record<string, string>>({});
-const confirmationDialog = ref<
-  InstanceType<typeof import("~/components/shared/ConfirmationDialog.vue").default> | null
->(null);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
 
 // Same preset set the PHP-site CreateScheduler dialog uses. Selecting
 // "custom" reveals the raw-expression input.
-const frequencies: Record<string, string> = {
-  "* * * * *": "Every Minute",
-  "*/5 * * * *": "Every 5 Minutes",
-  "*/15 * * * *": "Every 15 Minutes",
-  "*/30 * * * *": "Every 30 Minutes",
-  "0 * * * *": "Hourly",
-  "0 0 * * *": "Daily",
-  "0 0 * * 0": "Weekly",
-  "0 0 1 * *": "Monthly",
-  custom: "Custom Expression",
-};
+const frequencies = computed<Record<string, string>>(() => ({
+  "* * * * *": t("workload.schedules.everyMinute"),
+  "*/5 * * * *": t("workload.schedules.everyMinutes", { count: 5 }),
+  "*/15 * * * *": t("workload.schedules.everyMinutes", { count: 15 }),
+  "*/30 * * * *": t("workload.schedules.everyMinutes", { count: 30 }),
+  "0 * * * *": t("workload.schedules.hourly"),
+  "0 0 * * *": t("workload.schedules.daily"),
+  "0 0 * * 0": t("workload.schedules.weekly"),
+  "0 0 1 * *": t("workload.schedules.monthly"),
+  custom: t("workload.schedules.customExpression"),
+}));
 
 // When opening in edit mode, decide whether the row's cron string
 // matches a preset (radio selects that preset) or doesn't (radio
 // flips to "custom" and the raw expression goes in customExpression).
 const isPresetCron = (c: string) =>
-  Object.prototype.hasOwnProperty.call(frequencies, c);
+  Object.prototype.hasOwnProperty.call(frequencies.value, c);
 
 const command = ref(props.schedule?.command || "");
 const frequency = ref<string>(
@@ -75,29 +76,39 @@ const customExpression = ref(
 
 // Server-side validators are already strict; this is just enough to
 // stop empty submissions client-side.
-const schema = z
-  .object({
-    command: z.string().min(1, "Command is required").max(255),
-    frequency: z.string().min(1, "Frequency is required"),
-    custom_expression: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.frequency === "custom") {
-        return !!data.custom_expression && data.custom_expression.trim().length > 0;
-      }
-      return true;
-    },
-    {
-      message: "Custom expression is required",
-      path: ["custom_expression"],
-    },
-  );
+const schema = computed(() =>
+  z
+    .object({
+      command: z
+        .string()
+        .min(1, t("workload.schedules.commandRequired"))
+        .max(255),
+      frequency: z.string().min(1, t("workload.schedules.frequencyRequired")),
+      custom_expression: z.string().optional(),
+    })
+    .refine(
+      (data) => {
+        if (data.frequency === "custom") {
+          return (
+            !!data.custom_expression && data.custom_expression.trim().length > 0
+          );
+        }
+        return true;
+      },
+      {
+        message: t("workload.schedules.customRequired"),
+        path: ["custom_expression"],
+      },
+    ),
+);
 
 const canSubmit = computed(() => {
   if (isLoading.value) return false;
   if (command.value.trim().length === 0) return false;
-  if (frequency.value === "custom" && customExpression.value.trim().length === 0)
+  if (
+    frequency.value === "custom" &&
+    customExpression.value.trim().length === 0
+  )
     return false;
   return true;
 });
@@ -117,7 +128,7 @@ const resetForm = () => {
 };
 
 const validate = () => {
-  const result = schema.safeParse({
+  const result = schema.value.safeParse({
     command: command.value.trim(),
     frequency: frequency.value,
     custom_expression: customExpression.value.trim() || undefined,
@@ -140,15 +151,19 @@ const onSubmit = async () => {
   if (!confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
-    title: props.schedule ? "Update Scheduler" : "Create Scheduler",
+    title: props.schedule
+      ? t("workload.schedules.updateTitle")
+      : t("workload.schedules.createTitle"),
     description: props.schedule
-      ? "Are you sure you want to update this scheduled task?"
-      : "Are you sure you want to create this scheduled task?",
-    confirmText: props.schedule ? "Update" : "Create",
-    cancelText: "Cancel",
+      ? t("workload.schedules.updateConfirmation")
+      : t("workload.schedules.createConfirmation"),
+    confirmText: props.schedule
+      ? t("workload.actions.update")
+      : t("workload.actions.create"),
+    cancelText: t("workload.actions.cancel"),
   });
   if (!result.ok) {
-    toast.info("Cancelled");
+    toast.info(t("workload.actions.cancelled"));
     return;
   }
 
@@ -169,7 +184,7 @@ const onSubmit = async () => {
         props.schedule.id,
         { cron, command: data.command },
       );
-      toast.success("Scheduler updated");
+      toast.success(t("workload.schedules.updated"));
       emit("updated");
     } else {
       await dockerService.applications.createSchedule(
@@ -178,14 +193,14 @@ const onSubmit = async () => {
         props.application.id,
         { cron, command: data.command },
       );
-      toast.success("Scheduler created");
+      toast.success(t("workload.schedules.created"));
       emit("created");
     }
     open.value = false;
     resetForm();
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || "Failed to save scheduler");
+    toast.error(err.data?.message || t("workload.schedules.saveFailed"));
   } finally {
     isLoading.value = false;
   }
@@ -201,27 +216,37 @@ watch(open, (isOpen) => {
     <DialogTrigger as-child>
       <Button>
         <Icon name="lucide:plus-circle" class="mr-2 h-4 w-4" />
-        {{ schedule ? "Edit Scheduler" : "Create Scheduler" }}
+        {{
+          schedule
+            ? t("workload.schedules.editTitle")
+            : t("workload.schedules.createTitle")
+        }}
       </Button>
     </DialogTrigger>
     <DialogContent class="sm:max-w-3xl">
       <SharedConfirmationDialog ref="confirmationDialog" />
       <DialogHeader>
         <DialogTitle>
-          {{ schedule ? "Update Scheduler" : "Create Scheduler" }}
+          {{
+            schedule
+              ? t("workload.schedules.updateTitle")
+              : t("workload.schedules.createTitle")
+          }}
         </DialogTitle>
         <DialogDescription>
           {{
             schedule
-              ? "Update the scheduled task configuration."
-              : "Run a recurring command inside the application's container."
+              ? t("workload.schedules.updateDescription")
+              : t("workload.schedules.createDescription")
           }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
         <div class="space-y-2">
-          <Label for="sched-command">Command</Label>
+          <Label for="sched-command">{{
+            t("workload.schedules.command")
+          }}</Label>
           <Input
             id="sched-command"
             v-model="command"
@@ -232,12 +257,14 @@ watch(open, (isOpen) => {
             {{ errors.command }}
           </p>
           <p v-else class="text-xs text-muted-foreground">
-            Runs as <code>docker exec &lt;container&gt; sh -c '&lt;command&gt;'</code>.
+            {{ t("workload.schedules.runsAsBefore") }}
+            <code>docker exec &lt;container&gt; sh -c '&lt;command&gt;'</code
+            >{{ t("workload.punctuation.period") }}
           </p>
         </div>
 
         <div class="space-y-2">
-          <Label>Frequency</Label>
+          <Label>{{ t("workload.schedules.frequency") }}</Label>
           <RadioGroup v-model="frequency" class="grid grid-cols-2 gap-2">
             <div
               v-for="(label, value) in frequencies"
@@ -253,7 +280,9 @@ watch(open, (isOpen) => {
         </div>
 
         <div v-if="frequency === 'custom'" class="space-y-2">
-          <Label for="custom_expression">Custom Expression</Label>
+          <Label for="custom_expression">{{
+            t("workload.schedules.customExpression")
+          }}</Label>
           <Input
             id="custom_expression"
             v-model="customExpression"
@@ -264,7 +293,7 @@ watch(open, (isOpen) => {
             {{ errors.custom_expression }}
           </p>
           <p v-else class="text-xs text-muted-foreground">
-            5 fields: minute hour day month weekday.
+            {{ t("workload.schedules.cronHelp") }}
           </p>
         </div>
 
@@ -275,7 +304,11 @@ watch(open, (isOpen) => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            {{ schedule ? "Update" : "Create" }}
+            {{
+              schedule
+                ? t("workload.actions.update")
+                : t("workload.actions.create")
+            }}
           </Button>
         </DialogFooter>
       </form>

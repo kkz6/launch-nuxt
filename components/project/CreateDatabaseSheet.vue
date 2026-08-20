@@ -14,6 +14,7 @@ interface Props {
   projectId: string;
 }
 const props = defineProps<Props>();
+const { t } = useI18n();
 const emit = defineEmits<{
   "update:open": [value: boolean];
   created: [db: DockerDatabase];
@@ -98,7 +99,7 @@ onMounted(fetchCatalogue);
 const submit = async () => {
   const trimmedName = name.value.trim();
   if (!trimmedName) {
-    toast.error("Name is required");
+    toast.error(t("workload.validation.nameRequired"));
     return;
   }
 
@@ -118,11 +119,11 @@ const submit = async () => {
       props.projectId,
       payload,
     );
-    toast.success("Database creation queued");
+    toast.success(t("workload.database.create.queued"));
     emit("created", res.data);
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
-    toast.error(e.data?.message || "Failed to create database");
+    toast.error(e.data?.message || t("workload.database.create.failed"));
   } finally {
     isSubmitting.value = false;
   }
@@ -133,21 +134,21 @@ const submit = async () => {
   <Dialog v-model:open="isOpen">
     <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-lg">
       <DialogHeader>
-        <DialogTitle>New Database</DialogTitle>
+        <DialogTitle>{{ t("workload.database.create.title") }}</DialogTitle>
         <DialogDescription>
-          Pick an engine and version; we generate credentials and pull
-          the image. Reachable from other containers in this project by
-          the database's name on <code>launch-network</code>.
+          {{ t("workload.database.create.descriptionBefore") }}
+          <code>launch-network</code
+          >{{ t("workload.database.create.descriptionAfter") }}
         </DialogDescription>
       </DialogHeader>
 
       <form class="space-y-4" @submit.prevent="submit">
         <div class="space-y-2">
-          <Label for="db-name">Name</Label>
+          <Label for="db-name">{{ t("workload.fields.name") }}</Label>
           <Input
             id="db-name"
             v-model="name"
-            placeholder="e.g. orders-db, cache, sessions"
+            :placeholder="t('workload.database.create.namePlaceholder')"
             autocomplete="off"
             required
           />
@@ -155,10 +156,12 @@ const submit = async () => {
 
         <div class="grid grid-cols-2 gap-3">
           <div class="space-y-2">
-            <Label>Engine</Label>
+            <Label>{{ t("workload.fields.engine") }}</Label>
             <Select v-model="engine">
               <SelectTrigger>
-                <SelectValue placeholder="Pick an engine" />
+                <SelectValue
+                  :placeholder="t('workload.database.create.pickEngine')"
+                />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem v-for="e in engineList" :key="e" :value="e">
@@ -168,17 +171,13 @@ const submit = async () => {
             </Select>
           </div>
           <div class="space-y-2">
-            <Label>Version</Label>
+            <Label>{{ t("workload.fields.version") }}</Label>
             <Select v-model="version">
               <SelectTrigger>
-                <SelectValue placeholder="Version" />
+                <SelectValue :placeholder="t('workload.fields.version')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem
-                  v-for="v in versionsForEngine"
-                  :key="v"
-                  :value="v"
-                >
+                <SelectItem v-for="v in versionsForEngine" :key="v" :value="v">
                   {{ v }}
                 </SelectItem>
               </SelectContent>
@@ -188,14 +187,15 @@ const submit = async () => {
 
         <div class="space-y-2 rounded-md border p-3">
           <label class="flex cursor-pointer items-center gap-2 text-sm">
-            <input v-model="exposeExternalPort" type="checkbox" class="h-4 w-4" />
-            Expose on host
+            <input
+              v-model="exposeExternalPort"
+              type="checkbox"
+              class="h-4 w-4"
+            />
+            {{ t("workload.database.create.exposeOnHost") }}
           </label>
           <p class="text-xs text-muted-foreground">
-            Off by default. Leave off if only sibling containers need
-            the database — they reach it by name on launch-network.
-            Turn on to connect from outside the docker server (e.g. a
-            local dev machine).
+            {{ t("workload.database.create.exposeDescription") }}
           </p>
           <Input
             v-if="exposeExternalPort"
@@ -214,7 +214,7 @@ const submit = async () => {
             :disabled="isSubmitting"
             @click="isOpen = false"
           >
-            Cancel
+            {{ t("workload.actions.cancel") }}
           </Button>
           <Button type="submit" :disabled="isSubmitting">
             <Icon
@@ -222,7 +222,7 @@ const submit = async () => {
               name="lucide:loader-2"
               class="mr-2 h-4 w-4 animate-spin"
             />
-            Create Database
+            {{ t("workload.database.create.submit") }}
           </Button>
         </DialogFooter>
       </form>
