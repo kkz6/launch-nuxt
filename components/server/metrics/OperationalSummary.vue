@@ -148,7 +148,7 @@ const containerStatusLabel = (status: string) =>
 </script>
 
 <template>
-  <section class="border-y">
+  <section class="overflow-hidden rounded-lg border border-border bg-card">
     <div class="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-start">
       <div class="flex min-w-0 flex-1 items-start gap-3">
         <span
