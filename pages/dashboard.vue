@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
+import { useSiteQueueEvents } from "~/composables/useChannelEvents";
 
 definePageMeta({
   layout: "default",
@@ -67,16 +68,29 @@ interface Activity {
   } | null;
 }
 
+interface FailedQueue {
+  id: string;
+  name: string;
+  connection: string;
+  site_id: string;
+  site_name: string;
+  server_id: string;
+  server_name: string;
+  last_status_check: string | null;
+}
+
 interface DashboardResponse {
   data: {
     servers: Server[];
     recent_activity: Activity[];
+    failed_queues: FailedQueue[];
   };
 }
 
 const isLoading = ref(true);
 const servers = ref<Server[]>([]);
 const recentActivity = ref<Activity[]>([]);
+const failedQueues = ref<FailedQueue[]>([]);
 
 // Watch for refresh trigger from navbar (team switch)
 const dashboardRefreshKey = useState("dashboardRefreshKey", () => 0);
@@ -89,6 +103,7 @@ const fetchDashboard = async () => {
     const response = await $api<DashboardResponse>("/dashboard");
     servers.value = response.data.servers;
     recentActivity.value = response.data.recent_activity;
+    failedQueues.value = response.data.failed_queues || [];
   } catch {
     // Silent fail
   } finally {
@@ -108,6 +123,13 @@ onMounted(() => {
   if (typeof tab === "string" && tab) {
     openSettingsSheet(tab);
     void router.replace({ query: { ...route.query, settings: undefined } });
+  }
+});
+
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+useSiteQueueEvents(teamId, (_data, event) => {
+  if (event === "queues.synced" || event === "queues.failed") {
+    fetchDashboard();
   }
 });
 
@@ -244,6 +266,7 @@ const getUserInitials = (name: string): string => {
         <!-- SSL certificate expiry banner — renders nothing when no
              certs are expiring. Self-fetches via the composable. -->
         <DashboardCertificateExpiryBanner class="mb-6" />
+        <DashboardQueueFailureBanner :queues="failedQueues" class="mb-6" />
 
         <!-- Empty State -->
         <div

@@ -188,6 +188,7 @@ export const useSiteQueueEvents = (
       "queue.restarted",
       "queues.synced",
       "queues.restarted",
+      "queues.failed",
     ],
     onEvent,
   );

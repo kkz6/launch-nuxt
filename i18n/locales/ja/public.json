@@ -49,6 +49,11 @@
         "expiresMany": "{count}件の証明書が30日以内に期限切れになります",
         "reviewSuffix": "SSL証明書を確認してください。",
         "review": "確認"
+      },
+      "queueFailure": {
+        "title": "{count}件のキューワーカーが停止しています | {count}件のキューワーカーが停止しています",
+        "description": "最新のヘルスチェックで対応が必要なキューワーカーが検出されました。",
+        "more": "他{count}件"
       }
     },
     "onboarding": {

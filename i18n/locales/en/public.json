@@ -49,6 +49,11 @@
         "expiresMany": "{count} certificates expire in the next 30 days",
         "reviewSuffix": "review your SSL certificates.",
         "review": "Review"
+      },
+      "queueFailure": {
+        "title": "{count} queue worker not running | {count} queue workers not running",
+        "description": "Launch detected queue workers that need attention during the latest health check.",
+        "more": "+{count} more"
       }
     },
     "onboarding": {

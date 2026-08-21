@@ -2,6 +2,7 @@
 import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "~/components/ui/alert";
 import {
   Tooltip,
   TooltipContent,
@@ -76,6 +77,11 @@ const queueStatusLabel = (status: string | undefined, running: boolean) => {
 // Log viewer state
 const selectedQueueForLogs = ref<Queue | null>(null);
 const isLogDialogOpen = ref(false);
+const failedQueues = computed(() =>
+  queues.value.filter(
+    (queue) => queue.installed_at && queue.last_status_check && !queue.running,
+  ),
+);
 
 const viewLogs = (queue: Queue) => {
   selectedQueueForLogs.value = queue;
@@ -271,6 +277,16 @@ onMounted(fetchQueues);
     </div>
 
     <template v-else>
+      <Alert v-if="failedQueues.length > 0" variant="destructive" class="mb-4">
+        <Icon name="lucide:triangle-alert" class="h-4 w-4" />
+        <AlertTitle>
+          {{ t("site.queues.failureTitle", { count: failedQueues.length }) }}
+        </AlertTitle>
+        <AlertDescription>
+          {{ t("site.queues.failureDescription", { count: failedQueues.length }) }}
+        </AlertDescription>
+      </Alert>
+
       <SharedDataTable
         :data="queues"
         :columns="[
@@ -296,7 +312,7 @@ onMounted(fetchQueues);
             <Tooltip>
               <TooltipTrigger as-child>
                 <Badge
-                  :variant="row.running ? 'success' : 'secondary'"
+                  :variant="row.running ? 'success' : 'destructive'"
                   class="cursor-help"
                 >
                   {{
