@@ -191,6 +191,8 @@
       "deleteFailed": "キューワーカーを削除できませんでした",
       "syncStarted": "キューステータスを同期しています...",
       "syncFailed": "キューステータスを同期できませんでした",
+      "failureTitle": "{count}件のキューワーカーが停止しています",
+      "failureDescription": "停止したワーカーを確認し、必要に応じて再起動してからステータスを再同期してください。",
       "uptime": "稼働時間",
       "pid": "PID",
       "maxTries": "最大試行回数",

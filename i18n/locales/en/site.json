@@ -191,6 +191,8 @@
       "deleteFailed": "Failed to delete queue",
       "syncStarted": "Syncing queue status...",
       "syncFailed": "Failed to sync queue status",
+      "failureTitle": "{count} queue worker not running | {count} queue workers not running",
+      "failureDescription": "Review the stopped worker below, restart it if needed, then sync the status again. | Review the stopped workers below, restart them if needed, then sync the status again.",
       "uptime": "Uptime",
       "pid": "PID",
       "maxTries": "Max Tries",
