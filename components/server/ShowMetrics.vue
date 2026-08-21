@@ -7,6 +7,10 @@ import {
   TooltipTrigger,
 } from "~/components/ui/tooltip";
 import type { Server } from "~/types";
+import {
+  dockerService,
+  type DockerHostContainer,
+} from "~/services/dockerService";
 
 interface Props {
   server: Server;
@@ -14,6 +18,26 @@ interface Props {
 
 const props = defineProps<Props>();
 const { t } = useI18n();
+
+const isDocker = computed(() => props.server.type.toLowerCase() === "docker");
+const containers = ref<DockerHostContainer[] | null>(null);
+const containersLoading = ref(false);
+const containersError = ref(false);
+let containerRefreshTimer: ReturnType<typeof setInterval> | null = null;
+
+const fetchContainerHealth = async () => {
+  if (!isDocker.value || !props.server.connected) return;
+  containersLoading.value = true;
+  containersError.value = false;
+  try {
+    const response = await dockerService.host.containers(props.server.id);
+    containers.value = response.data;
+  } catch {
+    containersError.value = true;
+  } finally {
+    containersLoading.value = false;
+  }
+};
 
 const {
   metrics,
@@ -58,14 +82,22 @@ const statusTooltip = computed(() => {
 const handleReconnect = () => {
   clearHistory();
   connect();
+  void fetchContainerHealth();
 };
 
 onMounted(() => {
   connect();
+  void fetchContainerHealth();
+  if (isDocker.value) {
+    containerRefreshTimer = setInterval(() => {
+      void fetchContainerHealth();
+    }, 30_000);
+  }
 });
 
 onUnmounted(() => {
   disconnect();
+  if (containerRefreshTimer) clearInterval(containerRefreshTimer);
 });
 </script>
 
@@ -173,24 +205,53 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <!-- Connected state - show metrics cards -->
-    <div v-else class="space-y-3">
-      <!-- Resource metrics row -->
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <ServerMetricsCpuCard :metrics="metrics" :history="history" />
-        <ServerMetricsMemoryCard :metrics="metrics" :history="history" />
-        <ServerMetricsDiskCard :metrics="metrics" />
-        <ServerMetricsLoadCard :metrics="metrics" :history="history" />
-      </div>
+    <!-- Connected state - interpret the stream, then show raw diagnostics. -->
+    <div v-else class="space-y-7">
+      <ServerMetricsOperationalSummary
+        :metrics="metrics"
+        :history="history"
+        :system-info="systemInfo"
+        :server-cpu-cores="Number(server.cpu_cores || 0)"
+        :is-docker="isDocker"
+        :containers="containers"
+        :containers-loading="containersLoading"
+        :containers-error="containersError"
+      />
 
-      <!-- Processes and Network row -->
-      <div class="grid gap-3 sm:grid-cols-2">
-        <ServerMetricsProcessesCard :processes="metrics?.processes || []" />
-        <ServerMetricsNetworkCard
-          :network="metrics?.network || null"
-          :history="history"
-        />
-      </div>
+      <section class="space-y-3">
+        <div>
+          <h4 class="text-sm font-semibold">
+            {{ t("server.metrics.liveResources") }}
+          </h4>
+          <p class="text-xs text-muted-foreground">
+            {{ t("server.metrics.liveResourcesDescription") }}
+          </p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ServerMetricsCpuCard :metrics="metrics" :history="history" />
+          <ServerMetricsMemoryCard :metrics="metrics" :history="history" />
+          <ServerMetricsDiskCard :metrics="metrics" />
+          <ServerMetricsLoadCard :metrics="metrics" :history="history" />
+        </div>
+      </section>
+
+      <section class="space-y-3">
+        <div>
+          <h4 class="text-sm font-semibold">
+            {{ t("server.metrics.diagnostics") }}
+          </h4>
+          <p class="text-xs text-muted-foreground">
+            {{ t("server.metrics.diagnosticsDescription") }}
+          </p>
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <ServerMetricsProcessesCard :processes="metrics?.processes || []" />
+          <ServerMetricsNetworkCard
+            :network="metrics?.network || null"
+            :history="history"
+          />
+        </div>
+      </section>
 
       <!-- System Info row -->
       <ServerMetricsSystemInfoCard :system-info="systemInfo" />
