@@ -757,11 +757,21 @@
         "addCredential": "認証情報を追加",
         "saveConfiguration": "設定を保存"
       },
-      "configEditor": {
-        "title": "設定を編集",
-        "loadFailed": "ファイルの内容を読み込めませんでした",
-        "saved": "設定を保存しました",
-        "saveFailed": "設定を保存できませんでした"
+      "phpConfiguration": {
+        "title": "PHP {version} の設定",
+        "description": "このPHPバージョンの実行時設定を確認・編集します。",
+        "loadFailed": "PHP設定を読み込めませんでした",
+        "saveTitle": "{file}を保存",
+        "saveDescription": "設定を検証してからPHP {version} FPMを再読み込みします。無効な変更は適用されません。",
+        "saveAndReload": "保存して再読み込み",
+        "saved": "PHP設定を保存し、PHP-FPMを再読み込みしました",
+        "saveFailed": "PHP設定を保存できませんでした",
+        "validationNote": "PHP-FPMの再読み込み前に変更を検証し、以前のファイルの復旧用コピーを保持します。",
+        "readOnlyNote": "この設定は読み取り専用です。",
+        "unsaved": "未保存の変更",
+        "discardTitle": "未保存の変更を破棄しますか？",
+        "discardDescription": "未保存のPHP設定の変更は失われます。",
+        "discardChanges": "変更を破棄"
       },
       "backupHistory": {
         "title": "バックアップ履歴",
@@ -860,6 +870,7 @@
         "viewDetails": "詳細を表示",
         "updateAgent": "エージェントを更新",
         "extensions": "拡張機能",
+        "phpConfiguration": "PHP設定",
         "setDefault": "デフォルトに設定",
         "setDefaultTitle": "{name}をデフォルトに設定",
         "setDefaultDescription": "このバージョンをCLI PHPのデフォルトに設定します。",
