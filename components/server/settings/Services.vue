@@ -127,7 +127,9 @@ interface ServicesState {
   selectedTaskLog: TaskLogSelection | null;
   isExtensionsDialogOpen: boolean;
   isOpcacheDialogOpen: boolean;
+  isPhpConfigurationDialogOpen: boolean;
   selectedPhpService: any;
+  selectedPhpConfigurationService: Service | null;
   patchingServiceIds: Set<string>;
   phpPatchLogsByService: Map<string, TaskLogSelection>;
 }
@@ -150,7 +152,9 @@ const state = reactive({
   selectedTaskLog: null,
   isExtensionsDialogOpen: false,
   isOpcacheDialogOpen: false,
+  isPhpConfigurationDialogOpen: false,
   selectedPhpService: null,
+  selectedPhpConfigurationService: null,
   patchingServiceIds: new Set(),
   phpPatchLogsByService: new Map(),
 }) as ServicesState;
@@ -173,7 +177,9 @@ const {
   selectedTaskLog,
   isExtensionsDialogOpen,
   isOpcacheDialogOpen,
+  isPhpConfigurationDialogOpen,
   selectedPhpService,
+  selectedPhpConfigurationService,
   patchingServiceIds,
   phpPatchLogsByService,
 } = toRefs(state);
@@ -334,6 +340,11 @@ const openOpcacheDialog = async (service: Service) => {
     selectedPhpService.value = match;
     isOpcacheDialogOpen.value = true;
   }
+};
+
+const openPhpConfigurationDialog = (service: Service) => {
+  selectedPhpConfigurationService.value = service;
+  isPhpConfigurationDialogOpen.value = true;
 };
 
 const setPhpDefault = async (service: Service) => {
@@ -1013,6 +1024,13 @@ onBeforeUnmount(() => {
       @updated="fetchServices"
     />
 
+    <ServerSettingsPhpConfigEditorDialog
+      v-if="selectedPhpConfigurationService"
+      v-model:open="isPhpConfigurationDialogOpen"
+      :server-id="serverId"
+      :service="selectedPhpConfigurationService"
+    />
+
     <ServerSettingsServiceStatusDialog
       v-if="selectedServiceForStatus"
       v-model:open="isStatusDialogOpen"
@@ -1273,6 +1291,12 @@ onBeforeUnmount(() => {
                           >
                             <Icon name="lucide:package" class="mr-2 h-4 w-4" />
                             {{ t("server.settings.services.extensions") }}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            @click="openPhpConfigurationDialog(service)"
+                          >
+                            <Icon name="lucide:file-cog" class="mr-2 h-4 w-4" />
+                            {{ t("server.settings.services.phpConfiguration") }}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
@@ -1588,6 +1612,12 @@ onBeforeUnmount(() => {
                         >
                           <Icon name="lucide:package" class="mr-2 h-4 w-4" />
                           {{ t("server.settings.services.extensions") }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          @click="openPhpConfigurationDialog(service)"
+                        >
+                          <Icon name="lucide:file-cog" class="mr-2 h-4 w-4" />
+                          {{ t("server.settings.services.phpConfiguration") }}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem

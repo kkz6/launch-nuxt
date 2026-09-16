@@ -757,11 +757,21 @@
         "addCredential": "Add Credential",
         "saveConfiguration": "Save Configuration"
       },
-      "configEditor": {
-        "title": "Edit Configuration",
-        "loadFailed": "Failed to load file content",
-        "saved": "Configuration saved successfully",
-        "saveFailed": "Failed to save configuration"
+      "phpConfiguration": {
+        "title": "PHP {version} configuration",
+        "description": "Review and edit the runtime configuration for this PHP version.",
+        "loadFailed": "Failed to load PHP configuration",
+        "saveTitle": "Save {file}",
+        "saveDescription": "The configuration will be validated before PHP {version} FPM is reloaded. Invalid changes will not be applied.",
+        "saveAndReload": "Save and reload",
+        "saved": "PHP configuration saved and PHP-FPM reloaded",
+        "saveFailed": "Failed to save PHP configuration",
+        "validationNote": "Changes are validated before PHP-FPM reloads. A recovery copy of the previous file is retained.",
+        "readOnlyNote": "You have read-only access to this configuration.",
+        "unsaved": "Unsaved changes",
+        "discardTitle": "Discard unsaved changes?",
+        "discardDescription": "Your unsaved PHP configuration changes will be lost.",
+        "discardChanges": "Discard changes"
       },
       "backupHistory": {
         "title": "Backup History",
@@ -860,6 +870,7 @@
         "viewDetails": "View Details",
         "updateAgent": "Update Agent",
         "extensions": "Extensions",
+        "phpConfiguration": "PHP configuration",
         "setDefault": "Set Default",
         "setDefaultTitle": "Set {name} as default",
         "setDefaultDescription": "This will make this version the default CLI PHP version.",
