@@ -469,20 +469,18 @@ useServiceEvents(teamId, (data, eventName) => {
       const phpLabel = event.version ? `PHP ${event.version}` : "PHP";
       const error = phpPatchErrorSummary(event.output);
 
-      if (event.status === "queued") {
+      const taskId =
+        event.task_id ||
+        phpPatchLogsByService.value.get(event.service_id)?.taskId;
+      if (taskId) {
+        setPhpPatchLog(event.service_id, {
+          taskId,
+          title: t("server.settings.services.patchLog", { name: phpLabel }),
+          description: t("server.settings.services.patchLogDescription"),
+          error: event.status === "failed" ? error || undefined : undefined,
+        });
+      } else if (event.status === "queued") {
         setPhpPatchLog(event.service_id, null);
-      } else {
-        const taskId =
-          event.task_id ||
-          phpPatchLogsByService.value.get(event.service_id)?.taskId;
-        if (taskId) {
-          setPhpPatchLog(event.service_id, {
-            taskId,
-            title: t("server.settings.services.patchLog", { name: phpLabel }),
-            description: t("server.settings.services.patchLogDescription"),
-            error: event.status === "failed" ? error || undefined : undefined,
-          });
-        }
       }
 
       if (event.status === "finished") {
