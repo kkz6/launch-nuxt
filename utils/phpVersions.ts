@@ -33,6 +33,18 @@ export const phpVersionKey = (version: string) => {
   return `php${versionParts[1]}${versionParts[2]}`
 }
 
+export const phpVersionLabel = (version: string) => {
+  const normalizedVersion = version.trim()
+  const keyParts = normalizedVersion.match(/^php(\d+)(\d)$/i)
+
+  if (keyParts) return `PHP ${keyParts[1]}.${keyParts[2]}`
+  if (/^\d+\.\d+(?:\.\d+)?$/.test(normalizedVersion)) {
+    return `PHP ${normalizedVersion}`
+  }
+
+  return normalizedVersion
+}
+
 export const pendingPhpVersionKey = (
   version: string | null | undefined,
 ): string | null => {

@@ -7,6 +7,7 @@ import {
   phpPatchErrorSummary,
   phpPatchEndpoint,
   phpVersionKey,
+  phpVersionLabel,
   phpVersionOptions,
   sitePhpVersionState,
   updatingPhpServiceIds,
@@ -20,6 +21,21 @@ describe('phpVersionKey', () => {
     ['php82', 'php82'],
   ])('normalizes %s to %s', (version, expected) => {
     expect(phpVersionKey(version)).toBe(expected)
+  })
+})
+
+describe('phpVersionLabel', () => {
+  it.each([
+    ['php83', 'PHP 8.3'],
+    ['php84', 'PHP 8.4'],
+    ['php85', 'PHP 8.5'],
+    ['8.4.1', 'PHP 8.4.1'],
+  ])('formats %s as %s', (version, expected) => {
+    expect(phpVersionLabel(version)).toBe(expected)
+  })
+
+  it('preserves an unknown value instead of inventing a version', () => {
+    expect(phpVersionLabel('system')).toBe('system')
   })
 })
 
