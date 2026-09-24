@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Server, Site } from "~/types";
+import { phpVersionLabel } from "~/utils/phpVersions";
 
 interface Props {
   server: Server;
@@ -15,14 +16,6 @@ const applicationTypes = computed<Record<string, string>>(() => ({
   generic: t("site.types.genericPhp"),
   phpmyadmin: "phpMyAdmin",
 }));
-
-const phpVersions: Record<string, string> = {
-  php74: "PHP 7.4",
-  php80: "PHP 8.0",
-  php81: "PHP 8.1",
-  php82: "PHP 8.2",
-  php83: "PHP 8.3",
-};
 
 const tlsSettingLabels = computed<Record<string, string>>(() => ({
   auto: t("site.ssl.automatic"),
@@ -78,7 +71,7 @@ const applicationIcons: Record<string, string> = {
             {{ t("site.overview.phpVersion") }}
           </p>
           <p class="text-sm font-medium text-foreground">
-            {{ phpVersions[site.php_version] || site.php_version }}
+            {{ phpVersionLabel(site.php_version) }}
           </p>
         </div>
       </div>
