@@ -184,11 +184,10 @@ const getCommitHeading = (message: string | undefined): string => {
   return message.split("\n")[0];
 };
 
-const deployWebhookUrl = computed(() => {
-  const config = useRuntimeConfig();
-  const baseUrl = config.public.apiBase.replace(/\/api\/?$/, "");
-  return `${baseUrl}/deploy/${props.siteId}/${props.site.deploy_token}`;
-});
+const appUrl = useRequestURL();
+const deployWebhookUrl = computed(
+  () => `${appUrl.origin}/deploy/${props.siteId}/${props.site.deploy_token}`,
+);
 
 const isRegenerating = ref(false);
 
