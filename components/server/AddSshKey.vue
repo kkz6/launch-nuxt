@@ -20,6 +20,7 @@ import {
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
+import type { SSHKey } from "~/types";
 
 interface KeyOption {
   value: string;
@@ -56,12 +57,17 @@ const isCustomKey = computed(() => selectedKeyId.value === "custom");
 const fetchAvailableKeys = async () => {
   isFetchingKeys.value = true;
   try {
-    const data = await $api<{ data: { keys_available: KeyOption[] } }>(
-      `/servers/${props.serverId}/ssh-keys/create`,
-    );
-    availableKeys.value = data.data?.keys_available || [];
+    const [saved, attached] = await Promise.all([
+      $api<{ data: SSHKey[] }>("/ssh-keys?global=true"),
+      $api<{ data: SSHKey[] }>(`/servers/${props.serverId}/ssh-keys`),
+    ]);
+    const attachedIds = new Set(attached.data.map((key) => key.id));
+    availableKeys.value = saved.data
+      .filter((key) => !attachedIds.has(key.id))
+      .map((key) => ({ value: key.id, label: key.name }));
   } catch {
     availableKeys.value = [];
+    toast.error(t("server.sshKeys.loadFailed"));
   } finally {
     isFetchingKeys.value = false;
   }
@@ -82,9 +88,9 @@ const validate = (): boolean => {
     if (!publicKey.value.trim()) {
       errors.value.public_key = t("server.addSshKey.publicKeyRequired");
     } else if (
-      !publicKey.value.startsWith("ssh-rsa") &&
-      !publicKey.value.startsWith("ssh-ed25519") &&
-      !publicKey.value.startsWith("ecdsa-")
+      !publicKey.value.trim().startsWith("ssh-rsa") &&
+      !publicKey.value.trim().startsWith("ssh-ed25519") &&
+      !publicKey.value.trim().startsWith("ecdsa-")
     ) {
       errors.value.public_key = t("server.addSshKey.publicKeyInvalid");
     }
@@ -117,7 +123,7 @@ const onSubmit = async () => {
   isLoading.value = true;
   try {
     const body = isCustomKey.value
-      ? { ssh_key_id: "custom", name: name.value, public_key: publicKey.value }
+      ? { name: name.value.trim(), public_key: publicKey.value.trim() }
       : { ssh_key_id: selectedKeyId.value };
 
     await $api(`/servers/${props.serverId}/ssh-keys`, {
