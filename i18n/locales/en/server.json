@@ -925,7 +925,12 @@
         "lastChecked": "Last checked",
         "serviceLogs": "Service logs",
         "taskLog": "Task log",
-        "taskLogDescription": "Output from the task running on this server."
+        "taskLogDescription": "Output from the task running on this server.",
+        "installQueued": "Queued for installation",
+        "installing": "Installing",
+        "installLog": "Installation logs",
+        "installLogTitle": "Installation logs: {name}",
+        "installLogDescription": "Live output from installing this service."
       },
       "php": {
         "title": "PHP Versions",

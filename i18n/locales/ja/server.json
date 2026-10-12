@@ -925,7 +925,12 @@
         "lastChecked": "最終確認",
         "serviceLogs": "サービスログ",
         "taskLog": "タスクログ",
-        "taskLogDescription": "このサーバーで実行中のタスク出力です。"
+        "taskLogDescription": "このサーバーで実行中のタスク出力です。",
+        "installQueued": "インストール待ち",
+        "installing": "インストール中",
+        "installLog": "インストールログ",
+        "installLogTitle": "インストールログ: {name}",
+        "installLogDescription": "サービスのインストール中の出力です。"
       },
       "php": {
         "title": "PHPバージョン",

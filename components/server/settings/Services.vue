@@ -63,6 +63,7 @@ interface Service {
   status_details?: ServiceStatusDetails;
   status_output?: string;
   task_id?: string;
+  install_task_id?: string;
   patch_status?: string;
   patch_error?: string;
   image_path?: string;
@@ -212,6 +213,17 @@ const openTaskLog = (selection: TaskLogSelection) => {
   isTaskLogSheetOpen.value = true;
 };
 
+const openInstallationLog = (service: Service) => {
+  if (!service.install_task_id) return;
+  openTaskLog({
+    taskId: service.install_task_id,
+    title: t("server.settings.services.installLogTitle", {
+      name: service.name,
+    }),
+    description: t("server.settings.services.installLogDescription"),
+  });
+};
+
 const openAgentUpdateLog = () => {
   if (!agentUpdateTaskId.value) return;
 
@@ -232,6 +244,9 @@ const isPhpPatching = (service: Service) =>
   (patchingServiceIds.value.has(service.id) || service.status === "updating");
 
 const isServiceActionPending = (service: Service) =>
+  ["pending", "installing", "uninstalling", "updating"].includes(
+    service.status,
+  ) ||
   loadingAction.value?.software === service.software ||
   service.default_change_pending ||
   isPhpPatching(service);
@@ -460,6 +475,18 @@ useServiceEvents(teamId, (data, eventName) => {
   const event = data as ServiceOperationEvent;
   const eventServerId = event.server_id;
   if (eventServerId === props.serverId) {
+    if (
+      eventName === "service.status_changed" &&
+      event.status === "installing"
+    ) {
+      const service = services.value.find(
+        (item) => item.id === event.service_id,
+      );
+      if (service) {
+        service.status = "installing";
+        if (event.task_id) service.install_task_id = event.task_id;
+      }
+    }
     if (eventName === "php.patch" && event.service_id) {
       const isPatching =
         event.status === "queued" ||
@@ -550,6 +577,26 @@ const isPersistedStatusFresh = (service: Service): boolean => {
 };
 
 const getDisplayStatus = (service: Service) => {
+  const lifecycleLabels: Record<string, string> = {
+    pending: t("server.settings.services.installQueued"),
+    installing: t("server.settings.services.installing"),
+    uninstalling: t("server.sites.uninstalling"),
+  };
+  if (
+    lifecycleLabels[service.status] ||
+    (service.status === "failed" && service.install_task_id)
+  ) {
+    return {
+      status: service.status,
+      label:
+        lifecycleLabels[service.status] ||
+        t("server.settings.serviceStatus.failed"),
+      memory: undefined,
+      uptime: undefined,
+      pid: undefined,
+      isLive: false,
+    };
+  }
   if (isPhpPatching(service)) {
     return {
       status: "updating",
@@ -869,6 +916,9 @@ const sortedServices = computed(() =>
 
 const hasPendingPhpOperation = computed(
   () =>
+    services.value.some((service) =>
+      ["pending", "installing", "uninstalling"].includes(service.status),
+    ) ||
     patchingServiceIds.value.size > 0 ||
     hasPendingDefaultPhpChange(services.value),
 );
@@ -1422,6 +1472,16 @@ onBeforeUnmount(() => {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  <Button
+                    v-if="Boolean(service.install_task_id)"
+                    variant="outline"
+                    size="sm"
+                    class="ml-2"
+                    @click="openInstallationLog(service)"
+                  >
+                    <Icon name="lucide:terminal" class="mr-1.5 h-3.5 w-3.5" />
+                    {{ t("server.settings.services.installLog") }}
+                  </Button>
                 </div>
               </div>
 
@@ -1541,6 +1601,16 @@ onBeforeUnmount(() => {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
+                  <Button
+                    v-if="Boolean(service.install_task_id)"
+                    variant="outline"
+                    size="sm"
+                    class="ml-2"
+                    @click="openInstallationLog(service)"
+                  >
+                    <Icon name="lucide:terminal" class="mr-1.5 h-3.5 w-3.5" />
+                    {{ t("server.settings.services.installLog") }}
+                  </Button>
                 </div>
 
                 <div class="col-span-3 flex items-center justify-end gap-2">

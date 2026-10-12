@@ -137,9 +137,12 @@ beforeEach(() => {
     lastUpdated: ref(null),
     reconnect: vi.fn(),
   }));
-  vi.stubGlobal("useServiceEvents", (_teamId: unknown, handler: EventHandler) => {
-    mocks.serviceEventHandler = handler;
-  });
+  vi.stubGlobal(
+    "useServiceEvents",
+    (_teamId: unknown, handler: EventHandler) => {
+      mocks.serviceEventHandler = handler;
+    },
+  );
   vi.stubGlobal("useSiteEvents", (_teamId: unknown, handler: EventHandler) => {
     mocks.siteEventHandler = handler;
   });
@@ -149,6 +152,77 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+});
+
+describe("service installation progress", () => {
+  it.each([
+    ["pending", "Queued for installation"],
+    ["installing", "Installing"],
+    ["failed", "Failed"],
+  ])(
+    "keeps %s visible despite stale or missing agent status",
+    async (status, label) => {
+      const service = {
+        id: "bun-1",
+        server_id: "server-1",
+        type: "bun",
+        name: "Bun",
+        software: "bun",
+        status,
+        install_task_id: "install-task-1",
+        last_status_check: "2020-01-01T00:00:00Z",
+      };
+      mocks.api.mockImplementation(async (url: string) => ({
+        data: url.endsWith("/services") ? [service] : [],
+      }));
+      vi.stubGlobal("useServiceStatus", () => ({
+        services: ref([{ id: service.id, status: "missing" }]),
+        isConnected: ref(true),
+        isConnecting: ref(false),
+        error: ref(null),
+        lastUpdated: ref(null),
+        reconnect: vi.fn(),
+      }));
+      const wrapper = shallowMount(Services, {
+        props: { serverId: "server-1" },
+        global: {
+          stubs: {
+            Icon: true,
+            SharedConfirmationDialog: true,
+            ServerSettingsInstallServiceDialog: true,
+            ServerSettingsPhpExtensionsDialog: true,
+            ServerSettingsPhpOpcacheDialog: true,
+            ServerSettingsPhpConfigEditorDialog: true,
+            ServerSettingsServiceStatusDialog: true,
+            ServerLogViewer: true,
+          },
+        },
+      });
+      await flushPromises();
+      const state = (
+        wrapper.vm.$ as unknown as {
+          setupState: {
+            getDisplayStatus: (service: unknown) => {
+              status: string;
+              label: string;
+            };
+            openInstallationLog: (service: unknown) => void;
+            isServiceActionPending: (service: unknown) => boolean;
+            hasPendingPhpOperation: boolean;
+          };
+        }
+      ).setupState;
+      expect(state.getDisplayStatus(service)).toMatchObject({ status, label });
+      expect(state.isServiceActionPending(service)).toBe(status !== "failed");
+      expect(state.hasPendingPhpOperation).toBe(status !== "failed");
+      state.openInstallationLog(service);
+      expect(setupRef<boolean>(wrapper, "isTaskLogSheetOpen")).toBe(true);
+      expect(
+        setupRef<{ taskId: string }>(wrapper, "selectedTaskLog")?.taskId,
+      ).toBe("install-task-1");
+      wrapper.unmount();
+    },
+  );
 });
 
 describe("PHP lifecycle websocket handling", () => {
@@ -286,9 +360,7 @@ describe("PHP lifecycle websocket handling", () => {
       { site_id: "site-1", php_version: "php84", task_id: "task-site-1" },
       "site.php_version_update_requested",
     );
-    expect(setupRef<string | null>(wrapper, "pendingPhpVersion")).toBe(
-      "php84",
-    );
+    expect(setupRef<string | null>(wrapper, "pendingPhpVersion")).toBe("php84");
     expect(mocks.resetField).toHaveBeenCalledWith("php_version", {
       value: "php84",
     });
@@ -312,9 +384,7 @@ describe("PHP lifecycle websocket handling", () => {
     expect(mocks.toastError).toHaveBeenCalledWith("PHP-FPM reload failed");
     expect(wrapper.emitted("updated")).toHaveLength(1);
     expect(
-      mocks.api.mock.calls.filter(([url]) =>
-        String(url).endsWith("/settings"),
-      ),
+      mocks.api.mock.calls.filter(([url]) => String(url).endsWith("/settings")),
     ).toHaveLength(3);
   });
 });
