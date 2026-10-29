@@ -6,13 +6,15 @@ description: Deployment management API endpoints
 Trigger deployments and monitor deployment status through the API.
 
 ## Endpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/sites/{site_id}/deployments` | List deployments |
-| GET | `/deployments/{id}` | Get deployment details |
-| POST | `/sites/{site_id}/deploy` | Trigger deployment |
+
+| Method | Endpoint                       | Description            |
+| ------ | ------------------------------ | ---------------------- |
+| GET    | `/sites/{site_id}/deployments` | List deployments       |
+| GET    | `/deployments/{id}`            | Get deployment details |
+| POST   | `/sites/{site_id}/deploy`      | Trigger deployment     |
 
 ## List Deployments
+
 ```http
 GET /v1/sites/{site_id}/deployments
 ```
@@ -36,6 +38,7 @@ GET /v1/sites/{site_id}/deployments
 ```
 
 ## Get Deployment
+
 ```http
 GET /v1/deployments/{id}
 ```
@@ -61,14 +64,15 @@ GET /v1/deployments/{id}
 
 ### Deployment Status
 
-| Status | Description |
-|--------|-------------|
-| pending | Deployment queued |
-| deploying | Deployment in progress |
-| finished | Deployment completed successfully |
-| failed | Deployment failed |
+| Status    | Description                       |
+| --------- | --------------------------------- |
+| pending   | Deployment queued                 |
+| deploying | Deployment in progress            |
+| finished  | Deployment completed successfully |
+| failed    | Deployment failed                 |
 
 ## Trigger Deployment
+
 ```http
 POST /v1/sites/{site_id}/deploy
 ```
@@ -84,10 +88,10 @@ POST /v1/sites/{site_id}/deploy
 
 ### Parameters
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| branch | string | No | Branch to deploy (default: configured branch) |
-| commit | string | No | Specific commit to deploy |
+| Parameter | Type   | Required | Description                                   |
+| --------- | ------ | -------- | --------------------------------------------- |
+| branch    | string | No       | Branch to deploy (default: configured branch) |
+| commit    | string | No       | Specific commit to deploy                     |
 
 ### Response
 
@@ -102,16 +106,26 @@ POST /v1/sites/{site_id}/deploy
 ```
 
 ## Deployment Webhook
+
 You can also trigger deployments via webhook URL:
 
 ```http
-POST /deploy/{site_token}
+POST /deploy/{site_id}/{deploy_token}
 ```
 
-This endpoint doesn't require authentication - it uses a unique site token.
+Copy the full webhook URL from your site's Deployments page. New and regenerated
+deployment tokens contain exactly 32 letters and numbers (`A-Z`, `a-z`, `0-9`).
+Existing tokens containing hyphens (`-`) or underscores (`_`) remain valid until
+you regenerate them. Keep every character of an existing URL exactly as shown.
+
+The token authenticates the request, so no Authorization header is required.
+Both `POST` and `GET` are supported, and successful triggers return `204 No Content`.
+Regenerating the token invalidates the previous URL; update any integrations
+that use it.
 
 ## Required Permissions
-| Endpoint | Permission |
-|----------|------------|
-| GET /deployments | sites:read |
-| POST /deploy | sites:write |
+
+| Endpoint         | Permission  |
+| ---------------- | ----------- |
+| GET /deployments | sites:read  |
+| POST /deploy     | sites:write |

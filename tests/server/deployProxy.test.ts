@@ -54,6 +54,27 @@ const createProxy = async (backendBase: string) => {
 };
 
 describe("deployment webhook proxy", () => {
+  it.each(["GET", "POST"])(
+    "preserves a leading hyphen and underscores in a %s deployment token",
+    async (method) => {
+      const path = "/deploy/site-id/-test_TOKEN-with-hyphens_012345678";
+      let received: unknown;
+      const backend = await listen(
+        createServer((req, res) => {
+          received = { method: req.method, url: req.url };
+          res.writeHead(204);
+          res.end();
+        }),
+      );
+      const frontend = await createProxy(backend);
+
+      const response = await fetch(`${frontend}${path}`, { method });
+
+      expect(response.status).toBe(204);
+      expect(received).toEqual({ method, url: path });
+    },
+  );
+
   it("forwards POST body, provider headers and query unchanged, and returns 204", async () => {
     let received: unknown;
     const backend = await listen(

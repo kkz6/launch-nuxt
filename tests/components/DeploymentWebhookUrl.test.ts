@@ -69,10 +69,24 @@ describe("deployment webhook URL", () => {
     const wrapper = mountDeployments();
     await flushPromises();
     await wrapper.setProps({
-      site: { deploy_token: "regenerated-token" } as Site,
+      site: { deploy_token: "aB3dE6gH9jK2mN5pQ8sT1vW4yZ7cD0fG" } as Site,
     });
     expect(wrapper.get("code").text()).toBe(
-      "https://launchctl.io/deploy/site-id/regenerated-token",
+      "https://launchctl.io/deploy/site-id/aB3dE6gH9jK2mN5pQ8sT1vW4yZ7cD0fG",
     );
+  });
+
+  it("displays and copies every token character, including a leading hyphen", async () => {
+    const wrapper = mountDeployments();
+    await flushPromises();
+    await wrapper.setProps({
+      site: { deploy_token: "-test_TOKEN-with-hyphens_012345678" } as Site,
+    });
+    const url =
+      "https://launchctl.io/deploy/site-id/-test_TOKEN-with-hyphens_012345678";
+
+    expect(wrapper.get("code").text()).toBe(url);
+    await wrapper.get('button[title="Copy"]').trigger("click");
+    expect(clipboard).toHaveBeenCalledWith(url);
   });
 });
