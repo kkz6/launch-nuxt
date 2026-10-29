@@ -65,7 +65,8 @@ const applyOptimisticDeployment = (deploymentId: string, status: string) => {
     return;
   }
   // Different (or no) deployment in state — synthesize a minimal record.
-  // Commit data and task_id arrive on the terminal refetch.
+  // Metadata arrives from the Deploy response or a refetch. Do not reuse the
+  // previous deployment's commit details for a different deployment.
   site.value = {
     ...site.value,
     latest_deployment: {
@@ -78,12 +79,12 @@ const applyOptimisticDeployment = (deploymentId: string, status: string) => {
       user_id: null,
       task_id: "",
       git_hash: "",
-      vcs_data: existing?.vcs_data ?? ({} as Deployment["vcs_data"]),
-      commit_data: existing?.commit_data ?? ({} as Deployment["commit_data"]),
+      vcs_data: {} as Deployment["vcs_data"],
+      commit_data: {} as Deployment["commit_data"],
       user_notified_at: "",
-      created_at: existing?.created_at ?? new Date().toISOString(),
+      created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      user: existing?.user ?? null,
+      user: null,
     },
   };
 };
