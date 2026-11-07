@@ -1,87 +1,60 @@
 ---
 title: Site Commands
-description: Inspect sites and operate project files, logs, services, and TLS
+description: Create, update, deploy and remove native sites
 ---
 
-## List and inspect
+These commands manage native PHP/static sites. Use [Docker commands](/docs/cli/docker)
+for container workloads. Server and optional site IDs resolve from `.launchctl.yml`.
 
 ```bash
-lctl sites list --server <server-id>
-lctl sites show <site-id> --server <server-id>
+lctl sites list --server <server-id> --json
+lctl sites show <site-id> --server <server-id> --json
 ```
 
-Both commands support `--json`. After running `lctl init`, the server can be resolved from `.launchctl.yml`:
+## Create and update
 
 ```bash
-lctl sites list
+lctl sites create --server <server-id> --address example.com \
+  --type laravel --php-version php84 --web-folder public --json
+lctl sites update <site-id> --server <server-id> --branch main \
+  --release-retention 5 --queue-deployments=false --json
 ```
 
-## Project context
+Creation requires `--address`, `--type` and `--php-version`. Supported native
+types are `laravel`, `wordpress`, `static`, `generic` and `phpmyadmin`.
+Repository settings use `--source-control`, `--repository-id` and `--branch`;
+these are saved connection/repository identifiers, not arbitrary repository URLs.
 
-Run the interactive initializer from a repository:
+Updates support `--php-version`, `--web-folder`, `--branch`, `--release-retention`
+and `--queue-deployments`. Omitted fields stay unchanged; explicit empty strings
+clear supported fields and `--queue-deployments=false` disables queuing.
+PHP changes may be pending while a background task runs; inspect the returned
+status and `pending_php_version` rather than assuming the change completed.
+
+## Auto-deploy and deletion
 
 ```bash
-lctl init
+lctl sites auto-deploy enable <site-id> --server <server-id> --json
+lctl sites auto-deploy disable <site-id> --server <server-id> --json
+lctl sites delete <site-id> --server <server-id> --yes --json
 ```
 
-It creates:
+Deletion requires confirmation and is asynchronous. A `deletion_requested`
+receipt means cleanup was requested, not finished. Site hooks, TLS changes,
+queue-worker configuration, and optional database/DNS provisioning remain
+available through the backend API or dashboard.
 
-```yaml
-server: 01SERVERID
-site: 01SITEID
-```
-
-The CLI searches parent directories for `.launchctl.yml` until it reaches the Git root, so commands work from nested project folders.
-
-## Environment files
+## Environment, logs and commands
 
 ```bash
-# Print the remote environment file
-lctl env pull --server <server-id> --site <site-id>
-
-# Save it locally
-lctl env pull --output .env.production
-
-# Preview changes and confirm before writing
-lctl env push --file .env.production
-```
-
-`env push` shows a redacted diff. In CI, pass `--ci` only when the pipeline is intentionally authorized to update remote environment values.
-
-## Site and server logs
-
-```bash
-# Discover available site logs
-lctl logs --site <site-id> --server <server-id>
-
-# Tail a selected log
-lctl logs --site <site-id> --type laravel --lines 100
-lctl logs --site <site-id> --type laravel --follow
-
-# Discover server logs instead
-lctl logs --server <server-id>
-```
-
-Error and warning lines receive terminal-aware color while output remains readable without ANSI support.
-
-## Certificates
-
-```bash
-lctl ssl list --server <server-id>
-lctl ssl list --server <server-id> --site <site-id> --json
-```
-
-Certificate creation, renewal, and newer DNS workflows are available through their authenticated API paths:
-
-```bash
-lctl api GET '/api/servers/<server-id>/sites/<site-id>/certificates'
-```
-
-## Deploy and run
-
-```bash
-lctl deploy trigger <site-id> --server <server-id>
+lctl env pull --server <server-id> --site <site-id> --output .env.local
+lctl env push --server <server-id> --site <site-id> --file .env.local
+lctl logs --server <server-id> --site <site-id>
 lctl run "php artisan about" --server <server-id> --site <site-id>
+lctl ssl list --server <server-id> --site <site-id>
 ```
 
-See [Deployment commands](/docs/cli/deployments) for live output, history, rollback, and CI waiting.
+Environment output and the current push diff can contain secrets. Do not copy
+that output into shared logs. Environment editing and several older operations
+remain interactive; the global `--json` flag does not guarantee structured
+output for every mutation.

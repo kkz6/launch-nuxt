@@ -1,153 +1,94 @@
 ---
 title: CLI Reference
-description: Operate launchctl from a fast, resilient terminal interface
+description: Install lctl, sign in through your browser, and manage launchctl
 ---
 
-`lctl` gives you typed commands for daily operations, full-screen terminal views for live work, and an authenticated API command for every backend feature. It works in a local terminal, over SSH, and inside tmux.
+`lctl` manages launchctl servers, sites, Docker workloads and deployments.
+This reference follows the current source.
+Check `lctl version` and `lctl <command> --help` against your installed release.
 
-## Install
-
-### Homebrew
+## Install and update
 
 ```bash
 brew install kkz6/tap/lctl
+lctl version
+lctl update --check
+lctl update
 ```
 
-The fully qualified formula grants trust only to `lctl`. If Homebrew reports
-that a previously added tap is untrusted, trust the formula and retry:
+Published archives support macOS and Linux on AMD64 and ARM64. Contributors
+can build a source checkout with `go build -o bin/lctl .`.
+Homebrew installations update through Homebrew; direct binary updates verify
+checksums before replacement. `lctl upgrade` is an alias for `lctl update`.
+
+If Homebrew reports an untrusted tap, trust only this formula and retry:
 
 ```bash
 brew trust --formula kkz6/tap/lctl
 brew install kkz6/tap/lctl
 ```
 
-### Source checkout
+Use `lctl update --force` to reinstall the latest release. Passive update notices
+use a local cache and refresh in the background, at most once every 24 hours
+after a successful check or once per hour after a failure. Disable these checks
+and notices with `LAUNCHCTL_NO_UPDATE_CHECK=1`; explicit update commands remain
+available. After updating the binary, run `lctl ai update` if it manages your
+standalone skill.
 
-Repository contributors with source access can run `go build -o lctl .`. The
-source repository is private, so its Go module is not a public installation
-channel. Published binaries support macOS and Linux on AMD64 and ARM64.
-
-Verify the install:
-
-```bash
-lctl version
-lctl completion zsh > "${fpath[1]}/_lctl"
-```
-
-## Update lctl
-
-Check without changing the installation, or install the latest stable release:
+## Sign in through your browser
 
 ```bash
-lctl update --check
-lctl update
+lctl auth
 ```
 
-For scripts, `lctl update --check --json` reports the current and latest
-versions plus `update_available`. Homebrew installations delegate to
-`brew upgrade kkz6/tap/lctl`; direct installations verify the downloaded
-archive and staged binary before an atomic replacement. `lctl upgrade` is an
-alias, and `lctl update --force` reinstalls the latest release.
+The CLI displays an eight-digit one-time code and opens the approval page.
+Sign in to launchctl, paste the code from your terminal, and choose **Approve**.
+If your account uses two-factor authentication, provide the requested second
+factor. Return to the terminal when approval succeeds. You do not need to
+create or paste a personal API token.
 
-The interactive header can show `Update available: vX.Y.Z`. It reads a local
-cache immediately and refreshes it in a detached process, so launch does not
-wait on the network. Successful checks run at most once every 24 hours and
-failed checks retry after one hour. Disable only these passive checks and
-notices with:
+`lctl login` and `lctl auth login` use the same browser flow. On a machine without
+a browser, use `lctl auth --no-browser` and open the printed URL on another
+trusted device. Codes expire after ten minutes and can be used once. A denied
+or expired attempt leaves the previous local sign-in unchanged.
 
 ```bash
-export LAUNCHCTL_NO_UPDATE_CHECK=1
+lctl whoami --json
+lctl auth status
+lctl logout
 ```
 
-Explicit update commands remain available. If the CLI manages your
-`operate-launchctl` skill, run `lctl ai update` after updating the binary.
+Browser sign-in requires the matching API and web release with device
+approval support. It cannot work against an older server lacking those routes.
+`--ci` does not perform browser approval; see [Automation](/docs/cli/automation)
+for unattended credentials.
 
-## Authenticate
+## Manage resources
 
-Create a personal API token in the launchctl dashboard, then run:
-
-```bash
-lctl login
-lctl whoami
-```
-
-Login validates the token, handles two-factor verification when enabled, and stores credentials with the active team in `~/.config/launchctl/config.json`.
-
-## First workflow
-
-```bash
-# Inspect the account
-lctl servers list
-
-# Bind this repository to a server and site
-lctl init
-
-# Trigger a deploy; the terminal follows progress and task output
-lctl deploy trigger <site-id>
-
-# Open the live team event console
-lctl events
-```
-
-Once `lctl init` creates `.launchctl.yml`, commands that accept `--server` and `--site` can resolve those values from the current project.
-
-## Core operations
-
-:::card-group
-::doc-card{title="Servers" to="/docs/cli/servers"}
-Inspect, reboot, connect, measure, and watch provisioning
-::
-::doc-card{title="Sites" to="/docs/cli/sites"}
-Resolve projects, environment files, logs, services, and certificates
-::
-::doc-card{title="Deployments" to="/docs/cli/deployments"}
-Deploy, stream output, inspect history, and roll back
-::
-::doc-card{title="Live operations" to="/docs/cli/realtime"}
-WebSocket events, task consoles, dashboards, and tmux workflows
-::
-::doc-card{title="Operations" to="/docs/cli/operations"}
-Databases, SSH keys, firewall, cron, daemons, and services
-::
-:::
+- [Servers](/docs/cli/servers): create, update, recover, archive, watch and reboot.
+- [Sites](/docs/cli/sites): create, update, auto-deploy and delete.
+- [Deployments](/docs/cli/deployments): deploy, wait, roll back and inspect logs.
+- [Docker](/docs/cli/docker): projects, applications and Compose stacks.
+- [Operations](/docs/cli/operations): services, databases, keys and scheduled work.
+- [Command index](/docs/cli/command-index): all registered commands and flags.
+- [Feature coverage](/docs/cli/feature-coverage): dedicated commands and remaining gaps.
 
 ## Live, automation, and AI
 
-:::card-group
-::doc-card{title="Automation" to="/docs/cli/automation"}
-Profiles, CI, JSON, project config, and raw API access
-::
-::doc-card{title="AI Skill" to="/docs/cli/ai-skill"}
-Install the Codex skill and operate every CLI and API feature with AI
-::
-:::
+- [Live operations](/docs/cli/realtime): events, task output and dashboards.
+- [Automation](/docs/cli/automation): profiles, unattended credentials and raw API access.
+- [AI skill](/docs/cli/ai-skill): install and update the bundled operating guide.
 
-## Global flags
+## Configuration
 
-| Flag                 | Purpose                                                         |
-| -------------------- | --------------------------------------------------------------- |
-| `--json`             | Machine-readable output; live commands emit NDJSON              |
-| `--ci`               | Disable interactive workflows for CI/CD                         |
-| `--profile <name>`   | Use a profile for this invocation without switching globally    |
-| `--api-url <origin>` | Override the API origin for approved development or staging use |
-| `--help`             | Show command-specific syntax and flags                          |
+Configuration is stored in `~/.config/launchctl/config.json`; successful browser
+sign-in saves the active profile with owner-only permissions. `.launchctl.yml`
+holds project defaults created by `lctl init`.
 
-## Configuration precedence
+Global flags are `--json`, `--ci`, `--profile`, `--api-url` and `--help`.
+Not every older command supports noninteractive or JSON behavior; consult the
+workflow page and coverage notes. Use `lctl version`, not a `--version` flag.
+The default API origin is `https://api.launchctl.io`.
 
-`--api-url` has the highest priority, followed by `LAUNCHCTL_API_URL`, the active profile, and finally `https://launchctl.io`. Normal users should leave the origin unset because launchctl is currently hosted-only. Authentication can be supplied by `LAUNCHCTL_TOKEN` and `LAUNCHCTL_TEAM_ID` in CI.
-
-```bash
-LAUNCHCTL_TOKEN="$TOKEN" \
-LAUNCHCTL_TEAM_ID="$TEAM_ID" \
-lctl servers list --json --ci
-```
-
-## Interactive dashboard
-
-Run `lctl` without a command for the navigation interface, or open the live overview directly:
-
-```bash
-lctl status
-```
-
-The dashboard updates from WebSocket events immediately and performs a REST reconciliation every 30 seconds. Press `r` to refresh and `q` to quit.
+launchctl is currently hosted-only. The CLI connects to the hosted control plane;
+changing the API origin does not install a self-hosted control plane.

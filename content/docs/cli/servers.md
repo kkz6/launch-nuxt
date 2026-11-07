@@ -1,83 +1,64 @@
 ---
 title: Server Commands
-description: Inspect servers, open terminals, stream metrics, and follow provisioning
+description: Inspect, create, update and recover servers with lctl
 ---
 
-Server commands use immutable server IDs. Get them with `lctl servers list --json` or select a project default with `lctl init`.
-
-## List and inspect
+Use server IDs from `lctl servers list --json`; names are not identifiers.
 
 ```bash
-lctl servers list
 lctl servers list --json
 lctl servers show <server-id>
+lctl servers create-options
 ```
 
-The detail view includes connectivity, provider, operating system, capacity, IP address, provisioning status, progress, and installed feature counts.
+`create-options` returns the backend's current provider, type, operating-system,
+PHP, and plan information as JSON. Provider credentials are managed separately.
 
-## Watch provisioning
+## Create
+
+```bash
+lctl servers create --name staging --provider custom_server --type php \
+  --ip 192.0.2.10 --yes --json
+```
+
+For cloud provisioning, provide `--credential-id`, `--region` and `--size` from
+an existing provider connection. `--name`, `--provider` and `--type` are required.
+Optional settings include `--description`, `--ssh-port`, `--ssh-user`, `--os`,
+`--php-version`, `--database-type`, `--ssh-key` and `--install-agent=false`.
+Use the current create-options values; do not infer provider-specific values.
+Creation requires confirmation (`--yes` for automation) and returns the actual
+server status. A custom server may still need the dashboard's connection setup.
+
+## Update
+
+```bash
+lctl servers update <server-id> --name production --monitoring=false --json
+lctl servers update <server-id> --description='' --auto-update=true
+```
+
+Only explicitly supplied fields change. `--description=''` clears the description.
+`--ssh-port` updates the stored connection port; it does not reconfigure SSH on
+the server. Update and lifecycle commands can use the server in `.launchctl.yml`
+when the positional ID is omitted.
+
+## Recovery and lifecycle
+
+```bash
+lctl servers retry-provision <server-id> --yes --json
+lctl servers try-connection <server-id> --yes --json
+lctl servers reboot <server-id> --yes --json
+lctl servers archive <server-id> --yes --json
+lctl servers unarchive <server-id> --json
+```
+
+Reboot, retry and connection checks return queued receipts. Watch provisioning
+with `lctl servers watch <server-id>` and inspect the server afterward.
+Archive changes the launchctl record; it does not shut down or destroy the VM.
+Server deletion and provider-credential management still require confirmed API
+calls or the dashboard.
 
 ```bash
 lctl servers watch <server-id>
-```
-
-The tmux-friendly console displays the current REST state, then follows `server.<id>` events over a reconnecting WebSocket. It shows live connection status and supports:
-
-| Key | Action |
-| --- | --- |
-| `Space` or `p` | Pause/resume rendering |
-| `c` | Clear captured output |
-| `↑` / `↓`, `PgUp` / `PgDn` | Scroll |
-| `q` | Leave the console; the server continues provisioning |
-
-Use NDJSON for automation. The process exits after a terminal provisioning event:
-
-```bash
-lctl servers watch <server-id> --json \
-  | jq -c 'select(.event | startswith("server.provision"))'
-```
-
-## Metrics
-
-```bash
-lctl servers metrics <server-id>
 lctl servers metrics <server-id> --watch
-```
-
-The watch view streams CPU, memory, disk, load, uptime, and network data. Use `--json` without `--watch` for scripts.
-
-## Reboot
-
-```bash
-lctl servers reboot <server-id>
-```
-
-The command resolves the server first and asks for confirmation before sending the reboot request.
-
-## Terminal access
-
-```bash
 lctl servers ssh <server-id>
-lctl servers ssh <server-id> --user root
 ```
-
-This opens an authenticated WebSocket terminal through launchctl. Resize events, terminal raw mode, mouse state, keepalive, and cleanup are handled by the client, so it behaves correctly inside tmux and nested SSH sessions.
-
-For non-interactive site commands, use `lctl run`:
-
-```bash
-lctl run "php artisan migrate" --server <server-id> --site <site-id>
-lctl run --history --server <server-id>
-```
-
-## Newly released server APIs
-
-Provider creation, backups, scripts, platform updates, Docker projects, DNS, load balancers, and notification endpoints remain accessible even before a dedicated high-level command ships:
-
-```bash
-lctl api GET /api/servers/create-options
-lctl api GET /api/servers/<server-id>/backups
-lctl api GET /api/servers/<server-id>/docker/projects
-```
-
-Use `lctl api --help` for request bodies and development-only API-origin overrides.

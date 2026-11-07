@@ -73,4 +73,4 @@ lctl logs --server <server-id> --site <site-id> --type laravel
 lctl ssl list --server <server-id> --site <site-id>
 ```
 
-List commands support `--json`. Newer operational modules such as backups, scripts, platform updates, notifications, DNS, Docker workloads, and load balancers can be called through `lctl api` immediately.
+Most resource-list commands support `--json`. Older interactive mutations may still prompt or print plain output; `--ci` does not make every command scriptable. Backups, scripts, platform updates, notifications, DNS, container databases and load balancers use confirmed `lctl api` routes. Docker projects, applications and Compose stacks have dedicated commands. See [Feature coverage](/docs/cli/feature-coverage).

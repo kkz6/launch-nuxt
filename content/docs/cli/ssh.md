@@ -12,9 +12,7 @@ lctl servers ssh <server-id> --user root
 
 The terminal is proxied over an authenticated WebSocket. The CLI preserves raw-mode cleanup, resize handling, scroll regions, keepalive, and normal close frames—even when the session exits unexpectedly.
 
-::callout{type="info"}
-The default user comes from the server record. Use `--user` only when that account exists and your launchctl permissions allow it.
-::
+> The default user comes from the server record. Use `--user` only when that account exists and your launchctl permissions allow it.
 
 ## Run a site command
 

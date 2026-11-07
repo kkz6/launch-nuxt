@@ -1,91 +1,66 @@
 ---
 title: AI Skill
-description: Install the operate-launchctl Codex skill and use AI to manage launchctl safely
+description: Install and maintain the operate-launchctl guide bundled with lctl
 ---
 
-The `operate-launchctl` skill teaches Codex how to use `lctl`, select the safest command or API endpoint, follow WebSocket progress, and verify asynchronous work before reporting success. It covers servers, sites, Docker workloads, deployments, tasks, databases, services, DNS, backups, scripts, and other launchctl resources.
-
-## Choose one installation method
-
-Install either the standalone skill bundled with `lctl` or the repository plugin. Do not install both, because Codex would discover the same skill twice.
-
-### Install with the CLI
-
-This method works offline after the CLI has been installed:
+The `operate-launchctl` skill is bundled with the CLI and also distributed as
+part of the launchctl plugin. Choose one installation method to avoid duplicates.
 
 ```bash
 lctl ai install
 lctl ai doctor
-```
-
-The skill is installed at `$CODEX_HOME/skills/operate-launchctl`, or `~/.codex/skills/operate-launchctl` when `CODEX_HOME` is not set.
-
-After upgrading the CLI, update the embedded skill:
-
-```bash
 lctl ai update
 ```
 
-The manager hashes every installed file. It refuses to overwrite local changes unless you explicitly use `lctl ai update --force`, and it never replaces or removes an unmanaged directory.
+The standalone location is `$CODEX_HOME/skills/operate-launchctl`, or
+`~/.codex/skills/operate-launchctl` by default. Update the CLI first, then use
+`lctl ai update` to install its matching guidance. The manager checks file hashes
+and refuses to overwrite local changes without `--force`. Unmanaged directories
+are never replaced. `lctl ai uninstall` removes a managed copy.
 
-Remove only the CLI-managed copy with:
+All four commands support `--json` and `--codex-home`. Repository plugin users
+should update their plugin to a release containing the same CLI commands instead
+of installing a second standalone copy.
+
+## Install the repository plugin
+
+If you have access to the source repository, the plugin is versioned with the
+CLI release:
 
 ```bash
-lctl ai uninstall
-```
-
-All four commands support the global `--json` flag. Use `--codex-home <path>` when Codex uses a non-default home directory.
-
-### Install the repository plugin
-
-The plugin is versioned with the CLI release:
-
-```bash
-codex plugin marketplace add kkz6/launchctl-cli --ref v0.2.3
+codex plugin marketplace add kkz6/launchctl-cli --ref v0.4.0
 codex plugin add launchctl@launchctl
 ```
 
-Start a new Codex task if the skill does not appear in an already-open task. Update the marketplace to a newer release tag before updating the plugin.
+Use one installation method. Update the marketplace to a newer release tag
+before updating the plugin.
 
-## Use the skill
+## What the skill covers
 
-Invoke the skill explicitly with `$operate-launchctl`, or ask naturally about launchctl infrastructure. Useful requests include:
+The guide prefers dedicated server/site, native deployment, Docker project,
+application and Compose commands. It uses confirmed raw API routes for gaps
+listed in [Feature coverage](/docs/cli/feature-coverage). It does not invent
+commands or treat a queued response as completed work.
 
-```text
-Use $operate-launchctl to diagnose my latest failed site deployment.
-Use $operate-launchctl to deploy the api application in my Docker project and follow it until it finishes.
-Use $operate-launchctl to show failed tasks without exposing any secrets.
-Use $operate-launchctl to watch Docker application events in tmux.
-```
+For browser sign-in, it can start `lctl auth`, but the user enters the displayed
+code and approves in their browser. The skill must not approve its own device
+request or retrieve a sign-in credential from browser storage.
 
-Codex begins with read-only discovery, resolves names to immutable IDs, uses typed commands when available, and falls back to `lctl api` for newer backend resources such as Docker applications.
-
-## Docker application operations
-
-The current CLI exposes Docker resources through its authenticated raw API client:
-
-```bash
-lctl api GET /api/servers/<server-id>/docker/projects
-lctl api GET /api/servers/<server-id>/docker/projects/<project-id>/applications
-lctl api POST /api/servers/<server-id>/docker/projects/<project-id>/applications/<application-id>/deploy
-```
-
-The skill knows the supported payload shapes, lifecycle endpoints, deployment statuses, GitHub Actions flow, and Docker-specific events. See [Docker Applications](/docs/application/docker/applications) for the dashboard workflow and [Docker Applications API](/docs/api/docker-applications) for endpoints and examples.
+It distinguishes Compose deployment completion from workload health, preserves
+named volumes unless removal was requested, and keeps secrets out of responses.
+The command reference and bundled examples are checked against the actual CLI
+command tree during validation.
 
 ## Progress and verification
 
-For long-running work, the skill follows WebSocket events instead of treating a queued HTTP response as completion:
+Follow Docker application progress with the event stream:
 
 ```bash
 lctl events --filter 'docker.application.*' --filter 'deployment.gha_steps'
 ```
 
-In an interactive terminal or tmux, keep the event stream in a separate pane. In automation, use `--json` for newline-delimited JSON and reconcile the final application and deployment state through `lctl api GET`.
-
-## Safety model
-
-- Credentials come from the active `lctl` profile or CI environment and are never printed.
-- Secret values, registry passwords, private keys, and raw environment values stay redacted.
-- Mutations target resolved server, project, application, and deployment IDs.
-- Docker deletion preserves named volumes unless removal is explicitly requested.
-- A queued deployment, lifecycle action, or GitHub Actions synchronization is not reported as successful until its final state is verified.
+A queued HTTP response confirms acceptance, not completion. In a terminal or
+tmux, keep the event stream in a separate pane. In automation, `--json` emits
+NDJSON; use supported `--wait` commands or reconcile the final application and
+deployment state through the API. See [Docker commands](/docs/cli/docker) and
+[Feature coverage](/docs/cli/feature-coverage) for the available flows.

@@ -1,101 +1,54 @@
 ---
 title: Automation and API Access
-description: Profiles, project defaults, JSON output, CI credentials, and complete API coverage
+description: Profiles, project context, JSON output and authenticated API requests
 ---
 
-::callout{type="info"}
-launchctl is currently a hosted service. The CLI does not provide a self-hosted
-control plane or installation workflow.
-::
-
-## Profiles
-
-Profiles keep API origin, token, team, user, and favorites together.
+## Profiles and defaults
 
 ```bash
 lctl config profiles
 lctl config profiles add staging
-lctl config profiles use staging
-lctl switch production
-lctl --profile staging servers list
+lctl --profile staging auth
+lctl --profile staging servers list --json
+lctl init
 ```
 
-Use profiles to separate launchctl accounts, teams, or explicitly assigned
-development and staging environments.
+Use profiles for separate accounts or approved development environments.
+`lctl init` records server/site or Docker project/application IDs in
+`.launchctl.yml`. Compose commands require an explicit stack ID.
 
-## Environment variables
+## Unattended use
 
-| Variable                    | Purpose                                              |
-| --------------------------- | ---------------------------------------------------- |
-| `LAUNCHCTL_TOKEN`           | Personal API token                                   |
-| `LAUNCHCTL_TEAM_ID`         | Active team ID                                       |
-| `LAUNCHCTL_API_URL`         | Approved launchctl development or staging API origin |
-| `LAUNCHCTL_NO_UPDATE_CHECK` | Disable passive CLI update checks and notices        |
-
-Flags override environment variables; environment variables override the active profile.
-
-`LAUNCHCTL_NO_UPDATE_CHECK` affects only the detached check used by the
-interactive header. Explicit `lctl update` and `lctl update --check` commands
-continue to work in local terminals and CI.
-
-## JSON and CI
+Browser approval is for a person signing in. Existing machine credentials remain
+supported for pipelines through `LAUNCHCTL_TOKEN` and `LAUNCHCTL_TEAM_ID`; store
+them in the CI secret manager, not command arguments or source control.
 
 ```bash
 lctl servers list --json --ci
-lctl sites list --server "$SERVER_ID" --json --ci
-lctl tasks list --server "$SERVER_ID" --json --ci
+lctl deploy trigger "$SITE_ID" --server "$SERVER_ID" --wait --timeout 600 --json --ci
 ```
 
-Live commands emit newline-delimited JSON:
+`--json` formats supported outputs; event and log-follow streams use NDJSON.
+`--ci` is not authorization to destroy data. New destructive commands require
+`--yes`, and some older command groups still prompt or produce plain output.
+See [Feature coverage](/docs/cli/feature-coverage).
 
-```bash
-lctl events --filter 'task.*' --json --ci
-```
+The default API is `https://api.launchctl.io`. `--api-url` overrides
+`LAUNCHCTL_API_URL`, then the profile/default. An override selects an approved
+API origin; it is not a self-hosting interface. launchctl is currently a hosted service.
+`LAUNCHCTL_NO_UPDATE_CHECK=1` disables passive update checks.
 
-## Project defaults
-
-`lctl init` writes `.launchctl.yml` with server and site IDs. Commit it when every contributor should target the same launchctl project; otherwise add it to `.gitignore`.
-
-## Call any API endpoint
+## Raw API bridge
 
 ```bash
 lctl api GET /api/servers
-lctl api GET /api/servers/<server-id>/docker/projects
-lctl api POST /api/scripts --data '{"name":"health-check"}'
+lctl api GET /api/servers/<server-id>/backups
+lctl api GET /api/scripts
 lctl api PUT /api/settings/notification-preferences --data @settings.json
 ```
 
-`lctl api` applies the active bearer token, `X-Team-ID`, API origin, retries for safe reads, response limits, and typed API errors. The path must begin with `/api`.
-
-::callout{type="warning"}
-Raw `POST`, `PUT`, `PATCH`, and `DELETE` calls can change infrastructure. Prefer a high-level command when one exists and inspect the endpoint contract before automating a mutation.
-::
-
-## API origin override for development
-
-Normal users should leave the API origin unset and use the hosted launchctl
-service. The override exists for launchctl development, testing, and explicitly
-assigned staging environments; it is not a self-hosting interface.
-
-```bash
-lctl --api-url "$LAUNCHCTL_INTERNAL_API_URL" whoami
-LAUNCHCTL_API_URL="$LAUNCHCTL_INTERNAL_API_URL" lctl status
-```
-
-The same origin is transformed to `wss://` for terminal and pub/sub connections. Origins ending in `/api` are normalized without duplicating the path.
-
-## Pipeline example
-
-```yaml
-- name: Install lctl
-  run: brew install kkz6/tap/lctl
-
-- name: Deploy and wait
-  env:
-    LAUNCHCTL_TOKEN: ${{ secrets.LAUNCHCTL_TOKEN }}
-    LAUNCHCTL_TEAM_ID: ${{ secrets.LAUNCHCTL_TEAM_ID }}
-  run: >-
-    lctl deploy trigger "$SITE_ID"
-    --server "$SERVER_ID"
-    --ci --wait --timeout 600
-```
+The CLI accepts historical `/api`-prefixed paths and removes that prefix for the
+current root-mounted API. It supplies authentication and `X-Team-ID`.
+Request data must be JSON. Safe reads retry transient failures; mutations are
+not replayed automatically. Multipart upload, browser authentication ceremonies
+and WebSocket sessions are not covered by an arbitrary JSON request.
