@@ -402,7 +402,7 @@
       "slackWebhookHelp": "Slackワークスペース設定でWebhookを作成してください",
       "discordWebhookHelp": "Discordサーバー設定でWebhookを作成してください",
       "botToken": "Bot Token",
-      "botTokenHelp": "Telegramの@BotFatherから取得できます",
+      "botTokenHelp": "Telegramの{'@'}BotFatherから取得できます",
       "chatId": "Chat ID",
       "chatIdHelp": "チャットまたはグループのIDです",
       "emailAddress": "メールアドレス",

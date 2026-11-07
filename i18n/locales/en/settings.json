@@ -402,7 +402,7 @@
       "slackWebhookHelp": "Create a webhook in your Slack workspace settings",
       "discordWebhookHelp": "Create a webhook in your Discord server settings",
       "botToken": "Bot Token",
-      "botTokenHelp": "Get this from @BotFather on Telegram",
+      "botTokenHelp": "Get this from {'@'}BotFather on Telegram",
       "chatId": "Chat ID",
       "chatIdHelp": "Your chat or group ID",
       "emailAddress": "Email Address",

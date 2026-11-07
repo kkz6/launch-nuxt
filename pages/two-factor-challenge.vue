@@ -10,6 +10,7 @@ import {
   PinInputSlot,
 } from "~/components/ui/pin-input";
 import { authService } from "~/services/authService";
+import { cliAuthRedirect } from "~/utils/cliAuthRedirect";
 
 definePageMeta({
   layout: "guest",
@@ -29,6 +30,13 @@ const loading = ref(false);
 
 const { setTokens } = useApi();
 const { isInitialized, setUser } = useAuth();
+const route = useRoute();
+const returnToLogin = () => {
+  const redirect = cliAuthRedirect(route.query.redirect);
+  return navigateTo(
+    redirect ? { path: "/login", query: { redirect } } : "/login",
+  );
+};
 
 // Get the challenge token from sessionStorage
 const challengeToken = ref("");
@@ -36,13 +44,13 @@ const challengeToken = ref("");
 onMounted(() => {
   challengeToken.value = sessionStorage.getItem("2fa_challenge_token") || "";
   if (!challengeToken.value) {
-    navigateTo("/login");
+    returnToLogin();
   }
 });
 
 const handleSubmit = async (codeValue?: string) => {
   if (!challengeToken.value) {
-    navigateTo("/login");
+    returnToLogin();
     return;
   }
 
@@ -77,7 +85,10 @@ const handleSubmit = async (codeValue?: string) => {
     sessionStorage.removeItem("2fa_challenge_token");
 
     toast.success(t("auth.login.signedIn"));
-    navigateTo(response.data.user.onboarded ? "/dashboard" : "/onboarding");
+    navigateTo(
+      cliAuthRedirect(route.query.redirect) ||
+        (response.data.user.onboarded ? "/dashboard" : "/onboarding"),
+    );
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
       const fetchError = error as {

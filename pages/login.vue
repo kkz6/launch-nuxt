@@ -10,6 +10,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Separator } from "~/components/ui/separator";
+import { cliAuthRedirect } from "~/utils/cliAuthRedirect";
 
 definePageMeta({
   layout: "guest",
@@ -34,9 +35,13 @@ const showPasskeyOption = ref(false);
 const passkeyLoading = ref(false);
 
 const { login, checkUserStatus, isLoading: authLoading } = useAuth();
+const route = useRoute();
 
 const redirectAfterLogin = (onboarded: boolean) => {
-  navigateTo(onboarded ? "/dashboard" : "/onboarding");
+  navigateTo(
+    cliAuthRedirect(route.query.redirect) ||
+      (onboarded ? "/dashboard" : "/onboarding"),
+  );
 };
 
 const handleEmailSubmit = async () => {
@@ -76,7 +81,12 @@ const handlePasswordSubmit = async () => {
     // If 2FA is required, store the challenge token and redirect
     if (result.two_factor_required && result.challenge_token) {
       sessionStorage.setItem("2fa_challenge_token", result.challenge_token);
-      navigateTo("/two-factor-challenge");
+      const redirect = cliAuthRedirect(route.query.redirect);
+      navigateTo(
+        redirect
+          ? { path: "/two-factor-challenge", query: { redirect } }
+          : "/two-factor-challenge",
+      );
       return;
     }
 
