@@ -875,6 +875,8 @@ export interface AdminServerOwner {
 export interface AdminServerDetail {
   id: string;
   name: string;
+  sites_count: number;
+  projects_count: number;
   description?: string | null;
   provider: string;
   type?: string | null;
@@ -960,6 +962,10 @@ export interface AdminPlan {
 }
 
 export interface QueryEntry {
+  request_id?: string;
+  method?: string;
+  route?: string;
+  operation?: string;
   sql: string;
   duration_ns: number;
   rows: number;
@@ -971,9 +977,14 @@ export interface QueryEntry {
 }
 
 export interface N1Pattern {
+  request_id?: string;
+  method?: string;
+  route?: string;
+  operation?: string;
+  avg_ms?: number;
   sql: string;
   count: number;
-  trace_id: string;
+  trace_id?: string;
   caller: string;
   total_ms: number;
   timestamp: string;
@@ -1006,6 +1017,9 @@ export interface ObservabilitySnapshot {
   runtime: RuntimeStats;
   db_pool: DBPoolStats;
   queries: {
+    capacity?: number;
+    n1_threshold?: number;
+    slow_threshold_ms?: number;
     total: number;
     slow_count: number;
     n1_count: number;

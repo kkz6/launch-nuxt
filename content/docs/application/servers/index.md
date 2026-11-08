@@ -182,7 +182,11 @@ Archive servers you no longer need but want to keep the configuration.
 
 ### Delete Server
 
-Permanently delete a server. This action:
-- Removes the server from launchctl
-- Optionally deletes from cloud provider
-- Cannot be undone
+Remove all sites and Docker projects (including their workloads) first. Deletion is blocked while a server is starting, provisioning, or already being deleted.
+
+In **Admin → Servers**, open the server and select **Delete server**. This admin action requires `super_admin` access and confirmation by typing the exact server name.
+
+- **Custom server:** removes its launchctl record only. The machine, files, and installed services remain running; clean them up manually if needed.
+- **Cloud server:** requests deletion of the provider instance and its data in the background. A successful request is not proof of completion. If provider deletion fails, the server record is retained so the failure can be investigated and deletion retried.
+
+AWS instance deletion is currently unsupported; its deletion job fails and retains the server record. Deletion cannot be undone.

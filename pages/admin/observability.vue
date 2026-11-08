@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { toast } from "vue-sonner";
 import type { ObservabilitySnapshot } from "~/types";
 import { adminService } from "~/services/adminService";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -37,18 +36,24 @@ useHead({
 
 const snapshot = ref<ObservabilitySnapshot | null>(null);
 const isLoading = ref(true);
+const isRefreshing = ref(false);
+const loadError = ref("");
 const autoRefresh = ref(true);
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
 const fetchSnapshot = async () => {
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
   try {
     const response = await adminService.observabilitySnapshot();
     snapshot.value = response.data;
+    loadError.value = "";
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || t("admin.observability.loadFailed"));
+    loadError.value = err.data?.message || t("admin.observability.loadFailed");
   } finally {
     isLoading.value = false;
+    isRefreshing.value = false;
   }
 };
 
@@ -109,7 +114,7 @@ const formatDuration = (ms: number): string => {
 const formatTimestamp = (ts: string): string => {
   try {
     const d = new Date(ts);
-    return d.toLocaleTimeString(locale.value);
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleTimeString(locale.value);
   } catch {
     return ts;
   }
@@ -148,13 +153,33 @@ function formatDecimal(value: number, digits: number): string {
           {{ t("admin.observability.autoRefresh", { seconds: 5 }) }}
         </label>
         <button
-          class="rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent"
+          class="rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+          :disabled="isRefreshing"
+          :aria-busy="isRefreshing"
           @click="fetchSnapshot"
         >
           {{ t("admin.observability.refresh") }}
         </button>
       </div>
     </div>
+
+    <div
+      v-if="loadError"
+      role="alert"
+      class="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+    >
+      <p>{{ loadError }}</p>
+      <p v-if="snapshot" class="mt-1 text-muted-foreground">
+        {{ t("admin.observability.staleData") }}
+      </p>
+    </div>
+    <p v-if="snapshot" class="text-xs text-muted-foreground" role="status">
+      {{
+        t("admin.observability.lastUpdated", {
+          time: formatTimestamp(snapshot.timestamp),
+        })
+      }}
+    </p>
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
@@ -381,6 +406,27 @@ function formatDecimal(value: number, digits: number): string {
       </Card>
 
       <!-- Query tabs -->
+      <div class="space-y-1 text-sm text-muted-foreground">
+        <p>
+          {{
+            snapshot.queries.capacity
+              ? t("admin.observability.sampleWindow", {
+                  count: formatNumber(snapshot.queries.total),
+                  capacity: formatNumber(snapshot.queries.capacity),
+                })
+              : t("admin.observability.sampleCount", {
+                  count: formatNumber(snapshot.queries.total),
+                })
+          }}
+        </p>
+        <p v-if="snapshot.queries.slow_threshold_ms != null">
+          {{
+            t("admin.observability.slowThreshold", {
+              duration: formatDuration(snapshot.queries.slow_threshold_ms),
+            })
+          }}
+        </p>
+      </div>
       <Tabs default-value="recent" class="space-y-4">
         <TabsList>
           <TabsTrigger value="recent">
@@ -415,6 +461,14 @@ function formatDecimal(value: number, digits: number): string {
 
         <!-- Recent queries -->
         <TabsContent value="recent">
+          <p class="mb-3 text-xs text-muted-foreground">
+            {{
+              t("admin.observability.showingQueries", {
+                count: formatNumber(snapshot.queries.recent.length),
+                total: formatNumber(snapshot.queries.total),
+              })
+            }}
+          </p>
           <Card>
             <CardContent class="p-0">
               <Table>
@@ -426,30 +480,72 @@ function formatDecimal(value: number, digits: number): string {
                     }}</TableHead>
                     <TableHead>{{ t("admin.observability.rows") }}</TableHead>
                     <TableHead>{{ t("admin.observability.caller") }}</TableHead>
+                    <TableHead>{{
+                      t("admin.observability.request")
+                    }}</TableHead>
                     <TableHead>{{ t("admin.observability.time") }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow
-                    v-for="(q, i) in snapshot.queries.recent"
-                    :key="i"
+                    v-for="q in snapshot.queries.recent"
+                    :key="q.timestamp + q.sql"
                     :class="{ 'bg-destructive/5': q.slow }"
                   >
-                    <TableCell class="max-w-md truncate font-mono text-xs">
+                    <TableCell class="max-w-md font-mono text-xs">
                       <Badge v-if="q.slow" variant="destructive" class="mr-1">
                         {{ t("admin.observability.slowBadge") }}
                       </Badge>
                       <Badge v-if="q.error" variant="destructive" class="mr-1">
                         {{ t("admin.observability.errorBadge") }}
                       </Badge>
-                      {{ q.sql }}
+                      <details>
+                        <summary class="cursor-pointer space-y-1">
+                          <span class="line-clamp-2 break-all">{{
+                            q.sql
+                          }}</span>
+                          <span class="font-sans text-muted-foreground">{{
+                            t("admin.observability.inspectQuery")
+                          }}</span>
+                        </summary>
+                        <pre
+                          class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-3"
+                          >{{ q.sql }}</pre
+                        >
+                        <p v-if="q.trace_id" class="mt-2 break-all">
+                          {{ t("admin.observability.traceId") }}:
+                          {{ q.trace_id }}
+                        </p>
+                        <p
+                          v-if="q.error"
+                          class="mt-2 break-all text-destructive"
+                        >
+                          {{ q.error }}
+                        </p>
+                      </details>
                     </TableCell>
                     <TableCell class="font-mono text-xs">
                       {{ formatDuration(q.duration_ns / 1000000) }}
                     </TableCell>
                     <TableCell>{{ formatNumber(q.rows) }}</TableCell>
-                    <TableCell class="text-xs text-muted-foreground">
-                      {{ q.caller }}
+                    <TableCell
+                      class="max-w-xs break-all text-xs text-muted-foreground"
+                    >
+                      {{ q.caller || "—" }}
+                    </TableCell>
+                    <TableCell class="max-w-xs text-xs">
+                      <p class="break-all font-mono">
+                        {{
+                          [q.method, q.route].filter(Boolean).join(" ") ||
+                          t("admin.observability.noRequestContext")
+                        }}
+                      </p>
+                      <p
+                        v-if="q.request_id"
+                        class="mt-1 break-all font-mono text-muted-foreground"
+                      >
+                        {{ q.request_id }}
+                      </p>
                     </TableCell>
                     <TableCell class="text-xs text-muted-foreground">
                       {{ formatTimestamp(q.timestamp) }}
@@ -457,7 +553,7 @@ function formatDecimal(value: number, digits: number): string {
                   </TableRow>
                   <TableRow v-if="snapshot.queries.recent.length === 0">
                     <TableCell
-                      colspan="5"
+                      colspan="6"
                       class="py-8 text-center text-muted-foreground"
                     >
                       {{ t("admin.observability.noQueries") }}
@@ -471,6 +567,14 @@ function formatDecimal(value: number, digits: number): string {
 
         <!-- Slow queries -->
         <TabsContent value="slow">
+          <p class="mb-3 text-xs text-muted-foreground">
+            {{
+              t("admin.observability.showingQueries", {
+                count: formatNumber(snapshot.queries.slow_queries.length),
+                total: formatNumber(snapshot.queries.slow_count),
+              })
+            }}
+          </p>
           <Card>
             <CardContent class="p-0">
               <Table>
@@ -482,24 +586,66 @@ function formatDecimal(value: number, digits: number): string {
                     }}</TableHead>
                     <TableHead>{{ t("admin.observability.rows") }}</TableHead>
                     <TableHead>{{ t("admin.observability.caller") }}</TableHead>
+                    <TableHead>{{
+                      t("admin.observability.request")
+                    }}</TableHead>
                     <TableHead>{{ t("admin.observability.time") }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow
-                    v-for="(q, i) in snapshot.queries.slow_queries"
-                    :key="i"
+                    v-for="q in snapshot.queries.slow_queries"
+                    :key="q.timestamp + q.sql"
                     class="bg-destructive/5"
                   >
-                    <TableCell class="max-w-md truncate font-mono text-xs">
-                      {{ q.sql }}
+                    <TableCell class="max-w-md font-mono text-xs">
+                      <details>
+                        <summary class="cursor-pointer space-y-1">
+                          <span class="line-clamp-2 break-all">{{
+                            q.sql
+                          }}</span>
+                          <span class="font-sans text-muted-foreground">{{
+                            t("admin.observability.inspectQuery")
+                          }}</span>
+                        </summary>
+                        <pre
+                          class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-3"
+                          >{{ q.sql }}</pre
+                        >
+                        <p v-if="q.trace_id" class="mt-2 break-all">
+                          {{ t("admin.observability.traceId") }}:
+                          {{ q.trace_id }}
+                        </p>
+                        <p
+                          v-if="q.error"
+                          class="mt-2 break-all text-destructive"
+                        >
+                          {{ q.error }}
+                        </p>
+                      </details>
                     </TableCell>
                     <TableCell class="font-mono text-xs font-semibold">
                       {{ formatDuration(q.duration_ns / 1000000) }}
                     </TableCell>
                     <TableCell>{{ formatNumber(q.rows) }}</TableCell>
-                    <TableCell class="text-xs text-muted-foreground">
-                      {{ q.caller }}
+                    <TableCell
+                      class="max-w-xs break-all text-xs text-muted-foreground"
+                    >
+                      {{ q.caller || "—" }}
+                    </TableCell>
+                    <TableCell class="max-w-xs text-xs">
+                      <p class="break-all font-mono">
+                        {{
+                          [q.method, q.route].filter(Boolean).join(" ") ||
+                          t("admin.observability.noRequestContext")
+                        }}
+                      </p>
+                      <p
+                        v-if="q.request_id"
+                        class="mt-1 break-all font-mono text-muted-foreground"
+                      >
+                        {{ q.request_id }}
+                      </p>
                     </TableCell>
                     <TableCell class="text-xs text-muted-foreground">
                       {{ formatTimestamp(q.timestamp) }}
@@ -507,7 +653,7 @@ function formatDecimal(value: number, digits: number): string {
                   </TableRow>
                   <TableRow v-if="snapshot.queries.slow_queries.length === 0">
                     <TableCell
-                      colspan="5"
+                      colspan="6"
                       class="py-8 text-center text-muted-foreground"
                     >
                       {{ t("admin.observability.noSlowQueries") }}
@@ -521,6 +667,15 @@ function formatDecimal(value: number, digits: number): string {
 
         <!-- N+1 patterns -->
         <TabsContent value="n1">
+          <p class="mb-4 text-sm text-muted-foreground">
+            {{
+              snapshot.queries.n1_threshold
+                ? t("admin.observability.n1Explanation", {
+                    count: formatNumber(snapshot.queries.n1_threshold),
+                  })
+                : t("admin.observability.legacyN1Explanation")
+            }}
+          </p>
           <Card>
             <CardContent class="p-0">
               <Table>
@@ -533,20 +688,53 @@ function formatDecimal(value: number, digits: number): string {
                     <TableHead>{{
                       t("admin.observability.totalTime")
                     }}</TableHead>
+                    <TableHead>{{
+                      t("admin.observability.avgQuery")
+                    }}</TableHead>
                     <TableHead>{{ t("admin.observability.caller") }}</TableHead>
                     <TableHead>{{
-                      t("admin.observability.traceId")
+                      t("admin.observability.request")
                     }}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   <TableRow
-                    v-for="(p, i) in snapshot.queries.n1_patterns"
-                    :key="i"
+                    v-for="p in snapshot.queries.n1_patterns"
+                    :key="
+                      JSON.stringify([
+                        p.request_id || p.timestamp,
+                        p.sql,
+                        p.caller,
+                      ])
+                    "
                     class="bg-destructive/5"
                   >
-                    <TableCell class="max-w-md truncate font-mono text-xs">
-                      {{ p.sql }}
+                    <TableCell class="max-w-md font-mono text-xs">
+                      <details>
+                        <summary class="cursor-pointer space-y-1">
+                          <span class="line-clamp-2 break-all">{{
+                            p.sql
+                          }}</span>
+                          <span class="font-sans text-muted-foreground">{{
+                            t("admin.observability.inspectQuery")
+                          }}</span>
+                        </summary>
+                        <pre
+                          class="mt-2 max-h-80 overflow-auto whitespace-pre-wrap break-all rounded bg-muted p-3"
+                          >{{ p.sql }}</pre
+                        >
+                        <p class="mt-2 font-sans text-muted-foreground">
+                          {{
+                            t("admin.observability.lastSeen", {
+                              time: formatTimestamp(p.timestamp),
+                            })
+                          }}
+                        </p>
+                        <p v-if="p.trace_id" class="mt-2 break-all">
+                          {{ t("admin.observability.traceId") }}:
+                          {{ p.trace_id }}
+                        </p>
+                      </details>
                     </TableCell>
                     <TableCell>
                       <Badge variant="destructive">
@@ -558,20 +746,38 @@ function formatDecimal(value: number, digits: number): string {
                       </Badge>
                     </TableCell>
                     <TableCell class="font-mono text-xs">
-                      {{ formatDecimal(p.total_ms, 1) }}ms
+                      {{ formatDuration(p.total_ms) }}
                     </TableCell>
-                    <TableCell class="text-xs text-muted-foreground">
-                      {{ p.caller }}
+                    <TableCell class="font-mono text-xs">
+                      {{
+                        formatDuration(
+                          p.avg_ms ?? (p.count > 0 ? p.total_ms / p.count : 0),
+                        )
+                      }}
                     </TableCell>
                     <TableCell
-                      class="max-w-[120px] truncate font-mono text-xs text-muted-foreground"
+                      class="max-w-xs break-all text-xs text-muted-foreground"
                     >
-                      {{ p.trace_id || "—" }}
+                      {{ p.caller || "—" }}
+                    </TableCell>
+                    <TableCell class="max-w-xs text-xs">
+                      <p class="break-all font-mono">
+                        {{
+                          [p.method, p.route].filter(Boolean).join(" ") ||
+                          t("admin.observability.noRequestContext")
+                        }}
+                      </p>
+                      <p
+                        v-if="p.request_id"
+                        class="mt-1 break-all font-mono text-muted-foreground"
+                      >
+                        {{ p.request_id }}
+                      </p>
                     </TableCell>
                   </TableRow>
                   <TableRow v-if="snapshot.queries.n1_patterns.length === 0">
                     <TableCell
-                      colspan="5"
+                      colspan="6"
                       class="py-8 text-center text-muted-foreground"
                     >
                       {{ t("admin.observability.noN1Patterns") }}

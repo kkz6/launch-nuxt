@@ -14,6 +14,16 @@ Manage server provisioning, configuration, and monitoring through the API.
 | PUT | `/servers/{id}` | Update server |
 | DELETE | `/servers/{id}` | Delete server |
 
+## Admin server deletion
+
+`DELETE /admin/servers/{id}` requires `super_admin` access and a JSON body with the exact current server name:
+
+```json
+{"confirmation_name": "production-web"}
+```
+
+The response envelope contains `data.server_id` and `data.status`: `deleted` for a custom server record removed immediately, or `deletion_requested` for an asynchronous cloud deletion. The server's owning team is resolved by the API. Remove all sites and Docker projects first; starting, provisioning, and deleting servers are blocked. See [Delete Server](/docs/application/servers#delete-server) for provider impact and the AWS limitation.
+
 ## List Servers
 ```http
 GET /v1/servers

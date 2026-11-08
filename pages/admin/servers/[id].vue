@@ -16,10 +16,43 @@ const route = useRoute();
 const serverId = route.params.id as string;
 const { locale, t, te } = useI18n();
 const { getServerTypeLabel } = useStableMetadataLabels();
+const { user: currentUser } = useAuth();
+const isSuperAdmin = computed(
+  () => currentUser.value?.staff_role === "super_admin",
+);
 
 const server = ref<AdminServerDetail | null>(null);
 const isLoading = ref(true);
 const notFound = ref(false);
+const deleteLoading = ref(false);
+const deleteError = ref("");
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
+
+const deletionImpact = computed(() =>
+  t(
+    server.value?.provider === "custom_server"
+      ? "admin.serverDetail.deleteCustomImpact"
+      : "admin.serverDetail.deleteCloudImpact",
+  ),
+);
+const deletionBlockedReason = computed(() => {
+  const value = server.value;
+  if (!value) return "";
+  if (["starting", "provisioning", "deleting"].includes(value.status)) {
+    return t("admin.serverDetail.deleteBusy");
+  }
+  if (value.sites_count > 0) {
+    return t("admin.serverDetail.deleteSites", { count: value.sites_count });
+  }
+  if (value.projects_count > 0) {
+    return t("admin.serverDetail.deleteProjects", {
+      count: value.projects_count,
+    });
+  }
+  return "";
+});
 
 useHead({
   title: () =>
@@ -104,11 +137,57 @@ async function load(): Promise<void> {
   }
 }
 
+async function deleteServer(): Promise<void> {
+  if (
+    !isSuperAdmin.value ||
+    !server.value ||
+    deletionBlockedReason.value ||
+    deleteLoading.value ||
+    !confirmationDialog.value
+  )
+    return;
+
+  deleteError.value = "";
+  const result = await confirmationDialog.value.show({
+    title: t("admin.serverDetail.deleteTitle"),
+    description: t("admin.serverDetail.deleteDescription", {
+      name: server.value.name,
+    }),
+    warning: deletionImpact.value,
+    confirmText: t("admin.serverDetail.deleteTitle"),
+    cancelText: t("admin.common.cancel"),
+    destructive: true,
+    helpText: t("admin.serverDetail.deleteHelp"),
+    inputVerificationText: server.value.name,
+  });
+  if (!result.ok || deleteLoading.value) return;
+
+  deleteLoading.value = true;
+  try {
+    const res = await adminService.deleteServer(serverId, server.value.name);
+    toast.success(
+      t(
+        res.data.status === "deleted"
+          ? "admin.serverDetail.deleted"
+          : "admin.serverDetail.deleteRequested",
+      ),
+    );
+    await navigateTo("/admin/servers");
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } };
+    deleteError.value =
+      err.data?.message || t("admin.serverDetail.deleteFailed");
+  } finally {
+    deleteLoading.value = false;
+  }
+}
+
 onMounted(load);
 </script>
 
 <template>
   <div class="pb-10">
+    <SharedConfirmationDialog ref="confirmationDialog" />
     <div v-if="isLoading" class="flex items-center justify-center py-16">
       <Icon
         name="lucide:loader-2"
@@ -348,6 +427,45 @@ onMounted(load);
               </dd>
             </div>
           </dl>
+        </section>
+
+        <section
+          v-if="isSuperAdmin"
+          aria-labelledby="server-delete-heading"
+          class="space-y-3 border-t pt-6"
+        >
+          <h2
+            id="server-delete-heading"
+            class="text-sm font-semibold text-destructive"
+          >
+            {{ t("admin.serverDetail.deleteTitle") }}
+          </h2>
+          <p class="text-sm text-muted-foreground">{{ deletionImpact }}</p>
+          <p class="text-sm text-muted-foreground">
+            {{ t("admin.serverDetail.deleteRequirements") }}
+          </p>
+          <p v-if="deletionBlockedReason" class="text-sm text-muted-foreground">
+            {{ deletionBlockedReason }}
+          </p>
+          <p v-if="deleteError" role="alert" class="text-sm text-destructive">
+            {{ deleteError }}
+          </p>
+          <Button
+            variant="destructive"
+            :disabled="deleteLoading || !!deletionBlockedReason"
+            @click="deleteServer"
+          >
+            <Icon
+              v-if="deleteLoading"
+              name="lucide:loader-2"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            {{
+              server.status === "deleting"
+                ? t("admin.serverDetail.deleting")
+                : t("admin.serverDetail.deleteTitle")
+            }}
+          </Button>
         </section>
       </div>
     </div>

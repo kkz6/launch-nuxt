@@ -124,6 +124,14 @@ Receive recommendations to improve server health:
 - Apply security patches
 - Review firewall rules
 
+## Staff API diagnostics
+
+Staff with `support` or `super_admin` access can open **Admin → Observability** for API runtime and database query diagnostics. These metrics describe the launchctl API process, separately from the managed-server metrics above.
+
+The query sample retains the latest 200 queries in memory per API process and resets on restart. **Suspected N+1** groups at least three successful reads of the same SQL pattern from the same call site within one request. Repetition is a signal to investigate, not confirmation of an N+1 problem.
+
+Inspect the caller, request route/ID, count, and total/average duration. Expand **Inspect full query** to read the captured query with literal values redacted and the available trace ID. Auto-refresh runs every five seconds and can be paused; failed refreshes keep the last successful snapshot visible with a stale-data message.
+
 ## Troubleshooting
 ### Metrics Not Updating
 
