@@ -1,0 +1,25 @@
+{
+  "adminShell": {
+    "title": "Administration",
+    "manage": "Manage",
+    "monitor": "Monitor",
+    "navigation": "Admin navigation",
+    "navigationDescription": "Manage accounts and monitor the platform.",
+    "openNavigation": "Open admin navigation",
+    "breadcrumb": "Breadcrumb",
+    "skipToContent": "Skip to content",
+    "overviewDescription": "A clear view of subscriptions, revenue, and recent payments.",
+    "refresh": "Refresh",
+    "retry": "Try again",
+    "loading": "Loading overview…",
+    "staleOverview": "Showing the last successful overview. Refresh to try again.",
+    "monthlyRevenue": "Monthly recurring revenue",
+    "lifetimeRevenue": "All-time collected revenue",
+    "currentSubscriptions": "Currently active plans",
+    "trialSubscriptions": "Customers trying Launchctl",
+    "subscriptionActivity": "Subscription activity",
+    "thisMonth": "This month",
+    "revenueDescription": "Monthly payments collected over time.",
+    "paymentsDescription": "The latest successful payments across teams."
+  }
+}

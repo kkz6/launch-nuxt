@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
+import { shallowRef } from "vue";
+import type { DateValue } from "reka-ui";
 import type { ActionDef } from "~/types/data-table";
 import type { AdminPlan } from "~/types";
 import { adminService } from "~/services/adminService";
@@ -7,6 +9,12 @@ import { useAuth } from "~/composables/useAuth";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Calendar } from "~/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -58,21 +66,45 @@ const inviteOpen = ref(false);
 const inviting = ref(false);
 const inviteEmail = ref("");
 const invitePlanId = ref("");
-const inviteTrialEndsAt = ref("");
+const trialDate = shallowRef<DateValue>();
+const trialDateOpen = ref(false);
+const calendarDay = (date: DateValue): string =>
+  `${String(date.year).padStart(4, "0")}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+const inviteTrialEndsAt = computed(() =>
+  trialDate.value ? calendarDay(trialDate.value) : "",
+);
+const trialDateLabel = computed(() =>
+  inviteTrialEndsAt.value
+    ? new Intl.DateTimeFormat(locale.value, {
+        dateStyle: "long",
+        timeZone: "UTC",
+      }).format(new Date(`${inviteTrialEndsAt.value}T00:00:00.000Z`))
+    : t("adminDirectory.invitations.selectDate"),
+);
+const isTrialDateDisabled = (date: DateValue): boolean =>
+  new Date(`${calendarDay(date)}T00:00:00.000Z`).getTime() <= Date.now();
+const selectTrialDate = (date: DateValue | undefined): void => {
+  if (!date || isTrialDateDisabled(date)) return;
+  trialDate.value = date;
+  trialDateOpen.value = false;
+};
+const inviteError = ref("");
 
 // Plans drive the plan selector. Loaded once, lazily, the first time the
 // dialog opens.
 const plans = ref<AdminPlan[]>([]);
 const plansLoading = ref(false);
+const plansError = ref(false);
 
 const loadPlans = async () => {
   if (plans.value.length || plansLoading.value) return;
   plansLoading.value = true;
+  plansError.value = false;
   try {
     const res = await adminService.plans();
     plans.value = res.data ?? [];
   } catch {
-    toast.error(t("admin.invitations.loadPlansFailed"));
+    plansError.value = true;
   } finally {
     plansLoading.value = false;
   }
@@ -85,24 +117,44 @@ const formatPrice = (cents: number): string =>
   })}${t("admin.invitations.perMonth")}`;
 
 const openInvite = () => {
+  if (!isSuperAdmin.value || inviting.value) return;
   inviteEmail.value = "";
   invitePlanId.value = "";
-  inviteTrialEndsAt.value = "";
+  trialDate.value = undefined;
+  trialDateOpen.value = false;
+  inviteError.value = "";
   inviteOpen.value = true;
-  loadPlans();
+  void loadPlans();
 };
 
 const submitInvite = async () => {
+  if (
+    !isSuperAdmin.value ||
+    inviting.value ||
+    plansLoading.value ||
+    plansError.value
+  )
+    return;
+  inviteError.value = "";
   if (!inviteEmail.value.trim()) {
-    toast.error(t("admin.invitations.emailRequired"));
+    inviteError.value = t("admin.invitations.emailRequired");
     return;
   }
   if (!invitePlanId.value) {
-    toast.error(t("admin.invitations.planRequired"));
+    inviteError.value = t("admin.invitations.planRequired");
     return;
   }
-  if (!inviteTrialEndsAt.value) {
-    toast.error(t("admin.invitations.trialEndRequired"));
+  if (
+    !inviteTrialEndsAt.value ||
+    Number.isNaN(new Date(inviteTrialEndsAt.value).getTime())
+  ) {
+    inviteError.value = t("admin.invitations.trialEndRequired");
+    return;
+  }
+  if (
+    new Date(`${inviteTrialEndsAt.value}T00:00:00.000Z`).getTime() <= Date.now()
+  ) {
+    inviteError.value = t("adminDirectory.invitations.futureDateRequired");
     return;
   }
   inviting.value = true;
@@ -119,7 +171,8 @@ const submitInvite = async () => {
     table.value?.refresh();
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    toast.error(err.data?.message || t("admin.invitations.createFailed"));
+    inviteError.value =
+      err.data?.message || t("admin.invitations.createFailed");
   } finally {
     inviting.value = false;
   }
@@ -127,22 +180,41 @@ const submitInvite = async () => {
 </script>
 
 <template>
-  <div class="space-y-6 pb-10">
-    <div class="flex items-center justify-between gap-4">
-      <p class="text-sm text-muted-foreground">
-        {{ t("admin.invitations.description") }}
-      </p>
-      <Button v-if="isSuperAdmin" size="sm" @click="openInvite">
-        <Icon name="lucide:user-plus" class="h-4 w-4" />
-        {{ t("admin.invitations.inviteUser") }}
-      </Button>
-    </div>
+  <div class="space-y-7">
+    <AdminPageHeader
+      :title="t('admin.common.invitations')"
+      :description="t('adminDirectory.invitations.description')"
+    >
+      <template #actions>
+        <Button variant="ghost" size="sm" @click="table?.refresh()">
+          <Icon name="lucide:refresh-cw" class="h-3.5 w-3.5" />
+          {{ t("adminDirectory.refresh") }}
+        </Button>
+        <Button v-if="isSuperAdmin" size="sm" @click="openInvite">
+          <Icon name="lucide:plus" class="h-4 w-4" />
+          {{ t("admin.invitations.inviteUser") }}
+        </Button>
+      </template>
+    </AdminPageHeader>
 
-    <DataTable
-      ref="table"
-      endpoint="/admin/invitations/table"
-      :row-actions-filter="filterServerActions"
-    />
+    <section aria-labelledby="invitations-directory-title" class="space-y-4">
+      <div class="sr-only">
+        <h2 id="invitations-directory-title" class="font-semibold">
+          {{ t("adminDirectory.invitations.directoryTitle") }}
+        </h2>
+        <p class="text-sm text-muted-foreground">
+          {{ t("adminDirectory.invitations.directoryDescription") }}
+        </p>
+      </div>
+      <div class="admin-directory">
+        <DataTable
+          ref="table"
+          borderless
+          endpoint="/admin/invitations/table"
+          :row-actions-filter="filterServerActions"
+        />
+      </div>
+    </section>
 
     <!-- Invite user dialog -->
     <Dialog v-model:open="inviteOpen">
@@ -153,7 +225,11 @@ const submitInvite = async () => {
             {{ t("admin.invitations.dialogDescription") }}
           </DialogDescription>
         </DialogHeader>
-        <div class="space-y-4 py-2">
+        <form
+          id="admin-invitation-form"
+          class="space-y-5 py-2"
+          @submit.prevent="submitInvite"
+        >
           <div class="space-y-2">
             <Label for="invite-email">{{ t("admin.invitations.email") }}</Label>
             <Input
@@ -161,11 +237,19 @@ const submitInvite = async () => {
               v-model="inviteEmail"
               type="email"
               placeholder="user@example.com"
+              autocomplete="email"
+              required
+              :disabled="inviting"
             />
           </div>
           <div class="space-y-2">
             <Label for="invite-plan">{{ t("admin.invitations.plan") }}</Label>
-            <Select v-model="invitePlanId">
+            <Select
+              v-model="invitePlanId"
+              :disabled="
+                inviting || plansLoading || plansError || !plans.length
+              "
+            >
               <SelectTrigger id="invite-plan" class="w-full">
                 <SelectValue
                   :placeholder="
@@ -185,6 +269,34 @@ const submitInvite = async () => {
                 </SelectItem>
               </SelectContent>
             </Select>
+            <p
+              v-if="plansLoading"
+              role="status"
+              class="text-sm text-muted-foreground"
+            >
+              {{ t("admin.invitations.loadingPlans") }}
+            </p>
+            <div
+              v-else-if="plansError"
+              role="alert"
+              class="flex items-center justify-between gap-3 rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm"
+            >
+              <p>{{ t("admin.invitations.loadPlansFailed") }}</p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                @click="loadPlans"
+                >{{ t("adminDirectory.retry") }}</Button
+              >
+            </div>
+            <p
+              v-else-if="!plans.length"
+              role="status"
+              class="text-sm text-muted-foreground"
+            >
+              {{ t("adminDirectory.invitations.noPlans") }}
+            </p>
             <p class="text-xs text-muted-foreground">
               {{ t("admin.invitations.acceptHint") }}
             </p>
@@ -193,9 +305,50 @@ const submitInvite = async () => {
             <Label for="invite-trial">
               {{ t("admin.invitations.trialEndDate") }}
             </Label>
-            <Input id="invite-trial" v-model="inviteTrialEndsAt" type="date" />
+            <Popover v-model:open="trialDateOpen">
+              <PopoverTrigger as-child>
+                <Button
+                  id="invite-trial"
+                  type="button"
+                  variant="outline"
+                  class="w-full justify-start text-left font-normal"
+                  :class="{ 'text-muted-foreground': !trialDate }"
+                  :disabled="inviting"
+                  aria-describedby="invite-trial-hint"
+                >
+                  <Icon name="lucide:calendar-days" class="h-4 w-4" />
+                  {{ trialDateLabel }}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                class="w-auto max-w-[calc(100vw-2rem)] p-0"
+                :collision-padding="16"
+              >
+                <Calendar
+                  :model-value="trialDate"
+                  :locale="locale"
+                  :is-date-disabled="isTrialDateDisabled"
+                  :disabled="inviting"
+                  :calendar-label="t('admin.invitations.trialEndDate')"
+                  initial-focus
+                  prevent-deselect
+                  @update:model-value="selectTrialDate"
+                />
+              </PopoverContent>
+            </Popover>
+            <p id="invite-trial-hint" class="text-xs text-muted-foreground">
+              {{ t("adminDirectory.invitations.dateHint") }}
+            </p>
           </div>
-        </div>
+          <p
+            v-if="inviteError"
+            role="alert"
+            class="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive"
+          >
+            {{ inviteError }}
+          </p>
+        </form>
         <DialogFooter>
           <Button
             variant="outline"
@@ -204,7 +357,11 @@ const submitInvite = async () => {
           >
             {{ t("admin.common.cancel") }}
           </Button>
-          <Button :disabled="inviting" @click="submitInvite">
+          <Button
+            type="submit"
+            form="admin-invitation-form"
+            :disabled="inviting || plansLoading || plansError || !plans.length"
+          >
             <Icon
               v-if="inviting"
               name="lucide:loader-2"

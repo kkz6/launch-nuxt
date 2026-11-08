@@ -36,37 +36,34 @@ function save(): void {
 </script>
 
 <template>
-  <section
-    aria-labelledby="staff-access-label"
-    class="rounded-lg border bg-card p-4"
-  >
+  <section aria-labelledby="staff-access-label" class="min-w-0">
     <form
-      class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"
       @submit.prevent="save"
     >
-      <div class="space-y-1">
+      <div class="min-w-0 space-y-1.5">
         <Label
           id="staff-access-label"
           for="staff-access"
           class="text-sm font-semibold"
           >{{ t("admin.userDetail.staffAccess") }}</Label
         >
-        <p class="text-sm text-muted-foreground">
+        <p class="max-w-xl text-xs leading-relaxed text-muted-foreground">
           {{ t("admin.userDetail.staffAccessDescription") }}
         </p>
         <p
           v-if="isSelf"
           id="staff-access-help"
-          class="text-sm text-muted-foreground"
+          class="max-w-xl text-xs leading-relaxed text-muted-foreground"
         >
           {{ t("admin.userDetail.selfRoleGuard") }}
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="flex shrink-0 items-center gap-2">
         <Select v-model="selected" :disabled="disabled || isSelf">
           <SelectTrigger
             id="staff-access"
-            class="w-full sm:w-44"
+            class="h-9 w-full min-w-0 bg-background shadow-none md:w-40"
             :aria-describedby="isSelf ? 'staff-access-help' : undefined"
           >
             <SelectValue />
@@ -85,7 +82,7 @@ function save(): void {
         </Select>
         <Button
           type="submit"
-          variant="outline"
+          size="sm"
           :disabled="disabled || isSelf || unchanged"
         >
           <Icon

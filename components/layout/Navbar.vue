@@ -31,6 +31,8 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
 
+withDefaults(defineProps<{ compact?: boolean }>(), { compact: false });
+
 const { t } = useI18n();
 const navLabel = (key: string) => t(`common.navigation.${key}`);
 const actionLabel = (key: string) => t(`common.actions.${key}`);
@@ -50,55 +52,6 @@ const isStaff = computed(
     user.value?.staff_role === "super_admin",
 );
 const showAdminContext = computed(() => route.path.startsWith("/admin"));
-const adminBreadcrumbState = usePageBreadcrumbState();
-const adminCrumbs = computed(() =>
-  adminBreadcrumbState.value?.path === route.path
-    ? adminBreadcrumbState.value.crumbs
-    : [],
-);
-interface AdminTab {
-  label: string;
-  to: string;
-  icon: string;
-  match?: (path: string) => boolean;
-}
-
-const adminTabs = computed<AdminTab[]>(() => [
-  {
-    label: navLabel("overview"),
-    to: "/admin/overview",
-    icon: "lucide:bar-chart-3",
-  },
-  {
-    label: navLabel("users"),
-    to: "/admin",
-    icon: "lucide:users",
-    match: (p: string) => p === "/admin" || p.startsWith("/admin/users"),
-  },
-  {
-    label: navLabel("invitations"),
-    to: "/admin/invitations",
-    icon: "lucide:mail",
-  },
-  {
-    label: navLabel("servers"),
-    to: "/admin/servers",
-    icon: "lucide:server",
-  },
-  {
-    label: navLabel("failures"),
-    to: "/admin/failures",
-    icon: "lucide:triangle-alert",
-  },
-  {
-    label: navLabel("observability"),
-    to: "/admin/observability",
-    icon: "lucide:activity",
-  },
-]);
-const isAdminTabActive = (tab: AdminTab): boolean =>
-  tab.match ? tab.match(route.path) : route.path.startsWith(tab.to);
-
 // Check if current team is subscribed
 const isSubscribed = computed(
   () => user.value?.current_team?.is_subscribed ?? true,
@@ -1775,16 +1728,17 @@ const navigateTo = (path: string) => {
 
 <template>
   <nav
-    class="z-40 w-full shrink-0 border-b border-divider bg-background/70 backdrop-blur-lg"
+    class="z-40 shrink-0"
+    :class="compact ? '' : 'w-full border-b border-divider bg-background/70 backdrop-blur-lg'"
   >
-    <div class="flex h-16 items-center justify-between px-4 lg:px-8">
-      <NuxtLink to="/dashboard" class="flex items-center gap-2">
+    <div class="flex items-center justify-between" :class="compact ? 'h-14' : 'h-16 px-4 lg:px-8'">
+      <NuxtLink v-if="!compact" to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
       </NuxtLink>
 
       <!-- Subscription Banner -->
       <div
-        v-if="!isSubscribed"
+        v-if="!compact && !isSubscribed"
         class="group relative h-5 cursor-pointer overflow-hidden text-sm"
         @click="openSettingsSheet('billing')"
       >
@@ -2010,48 +1964,6 @@ const navigateTo = (path: string) => {
           />
         </div>
       </div>
-    </div>
-
-    <!-- Admin back-office context (breadcrumb + section tabs) -->
-    <div v-if="showAdminContext" class="px-4 lg:px-8">
-      <div
-        v-if="adminCrumbs.length"
-        class="flex items-center gap-1.5 pb-1.5 pt-1 text-sm"
-      >
-        <template v-for="(crumb, i) in adminCrumbs" :key="i">
-          <NuxtLink
-            v-if="crumb.to && i < adminCrumbs.length - 1"
-            :to="crumb.to"
-            class="text-muted-foreground transition-colors hover:text-foreground"
-          >
-            {{ crumb.label }}
-          </NuxtLink>
-          <span v-else class="font-medium text-foreground">{{
-            crumb.label
-          }}</span>
-          <Icon
-            v-if="i < adminCrumbs.length - 1"
-            name="lucide:chevron-right"
-            class="h-3.5 w-3.5 text-muted-foreground/60"
-          />
-        </template>
-      </div>
-      <nav class="-mb-px flex gap-6 overflow-x-auto">
-        <NuxtLink
-          v-for="tab in adminTabs"
-          :key="tab.to"
-          :to="tab.to"
-          class="relative flex items-center gap-2 whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors"
-          :class="
-            isAdminTabActive(tab)
-              ? 'border-foreground text-foreground'
-              : 'border-transparent text-muted-foreground hover:text-foreground'
-          "
-        >
-          <Icon :name="tab.icon" class="h-4 w-4" />
-          {{ tab.label }}
-        </NuxtLink>
-      </nav>
     </div>
 
     <!-- Server Detail Navigation -->

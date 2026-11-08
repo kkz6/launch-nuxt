@@ -1,0 +1,20 @@
+{
+  "adminDirectory": {
+    "refresh": "更新",
+    "retry": "再試行",
+    "users": {
+      "description": "顧客アカウントを検索し、アクセス権、請求、リソースを管理します。",
+      "directoryTitle": "すべてのユーザー",
+      "directoryDescription": "名前やメールアドレスで検索し、ユーザーを開いてアカウントを確認します。"
+    },
+    "invitations": {
+      "selectDate": "日付を選択",
+      "dateHint": "トライアルは選択した日付の午前0時（UTC）に終了します。",
+      "futureDateRequired": "今後のトライアル終了日を選択してください。",
+      "description": "トライアルプランで顧客を招待し、招待の状況を確認します。",
+      "directoryTitle": "送信済みの招待",
+      "directoryDescription": "プラン、トライアル期間、招待の状況を確認します。",
+      "noPlans": "招待に利用できるプランがありません。しばらくしてから再試行してください。"
+    }
+  }
+}

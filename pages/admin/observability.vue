@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { ObservabilitySnapshot } from "~/types";
 import { adminService } from "~/services/adminService";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import {
   Table,
   TableBody,
@@ -13,6 +12,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { Badge } from "~/components/ui/badge";
 import { Progress } from "~/components/ui/progress";
+import AdminPageHeader from "~/components/admin/PageHeader.vue";
 
 definePageMeta({
   layout: "default",
@@ -132,36 +132,41 @@ function formatDecimal(value: number, digits: number): string {
 </script>
 
 <template>
-  <div class="space-y-6 pb-10">
+  <div class="space-y-7">
     <!-- Header -->
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-lg font-semibold">
-          {{ t("admin.observability.title") }}
-        </h2>
-        <p class="text-sm text-muted-foreground">
-          {{ t("admin.observability.description") }}
-        </p>
-      </div>
-      <div class="flex items-center gap-3">
-        <label class="flex items-center gap-2 text-sm text-muted-foreground">
-          <input
-            v-model="autoRefresh"
-            type="checkbox"
-            class="rounded border-input"
-          />
-          {{ t("admin.observability.autoRefresh", { seconds: 5 }) }}
-        </label>
-        <button
-          class="rounded-md border border-input bg-background px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-          :disabled="isRefreshing"
-          :aria-busy="isRefreshing"
-          @click="fetchSnapshot"
-        >
-          {{ t("admin.observability.refresh") }}
-        </button>
-      </div>
-    </div>
+    <AdminPageHeader
+      :title="t('admin.observability.title')"
+      :description="t('admin.observability.description')"
+    >
+      <template #actions>
+        <div class="flex flex-wrap items-center gap-3">
+          <label
+            class="inline-flex min-h-8 items-center gap-2 text-xs text-muted-foreground"
+          >
+            <input
+              v-model="autoRefresh"
+              type="checkbox"
+              class="h-3.5 w-3.5 rounded border-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            {{ t("admin.observability.autoRefresh", { seconds: 5 }) }}
+          </label>
+          <button
+            type="button"
+            class="inline-flex h-8 items-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            :disabled="isRefreshing"
+            :aria-busy="isRefreshing"
+            @click="fetchSnapshot"
+          >
+            <Icon
+              name="lucide:refresh-cw"
+              class="h-4 w-4"
+              :class="{ 'animate-spin': isRefreshing }"
+            />
+            {{ t("admin.observability.refresh") }}
+          </button>
+        </div>
+      </template>
+    </AdminPageHeader>
 
     <div
       v-if="loadError"
@@ -173,7 +178,12 @@ function formatDecimal(value: number, digits: number): string {
         {{ t("admin.observability.staleData") }}
       </p>
     </div>
-    <p v-if="snapshot" class="text-xs text-muted-foreground" role="status">
+    <p
+      v-if="snapshot"
+      class="flex items-center gap-1.5 text-xs text-muted-foreground"
+      role="status"
+    >
+      <Icon name="lucide:clock-3" class="h-3.5 w-3.5" />
       {{
         t("admin.observability.lastUpdated", {
           time: formatTimestamp(snapshot.timestamp),
@@ -189,289 +199,321 @@ function formatDecimal(value: number, digits: number): string {
     </div>
 
     <template v-else-if="snapshot">
-      <!-- Top stat cards -->
-      <div class="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        <Card>
-          <CardHeader class="pb-2">
-            <CardTitle class="text-sm font-medium text-muted-foreground">
+      <!-- Runtime summary -->
+      <div
+        class="grid grid-cols-2 gap-x-8 gap-y-5 border-y border-border/70 py-5 sm:grid-cols-3 xl:grid-cols-5"
+      >
+        <div class="min-w-0">
+          <div class="mb-2">
+            <h2 class="text-xs font-medium text-muted-foreground">
               {{ t("admin.observability.uptime") }}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p class="text-xl font-bold">{{ snapshot.runtime.uptime }}</p>
-          </CardContent>
-        </Card>
+            </h2>
+          </div>
+          <div>
+            <p class="text-2xl font-semibold tracking-tight tabular-nums">
+              {{ snapshot.runtime.uptime }}
+            </p>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader class="pb-2">
-            <CardTitle class="text-sm font-medium text-muted-foreground">
+        <div class="min-w-0">
+          <div class="mb-2">
+            <h2 class="text-xs font-medium text-muted-foreground">
               {{ t("admin.observability.goroutines") }}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p class="text-xl font-bold">
+            </h2>
+          </div>
+          <div>
+            <p class="text-2xl font-semibold tracking-tight tabular-nums">
               {{ formatNumber(snapshot.runtime.goroutines) }}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader class="pb-2">
-            <CardTitle class="text-sm font-medium text-muted-foreground">
+        <div class="min-w-0">
+          <div class="mb-2">
+            <h2 class="text-xs font-medium text-muted-foreground">
               {{ t("admin.observability.heapAlloc") }}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p class="text-xl font-bold">
+            </h2>
+          </div>
+          <div>
+            <p class="text-2xl font-semibold tracking-tight tabular-nums">
               {{ formatDecimal(snapshot.runtime.heap_alloc_mb, 1) }} MB
             </p>
             <Progress :model-value="memoryPercent" class="mt-2 h-1.5" />
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader class="pb-2">
-            <CardTitle class="text-sm font-medium text-muted-foreground">
+        <div class="min-w-0">
+          <div class="mb-2">
+            <h2 class="text-xs font-medium text-muted-foreground">
               {{ t("admin.observability.gcPauses") }}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p class="text-xl font-bold">
+            </h2>
+          </div>
+          <div>
+            <p class="text-2xl font-semibold tracking-tight tabular-nums">
               {{ formatDecimal(snapshot.runtime.last_gc_pause_ms, 2) }}ms
             </p>
-            <p class="text-xs text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               {{
                 t("admin.observability.cycles", {
                   count: formatNumber(snapshot.runtime.num_gc),
                 })
               }}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
-        <Card>
-          <CardHeader class="pb-2">
-            <CardTitle class="text-sm font-medium text-muted-foreground">
+        <div class="min-w-0">
+          <div class="mb-2">
+            <h2 class="text-xs font-medium text-muted-foreground">
               {{ t("admin.observability.avgQuery") }}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p class="text-xl font-bold">
+            </h2>
+          </div>
+          <div>
+            <p class="text-2xl font-semibold tracking-tight tabular-nums">
               {{ formatDuration(snapshot.queries.avg_ms) }}
             </p>
-            <p class="text-xs text-muted-foreground">
+            <p class="mt-1 text-xs text-muted-foreground">
               {{
                 t("admin.observability.total", {
                   count: formatNumber(snapshot.queries.total),
                 })
               }}
             </p>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
 
-      <!-- DB Pool -->
-      <Card>
-        <CardHeader>
-          <div class="flex items-center justify-between">
-            <CardTitle class="text-base">
-              {{ t("admin.observability.dbConnectionPool") }}
-            </CardTitle>
-            <Badge :variant="poolStatus">
-              {{
-                t("admin.observability.percentUsed", {
-                  percent: formatNumber(poolUsagePercent),
-                })
-              }}
-            </Badge>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div
-            v-if="snapshot.db_pool"
-            class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6"
-          >
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.maxOpen") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatNumber(snapshot.db_pool.max_open) }}
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.open") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatNumber(snapshot.db_pool.open) }}
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.inUse") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatNumber(snapshot.db_pool.in_use) }}
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.idle") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatNumber(snapshot.db_pool.idle) }}
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.waitCount") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatNumber(snapshot.db_pool.wait_count) }}
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.waitDuration") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ snapshot.db_pool.wait_duration }}
-              </p>
+      <div class="grid gap-x-12 gap-y-7 lg:grid-cols-2">
+        <!-- DB Pool -->
+        <section class="min-w-0">
+          <div class="mb-5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold">
+                {{ t("admin.observability.dbConnectionPool") }}
+              </h2>
+              <Badge :variant="poolStatus">
+                {{
+                  t("admin.observability.percentUsed", {
+                    percent: formatNumber(poolUsagePercent),
+                  })
+                }}
+              </Badge>
             </div>
           </div>
-          <Progress :model-value="poolUsagePercent" class="mt-4 h-2" />
-        </CardContent>
-      </Card>
+          <div>
+            <div
+              v-if="snapshot.db_pool"
+              class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3"
+            >
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.maxOpen") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatNumber(snapshot.db_pool.max_open) }}
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.open") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatNumber(snapshot.db_pool.open) }}
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.inUse") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatNumber(snapshot.db_pool.in_use) }}
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.idle") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatNumber(snapshot.db_pool.idle) }}
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.waitCount") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatNumber(snapshot.db_pool.wait_count) }}
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.waitDuration") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ snapshot.db_pool.wait_duration }}
+                </p>
+              </div>
+            </div>
+            <Progress :model-value="poolUsagePercent" class="mt-5 h-1" />
+          </div>
+        </section>
 
-      <!-- Runtime Details -->
-      <Card>
-        <CardHeader>
-          <CardTitle class="text-base">
-            {{ t("admin.observability.goRuntime") }}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div class="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-6">
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.heapInUse") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatDecimal(snapshot.runtime.heap_inuse_mb, 1) }} MB
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.heapObjects") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatDecimal(snapshot.runtime.heap_objects_k, 1) }}K
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.stackInUse") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatDecimal(snapshot.runtime.stack_inuse_mb, 1) }} MB
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.systemMemory") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatDecimal(snapshot.runtime.sys_mem_mb, 1) }} MB
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.gcCpu") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatDecimal(snapshot.runtime.gc_cpu_percent, 3) }}%
-              </p>
-            </div>
-            <div>
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.observability.cpus") }}
-              </p>
-              <p class="text-lg font-semibold">
-                {{ formatNumber(snapshot.runtime.num_cpu) }}
-              </p>
+        <!-- Runtime Details -->
+        <section class="min-w-0">
+          <div class="mb-5">
+            <h2 class="text-sm font-semibold">
+              {{ t("admin.observability.goRuntime") }}
+            </h2>
+          </div>
+          <div>
+            <div class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.heapInUse") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatDecimal(snapshot.runtime.heap_inuse_mb, 1) }} MB
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.heapObjects") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatDecimal(snapshot.runtime.heap_objects_k, 1) }}K
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.stackInUse") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatDecimal(snapshot.runtime.stack_inuse_mb, 1) }} MB
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.systemMemory") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatDecimal(snapshot.runtime.sys_mem_mb, 1) }} MB
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.gcCpu") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatDecimal(snapshot.runtime.gc_cpu_percent, 3) }}%
+                </p>
+              </div>
+              <div>
+                <p class="mb-1 text-xs text-muted-foreground">
+                  {{ t("admin.observability.cpus") }}
+                </p>
+                <p class="text-sm font-medium tabular-nums">
+                  {{ formatNumber(snapshot.runtime.num_cpu) }}
+                </p>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </section>
+      </div>
 
       <!-- Query tabs -->
-      <div class="space-y-1 text-sm text-muted-foreground">
-        <p>
-          {{
-            snapshot.queries.capacity
-              ? t("admin.observability.sampleWindow", {
-                  count: formatNumber(snapshot.queries.total),
-                  capacity: formatNumber(snapshot.queries.capacity),
-                })
-              : t("admin.observability.sampleCount", {
-                  count: formatNumber(snapshot.queries.total),
-                })
-          }}
-        </p>
-        <p v-if="snapshot.queries.slow_threshold_ms != null">
-          {{
-            t("admin.observability.slowThreshold", {
-              duration: formatDuration(snapshot.queries.slow_threshold_ms),
-            })
-          }}
-        </p>
-      </div>
-      <Tabs default-value="recent" class="space-y-4">
-        <TabsList>
-          <TabsTrigger value="recent">
-            {{ t("admin.observability.recentQueries") }}
-            <Badge variant="secondary" class="ml-2">
-              {{ formatNumber(snapshot.queries.total) }}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="slow">
-            {{ t("admin.observability.slowQueries") }}
-            <Badge
-              :variant="
-                snapshot.queries.slow_count > 0 ? 'destructive' : 'secondary'
-              "
-              class="ml-2"
+      <section
+        aria-labelledby="query-analysis-title"
+        class="min-w-0 border-t border-border/70 pt-6"
+      >
+        <div class="mb-5 flex items-start gap-3">
+          <div class="pt-0.5 text-primary">
+            <Icon name="lucide:database" class="h-4 w-4" />
+          </div>
+          <div class="min-w-0">
+            <h2 id="query-analysis-title" class="mb-1 text-sm font-semibold">
+              {{ t("adminResources.observability.queryAnalysis") }}
+            </h2>
+            <div class="space-y-1 text-xs leading-5 text-muted-foreground">
+              <p>
+                {{
+                  snapshot.queries.capacity
+                    ? t("admin.observability.sampleWindow", {
+                        count: formatNumber(snapshot.queries.total),
+                        capacity: formatNumber(snapshot.queries.capacity),
+                      })
+                    : t("admin.observability.sampleCount", {
+                        count: formatNumber(snapshot.queries.total),
+                      })
+                }}
+              </p>
+              <p v-if="snapshot.queries.slow_threshold_ms != null">
+                {{
+                  t("admin.observability.slowThreshold", {
+                    duration: formatDuration(
+                      snapshot.queries.slow_threshold_ms,
+                    ),
+                  })
+                }}
+              </p>
+            </div>
+          </div>
+        </div>
+        <Tabs default-value="recent" class="space-y-4">
+          <TabsList
+            class="h-auto w-full justify-start gap-5 overflow-x-auto rounded-none border-b border-border/70 bg-transparent p-0"
+          >
+            <TabsTrigger
+              value="recent"
+              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-[13px] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             >
-              {{ formatNumber(snapshot.queries.slow_count) }}
-            </Badge>
-          </TabsTrigger>
-          <TabsTrigger value="n1">
-            {{ t("admin.observability.n1Detected") }}
-            <Badge
-              :variant="
-                snapshot.queries.n1_count > 0 ? 'destructive' : 'secondary'
-              "
-              class="ml-2"
+              {{ t("admin.observability.recentQueries") }}
+              <Badge variant="secondary" class="ml-2">
+                {{ formatNumber(snapshot.queries.total) }}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="slow"
+              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-[13px] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             >
-              {{ formatNumber(snapshot.queries.n1_count) }}
-            </Badge>
-          </TabsTrigger>
-        </TabsList>
+              {{ t("admin.observability.slowQueries") }}
+              <Badge
+                :variant="
+                  snapshot.queries.slow_count > 0 ? 'destructive' : 'secondary'
+                "
+                class="ml-2"
+              >
+                {{ formatNumber(snapshot.queries.slow_count) }}
+              </Badge>
+            </TabsTrigger>
+            <TabsTrigger
+              value="n1"
+              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-[13px] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
+              {{ t("admin.observability.n1Detected") }}
+              <Badge
+                :variant="
+                  snapshot.queries.n1_count > 0 ? 'destructive' : 'secondary'
+                "
+                class="ml-2"
+              >
+                {{ formatNumber(snapshot.queries.n1_count) }}
+              </Badge>
+            </TabsTrigger>
+          </TabsList>
 
-        <!-- Recent queries -->
-        <TabsContent value="recent">
-          <p class="mb-3 text-xs text-muted-foreground">
-            {{
-              t("admin.observability.showingQueries", {
-                count: formatNumber(snapshot.queries.recent.length),
-                total: formatNumber(snapshot.queries.total),
-              })
-            }}
-          </p>
-          <Card>
-            <CardContent class="p-0">
-              <Table>
+          <!-- Recent queries -->
+          <TabsContent value="recent">
+            <p class="mb-3 text-xs text-muted-foreground">
+              {{
+                t("admin.observability.showingQueries", {
+                  count: formatNumber(snapshot.queries.recent.length),
+                  total: formatNumber(snapshot.queries.total),
+                })
+              }}
+            </p>
+            <div class="min-w-0 overflow-x-auto">
+              <Table borderless>
                 <TableHeader>
                   <TableRow>
                     <TableHead class="w-[50%]">SQL</TableHead>
@@ -561,23 +603,21 @@ function formatDecimal(value: number, digits: number): string {
                   </TableRow>
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </TabsContent>
 
-        <!-- Slow queries -->
-        <TabsContent value="slow">
-          <p class="mb-3 text-xs text-muted-foreground">
-            {{
-              t("admin.observability.showingQueries", {
-                count: formatNumber(snapshot.queries.slow_queries.length),
-                total: formatNumber(snapshot.queries.slow_count),
-              })
-            }}
-          </p>
-          <Card>
-            <CardContent class="p-0">
-              <Table>
+          <!-- Slow queries -->
+          <TabsContent value="slow">
+            <p class="mb-3 text-xs text-muted-foreground">
+              {{
+                t("admin.observability.showingQueries", {
+                  count: formatNumber(snapshot.queries.slow_queries.length),
+                  total: formatNumber(snapshot.queries.slow_count),
+                })
+              }}
+            </p>
+            <div class="min-w-0 overflow-x-auto">
+              <Table borderless>
                 <TableHeader>
                   <TableRow>
                     <TableHead class="w-[50%]">SQL</TableHead>
@@ -661,24 +701,22 @@ function formatDecimal(value: number, digits: number): string {
                   </TableRow>
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </div>
+          </TabsContent>
 
-        <!-- N+1 patterns -->
-        <TabsContent value="n1">
-          <p class="mb-4 text-sm text-muted-foreground">
-            {{
-              snapshot.queries.n1_threshold
-                ? t("admin.observability.n1Explanation", {
-                    count: formatNumber(snapshot.queries.n1_threshold),
-                  })
-                : t("admin.observability.legacyN1Explanation")
-            }}
-          </p>
-          <Card>
-            <CardContent class="p-0">
-              <Table>
+          <!-- N+1 patterns -->
+          <TabsContent value="n1">
+            <p class="mb-4 max-w-3xl text-xs leading-5 text-muted-foreground">
+              {{
+                snapshot.queries.n1_threshold
+                  ? t("admin.observability.n1Explanation", {
+                      count: formatNumber(snapshot.queries.n1_threshold),
+                    })
+                  : t("admin.observability.legacyN1Explanation")
+              }}
+            </p>
+            <div class="min-w-0 overflow-x-auto">
+              <Table borderless>
                 <TableHeader>
                   <TableRow>
                     <TableHead class="w-[50%]">
@@ -785,10 +823,10 @@ function formatDecimal(value: number, digits: number): string {
                   </TableRow>
                 </TableBody>
               </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </section>
     </template>
   </div>
 </template>

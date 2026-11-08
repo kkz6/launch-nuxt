@@ -41,8 +41,10 @@ const server = (overrides: Record<string, unknown> = {}) => ({
 const mountPage = () =>
   shallowMount(AdminServerPage, {
     global: {
+      mocks: { navigateTo: mocks.navigateTo },
       stubs: {
         Icon: true,
+        AdminPageHeader: false,
         Badge: true,
         Avatar: true,
         AvatarFallback: true,
@@ -85,6 +87,21 @@ describe("admin server deletion", () => {
   });
 
   afterEach(() => vi.unstubAllGlobals());
+
+  it("keeps the server heading and return action available above its management cards", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.findAll("h1")).toHaveLength(1);
+    expect(wrapper.get("h1").text()).toBe("production-web");
+    expect(wrapper.text()).toContain("Configuration");
+    const back = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("Back to servers"));
+    expect(back).toBeDefined();
+    await back!.trigger("click");
+    expect(mocks.navigateTo).toHaveBeenCalledWith("/admin/servers");
+    expect(mocks.deleteServer).not.toHaveBeenCalled();
+  });
 
   it.each(["support", ""])("hides deletion for role %j", async (role) => {
     currentUser.value.staff_role = role;

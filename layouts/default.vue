@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Toaster } from "~/components/ui/sonner";
 import { useImpersonation } from "~/composables/useImpersonation";
+import AdminShell from "~/components/admin/Shell.vue";
 
 defineProps<{
   title?: string;
@@ -10,6 +11,10 @@ const { isAuthenticated, isInitialized } = useAuth();
 const { isImpersonating, impersonatedName, stop } = useImpersonation();
 const { t } = useI18n();
 const colorMode = useColorMode();
+const route = useRoute();
+const isAdminRoute = computed(
+  () => route.path === "/admin" || route.path.startsWith("/admin/"),
+);
 
 const isExiting = ref(false);
 
@@ -77,8 +82,15 @@ const showAuthedShell = computed(
         </button>
       </div>
       <LayoutPlatformUpdateBanner />
-      <LayoutNavbar />
-      <main class="w-full flex-1 overflow-y-auto px-4 pt-4 pb-10 lg:px-8">
+      <LayoutNavbar v-if="!isAdminRoute" />
+      <AdminShell v-if="isAdminRoute">
+        <template #toolbar><LayoutNavbar compact /></template>
+        <slot />
+      </AdminShell>
+      <main
+        v-else
+        class="w-full flex-1 overflow-y-auto px-4 pt-4 pb-10 lg:px-8"
+      >
         <slot />
       </main>
       <Toaster position="bottom-center" :close-button="true" :duration="4000" />

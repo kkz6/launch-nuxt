@@ -79,7 +79,10 @@ const snapshot = (): ObservabilitySnapshot => ({
 let wrappers: VueWrapper[] = [];
 const mountPage = () => {
   const wrapper = shallowMount(ObservabilityPage, {
-    global: { renderStubDefaultSlot: true, stubs: { Icon: true } },
+    global: {
+      renderStubDefaultSlot: true,
+      stubs: { Icon: true, AdminPageHeader: false },
+    },
   });
   wrappers.push(wrapper);
   return wrapper;
@@ -110,6 +113,8 @@ describe("admin query diagnostics", () => {
   it("shows request-scoped suspects, full SQL and trace details, and the bounded sample", async () => {
     const wrapper = mountPage();
     await flushPromises();
+    expect(wrapper.get("h1").text()).toBe("Observability");
+    expect(wrapper.get("#query-analysis-title").text()).toBe("Query analysis");
     expect(wrapper.text()).toContain("8 of the latest 200 queries");
     expect(wrapper.text()).toContain("resets on restart");
     expect(wrapper.text()).toContain(

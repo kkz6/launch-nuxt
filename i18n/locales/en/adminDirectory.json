@@ -1,0 +1,20 @@
+{
+  "adminDirectory": {
+    "refresh": "Refresh",
+    "retry": "Try again",
+    "users": {
+      "description": "Find customer accounts and manage their access, billing, and resources.",
+      "directoryTitle": "All users",
+      "directoryDescription": "Search by name or email. Open a user to review their account."
+    },
+    "invitations": {
+      "selectDate": "Select a date",
+      "dateHint": "The trial ends at the start of this date (UTC).",
+      "futureDateRequired": "Choose a trial end date in the future.",
+      "description": "Invite customers with a trial plan and keep track of their invitations.",
+      "directoryTitle": "Sent invitations",
+      "directoryDescription": "Review plans, trial dates, and invitation status.",
+      "noPlans": "No plans are available for invitations. Try again later."
+    }
+  }
+}

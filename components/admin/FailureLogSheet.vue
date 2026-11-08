@@ -108,20 +108,27 @@ watch(
 <template>
   <Sheet v-model:open="isOpen">
     <SheetContent
-      class="!inset-y-auto !right-3 !top-16 !bottom-4 flex !h-auto w-full flex-col rounded-lg border sm:max-w-5xl"
+      :close-label="t('common.ui.close')"
+      class="!inset-y-0 !right-0 flex !h-full w-full flex-col gap-0 border-l p-0 sm:max-w-3xl"
     >
-      <SheetHeader class="flex-row items-start justify-between gap-4 space-y-0">
-        <div class="min-w-0 space-y-1">
-          <SheetTitle class="flex items-center gap-2">
-            <Badge v-if="kindLabel" variant="secondary" class="capitalize">
+      <SheetHeader
+        class="flex-col items-start justify-between gap-3 space-y-0 border-b px-5 py-5 pr-12 text-left sm:flex-row sm:gap-4"
+      >
+        <div class="min-w-0 space-y-2">
+          <SheetTitle class="flex flex-wrap items-center gap-2 text-sm">
+            <Badge
+              v-if="kindLabel"
+              variant="secondary"
+              class="text-[11px] font-medium capitalize"
+            >
               {{ kindLabel }}
             </Badge>
-            <span class="truncate">{{
+            <span class="break-words">{{
               failure?.title || t("admin.failureLog.title")
             }}</span>
           </SheetTitle>
           <SheetDescription
-            class="flex flex-wrap items-center gap-x-2 gap-y-0.5"
+            class="flex flex-wrap items-center gap-x-2 gap-y-0.5 break-words text-xs leading-5"
           >
             <span v-if="failure?.error" class="font-medium text-destructive">
               {{ failure.error }}
@@ -138,7 +145,7 @@ watch(
         <Button
           variant="outline"
           size="sm"
-          class="shrink-0"
+          class="h-8 shrink-0 text-xs"
           :disabled="!cleanLog"
           @click="copyLog"
         >
@@ -153,21 +160,21 @@ watch(
       </SheetHeader>
 
       <div
-        class="relative mt-3 min-h-0 flex-1 overflow-auto rounded-md border bg-muted/30"
+        class="relative min-h-0 flex-1 overflow-auto bg-slate-950 text-slate-200"
       >
         <div
           v-if="loading"
-          class="absolute right-2 top-2 flex items-center gap-1.5 rounded bg-background/80 px-2 py-1 text-xs text-muted-foreground"
+          class="absolute right-4 top-3 flex items-center gap-1.5 rounded bg-slate-800 px-2 py-1 text-xs text-slate-300"
         >
           <Icon name="lucide:loader-2" class="h-3.5 w-3.5 animate-spin" />
           {{ t("admin.failureLog.loading") }}
         </div>
         <pre
           v-if="cleanLog"
-          class="whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed"
+          class="whitespace-pre-wrap break-words p-5 font-mono text-xs leading-6"
           >{{ cleanLog }}</pre
         >
-        <p v-else class="p-4 text-sm text-muted-foreground">
+        <p v-else class="p-5 text-sm text-slate-400">
           {{ t("admin.failureLog.empty") }}
         </p>
       </div>

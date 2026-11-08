@@ -1,0 +1,20 @@
+{
+  "adminResources": {
+    "servers": {
+      "directory": "サーバー一覧",
+      "searchHint": "名前やIPアドレスで検索し、サーバーを開いて詳細を確認できます。",
+      "allTeams": "すべてのチーム"
+    },
+    "serverDetail": {
+      "description": "このサーバーの所有者、構成、ライフサイクルを確認できます。",
+      "configuration": "構成"
+    },
+    "failures": {
+      "history": "失敗履歴",
+      "inspectHint": "失敗した処理を選択し、記録された出力と次の対応を確認できます。"
+    },
+    "observability": {
+      "queryAnalysis": "クエリ分析"
+    }
+  }
+}

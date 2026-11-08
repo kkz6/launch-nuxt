@@ -6,6 +6,7 @@ import { adminService } from "~/services/adminService";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
+import AdminPageHeader from "~/components/admin/PageHeader.vue";
 
 definePageMeta({
   layout: "default",
@@ -186,8 +187,23 @@ onMounted(load);
 </script>
 
 <template>
-  <div class="pb-10">
+  <div class="space-y-7">
     <SharedConfirmationDialog ref="confirmationDialog" />
+    <AdminPageHeader
+      :title="server?.name || t('admin.common.server')"
+      :description="t('adminResources.serverDetail.description')"
+    >
+      <template #actions>
+        <Button
+          variant="outline"
+          size="sm"
+          @click="navigateTo('/admin/servers')"
+        >
+          <Icon name="lucide:arrow-left" class="mr-2 h-4 w-4" />
+          {{ t("admin.serverDetail.backToServers") }}
+        </Button>
+      </template>
+    </AdminPageHeader>
     <div v-if="isLoading" class="flex items-center justify-center py-16">
       <Icon
         name="lucide:loader-2"
@@ -197,7 +213,7 @@ onMounted(load);
 
     <div
       v-else-if="notFound"
-      class="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed py-16"
+      class="flex flex-col items-center justify-center gap-4 border-y py-16"
     >
       <Icon name="lucide:server-off" class="h-10 w-10 text-muted-foreground" />
       <p class="text-sm text-muted-foreground">
@@ -208,50 +224,52 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="server" class="flex flex-col gap-8 lg:flex-row">
-      <!-- Left rail: identity + specs -->
-      <aside
-        class="shrink-0 space-y-5 lg:sticky lg:top-4 lg:w-72 lg:self-start lg:border-r lg:pr-8"
-      >
-        <div class="space-y-3">
-          <div
-            class="flex h-14 w-14 items-center justify-center rounded-xl bg-muted"
-          >
-            <Icon :name="providerIcon" class="h-7 w-7 text-foreground" />
-          </div>
-          <div class="space-y-1.5">
-            <h1 class="text-xl font-semibold tracking-tight">
-              {{ server.name }}
-            </h1>
-            <div class="flex flex-wrap items-center gap-2">
-              <Badge :variant="statusVariant" class="capitalize">
-                {{ serverStatusLabel }}
-              </Badge>
-              <span
-                class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
-              >
-                <span
-                  class="h-1.5 w-1.5 rounded-full"
-                  :class="server.connected ? 'bg-emerald-500' : 'bg-red-500'"
-                />
-                {{
-                  server.connected
-                    ? t("admin.serverDetail.connected")
-                    : t("admin.serverDetail.disconnected")
-                }}
-              </span>
+    <div v-else-if="server" class="space-y-8">
+      <!-- Compact identity and configuration strip -->
+      <section class="min-w-0 border-y border-border/70 py-5">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/5 text-primary"
+            >
+              <Icon :name="providerIcon" class="h-5 w-5" />
             </div>
-            <p class="text-sm capitalize text-muted-foreground">
-              {{ server.provider.replace("_", " ") }}
-              <template v-if="server.type">
-                · {{ getServerTypeLabel(server.type, server.type) }}
-              </template>
-            </p>
+            <div class="space-y-1">
+              <h2 class="text-sm font-semibold">
+                {{ t("adminResources.serverDetail.configuration") }}
+              </h2>
+              <p class="text-sm capitalize text-muted-foreground">
+                {{ server.provider.replace("_", " ") }}
+                <template v-if="server.type">
+                  · {{ getServerTypeLabel(server.type, server.type) }}
+                </template>
+              </p>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <Badge :variant="statusVariant" class="capitalize">
+              {{ serverStatusLabel }}
+            </Badge>
+            <span
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+            >
+              <span
+                class="h-1.5 w-1.5 rounded-full"
+                :class="server.connected ? 'bg-emerald-500' : 'bg-red-500'"
+              />
+              {{
+                server.connected
+                  ? t("admin.serverDetail.connected")
+                  : t("admin.serverDetail.disconnected")
+              }}
+            </span>
           </div>
         </div>
 
-        <dl class="space-y-2.5 border-t pt-4 text-sm">
-          <div class="flex items-center justify-between gap-3">
+        <dl
+          class="mt-5 grid grid-cols-2 gap-x-8 gap-y-4 text-sm sm:grid-cols-4"
+        >
+          <div class="space-y-1">
             <dt class="text-muted-foreground">
               {{ t("admin.serverDetail.vcpu") }}
             </dt>
@@ -259,13 +277,13 @@ onMounted(load);
               {{ server.cpu_cores ? formatNumber(server.cpu_cores) : "—" }}
             </dd>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="space-y-1">
             <dt class="text-muted-foreground">
               {{ t("admin.serverDetail.memory") }}
             </dt>
             <dd class="font-medium">{{ memory }}</dd>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="space-y-1">
             <dt class="text-muted-foreground">
               {{ t("admin.serverDetail.storage") }}
             </dt>
@@ -277,37 +295,39 @@ onMounted(load);
               }}
             </dd>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="space-y-1">
             <dt class="text-muted-foreground">
               {{ t("admin.serverDetail.publicIpv4") }}
             </dt>
-            <dd class="font-mono font-medium">
+            <dd class="break-all font-mono text-[13px] font-medium">
               {{ server.public_ipv4 || "—" }}
             </dd>
           </div>
         </dl>
-      </aside>
+      </section>
 
-      <!-- Right content -->
-      <div class="min-w-0 flex-1 space-y-8">
-        <!-- Owner (the key ask: who owns this) -->
-        <section>
-          <h2 class="mb-2 text-sm font-semibold">
+      <!-- Ownership and system metadata -->
+      <div class="grid min-w-0 items-start gap-x-12 gap-y-8 lg:grid-cols-2">
+        <!-- Owner -->
+        <section class="min-w-0">
+          <h2 class="mb-4 text-sm font-semibold">
             {{ t("admin.serverDetail.owner") }}
           </h2>
           <NuxtLink
             v-if="server.owner.user_id"
             :to="`/admin/users/${server.owner.user_id}`"
-            class="group flex items-center justify-between gap-4 rounded-lg border px-4 py-3 transition-colors hover:bg-muted/50"
+            class="group -mx-2 flex items-center justify-between gap-4 rounded-md px-2 py-2 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <div class="flex items-center gap-3">
-              <Avatar class="h-10 w-10">
-                <AvatarFallback class="text-sm font-semibold">
+            <div class="flex min-w-0 items-center gap-3">
+              <Avatar class="h-9 w-9 shrink-0">
+                <AvatarFallback
+                  class="bg-primary/5 text-xs font-semibold text-primary"
+                >
                   {{ teamInitials }}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <div class="flex items-center gap-2">
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
                   <p class="text-sm font-medium">
                     {{ server.owner.team_name }}
                   </p>
@@ -318,7 +338,7 @@ onMounted(load);
                     · {{ t("admin.serverDetail.personal") }}
                   </span>
                 </div>
-                <p class="text-xs text-muted-foreground">
+                <p class="break-words text-xs text-muted-foreground">
                   {{ server.owner.user_name }} · {{ server.owner.user_email }}
                 </p>
               </div>
@@ -330,11 +350,11 @@ onMounted(load);
           </NuxtLink>
         </section>
 
-        <section>
-          <h2 class="mb-2 text-sm font-semibold">
+        <section class="min-w-0">
+          <h2 class="mb-4 text-sm font-semibold">
             {{ t("admin.serverDetail.operatingSystem") }}
           </h2>
-          <dl class="divide-y border-t text-sm">
+          <dl class="divide-y divide-border/60 text-sm">
             <div class="flex justify-between gap-4 py-2.5">
               <dt class="text-muted-foreground">
                 {{ t("admin.serverDetail.selected") }}
@@ -345,7 +365,9 @@ onMounted(load);
               <dt class="text-muted-foreground">
                 {{ t("admin.serverDetail.detected") }}
               </dt>
-              <dd class="font-medium">{{ detectedOS }}</dd>
+              <dd class="break-words text-right font-medium">
+                {{ detectedOS }}
+              </dd>
             </div>
             <div
               v-if="server.detected_kernel"
@@ -354,18 +376,18 @@ onMounted(load);
               <dt class="text-muted-foreground">
                 {{ t("admin.serverDetail.kernel") }}
               </dt>
-              <dd class="font-mono text-xs font-medium">
+              <dd class="break-all text-right font-mono text-xs font-medium">
                 {{ server.detected_kernel }}
               </dd>
             </div>
           </dl>
         </section>
 
-        <section>
-          <h2 class="mb-2 text-sm font-semibold">
+        <section class="min-w-0">
+          <h2 class="mb-4 text-sm font-semibold">
             {{ t("admin.serverDetail.statusLifecycle") }}
           </h2>
-          <dl class="divide-y border-t text-sm">
+          <dl class="divide-y divide-border/60 text-sm">
             <div class="flex items-center justify-between gap-4 py-2.5">
               <dt class="text-muted-foreground">
                 {{ t("admin.serverDetail.monitoring") }}
@@ -432,7 +454,7 @@ onMounted(load);
         <section
           v-if="isSuperAdmin"
           aria-labelledby="server-delete-heading"
-          class="space-y-3 border-t pt-6"
+          class="min-w-0 space-y-3 border-t border-border/70 pt-5"
         >
           <h2
             id="server-delete-heading"
@@ -451,7 +473,9 @@ onMounted(load);
             {{ deleteError }}
           </p>
           <Button
-            variant="destructive"
+            variant="outline"
+            size="sm"
+            class="border-destructive/25 text-destructive hover:bg-destructive/5 hover:text-destructive"
             :disabled="deleteLoading || !!deletionBlockedReason"
             @click="deleteServer"
           >

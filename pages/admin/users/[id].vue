@@ -467,20 +467,23 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="user" class="space-y-6">
-      <header class="space-y-5 rounded-xl border bg-card p-5 shadow-sm sm:p-6">
+    <div v-else-if="user" class="space-y-8">
+      <header class="space-y-5">
         <div
           class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
         >
-          <div class="flex min-w-0 items-center gap-3">
-            <Avatar class="h-12 w-12 shrink-0">
-              <AvatarFallback class="font-semibold">{{
-                initials
-              }}</AvatarFallback>
+          <div class="flex min-w-0 items-center gap-4">
+            <Avatar class="h-12 w-12 shrink-0 rounded-xl">
+              <AvatarFallback
+                class="rounded-xl bg-primary/10 text-base font-semibold text-primary"
+                >{{ initials }}</AvatarFallback
+              >
             </Avatar>
-            <div class="min-w-0 space-y-1">
+            <div class="min-w-0 space-y-2">
               <div class="flex flex-wrap items-center gap-2">
-                <h1 class="text-2xl font-semibold tracking-tight">
+                <h1
+                  class="text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]"
+                >
                   {{ user.name }}
                 </h1>
                 <Badge :variant="statusVariant">{{ userStatusLabel }}</Badge>
@@ -539,18 +542,22 @@ onMounted(load);
             </template>
           </div>
         </div>
-        <dl class="flex flex-wrap gap-x-8 gap-y-3 border-t pt-4 text-sm">
+        <dl class="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:pl-16">
           <div class="flex items-center gap-2">
             <dt class="text-muted-foreground">
               {{ t("admin.userDetail.tabs.teams") }}
             </dt>
-            <dd class="font-medium">{{ formatNumber(user.teams.length) }}</dd>
+            <dd class="font-semibold tabular-nums">
+              {{ formatNumber(user.teams.length) }}
+            </dd>
           </div>
           <div class="flex items-center gap-2">
             <dt class="text-muted-foreground">
               {{ t("admin.userDetail.activeSubscriptionsShort") }}
             </dt>
-            <dd class="font-medium">{{ formatNumber(activeSubs) }}</dd>
+            <dd class="font-semibold tabular-nums">
+              {{ formatNumber(activeSubs) }}
+            </dd>
           </div>
           <div class="flex items-center gap-2">
             <dt class="text-muted-foreground">
@@ -572,7 +579,7 @@ onMounted(load);
           {{ actionErrorMessage }}
         </p>
       </header>
-      <div v-if="isSuperAdmin" class="space-y-2">
+      <div v-if="isSuperAdmin" class="space-y-2 border-y border-border/70 py-5">
         <UserStaffRoleControl
           :role="user.staff_role"
           :is-self="isSelf"
@@ -584,47 +591,59 @@ onMounted(load);
         <p
           v-if="user.staff_role && !isSelf"
           id="staff-deletion-help"
-          class="px-1 text-sm text-muted-foreground"
+          class="text-xs leading-relaxed text-muted-foreground"
         >
           {{ t("admin.userDetail.demoteBeforeDelete") }}
         </p>
       </div>
 
       <!-- User resources -->
-      <div
-        class="min-w-0 flex-1 rounded-xl border bg-card p-4 shadow-sm sm:p-6"
-      >
+      <div class="min-w-0 flex-1">
         <Tabs :model-value="activeTab" @update:model-value="onTabChange">
-          <TabsList class="mb-5 max-w-full justify-start overflow-x-auto">
-            <TabsTrigger value="teams">
+          <TabsList
+            class="mb-6 flex w-full justify-start gap-5 overflow-x-auto rounded-none border-b border-border/70 bg-transparent p-0 sm:gap-7"
+          >
+            <TabsTrigger
+              value="teams"
+              class="relative -mb-px rounded-none border-b-2 border-transparent bg-transparent px-0 pb-3 pt-0 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
               {{ t("admin.userDetail.tabs.teams") }}
-              <span class="ml-1.5 text-xs text-muted-foreground">
+              <span class="ml-2 text-xs tabular-nums text-muted-foreground">
                 {{ formatNumber(user.teams.length) }}
               </span>
             </TabsTrigger>
-            <TabsTrigger value="subscriptions">
+            <TabsTrigger
+              value="subscriptions"
+              class="relative -mb-px rounded-none border-b-2 border-transparent bg-transparent px-0 pb-3 pt-0 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
               {{ t("admin.userDetail.tabs.subscriptions") }}
               <span
                 v-if="loaded.subscriptions"
-                class="ml-1.5 text-xs text-muted-foreground"
+                class="ml-2 text-xs tabular-nums text-muted-foreground"
               >
                 {{ formatNumber(subscriptions.length) }}
               </span>
             </TabsTrigger>
-            <TabsTrigger value="servers">
+            <TabsTrigger
+              value="servers"
+              class="relative -mb-px rounded-none border-b-2 border-transparent bg-transparent px-0 pb-3 pt-0 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
               {{ t("admin.userDetail.tabs.servers") }}
               <span
                 v-if="loaded.servers"
-                class="ml-1.5 text-xs text-muted-foreground"
+                class="ml-2 text-xs tabular-nums text-muted-foreground"
               >
                 {{ formatNumber(servers.length) }}
               </span>
             </TabsTrigger>
-            <TabsTrigger value="sites">
+            <TabsTrigger
+              value="sites"
+              class="relative -mb-px rounded-none border-b-2 border-transparent bg-transparent px-0 pb-3 pt-0 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+            >
               {{ t("admin.userDetail.tabs.sites") }}
               <span
                 v-if="loaded.sites"
-                class="ml-1.5 text-xs text-muted-foreground"
+                class="ml-2 text-xs tabular-nums text-muted-foreground"
               >
                 {{ formatNumber(sites.length) }}
               </span>
@@ -648,15 +667,15 @@ onMounted(load);
 
           <!-- Teams -->
           <TabsContent value="teams">
-            <div v-if="user.teams.length" class="divide-y border-t">
+            <div v-if="user.teams.length" class="divide-y divide-border/60">
               <div
                 v-for="team in user.teams"
                 :key="team.id"
-                class="flex items-center justify-between gap-4 py-3.5"
+                class="flex items-center justify-between gap-4 py-4"
               >
                 <div class="flex items-center gap-3">
                   <div
-                    class="flex h-9 w-9 items-center justify-center rounded-full bg-muted"
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60"
                   >
                     <Icon
                       :name="
@@ -685,7 +704,7 @@ onMounted(load);
             </div>
             <div
               v-else
-              class="flex flex-col items-center justify-center gap-2 border-t py-16 text-center"
+              class="flex flex-col items-center justify-center gap-3 py-16 text-center"
             >
               <Icon
                 name="lucide:users"
@@ -701,22 +720,25 @@ onMounted(load);
           <TabsContent value="subscriptions">
             <div
               v-if="loadingTab.subscriptions"
-              class="flex items-center justify-center border-t py-16"
+              class="flex items-center justify-center py-16"
             >
               <Icon
                 name="lucide:loader-2"
                 class="h-6 w-6 animate-spin text-muted-foreground"
               />
             </div>
-            <div v-else-if="subscriptions.length" class="divide-y border-t">
+            <div
+              v-else-if="subscriptions.length"
+              class="divide-y divide-border/60"
+            >
               <div
                 v-for="(sub, i) in subscriptions"
                 :key="`${sub.team_id}-${i}`"
-                class="flex items-center justify-between gap-4 py-3.5"
+                class="flex items-center justify-between gap-4 py-4"
               >
                 <div class="flex items-center gap-3">
                   <div
-                    class="flex h-9 w-9 items-center justify-center rounded-full bg-muted"
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60"
                   >
                     <Icon
                       name="lucide:credit-card"
@@ -755,7 +777,7 @@ onMounted(load);
             </div>
             <div
               v-else
-              class="flex flex-col items-center justify-center gap-2 border-t py-16 text-center"
+              class="flex flex-col items-center justify-center gap-3 py-16 text-center"
             >
               <Icon
                 name="lucide:credit-card"
@@ -769,36 +791,45 @@ onMounted(load);
 
           <!-- Servers -->
           <TabsContent value="servers" class="space-y-4">
-            <div class="max-w-sm space-y-1.5">
-              <Label for="admin-server-search">{{
+            <div class="relative max-w-sm">
+              <Label for="admin-server-search" class="sr-only">{{
                 t("admin.userDetail.searchServers")
               }}</Label>
+              <Icon
+                name="lucide:search"
+                class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
+                aria-hidden="true"
+              />
               <Input
                 id="admin-server-search"
                 v-model="serverSearch"
                 type="search"
+                class="h-9 border-border/70 bg-background pl-9 shadow-none"
                 :placeholder="t('admin.userDetail.searchServersPlaceholder')"
               />
             </div>
             <div
               v-if="loadingTab.servers"
-              class="flex items-center justify-center border-t py-16"
+              class="flex items-center justify-center py-16"
             >
               <Icon
                 name="lucide:loader-2"
                 class="h-6 w-6 animate-spin text-muted-foreground"
               />
             </div>
-            <div v-else-if="filteredServers.length" class="divide-y border-t">
+            <div
+              v-else-if="filteredServers.length"
+              class="divide-y divide-border/60"
+            >
               <NuxtLink
                 v-for="server in filteredServers"
                 :key="server.id"
                 :to="`/admin/servers/${server.id}`"
-                class="flex items-center justify-between gap-4 px-2 py-3.5 transition-colors hover:bg-muted/50"
+                class="group flex items-center justify-between gap-4 py-4 transition-colors hover:bg-muted/30"
               >
                 <div class="flex items-center gap-3">
                   <div
-                    class="flex h-9 w-9 items-center justify-center rounded-full bg-muted"
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60"
                   >
                     <Icon
                       name="lucide:server"
@@ -820,7 +851,7 @@ onMounted(load);
             </div>
             <div
               v-else
-              class="flex flex-col items-center justify-center gap-2 border-t py-16 text-center"
+              class="flex flex-col items-center justify-center gap-3 py-16 text-center"
             >
               <Icon
                 name="lucide:server"

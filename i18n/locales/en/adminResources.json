@@ -1,0 +1,20 @@
+{
+  "adminResources": {
+    "servers": {
+      "directory": "Server directory",
+      "searchHint": "Search by name or IP address, then open a server to inspect its details.",
+      "allTeams": "All teams"
+    },
+    "serverDetail": {
+      "description": "Ownership, configuration, and lifecycle for this server.",
+      "configuration": "Configuration"
+    },
+    "failures": {
+      "history": "Failure history",
+      "inspectHint": "Select a failure to inspect its captured output and identify the next step."
+    },
+    "observability": {
+      "queryAnalysis": "Query analysis"
+    }
+  }
+}

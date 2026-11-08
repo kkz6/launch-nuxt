@@ -1,0 +1,25 @@
+{
+  "adminShell": {
+    "title": "管理パネル",
+    "manage": "管理",
+    "monitor": "監視",
+    "navigation": "管理ナビゲーション",
+    "navigationDescription": "アカウントの管理とプラットフォームの監視。",
+    "openNavigation": "管理ナビゲーションを開く",
+    "breadcrumb": "パンくずリスト",
+    "skipToContent": "コンテンツへ移動",
+    "overviewDescription": "サブスクリプション、収益、最近の支払いを確認できます。",
+    "refresh": "更新",
+    "retry": "再試行",
+    "loading": "概要を読み込み中…",
+    "staleOverview": "最後に取得できた概要を表示しています。更新して再試行してください。",
+    "monthlyRevenue": "月次の継続収益",
+    "lifetimeRevenue": "これまでの収益合計",
+    "currentSubscriptions": "現在有効なプラン",
+    "trialSubscriptions": "Launchctl を試用中のお客様",
+    "subscriptionActivity": "サブスクリプションの動向",
+    "thisMonth": "今月",
+    "revenueDescription": "月ごとの支払い実績。",
+    "paymentsDescription": "各チームの直近の支払い。"
+  }
+}

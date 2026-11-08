@@ -25,6 +25,7 @@ const props = withDefaults(
     debounce?: number;
     syncUrl?: boolean;
     tableClass?: string;
+    borderless?: boolean;
     headers?: Record<string, string> | (() => Record<string, string>);
     // Optional per-row filter for the server-declared actions. Lets a page
     // hide actions the current user isn't allowed to invoke (the backend is
@@ -36,6 +37,7 @@ const props = withDefaults(
     debounce: 300,
     syncUrl: true,
     tableClass: "",
+    borderless: false,
     headers: () => ({}),
     rowActionsFilter: undefined,
   },
@@ -262,7 +264,8 @@ defineExpose({ refresh });
     </div>
     <div
       v-if="!loadError || data.length"
-      class="rounded-xl border bg-card overflow-hidden"
+      class="bg-card overflow-hidden"
+      :class="borderless ? 'border-y' : 'rounded-xl border'"
     >
       <div class="relative overflow-auto">
         <table
