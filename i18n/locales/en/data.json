@@ -1,5 +1,8 @@
 {
   "data": {
+    "loadFailed": "We couldn't load this list. Try again.",
+    "staleData": "Showing the last loaded results. They may be out of date.",
+    "retry": "Try again",
     "actions": "Actions",
     "export": "Export",
     "filter": "Filter",

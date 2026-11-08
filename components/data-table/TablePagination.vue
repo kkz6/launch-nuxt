@@ -22,6 +22,14 @@ const emit = defineEmits<{
   perPage: [value: number];
 }>();
 
+// The API's current page size may differ from its configured suggestions.
+// Keep the active value available so SelectValue can display its label.
+const availablePageSizes = computed(() =>
+  [...new Set([...props.perPageOptions, props.pagination.perPage])]
+    .filter((value) => Number.isInteger(value) && value > 0)
+    .sort((a, b) => a - b),
+);
+
 const pages = computed(() => {
   const { currentPage, lastPage } = props.pagination;
   if (lastPage <= 7) return Array.from({ length: lastPage }, (_, i) => i + 1);
@@ -40,8 +48,10 @@ const pages = computed(() => {
 });
 </script>
 <template>
-  <div class="flex items-center justify-between px-1 pt-4 pb-1">
-    <div class="text-sm text-muted-foreground">
+  <div
+    class="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 px-1 pt-4 pb-1"
+  >
+    <div class="min-w-0 text-sm text-muted-foreground">
       <template v-if="pagination.total > 0">
         {{
           t("data.pagination.showing", {
@@ -53,17 +63,22 @@ const pages = computed(() => {
       </template>
     </div>
 
-    <div class="flex items-center gap-2">
+    <div class="flex max-w-full flex-wrap items-center gap-2">
       <Select
         :model-value="String(pagination.perPage)"
         @update:model-value="emit('perPage', Number($event))"
       >
-        <SelectTrigger class="w-[130px]">
+        <SelectTrigger
+          class="w-[130px] shrink-0"
+          :aria-label="
+            t('data.pagination.perPage', { count: pagination.perPage })
+          "
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
           <SelectItem
-            v-for="opt in perPageOptions"
+            v-for="opt in availablePageSizes"
             :key="opt"
             :value="String(opt)"
           >
@@ -72,7 +87,10 @@ const pages = computed(() => {
         </SelectContent>
       </Select>
 
-      <div v-if="pagination.type === 'full'" class="flex items-center gap-1">
+      <div
+        v-if="pagination.type === 'full'"
+        class="flex max-w-full flex-wrap items-center gap-1"
+      >
         <Button
           variant="outline"
           size="sm"
@@ -111,7 +129,7 @@ const pages = computed(() => {
         </Button>
       </div>
 
-      <div v-else class="flex items-center gap-1">
+      <div v-else class="flex max-w-full flex-wrap items-center gap-1">
         <Button
           variant="outline"
           size="sm"

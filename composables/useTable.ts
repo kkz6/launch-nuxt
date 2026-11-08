@@ -20,6 +20,7 @@ interface TableState<T> {
   pagination: PaginationData | null;
   isLoading: boolean;
   hasLoaded: boolean;
+  loadError: boolean;
   currentPage: number;
   perPage: number;
   sortColumn: string | null;
@@ -39,6 +40,7 @@ export function useTable<T = any>(
     pagination: null as PaginationData | null,
     isLoading: false,
     hasLoaded: false,
+    loadError: false,
     currentPage: 1,
     perPage: options.defaultPerPage ?? 15,
     sortColumn: null as string | null,
@@ -114,15 +116,33 @@ export function useTable<T = any>(
       if (!result) {
         throw new Error("Table response was empty");
       }
-      state.data = result.data;
-      state.meta = result.meta;
+      // Go encodes unset slices as null. Keep the component-facing metadata
+      // consistent so tables with no filters or actions still render.
+      const meta = result.meta;
+      const normalizedMeta: TableMeta = {
+        ...meta,
+        columns: meta.columns ?? [],
+        filters: meta.filters ?? [],
+        actions: {
+          row: meta.actions?.row ?? [],
+          bulk: meta.actions?.bulk ?? [],
+        },
+        exports: meta.exports ?? [],
+        views: meta.views ?? [],
+        search: meta.search ?? { enabled: false, placeholder: "" },
+        perPageOptions: meta.perPageOptions ?? [15, 30, 50, 100],
+      };
+      state.data = result.data ?? [];
+      state.meta = normalizedMeta;
       state.pagination = result.pagination;
-      if (state.visibleColumns.length === 0 && result.meta?.columns?.length) {
-        state.visibleColumns = result.meta.columns
+      state.loadError = false;
+      if (state.visibleColumns.length === 0 && normalizedMeta.columns.length) {
+        state.visibleColumns = normalizedMeta.columns
           .filter((c: any) => c.toggleable !== false && c.visible !== false)
           .map((c: any) => c.key);
       }
     } catch (error) {
+      state.loadError = true;
       console.error("Failed to fetch table data:", error);
     } finally {
       state.isLoading = false;

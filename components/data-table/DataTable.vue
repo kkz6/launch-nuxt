@@ -6,6 +6,7 @@ import { useActions } from "~/composables/useActions";
 import { useExport } from "~/composables/useExport";
 import { useStickyTable } from "~/composables/useStickyTable";
 import { Checkbox } from "~/components/ui/checkbox";
+import { Button } from "~/components/ui/button";
 import { CellRenderer } from "./columns";
 import { AddFilterDropdown, ActiveFilters } from "./filters";
 import { RowActions, BulkActionsDropdown } from "./actions";
@@ -50,6 +51,7 @@ const {
   pagination,
   isLoading,
   hasLoaded,
+  loadError,
   isEmpty,
   sortColumn,
   sortDirection,
@@ -86,6 +88,7 @@ const {
 
 const { isExporting, exportProgress, triggerExport } = useExport();
 const { tableRef, headerStuck } = useStickyTable();
+const { t } = useI18n();
 const slots = useSlots();
 
 // Skip the action column entirely when no row on the current page has a
@@ -238,7 +241,29 @@ defineExpose({ refresh });
     />
 
     <!-- Table -->
-    <div class="rounded-xl border bg-card overflow-hidden">
+    <div
+      v-if="loadError"
+      role="alert"
+      class="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-4 text-sm"
+    >
+      <div class="space-y-1">
+        <p class="font-medium">{{ t("data.loadFailed") }}</p>
+        <p v-if="data.length" class="text-muted-foreground">
+          {{ t("data.staleData") }}
+        </p>
+      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        :disabled="isLoading"
+        @click="refresh"
+      >{{ t("data.retry") }}</Button>
+    </div>
+    <div
+      v-if="!loadError || data.length"
+      class="rounded-xl border bg-card overflow-hidden"
+    >
       <div class="relative overflow-auto">
         <table
           class="w-full text-sm"
@@ -434,7 +459,7 @@ defineExpose({ refresh });
         </table>
 
         <EmptyState
-          v-if="!isInitialLoading && isEmpty"
+          v-if="!isInitialLoading && isEmpty && !loadError"
           :config="meta?.emptyState"
         />
 
