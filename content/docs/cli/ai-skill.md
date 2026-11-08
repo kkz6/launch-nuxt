@@ -28,7 +28,7 @@ If you have access to the source repository, the plugin is versioned with the
 CLI release:
 
 ```bash
-codex plugin marketplace add kkz6/launchctl-cli --ref v0.4.0
+codex plugin marketplace add kkz6/launchctl-cli --ref v0.4.1
 codex plugin add launchctl@launchctl
 ```
 

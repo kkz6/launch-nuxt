@@ -40,7 +40,7 @@ describe("Docker and AI documentation", () => {
     const content = readDoc("cli/ai-skill");
     expect(content).toContain("lctl ai install");
     expect(content).toContain("codex plugin marketplace add");
-    expect(content).toContain("--ref v0.4.0");
+    expect(content).toContain("--ref v0.4.1");
     expect(content).not.toContain("--ref v0.2.2");
     expect(content).toContain("docker.application.*");
     expect(content).toContain("queued HTTP response");

@@ -115,3 +115,9 @@ For Laravel sites with queues:
 - **Rollback**: Revert to a previous release
 - **Restart**: Restart PHP-FPM for the site
 - **Delete**: Remove the site from the server
+
+### Delete a site as an administrator
+
+Open **Admin → Users → user → Sites**. Search by domain or server name, then select **Delete site** on the intended row. This action requires **Super admin** access. Type the exact site domain in the confirmation dialog.
+
+Deletion removes the site's files and configuration from its owning server. The server itself remains. After the request is accepted, the row shows **Deletion requested** while cleanup runs in the background. Use **Refresh** to check the result; a queued request is not completed deletion. Failed cleanup retains the site record so you can investigate and retry.

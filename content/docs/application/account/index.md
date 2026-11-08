@@ -175,6 +175,24 @@ Disconnecting removes launchctl's access but doesn't affect existing deployments
 Account deletion is permanent. All data, teams, servers, and sites will be deleted.
 ::
 
+## Admin user management
+
+The admin panel uses a sidebar for **Overview**, **Users**, **Invitations**, **Servers**, **Failures**, and **Observability**. On smaller screens, open the navigation menu above the page. Use the available search, filters, and pagination to find records. User and invitation lists include **Refresh**; failed list requests offer **Try again**.
+
+Overview shows compact subscription and revenue totals, revenue history, and recent payments. In **Failures**, select **View log** to open the log drawer and **Copy log** to copy its output. **Observability** groups runtime and database metrics above the query-analysis tabs.
+
+In **Invitations → Invite user**, choose a plan and use the calendar to select a future trial end date. The trial ends at the start of the selected date (00:00 UTC).
+
+Open **Admin → Users** and select a user. Account actions, including **Delete user**, appear in the header. Super administrators see **Staff access** below it. The **Teams**, **Subscriptions**, **Servers**, and **Sites** tabs contain the user’s resources; site deletion is available on the intended site row.
+
+Super administrators can change **Staff access** to **Regular user**, **Support**, or **Super admin**, select **Save role**, and confirm the change. Regular user removes access to the admin panel; it does not change team permissions. Role changes are audited and apply to subsequent admin requests.
+
+You cannot change your own staff role or demote the last super administrator. Ask another super administrator to change your role when needed. Support staff can view user details but cannot change roles or delete users or sites.
+
+To delete another staff account, first change its staff access to **Regular user**, then use **Delete user**. Removing staff access does not bypass the existing billing-history restriction: users whose owned teams have a paid order or a current or past non-trial subscription cannot be deleted. Self-deletion is also blocked here.
+
+See the [staff API](/docs/api/staff) for the corresponding administrative endpoints.
+
 ## Best Practices
 1. **Enable 2FA**: Protect your account with two-factor auth
 2. **Use Passkeys**: Modern, phishing-resistant authentication
