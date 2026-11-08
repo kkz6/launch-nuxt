@@ -44,6 +44,7 @@ export const useServersStore = defineStore('servers', () => {
   const isLoading = ref(false)
   const hasFetched = ref(false)
   let subscribed = false
+  let deletionVersion = 0
   // Own effect scope for the WS subscription. useServerEvents registers
   // cleanup via onScopeDispose; without our own scope it would attach
   // to whichever component happened to be active when ensureSubscribed
@@ -115,9 +116,11 @@ export const useServersStore = defineStore('servers', () => {
 
   const fetchAll = async () => {
     ensureSubscribed()
+    const requestDeletionVersion = deletionVersion
     isLoading.value = true
     try {
       const response = await serverService.list()
+      if (requestDeletionVersion !== deletionVersion) return
       replaceAll(response.data)
       hasFetched.value = true
     } finally {
@@ -143,7 +146,7 @@ export const useServersStore = defineStore('servers', () => {
 
       useServerEvents(teamId, (data, event) => {
         onServerEvent(event, data)
-      })
+      }, { onReconnect: scheduleRefetch })
     })
   }
 
@@ -162,6 +165,8 @@ export const useServersStore = defineStore('servers', () => {
 
     switch (event) {
       case 'server.deleted':
+        // A response started before this completion must not restore the row.
+        deletionVersion++
         if (id) remove(id)
         return
 
@@ -275,8 +280,10 @@ export const useServersStore = defineStore('servers', () => {
   }
 
   const backgroundRefetch = async () => {
+    const requestDeletionVersion = deletionVersion
     try {
       const response = await serverService.list()
+      if (requestDeletionVersion !== deletionVersion) return
       replaceAll(response.data)
     } catch {
       // Silent — the next interactive fetch will surface errors.

@@ -184,12 +184,12 @@ defineExpose({ refresh });
 <template>
   <div ref="tableRef" class="w-full">
     <!-- Header toolbar -->
-    <div class="flex flex-wrap items-center gap-2 pb-4">
+    <div class="flex flex-wrap items-center gap-2 pb-3">
       <SearchInput
         v-if="meta?.search.enabled"
         :model-value="search"
         :placeholder="meta.search.placeholder"
-        class="w-64"
+        class="w-full sm:w-72"
         @update:model-value="setSearch"
       />
 
@@ -201,8 +201,6 @@ defineExpose({ refresh });
         @action="handleBulkAction"
         @export="handleExport"
       />
-
-      <div class="flex-1" />
 
       <AddFilterDropdown
         v-if="meta?.filters.length"
@@ -260,12 +258,13 @@ defineExpose({ refresh });
         size="sm"
         :disabled="isLoading"
         @click="refresh"
-      >{{ t("data.retry") }}</Button>
+        >{{ t("data.retry") }}</Button
+      >
     </div>
     <div
       v-if="!loadError || data.length"
       class="bg-card overflow-hidden"
-      :class="borderless ? 'border-y' : 'rounded-xl border'"
+      :class="borderless ? 'border-y' : 'rounded-lg border'"
     >
       <div class="relative overflow-auto">
         <table
@@ -275,7 +274,7 @@ defineExpose({ refresh });
           <thead
             :class="
               cn(
-                'border-b bg-muted/30',
+                'border-b bg-muted/40',
                 meta?.stickyHeader &&
                   headerStuck &&
                   'sticky top-0 z-10 shadow-sm',
@@ -303,7 +302,7 @@ defineExpose({ refresh });
                 :key="col.key"
                 :class="
                   cn(
-                    'px-4 py-2.5 text-xs font-medium text-muted-foreground',
+                    'h-10 px-4 text-xs font-medium text-muted-foreground',
                     col.alignment === 'right'
                       ? 'text-right'
                       : col.alignment === 'center'
@@ -312,66 +311,41 @@ defineExpose({ refresh });
                     col.headerClass,
                   )
                 "
-                class="cursor-default"
-                @click="col.sortable && setSort(col.key)"
+                :aria-sort="
+                  col.sortable
+                    ? sortColumn === col.key
+                      ? sortDirection === 'asc'
+                        ? 'ascending'
+                        : 'descending'
+                      : 'none'
+                    : undefined
+                "
               >
-                <div
-                  class="flex items-center gap-1"
-                  :class="[
-                    {
-                      'cursor-pointer select-none hover:text-foreground':
-                        col.sortable,
-                    },
-                    col.alignment === 'right'
-                      ? 'justify-end'
-                      : col.alignment === 'center'
-                        ? 'justify-center'
-                        : 'justify-start',
-                  ]"
+                <button
+                  v-if="col.sortable"
+                  type="button"
+                  class="-mx-2 inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  @click="setSort(col.key)"
                 >
                   {{ col.header }}
-                  <template v-if="col.sortable">
-                    <svg
-                      v-if="sortColumn === col.key && sortDirection === 'asc'"
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                    >
-                      <path d="m5 15 7-7 7 7" />
-                    </svg>
-                    <svg
-                      v-else-if="
-                        sortColumn === col.key && sortDirection === 'desc'
-                      "
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2.5"
-                    >
-                      <path d="m19 9-7 7-7-7" />
-                    </svg>
-                    <svg
-                      v-else
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      class="opacity-30"
-                    >
-                      <path d="m7 15 5 5 5-5M7 9l5-5 5 5" />
-                    </svg>
-                  </template>
-                </div>
+                  <Icon
+                    :name="
+                      sortColumn === col.key
+                        ? sortDirection === 'asc'
+                          ? 'lucide:chevron-up'
+                          : 'lucide:chevron-down'
+                        : 'lucide:chevrons-up-down'
+                    "
+                    class="h-3.5 w-3.5 shrink-0"
+                    :class="
+                      sortColumn === col.key
+                        ? 'text-foreground'
+                        : 'text-muted-foreground/60'
+                    "
+                    aria-hidden="true"
+                  />
+                </button>
+                <span v-else>{{ col.header }}</span>
               </th>
             </tr>
           </thead>
@@ -401,7 +375,7 @@ defineExpose({ refresh });
             <tr
               v-for="row in data"
               :key="(row as any).id"
-              class="transition-colors hover:bg-muted/30 cursor-pointer"
+              class="cursor-pointer transition-colors duration-150 hover:bg-muted/20"
               @click="emit('row-click', row)"
             >
               <td v-if="showCheckboxes" class="pl-4 pr-2 py-2" @click.stop>
@@ -415,7 +389,7 @@ defineExpose({ refresh });
                 :key="col.key"
                 :class="
                   cn(
-                    'px-4 py-2.5',
+                    'px-4 py-2 align-middle',
                     col.alignment === 'right'
                       ? 'text-right'
                       : col.alignment === 'center'
@@ -468,10 +442,12 @@ defineExpose({ refresh });
 
         <div
           v-if="isLoading && !isInitialLoading"
-          class="absolute inset-0 flex items-center justify-center bg-card/60 backdrop-blur-sm"
+          role="status"
+          :aria-label="t('data.loadingData')"
+          class="pointer-events-none absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-card text-muted-foreground"
         >
           <div
-            class="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
+            class="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
           />
         </div>
       </div>

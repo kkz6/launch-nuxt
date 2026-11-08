@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
 import { ref } from "vue";
 import DataTable from "~/components/data-table/DataTable.vue";
 import AdminPageHeader from "~/components/admin/PageHeader.vue";
@@ -11,6 +12,7 @@ definePageMeta({
 });
 
 const { locale, t } = useI18n();
+const table = ref<{ refresh: () => Promise<void> } | null>(null);
 
 useHead({
   title: () => t("admin.failures.pageTitle"),
@@ -46,6 +48,9 @@ function openLog(row: FailureRow): void {
   activeFailure.value = row;
   logOpen.value = true;
 }
+useAdminLiveUpdates(() => table.value?.refresh(), {
+  resources: ["task", "deployment", "server", "site", "docker"],
+});
 </script>
 
 <template>
@@ -55,10 +60,7 @@ function openLog(row: FailureRow): void {
       :description="t('admin.failures.description')"
     />
 
-    <section
-      aria-labelledby="failure-history-title"
-      class="space-y-4"
-    >
+    <section aria-labelledby="failure-history-title" class="space-y-4">
       <div class="sr-only">
         <h2 id="failure-history-title" class="text-base font-semibold">
           {{ t("adminResources.failures.history") }}
@@ -68,7 +70,11 @@ function openLog(row: FailureRow): void {
         </p>
       </div>
       <div class="admin-directory">
-        <DataTable borderless endpoint="/admin/failures/table" @row-click="openLog">
+        <DataTable
+          ref="table"
+          endpoint="/admin/failures/table"
+          @row-click="openLog"
+        >
           <!-- Replace the raw inline log dump with a compact affordance that opens
            the full output in the log viewer sheet. -->
           <template #cell-detail="{ value, row }">

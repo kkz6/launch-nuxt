@@ -41,9 +41,15 @@ The API resolves the owning server and team from the site. A successful response
 {"data": {"site_id": "SITE_ID", "status": "deletion_requested"}}
 ```
 
-This is an asynchronous request. Cleanup removes the site's files and configuration; it does not delete the server. A pending site remains in `GET /admin/users/{id}/sites` with `uninstallation_requested_at` set. Refresh that list to reconcile completion. Queue submission failure restores the previous state. Remote cleanup failure retains the record and clears the pending flag for a later retry. Duplicate pending requests are rejected.
+This is an asynchronous request. Cleanup removes the site's files and configuration; it does not delete the server. A pending site remains in `GET /admin/users/{id}/sites` with `uninstallation_requested_at` set. Re-fetch that list to verify completion; the dashboard does this automatically when resource notifications arrive and after reconnecting. Queue submission failure restores the previous state. Remote cleanup failure retains the record and clears the pending flag for a later retry. Duplicate pending requests are rejected.
 
 See [admin user management](/docs/application/account#admin-user-management), [site deletion](/docs/application/sites#delete-a-site-as-an-administrator), and [admin server deletion](/docs/api/servers#admin-server-deletion) for dashboard workflows.
+
+## Live resource notifications
+
+An active staff session can subscribe to the WebSocket channel `admin.resources`. The `admin.resource.changed` event carries a resource family, an action, and optional `team_id`, `user_id`, `server_id`, and `site_id` fields. It contains identifiers rather than full resource models, logs, or credentials. Staff access and session expiry are checked for subscriptions and subsequent delivery.
+
+Treat notifications as a reason to re-fetch the relevant authorized REST views, not as authoritative state or proof of successful cleanup. Reconcile again after reconnecting to recover changes missed while disconnected. The dashboard coalesces notifications and refreshes the affected lists, loaded resource tabs, counts, and server deletion eligibility without requiring a page reload.
 
 ## CLI access
 

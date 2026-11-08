@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Toaster } from "~/components/ui/sonner";
 import { useImpersonation } from "~/composables/useImpersonation";
-import AdminShell from "~/components/admin/Shell.vue";
+import AdminNavigation from "~/components/admin/Navigation.vue";
+import WorkspaceLoading from "~/components/layout/WorkspaceLoading.vue";
 
 defineProps<{
   title?: string;
@@ -54,12 +55,16 @@ const showAuthedShell = computed(
 <template>
   <div class="contents">
     <div
-      v-if="showAuthedShell"
       id="app-container"
-      class="relative flex h-screen w-full flex-col overflow-hidden bg-background"
+      class="relative flex h-screen w-full flex-col overflow-hidden bg-background font-sans"
     >
+      <a
+        href="#workspace-content"
+        class="sr-only z-50 rounded-md bg-background px-4 py-2 text-sm shadow focus:not-sr-only focus:absolute focus:left-4 focus:top-2"
+        >{{ t("adminShell.skipToContent") }}</a
+      >
       <div
-        v-if="isImpersonating"
+        v-if="showAuthedShell && isImpersonating"
         class="flex shrink-0 items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-sm font-medium text-black"
       >
         <span class="flex items-center gap-2">
@@ -81,20 +86,23 @@ const showAuthedShell = computed(
           {{ t("common.impersonation.exit") }}
         </button>
       </div>
-      <LayoutPlatformUpdateBanner />
-      <LayoutNavbar v-if="!isAdminRoute" />
-      <AdminShell v-if="isAdminRoute">
-        <template #toolbar><LayoutNavbar compact /></template>
-        <slot />
-      </AdminShell>
+      <LayoutPlatformUpdateBanner v-if="showAuthedShell" />
+      <LayoutNavbar v-if="showAuthedShell" />
+      <header v-else class="shrink-0 border-b px-4 lg:px-8">
+        <div class="flex h-16 items-center">
+          <span class="text-xl font-bold">launchctl</span>
+        </div>
+        <AdminNavigation v-if="isAdminRoute" />
+      </header>
       <main
-        v-else
-        class="w-full flex-1 overflow-y-auto px-4 pt-4 pb-10 lg:px-8"
+        id="workspace-content"
+        tabindex="-1"
+        class="min-h-0 w-full flex-1 overflow-y-auto px-4 pt-4 pb-10 lg:px-8"
       >
-        <slot />
+        <slot v-if="showAuthedShell" />
+        <WorkspaceLoading v-else />
       </main>
       <Toaster position="bottom-center" :close-button="true" :duration="4000" />
     </div>
-    <slot v-else />
   </div>
 </template>

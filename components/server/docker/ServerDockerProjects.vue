@@ -13,15 +13,22 @@ const { t } = useI18n();
 const projects = ref<DockerProject[]>([]);
 const isLoading = ref(true);
 
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
 const fetchProjects = async (silent = false) => {
+  const request = ++resourceRequest;
   if (!silent) isLoading.value = true;
   try {
     const res = await dockerService.projects.list(props.server.id);
+    if (request !== resourceRequest) return;
     projects.value = res.data;
   } catch {
+    if (request !== resourceRequest) return;
     if (!silent) toast.error(t("server.docker.projects.loadFailed"));
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
@@ -39,10 +46,30 @@ watch(refreshKey, () => {
 // for projects on OTHER servers don't refetch this page.
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
-useDockerProjectEvents(teamId, (data) => {
-  if (data.server_id && data.server_id !== props.server.id) return;
-  void fetchProjects(true);
-});
+const refreshProjects = useLiveRefresh(() => fetchProjects(true));
+useDockerProjectEvents(
+  teamId,
+  (data) => {
+    if (data.server_id && data.server_id !== props.server.id) return;
+    refreshProjects();
+  },
+  { onReconnect: refreshProjects },
+);
+// Child resources change the counts rendered on each project card.
+useChannelEvents(
+  computed(() => `team.${teamId.value}`),
+  [
+    "docker.application.created",
+    "docker.application.deleted",
+    "docker.compose.created",
+    "docker.compose.deleted",
+    "docker.database.created",
+    "docker.database.deleted",
+  ],
+  (data) => {
+    if (data.server_id === props.server.id) refreshProjects();
+  },
+);
 
 // formatDate used to live here; replaced by SharedDateTooltip in
 // the template so the project's created_at shows live "X ago" with

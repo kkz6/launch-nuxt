@@ -28,18 +28,25 @@ const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
 
-const fetchApps = async () => {
-  isLoading.value = true;
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
+const fetchApps = async (silent = false) => {
+  const request = ++resourceRequest;
+  if (!silent) isLoading.value = true;
   try {
     const res = await dockerService.applications.list(
       props.serverId,
       props.projectId,
     );
+    if (request !== resourceRequest) return;
     apps.value = res.data;
   } catch {
-    toast.error(t("workload.project.applications.loadFailed"));
+    if (request !== resourceRequest) return;
+    if (!silent) toast.error(t("workload.project.applications.loadFailed"));
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
@@ -51,7 +58,7 @@ const onCreated = (app: DockerApplication) => {
 };
 
 const deleteApp = async (app: DockerApplication) => {
-  if (!confirmationDialog.value) return;
+  if (!confirmationDialog.value || app.status === "deleting") return;
   const result = await confirmationDialog.value.show({
     title: t("workload.application.delete.title"),
     description:
@@ -81,11 +88,12 @@ const deleteApp = async (app: DockerApplication) => {
       app.id,
       { removeVolumes },
     );
-    apps.value = apps.value.filter((a) => a.id !== app.id);
+    const pending = apps.value.find((a) => a.id === app.id);
+    if (pending) pending.status = "deleting";
     toast.success(
       removeVolumes
-        ? t("workload.application.delete.successWithVolumes")
-        : t("workload.application.delete.success"),
+        ? t("workload.application.delete.queuedWithVolumes")
+        : t("workload.application.delete.queuedPreserved"),
     );
   } catch (err: unknown) {
     const e = err as { data?: { message?: string } };
@@ -176,10 +184,16 @@ const { user } = useAuth();
 // Role gating — members are read-only; editors+ can create, admins+ delete.
 const { canEdit, canDelete } = useCan();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
-useDockerApplicationEvents(teamId, (data) => {
-  if (data.project_id && data.project_id !== props.projectId) return;
-  void fetchApps();
-});
+const refreshApps = useLiveRefresh(() => fetchApps(true));
+useDockerApplicationEvents(
+  teamId,
+  (data) => {
+    if (data.server_id && data.server_id !== props.serverId) return;
+    if (data.project_id && data.project_id !== props.projectId) return;
+    refreshApps();
+  },
+  { onReconnect: refreshApps },
+);
 
 onMounted(fetchApps);
 </script>
@@ -279,6 +293,7 @@ onMounted(fetchApps);
               variant="ghost"
               size="icon"
               class="-mr-1 -mt-1 shrink-0 opacity-0 transition group-hover:opacity-100"
+              :disabled="app.status === 'deleting'"
               @click.stop.prevent="deleteApp(app)"
             >
               <Icon name="lucide:trash-2" class="h-4 w-4" />

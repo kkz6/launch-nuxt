@@ -56,11 +56,20 @@ const onCardClick = (server: Server) => {
   navigateTo(`/servers/${server.id}`);
 };
 
-// Optimistically remove the row immediately while the WS event catches up.
-// The store will reconcile on the next event.
-const handleServerDeleted = (serverId: string) => {
-  serversStore.remove(serverId);
+// A delete request may only queue remote cleanup. Keep the row until the
+// canonical list or server.deleted confirms completion.
+const handleServerDeleted = (_serverId: string) => {
+  void serversStore.fetchAll().catch(() => {});
 };
+const { user: liveUser } = useAuth();
+const liveTeamId = computed(
+  () => liveUser.value?.current_team_id?.toString() || "",
+);
+useServerEvents(liveTeamId, (data, event) => {
+  if (event === "server.deletion_failed") {
+    toast.error(data.message || data.error || t("server.pending.deleteFailed"));
+  }
+});
 
 const handleRetryProvision = async (server: Server) => {
   try {

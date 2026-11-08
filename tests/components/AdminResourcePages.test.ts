@@ -7,6 +7,16 @@ import DataTable from "../../components/data-table/DataTable.vue";
 import FailureLogSheet from "../../components/admin/FailureLogSheet.vue";
 import { createI18nStub } from "../helpers/i18n";
 
+const mocks = vi.hoisted(() => ({
+  liveUpdates: vi.fn(),
+  refresh: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock("~/composables/useAdminLiveUpdates", () => ({
+  useAdminLiveUpdates: mocks.liveUpdates,
+}));
+vi.mock("vue-sonner", () => ({ toast: { error: mocks.error } }));
+
 const navigate = vi.fn();
 const failure = {
   id: "failure-1",
@@ -17,7 +27,8 @@ const failure = {
 const tableStub = defineComponent({
   props: ["endpoint"],
   emits: ["row-click"],
-  setup() {
+  setup(_, { expose }) {
+    expose({ refresh: mocks.refresh });
     return { failure, server: { id: "server-1", name: "production-web" } };
   },
   template: `<div>
@@ -43,6 +54,7 @@ const options = {
 
 describe("admin resource page presentation", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     navigate.mockReset();
     vi.stubGlobal("definePageMeta", vi.fn());
     vi.stubGlobal("useHead", vi.fn());
@@ -87,4 +99,32 @@ describe("admin resource page presentation", () => {
       wrapper.unmount();
     },
   );
+
+  it("reconciles deployment failures through the existing failure table", async () => {
+    const wrapper = shallowMount(FailuresPage, options);
+    const [refresh, settings] = mocks.liveUpdates.mock.calls[0];
+    expect(settings.resources).toContain("deployment");
+    await refresh();
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+
+  it("reports a queued server deletion failure while retaining the server directory", async () => {
+    const wrapper = shallowMount(ServersPage, options);
+    const [refresh, settings] = mocks.liveUpdates.mock.calls[0];
+    settings.onChange({ resource: "site", action: "deletion_failed" });
+    settings.onChange({ resource: "server", action: "updated" });
+    expect(mocks.error).not.toHaveBeenCalled();
+    settings.onChange({
+      resource: "server",
+      action: "deletion_failed",
+      server_id: "server-1",
+    });
+    await refresh();
+    expect(mocks.error).toHaveBeenCalledWith("Failed to delete server");
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+    expect(wrapper.text()).toContain("production-web");
+    expect(navigate).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
 });

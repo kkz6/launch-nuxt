@@ -89,23 +89,34 @@ const quickDeploy = async () => {
 
 // Reload from the route — keeps the back-button working when navigating
 // between sibling applications.
-const fetchApp = async () => {
-  isLoading.value = true;
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
+const fetchApp = async (silent = false) => {
+  const request = ++resourceRequest;
+  if (!silent) isLoading.value = true;
   try {
     const res = await dockerService.applications.get(
       serverId.value,
       projectId.value,
       applicationId.value,
     );
+    if (request !== resourceRequest) return;
     app.value = res.data;
     useHead({ title: app.value.name });
-  } catch {
+  } catch (error: unknown) {
+    if (request !== resourceRequest) return;
+    const status =
+      (error as { status?: number; statusCode?: number }).status ||
+      (error as { statusCode?: number }).statusCode;
+    if (silent && status !== 404) return;
     toast.error(t("server.workload.applicationNotFound"));
     navigateTo(
       `/servers/${serverId.value}/projects/${projectId.value}?tab=applications`,
     );
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
@@ -155,31 +166,23 @@ const _exposedSubtabs = visibleSubtabs;
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
-useDockerApplicationEvents(teamId, (data, event) => {
-  if (data.application_id !== applicationId.value) return;
-  // Status fields live on the application row; the Deployments tab
-  // owns deployment-history refetches.
-  if (
-    data.status === "running" ||
-    data.status === "failed" ||
-    data.status === "building" ||
-    data.status === "stopped"
-  ) {
-    void fetchApp();
-    return;
-  }
-  // GHA sync state (out-of-sync banner, synced/broken/disabled) all
-  // live on the application row's source_config — refetch so the
-  // Environment Build-time banner + Advanced GHA card stay current.
-  if (
-    event === "docker.application.gha_out_of_sync" ||
-    event === "docker.application.gha_synced" ||
-    event === "docker.application.gha_install_broken" ||
-    event === "docker.application.gha_disabled"
-  ) {
-    void fetchApp();
-  }
-});
+const refreshApplication = useLiveRefresh(() => fetchApp(true));
+useDockerApplicationEvents(
+  teamId,
+  (data, event) => {
+    if (data.server_id && data.server_id !== serverId.value) return;
+    if (data.project_id && data.project_id !== projectId.value) return;
+    if ((data.application_id || data.id) !== applicationId.value) return;
+    if (event === "docker.application.deleted") {
+      navigateTo(
+        `/servers/${serverId.value}/projects/${projectId.value}?tab=applications`,
+      );
+      return;
+    }
+    refreshApplication();
+  },
+  { onReconnect: refreshApplication },
+);
 </script>
 
 <template>

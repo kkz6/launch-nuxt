@@ -20,15 +20,14 @@ const confirmationDialog = ref<InstanceType<
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
-// Debounced refetch for WebSocket events
-let upstreamFetchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-useLoadBalancerEvents(teamId, (data) => {
-  if (data.server_id === props.server.id) {
-    if (upstreamFetchTimeout) clearTimeout(upstreamFetchTimeout);
-    upstreamFetchTimeout = setTimeout(() => fetchUpstreams(), 300);
-  }
-});
+const refreshUpstreams = useLiveRefresh(() => fetchUpstreams());
+useLoadBalancerEvents(
+  teamId,
+  (data) => {
+    if (data.server_id === props.server.id) refreshUpstreams();
+  },
+  { onReconnect: refreshUpstreams },
+);
 
 const fetchUpstreams = async () => {
   try {

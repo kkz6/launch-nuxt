@@ -144,19 +144,18 @@ const hasStatusInfo = computed(() =>
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
-// Debounced refetch for WebSocket events
-let daemonFetchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-useDaemonEvents(teamId, (data) => {
-  if (data.server_id === serverId.value) {
-    if (daemonFetchTimeout) clearTimeout(daemonFetchTimeout);
-    daemonFetchTimeout = setTimeout(() => {
-      fetchData();
-      restartingId.value = null;
-      isSyncing.value = false;
-    }, 300);
-  }
+const refreshDaemons = useLiveRefresh(async () => {
+  await fetchData();
+  restartingId.value = null;
+  isSyncing.value = false;
 });
+useDaemonEvents(
+  teamId,
+  (data) => {
+    if (data.server_id === serverId.value) refreshDaemons();
+  },
+  { onReconnect: refreshDaemons },
+);
 
 onMounted(fetchData);
 </script>

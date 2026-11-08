@@ -46,10 +46,12 @@ const props = withDefaults(
     toLink?: (tab: T) => string | RouteLocationRaw
     variant?: 'foreground' | 'rose'
     extendBorder?: boolean
+    ariaLabel?: string
   }>(),
   {
     variant: 'foreground',
     extendBorder: false,
+    ariaLabel: undefined,
   },
 )
 const emit = defineEmits<{ 'update:activeKey': [value: string] }>()
@@ -60,17 +62,29 @@ const navRef = ref<HTMLElement | null>(null)
 const tabRefs = ref(new Map<string, HTMLElement>())
 const indicatorLeft = ref(0)
 const indicatorWidth = ref(0)
+let resizeObserver: ResizeObserver | undefined
+let disposed = false
 
 const setTabRef = (key: string, el: unknown) => {
-  if (!el) return
+  const previous = tabRefs.value.get(key)
+  if (!el) {
+    if (previous) resizeObserver?.unobserve(previous)
+    tabRefs.value.delete(key)
+    return
+  }
   // <NuxtLink ref="..."> hands back a Vue component instance whose
   // `$el` is the rendered <a>. Functional refs occasionally pass the
   // raw element directly, so accept both shapes.
   const node = (el as { $el?: HTMLElement }).$el ?? (el as HTMLElement)
-  if (node) tabRefs.value.set(key, node)
+  if (node && node !== previous) {
+    if (previous) resizeObserver?.unobserve(previous)
+    tabRefs.value.set(key, node)
+    resizeObserver?.observe(node)
+  }
 }
 
 const updateIndicator = () => {
+  if (disposed) return
   const tabEl = tabRefs.value.get(props.activeKey)
   if (!tabEl || !navRef.value) {
     indicatorWidth.value = 0
@@ -78,17 +92,22 @@ const updateIndicator = () => {
   }
   const navRect = navRef.value.getBoundingClientRect()
   const tabRect = tabEl.getBoundingClientRect()
-  indicatorLeft.value = tabRect.left - navRect.left
+  indicatorLeft.value = tabRect.left - navRect.left + navRef.value.scrollLeft
   indicatorWidth.value = tabRect.width
 }
 
 watch(
-  [() => props.activeKey, () => props.tabs.length],
+  [() => props.activeKey, () => props.tabs.map(tab => [tab.value, tab.label])],
   () => nextTick(updateIndicator),
   { immediate: true },
 )
 
 onMounted(() => {
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(updateIndicator)
+    if (navRef.value) resizeObserver.observe(navRef.value)
+    tabRefs.value.forEach(node => resizeObserver?.observe(node))
+  }
   nextTick(updateIndicator)
   if (typeof window !== 'undefined') {
     window.addEventListener('resize', updateIndicator)
@@ -96,6 +115,9 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
+  resizeObserver?.disconnect()
+  tabRefs.value.clear()
   if (typeof window !== 'undefined') {
     window.removeEventListener('resize', updateIndicator)
   }
@@ -131,7 +153,9 @@ export interface TabItem {
   >
     <nav
       ref="navRef"
+      :aria-label="ariaLabel"
       class="relative -mb-px -ml-3 flex gap-1 overflow-x-auto"
+      @scroll="updateIndicator"
     >
       <component
         :is="toLink ? NuxtLink : 'button'"
@@ -140,6 +164,7 @@ export interface TabItem {
         :ref="(el: unknown) => setTabRef(tab.value, el)"
         :to="toLink ? toLink(tab) : undefined"
         :type="toLink ? undefined : 'button'"
+        :aria-current="toLink && activeKey === tab.value ? 'page' : undefined"
         class="relative flex items-center gap-1.5 whitespace-nowrap rounded-sm px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:!outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         :class="
           activeKey === tab.value

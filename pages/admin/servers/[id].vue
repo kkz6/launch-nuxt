@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onScopeDispose, ref } from "vue";
 import { toast } from "vue-sonner";
+import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
 import type { AdminServerDetail } from "~/types";
 import { adminService } from "~/services/adminService";
 import { Badge } from "~/components/ui/badge";
@@ -120,13 +121,24 @@ const detectedOS = computed(() => {
     .join(" · ");
 });
 
+let loadVersion = 0;
+let disposed = false;
+onScopeDispose(() => {
+  disposed = true;
+  loadVersion++;
+});
+
 async function load(): Promise<void> {
-  isLoading.value = true;
+  const version = ++loadVersion;
+  isLoading.value = !server.value;
   try {
     const res = await adminService.showServer(serverId);
+    if (disposed || version !== loadVersion) return;
+    notFound.value = false;
     server.value = res.data;
     applyBreadcrumb();
   } catch (error: unknown) {
+    if (disposed || version !== loadVersion) return;
     const err = error as { status?: number; statusCode?: number };
     if (err.status === 404 || err.statusCode === 404) {
       notFound.value = true;
@@ -134,7 +146,7 @@ async function load(): Promise<void> {
       toast.error(t("admin.serverDetail.loadFailed"));
     }
   } finally {
-    isLoading.value = false;
+    if (version === loadVersion) isLoading.value = false;
   }
 }
 
@@ -182,6 +194,18 @@ async function deleteServer(): Promise<void> {
     deleteLoading.value = false;
   }
 }
+
+useAdminLiveUpdates(load, {
+  resources: ["server", "site", "docker", "team", "user"],
+  serverId,
+  paused: deleteLoading,
+  onChange(change) {
+    if (change.resource === "server" && change.action === "deletion_failed") {
+      deleteError.value = t("admin.serverDetail.deleteFailed");
+      toast.error(deleteError.value);
+    }
+  },
+});
 
 onMounted(load);
 </script>

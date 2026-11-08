@@ -12,6 +12,7 @@
       "observability": "Observability",
       "cancel": "Cancel",
       "delete": "Delete",
+      "moreActions": "More actions",
       "on": "On",
       "off": "Off"
     },
@@ -182,6 +183,9 @@
       "deleting": "Deleting…"
     },
     "userDetail": {
+      "sections": "User sections",
+      "providerColumn": "Provider",
+      "viewServerNamed": "View server {name}",
       "pageTitle": "Admin — {name}",
       "loadFailed": "Failed to load user",
       "loadTabFailed": "Failed to load {resource}",
@@ -191,7 +195,7 @@
       "joined": "Joined",
       "spectate": "Spectate",
       "suspend": "Suspend",
-      "unsuspend": "Unsuspend",
+      "unsuspend": "Reactivate",
       "deleteTitle": "Delete this user?",
       "deleteDescription": "Permanently deletes {name} and all their data. Only allowed if they never had a paying subscription.",
       "deleteUser": "Delete user",
@@ -235,8 +239,8 @@
       "searchSitesPlaceholder": "Domain or server name",
       "searchServers": "Search servers",
       "searchServersPlaceholder": "Name, IP address, or provider",
-      "refresh": "Refresh",
-      "siteDeletionPendingHelp": "Site cleanup runs in the background. Refresh to check progress; the row remains until deletion completes.",
+      "retry": "Retry",
+      "siteDeletionPendingHelp": "Site cleanup runs in the background. This list updates automatically after changes and when the live connection reconnects. The row remains until deletion completes.",
       "siteColumn": "Site",
       "typeColumn": "Type",
       "tlsColumn": "TLS",

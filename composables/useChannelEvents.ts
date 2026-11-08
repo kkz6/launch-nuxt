@@ -34,83 +34,74 @@ interface ChannelEventHandler {
   (data: ChannelEventData, event: string): void;
 }
 
+export interface ChannelEventsOptions {
+  /** Reload canonical state after a connection gap; events are not replayed. */
+  onReconnect?: () => void;
+}
+
 export const useChannelEvents = (
   channel: string | Ref<string>,
   events: string[] | Ref<string[]>,
   onEvent: ChannelEventHandler,
+  options: ChannelEventsOptions = {},
 ) => {
   const { subscribe, subscribeToChannel, unsubscribeFromChannel, isConnected } =
     useWebSocket();
 
   const channelValue = computed(() => unref(channel));
   const eventsValue = computed(() => unref(events));
-
   const unsubscribes: (() => void)[] = [];
   let subscribedChannel: string | null = null;
-
-  const setupSubscriptions = () => {
-    cleanup();
-
-    if (isConnected.value && channelValue.value) {
-      subscribeToChannel(channelValue.value);
-      subscribedChannel = channelValue.value;
-    }
-
-    eventsValue.value.forEach((event) => {
-      const unsub = subscribe(event, (data) => {
-        const eventData = data as ChannelEventData;
-        const channelParts = channelValue.value.split(".");
-        if (
-          channelParts[0] === "site" &&
-          eventData.site_id === channelParts[1]
-        ) {
-          onEvent(eventData, event);
-        } else if (
-          channelParts[0] === "server" &&
-          eventData.server_id === channelParts[1]
-        ) {
-          onEvent(eventData, event);
-        } else if (
-          channelParts[0] === "team" &&
-          eventData.team_id === channelParts[1]
-        ) {
-          onEvent(eventData, event);
-        } else if (
-          channelParts[0] === "deployment" &&
-          eventData.deployment_id === channelParts[1]
-        ) {
-          onEvent(eventData, event);
-        }
-      });
-      unsubscribes.push(unsub);
-    });
-  };
 
   const cleanup = () => {
     if (subscribedChannel) {
       unsubscribeFromChannel(subscribedChannel);
       subscribedChannel = null;
     }
-
     unsubscribes.forEach((unsub) => unsub());
     unsubscribes.length = 0;
   };
 
-  watch(
-    [isConnected, channelValue],
-    () => {
-      if (isConnected.value) {
-        setupSubscriptions();
-      }
-    },
-    { immediate: true },
-  );
+  const setupSubscriptions = () => {
+    if (import.meta.server) return;
+    cleanup();
+    const target = channelValue.value;
+    const [scope, id] = target.split(".");
+    if (!id) return;
 
+    // Keep the desired channel registered while disconnected. The socket
+    // restores it once on open; re-registering on every reconnect can race
+    // another component's refcount and briefly unsubscribe a live channel.
+    subscribeToChannel(target);
+    subscribedChannel = target;
+    eventsValue.value.forEach((event) => {
+      const unsub = subscribe(event, (data, sourceChannel) => {
+        if (target !== channelValue.value) return;
+        const eventData = data as ChannelEventData;
+        const scopeKey = `${scope}_id`;
+        if (sourceChannel && sourceChannel !== target) return;
+        // Payload scope remains a fallback for older publishers/consumers.
+        // If present it must agree even when the envelope names this channel.
+        if (eventData[scopeKey] && eventData[scopeKey] !== id) return;
+        if (!sourceChannel && eventData[scopeKey] !== id) return;
+        onEvent(eventData, event);
+      });
+      unsubscribes.push(unsub);
+    });
+  };
+
+  watch([channelValue, eventsValue], setupSubscriptions, {
+    immediate: true,
+    deep: true,
+  });
+  watch(isConnected, (connected, previous) => {
+    if (connected && previous === false && subscribedChannel) {
+      options.onReconnect?.();
+    }
+  });
   onScopeDispose(cleanup);
 
-  return {
-    isConnected,
-  };
+  return { isConnected };
 };
 
 const useScopedChannelEvents = (
@@ -118,40 +109,47 @@ const useScopedChannelEvents = (
   id: string | Ref<string>,
   events: string[],
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) =>
   useChannelEvents(
     computed(() => `${scope}.${unref(id)}`),
     events,
     onEvent,
+    options,
   );
 
 const useTeamChannelEvents = (
   teamId: string | Ref<string>,
   events: string[],
   onEvent: ChannelEventHandler,
-) => useScopedChannelEvents("team", teamId, events, onEvent);
+  options?: ChannelEventsOptions,
+) => useScopedChannelEvents("team", teamId, events, onEvent, options);
 
 export const useCommandEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
-  return useTeamChannelEvents(teamId, ["command.updated"], onEvent);
+  return useTeamChannelEvents(teamId, ["command.updated"], onEvent, options);
 };
 
 export const useTaskEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
     ["task.created", "task.running", "task.updated"],
     onEvent,
+    options,
   );
 };
 
 export const useDeploymentEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -166,19 +164,27 @@ export const useDeploymentEvents = (
       "deployment.rollback.failed",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useDeploymentGhaStepsEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
-  return useTeamChannelEvents(teamId, ["deployment.gha_steps"], onEvent);
+  return useTeamChannelEvents(
+    teamId,
+    ["deployment.gha_steps"],
+    onEvent,
+    options,
+  );
 };
 
 export const useSiteQueueEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -191,12 +197,14 @@ export const useSiteQueueEvents = (
       "queues.failed",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useDaemonEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -207,12 +215,14 @@ export const useDaemonEvents = (
       "daemons.synced",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useSiteEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -220,6 +230,7 @@ export const useSiteEvents = (
       "site.created",
       "site.updated",
       "site.deleted",
+      "site.deletion_failed",
       "site.installed",
       "site.installation_failed",
       "site.php_version_update_requested",
@@ -227,23 +238,27 @@ export const useSiteEvents = (
       "site.php_version_update_failed",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useScriptExecutionEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
     ["script.execution.started", "script.output", "script.execution.completed"],
     onEvent,
+    options,
   );
 };
 
 export const useServerEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -271,12 +286,14 @@ export const useServerEvents = (
       "server.cleanup_failed",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useDockerApplicationEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -297,12 +314,14 @@ export const useDockerApplicationEvents = (
       "docker.application.gha_out_of_sync",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useDockerProjectEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -312,12 +331,14 @@ export const useDockerProjectEvents = (
       "docker.project.deleted",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useDockerComposeEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -334,12 +355,14 @@ export const useDockerComposeEvents = (
       "docker.compose.gha_disabled",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useDockerBackupEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -354,12 +377,14 @@ export const useDockerBackupEvents = (
       "docker.database.backup.run.failed",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useBackupEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -371,12 +396,14 @@ export const useBackupEvents = (
       "backup.run.failed",
     ],
     onEvent,
+    options,
   );
 };
 
 export const useLoadBalancerEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -394,24 +421,28 @@ export const useLoadBalancerEvents = (
       "backend.health_changed",
     ],
     onEvent,
+    options,
   );
 };
 
 export const usePhpExtensionEvents = (
   serverId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useScopedChannelEvents(
     "server",
     serverId,
     ["php.extension_installed", "php.extension_uninstalled"],
     onEvent,
+    options,
   );
 };
 
 export const useServiceEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -425,22 +456,26 @@ export const useServiceEvents = (
       "php.patch",
     ],
     onEvent,
+    options,
   );
 };
 
 export const usePlatformUpdateEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
     ["platform_update.status_changed"],
     onEvent,
+    options,
   );
 };
 export const useCertificateEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
 ) => {
   return useTeamChannelEvents(
     teamId,
@@ -452,5 +487,6 @@ export const useCertificateEvents = (
       "certificate.fanout_required",
     ],
     onEvent,
+    options,
   );
 };

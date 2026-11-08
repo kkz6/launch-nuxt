@@ -1,4 +1,11 @@
-import { computed, onMounted, reactive, toRefs, watch } from "vue";
+import {
+  computed,
+  onMounted,
+  onScopeDispose,
+  reactive,
+  toRefs,
+  watch,
+} from "vue";
 import { useDebounceFn } from "@vueuse/core";
 import type {
   TableMeta,
@@ -100,7 +107,13 @@ export function useTable<T = any>(
     window.history.replaceState({}, "", url);
   }
 
-  async function fetchData() {
+  let requestVersion = 0;
+  onScopeDispose(() => {
+    requestVersion++;
+  });
+
+  async function fetchData(): Promise<void> {
+    const version = ++requestVersion;
     state.isLoading = true;
     try {
       const queryString = buildQueryString();
@@ -112,9 +125,16 @@ export function useTable<T = any>(
         `${endpoint}/data?${queryString}`,
         headers ? { headers } : {},
       );
+      if (version !== requestVersion) return;
       const result = (envelope?.data ?? null) as TableResponse<T> | null;
       if (!result) {
         throw new Error("Table response was empty");
+      }
+      const lastPage = Math.max(1, result.pagination?.lastPage || 1);
+      if (result.pagination?.type === "full" && state.currentPage > lastPage) {
+        state.currentPage = lastPage;
+        syncToUrl();
+        return await fetchData();
       }
       // Go encodes unset slices as null. Keep the component-facing metadata
       // consistent so tables with no filters or actions still render.
@@ -142,11 +162,14 @@ export function useTable<T = any>(
           .map((c: any) => c.key);
       }
     } catch (error) {
+      if (version !== requestVersion) return;
       state.loadError = true;
       console.error("Failed to fetch table data:", error);
     } finally {
-      state.isLoading = false;
-      state.hasLoaded = true;
+      if (version === requestVersion) {
+        state.isLoading = false;
+        state.hasLoaded = true;
+      }
     }
   }
 
@@ -215,7 +238,7 @@ export function useTable<T = any>(
   }
 
   function refresh() {
-    void fetchData();
+    return fetchData();
   }
 
   onMounted(() => {

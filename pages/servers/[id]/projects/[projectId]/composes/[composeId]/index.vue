@@ -89,23 +89,34 @@ const setSubTab = (v: SubTabId) => {
   router.replace({ query: { ...route.query, subtab: v } });
 };
 
-const fetchCompose = async () => {
-  isLoading.value = true;
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
+const fetchCompose = async (silent = false) => {
+  const request = ++resourceRequest;
+  if (!silent) isLoading.value = true;
   try {
     const res = await dockerService.composes.get(
       serverId.value,
       projectId.value,
       composeId.value,
     );
+    if (request !== resourceRequest) return;
     compose.value = res.data;
     useHead({ title: compose.value.name });
-  } catch {
+  } catch (error: unknown) {
+    if (request !== resourceRequest) return;
+    const status =
+      (error as { status?: number; statusCode?: number }).status ||
+      (error as { statusCode?: number }).statusCode;
+    if (silent && status !== 404) return;
     toast.error(t("server.workload.composeNotFound"));
     navigateTo(
       `/servers/${serverId.value}/projects/${projectId.value}?tab=compose`,
     );
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
@@ -176,6 +187,25 @@ const statusBadge = computed(() => {
       return "bg-muted text-muted-foreground";
   }
 });
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+const refreshCompose = useLiveRefresh(() => fetchCompose(true));
+useDockerComposeEvents(
+  teamId,
+  (data, event) => {
+    if (data.server_id && data.server_id !== serverId.value) return;
+    if (data.project_id && data.project_id !== projectId.value) return;
+    if ((data.compose_id || data.id) !== composeId.value) return;
+    if (event === "docker.compose.deleted") {
+      navigateTo(
+        `/servers/${serverId.value}/projects/${projectId.value}?tab=compose`,
+      );
+      return;
+    }
+    refreshCompose();
+  },
+  { onReconnect: refreshCompose },
+);
 </script>
 
 <template>

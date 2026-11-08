@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { useDeploymentEvents } from "~/composables/useChannelEvents";
+import { onScopeDispose } from "vue";
+import {
+  useDeploymentEvents,
+  useSiteEvents,
+} from "~/composables/useChannelEvents";
 import type { Deployment, Server, Site } from "~/types";
 
 definePageMeta({
@@ -148,16 +152,40 @@ watch(
   },
 );
 
+let siteRequest = 0;
 const fetchSite = async () => {
+  const request = ++siteRequest;
   try {
     const siteData = await $api<{ data: Site }>(
       `/servers/${serverId.value}/sites/${siteId.value}`,
     );
+    if (request !== siteRequest) return;
     site.value = siteData.data;
-  } catch {
-    // Silent fail on refresh
+  } catch (error: unknown) {
+    if (request !== siteRequest) return;
+    const status =
+      (error as { status?: number; statusCode?: number }).status ||
+      (error as { statusCode?: number }).statusCode;
+    if (status === 404) navigateTo(`/servers/${serverId.value}`);
   }
 };
+useSiteEvents(
+  teamId,
+  (data, event) => {
+    if (data.server_id && data.server_id !== serverId.value) return;
+    if ((data.site_id || data.site?.id || data.id) !== siteId.value) return;
+    if (event === "site.deleted") {
+      navigateTo(`/servers/${serverId.value}`);
+      return;
+    }
+    scheduleRefetch();
+  },
+  { onReconnect: scheduleRefetch },
+);
+onScopeDispose(() => {
+  siteRequest++;
+  if (siteFetchTimeout) clearTimeout(siteFetchTimeout);
+});
 
 const handleAutoRestartUpdated = (enabled: boolean) => {
   if (!site.value) return;

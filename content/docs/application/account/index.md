@@ -177,19 +177,21 @@ Account deletion is permanent. All data, teams, servers, and sites will be delet
 
 ## Admin user management
 
-The admin panel uses a sidebar for **Overview**, **Users**, **Invitations**, **Servers**, **Failures**, and **Observability**. On smaller screens, open the navigation menu above the page. Use the available search, filters, and pagination to find records. User and invitation lists include **Refresh**; failed list requests offer **Try again**.
+The admin panel shares the application’s header, font, and horizontal navigation. Use the tabs for **Overview**, **Users**, **Invitations**, **Servers**, **Failures**, and **Observability**; scroll the tab row on smaller screens. The page frame stays visible while the initial content loads. Use the available search, filters, and pagination to find records.
 
 Overview shows compact subscription and revenue totals, revenue history, and recent payments. In **Failures**, select **View log** to open the log drawer and **Copy log** to copy its output. **Observability** groups runtime and database metrics above the query-analysis tabs.
 
+Site, server, and Docker lifecycle changes, along with staff account and invitation actions, update the affected admin resource lists, user resource tabs, and server details automatically. Statuses, resource counts, and server deletion availability are reconciled with the API, including after a live connection reconnects. Existing content remains visible during background updates. These resource views use live updates without a manual Refresh control. Failed requests offer **Retry** or **Try again**. The billing Overview keeps its **Refresh** control because billing changes do not currently update it automatically.
+
 In **Invitations → Invite user**, choose a plan and use the calendar to select a future trial end date. The trial ends at the start of the selected date (00:00 UTC).
 
-Open **Admin → Users** and select a user. Account actions, including **Delete user**, appear in the header. Super administrators see **Staff access** below it. The **Teams**, **Subscriptions**, **Servers**, and **Sites** tabs contain the user’s resources; site deletion is available on the intended site row.
+Open **Admin → Users** and select a user. A second navigation row starts with the user’s name, followed by **Teams**, **Subscriptions**, **Servers**, and **Sites**. The name tab contains account details and **Staff access**; resource tabs open directly to their content. **Spectate** and the account actions appear only on the name tab. There, super administrators can open **More actions** (the ellipsis button) to **Suspend**, **Reactivate**, or **Delete user**. Site deletion is available on the intended site row.
 
 Super administrators can change **Staff access** to **Regular user**, **Support**, or **Super admin**, select **Save role**, and confirm the change. Regular user removes access to the admin panel; it does not change team permissions. Role changes are audited and apply to subsequent admin requests.
 
 You cannot change your own staff role or demote the last super administrator. Ask another super administrator to change your role when needed. Support staff can view user details but cannot change roles or delete users or sites.
 
-To delete another staff account, first change its staff access to **Regular user**, then use **Delete user**. Removing staff access does not bypass the existing billing-history restriction: users whose owned teams have a paid order or a current or past non-trial subscription cannot be deleted. Self-deletion is also blocked here.
+To delete another staff account, first change its staff access to **Regular user**, then choose **More actions → Delete user**. Removing staff access does not bypass the existing billing-history restriction: users whose owned teams have a paid order or a current or past non-trial subscription cannot be deleted. Self-deletion is also blocked here.
 
 See the [staff API](/docs/api/staff) for the corresponding administrative endpoints.
 

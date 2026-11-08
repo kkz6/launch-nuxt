@@ -198,13 +198,20 @@ const kindLabel = (kind: Activity["kind"]) => t(`workload.kind.${kind}`, kind);
 // project's events don't refetch us.
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
-useDockerApplicationEvents(teamId, (data) => {
-  if (data.project_id && data.project_id !== props.project.id) return;
-  void fetchAll(true);
-});
+const refreshOverview = useLiveRefresh(() => fetchAll(true));
+useDockerApplicationEvents(
+  teamId,
+  (data) => {
+    if (data.server_id && data.server_id !== props.serverId) return;
+    if (data.project_id && data.project_id !== props.project.id) return;
+    refreshOverview();
+  },
+  { onReconnect: refreshOverview },
+);
 useDockerComposeEvents(teamId, (data) => {
+  if (data.server_id && data.server_id !== props.serverId) return;
   if (data.project_id && data.project_id !== props.project.id) return;
-  void fetchAll(true);
+  refreshOverview();
 });
 const channel = computed(() => `team.${teamId.value}`);
 useChannelEvents(
@@ -218,8 +225,9 @@ useChannelEvents(
     "docker.database.deleted",
   ],
   (data) => {
+    if (data.server_id && data.server_id !== props.serverId) return;
     if (data.project_id && data.project_id !== props.project.id) return;
-    void fetchAll(true);
+    refreshOverview();
   },
 );
 

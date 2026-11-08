@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { toast } from "vue-sonner";
+import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
 import DataTable from "~/components/data-table/DataTable.vue";
 import AdminPageHeader from "~/components/admin/PageHeader.vue";
 
@@ -8,6 +10,7 @@ definePageMeta({
 });
 
 const { locale, t } = useI18n();
+const table = ref<{ refresh: () => Promise<void> } | null>(null);
 
 useHead({
   title: () => t("admin.serversList.pageTitle"),
@@ -25,6 +28,14 @@ watch(locale, applyBreadcrumb);
 const openServer = (row: { id: string }): void => {
   navigateTo(`/admin/servers/${row.id}`);
 };
+useAdminLiveUpdates(() => table.value?.refresh(), {
+  resources: ["server", "site", "docker", "user", "team"],
+  onChange(change) {
+    if (change.resource === "server" && change.action === "deletion_failed") {
+      toast.error(t("admin.serverDetail.deleteFailed"));
+    }
+  },
+});
 </script>
 
 <template>
@@ -53,7 +64,7 @@ const openServer = (row: { id: string }): void => {
       </div>
       <div class="admin-directory">
         <DataTable
-          borderless
+          ref="table"
           endpoint="/admin/servers/table"
           @row-click="openServer"
         >

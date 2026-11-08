@@ -5,6 +5,7 @@ import AdminServerPage from "../../pages/admin/servers/[id].vue";
 import { createI18nStub } from "../helpers/i18n";
 
 const mocks = vi.hoisted(() => ({
+  liveUpdates: vi.fn(),
   showServer: vi.fn(),
   deleteServer: vi.fn(),
   confirm: vi.fn(),
@@ -13,6 +14,9 @@ const mocks = vi.hoisted(() => ({
   error: vi.fn(),
 }));
 
+vi.mock("~/composables/useAdminLiveUpdates", () => ({
+  useAdminLiveUpdates: mocks.liveUpdates,
+}));
 vi.mock("~/services/adminService", () => ({
   adminService: {
     showServer: mocks.showServer,
@@ -111,6 +115,38 @@ describe("admin server deletion", () => {
     expect(mocks.deleteServer).not.toHaveBeenCalled();
   });
 
+  it("reconciles deletion counts after a site event without hiding the server", async () => {
+    mocks.showServer.mockResolvedValueOnce({
+      data: server({ sites_count: 1 }),
+    });
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(mocks.liveUpdates).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        serverId: "server-1",
+        resources: expect.arrayContaining(["site", "docker", "server"]),
+      }),
+    );
+    let finish!: (value: unknown) => void;
+    mocks.showServer.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const refreshing = mocks.liveUpdates.mock.calls[0][0]();
+    await flushPromises();
+    expect(wrapper.get("h1").text()).toBe("production-web");
+    expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+    finish({ data: server({ sites_count: 0 }) });
+    await refreshing;
+    await flushPromises();
+    expect(deleteButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(mocks.deleteServer).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
   it("requires a destructive, typed-name confirmation and respects cancellation", async () => {
     mocks.confirm.mockResolvedValueOnce({ ok: false });
     const wrapper = mountPage();
@@ -126,6 +162,34 @@ describe("admin server deletion", () => {
     );
     expect(mocks.deleteServer).not.toHaveBeenCalled();
     expect(mocks.navigateTo).not.toHaveBeenCalled();
+  });
+
+  it("shows asynchronous deletion failure and restores retry from canonical server state", async () => {
+    mocks.showServer.mockResolvedValueOnce({
+      data: server({ provider: "digital_ocean", status: "deleting" }),
+    });
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+    const [refresh, options] = mocks.liveUpdates.mock.calls[0];
+    options.onChange({ resource: "site", action: "deletion_failed" });
+    expect(mocks.error).not.toHaveBeenCalled();
+    options.onChange({
+      resource: "server",
+      action: "deletion_failed",
+      server_id: "server-1",
+    });
+    await refresh();
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toBe(
+      "Failed to delete server",
+    );
+    expect(mocks.error).toHaveBeenCalledWith("Failed to delete server");
+    expect(wrapper.get("h1").text()).toBe("production-web");
+    expect(deleteButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
+    expect(mocks.deleteServer).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it("deletes the selected server and returns to the admin server list", async () => {

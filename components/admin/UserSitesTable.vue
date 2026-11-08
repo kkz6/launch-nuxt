@@ -6,6 +6,12 @@ import { Badge } from "~/components/ui/badge";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,7 +29,7 @@ const props = defineProps<{
   pendingIds: string[];
   errors: Record<string, string>;
 }>();
-const emit = defineEmits<{ delete: [site: AdminSiteSummary]; refresh: [] }>();
+const emit = defineEmits<{ delete: [site: AdminSiteSummary] }>();
 const { t } = useI18n();
 const { getSiteTypeLabel } = useStableMetadataLabels();
 const search = ref("");
@@ -44,39 +50,22 @@ const tlsLabel = (value: string): string =>
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between gap-3">
-      <div class="relative w-full max-w-sm">
-        <Label for="admin-site-search" class="sr-only">{{
-          t("admin.userDetail.searchSites")
-        }}</Label>
-        <Icon
-          name="lucide:search"
-          class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
-          aria-hidden="true"
-        />
-        <Input
-          id="admin-site-search"
-          v-model="search"
-          type="search"
-          class="h-9 border-border/70 bg-background pl-9 shadow-none"
-          :placeholder="t('admin.userDetail.searchSitesPlaceholder')"
-        />
-      </div>
-      <Button
-        variant="ghost"
-        size="sm"
-        class="shrink-0 text-muted-foreground"
-        :disabled="loading"
-        @click="emit('refresh')"
-      >
-        <Icon
-          name="lucide:refresh-cw"
-          class="h-3.5 w-3.5"
-          :class="{ 'animate-spin': loading }"
-          aria-hidden="true"
-        />
-        {{ t("admin.userDetail.refresh") }}
-      </Button>
+    <div class="relative w-full sm:w-72">
+      <Label for="admin-site-search" class="sr-only">{{
+        t("admin.userDetail.searchSites")
+      }}</Label>
+      <Icon
+        name="lucide:search"
+        class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"
+        aria-hidden="true"
+      />
+      <Input
+        id="admin-site-search"
+        v-model="search"
+        type="search"
+        class="h-9 border-border/70 bg-background pl-9 shadow-none"
+        :placeholder="t('admin.userDetail.searchSitesPlaceholder')"
+      />
     </div>
     <p
       v-if="pendingIds.length || sites.some(isPending)"
@@ -94,32 +83,31 @@ const tlsLabel = (value: string): string =>
         class="h-6 w-6 animate-spin text-muted-foreground"
       />
     </div>
-    <div
-      v-else-if="filteredSites.length"
-      class="[&>div]:rounded-none [&>div]:border-0 [&>div]:bg-transparent"
-    >
+    <div v-else-if="filteredSites.length" class="[&>div]:overflow-x-auto">
       <Table class="block md:table">
         <TableHeader class="hidden md:table-header-group">
           <TableRow
-            class="border-border/70 bg-transparent text-xs hover:bg-transparent [&>th]:h-10 [&>th]:font-medium"
+            class="bg-muted/40 hover:bg-muted/40 [&>th]:h-10 [&>th]:text-xs"
           >
             <TableHead>{{ t("admin.userDetail.siteColumn") }}</TableHead>
             <TableHead>{{ t("admin.common.server") }}</TableHead>
             <TableHead>{{ t("admin.userDetail.typeColumn") }}</TableHead>
             <TableHead>{{ t("admin.userDetail.tlsColumn") }}</TableHead>
-            <TableHead v-if="canDelete" class="text-right">{{
-              t("admin.userDetail.actionsColumn")
-            }}</TableHead>
+            <TableHead v-if="canDelete" class="w-14 text-right">
+              <span class="sr-only">{{
+                t("admin.userDetail.actionsColumn")
+              }}</span>
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody class="block md:table-row-group">
           <TableRow
             v-for="site in filteredSites"
             :key="site.id"
-            class="grid grid-cols-2 border-border/60 transition-colors md:table-row"
+            class="grid grid-cols-2 px-3 py-2 transition-colors duration-150 last:border-b-0 hover:bg-muted/20 md:table-row md:p-0"
           >
             <TableCell
-              class="col-span-2 block break-all px-0 pb-2 font-medium md:table-cell md:max-w-sm md:pr-4 md:py-3.5"
+              class="col-span-2 block break-all px-0 pb-2 font-medium md:table-cell md:max-w-sm md:px-4 md:py-2"
             >
               <span class="flex items-start gap-2.5">
                 <Icon
@@ -129,6 +117,9 @@ const tlsLabel = (value: string): string =>
                 />
                 <span class="min-w-0">{{ site.address }}</span>
               </span>
+              <Badge v-if="isPending(site)" variant="secondary" class="mt-1">{{
+                t("admin.userDetail.siteDeletionRequested")
+              }}</Badge>
               <p
                 v-if="errors[site.id]"
                 role="alert"
@@ -145,7 +136,7 @@ const tlsLabel = (value: string): string =>
               </p>
             </TableCell>
             <TableCell
-              class="col-span-2 block break-words px-0 pt-0 pb-2 text-xs md:table-cell md:max-w-xs md:px-4 md:py-3.5"
+              class="col-span-2 block break-words px-0 pt-0 pb-2 text-xs md:table-cell md:max-w-xs md:px-4 md:py-2"
             >
               <span class="mr-2 text-xs text-muted-foreground md:hidden">{{
                 t("admin.common.server")
@@ -157,12 +148,12 @@ const tlsLabel = (value: string): string =>
               >
             </TableCell>
             <TableCell
-              class="block px-0 py-2 text-xs text-muted-foreground md:table-cell md:px-4 md:py-3.5"
+              class="block px-0 py-2 text-xs text-muted-foreground md:table-cell md:px-4 md:py-2"
             >
               {{ getSiteTypeLabel(site.type, site.type) }}
             </TableCell>
             <TableCell
-              class="block px-0 py-2 text-right text-xs text-muted-foreground md:table-cell md:px-4 md:py-3.5 md:text-left"
+              class="block px-0 py-2 text-right text-xs text-muted-foreground md:table-cell md:px-4 md:py-2 md:text-left"
               ><span class="mr-2 text-xs md:hidden">{{
                 t("admin.userDetail.tlsColumn")
               }}</span
@@ -170,34 +161,49 @@ const tlsLabel = (value: string): string =>
             >
             <TableCell
               v-if="canDelete"
-              class="col-span-2 block px-0 pt-1 text-right md:table-cell md:py-3.5"
+              class="col-span-2 block px-0 pt-1 text-right md:table-cell md:w-14 md:px-4 md:py-2"
             >
-              <Badge v-if="isPending(site)" variant="secondary">{{
-                t("admin.userDetail.siteDeletionRequested")
-              }}</Badge>
-              <Button
-                v-else
-                variant="ghost"
-                size="sm"
-                class="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
-                :disabled="disabled || !!busyId || loading"
-                :aria-label="
-                  t('admin.userDetail.deleteSiteNamed', {
-                    address: site.address,
-                  })
-                "
-                @click="emit('delete', site)"
-              >
-                <Icon
-                  :name="
-                    busyId === site.id ? 'lucide:loader-2' : 'lucide:trash-2'
-                  "
-                  class="h-3.5 w-3.5"
-                  :class="{ 'animate-spin': busyId === site.id }"
-                  aria-hidden="true"
-                />
-                {{ t("admin.userDetail.deleteSite") }}
-              </Button>
+              <TooltipProvider v-if="!isPending(site)" :delay-duration="200">
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                      :disabled="disabled || !!busyId || loading"
+                      :aria-label="
+                        t('admin.userDetail.deleteSiteNamed', {
+                          address: site.address,
+                        })
+                      "
+                      :title="
+                        t('admin.userDetail.deleteSiteNamed', {
+                          address: site.address,
+                        })
+                      "
+                      @click="emit('delete', site)"
+                    >
+                      <Icon
+                        :name="
+                          busyId === site.id
+                            ? 'lucide:loader-2'
+                            : 'lucide:trash-2'
+                        "
+                        class="h-4 w-4"
+                        :class="{ 'animate-spin': busyId === site.id }"
+                        aria-hidden="true"
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {{
+                      t("admin.userDetail.deleteSiteNamed", {
+                        address: site.address,
+                      })
+                    }}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </TableCell>
           </TableRow>
         </TableBody>

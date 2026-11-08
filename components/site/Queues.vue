@@ -122,19 +122,18 @@ const fetchQueues = async () => {
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
-// Debounced refetch for WebSocket events
-let queueFetchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-useSiteQueueEvents(teamId, (data) => {
-  if (data.site_id === props.siteId) {
-    if (queueFetchTimeout) clearTimeout(queueFetchTimeout);
-    queueFetchTimeout = setTimeout(() => {
-      fetchQueues();
-      restartingId.value = null;
-      isSyncing.value = false;
-    }, 300);
-  }
+const refreshQueues = useLiveRefresh(async () => {
+  await fetchQueues();
+  restartingId.value = null;
+  isSyncing.value = false;
 });
+useSiteQueueEvents(
+  teamId,
+  (data) => {
+    if (data.site_id === props.siteId) refreshQueues();
+  },
+  { onReconnect: refreshQueues },
+);
 
 const restartQueue = async (queue: Queue) => {
   if (!confirmationDialog.value) return;
@@ -283,7 +282,9 @@ onMounted(fetchQueues);
           {{ t("site.queues.failureTitle", { count: failedQueues.length }) }}
         </AlertTitle>
         <AlertDescription>
-          {{ t("site.queues.failureDescription", { count: failedQueues.length }) }}
+          {{
+            t("site.queues.failureDescription", { count: failedQueues.length })
+          }}
         </AlertDescription>
       </Alert>
 

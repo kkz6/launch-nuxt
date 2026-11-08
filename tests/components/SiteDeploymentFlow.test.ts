@@ -10,6 +10,7 @@ import { createI18nStub } from "../helpers/i18n";
 
 vi.mock("~/composables/useChannelEvents", () => ({
   useDeploymentEvents: vi.fn(),
+  useSiteEvents: vi.fn(),
 }));
 vi.mock("vue-sonner", () => ({
   toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() },

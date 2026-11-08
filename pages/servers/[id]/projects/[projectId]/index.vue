@@ -58,27 +58,67 @@ watch(
   },
 );
 
-const fetchData = async () => {
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
+const fetchData = async (silent = false) => {
+  const request = ++resourceRequest;
   try {
     const [s, p] = await Promise.all([
       $api<{ data: Server }>(`/servers/${serverId.value}`),
       dockerService.projects.get(serverId.value, projectId.value),
     ]);
+    if (request !== resourceRequest) return;
     server.value = s.data;
     project.value = p.data;
     useHead(() => ({
       title: project.value?.name || t("server.project.fallbackTitle"),
     }));
-  } catch {
+  } catch (error: unknown) {
+    if (request !== resourceRequest) return;
+    const status =
+      (error as { status?: number; statusCode?: number }).status ||
+      (error as { statusCode?: number }).statusCode;
+    if (silent && status !== 404) return;
     toast.error(t("server.project.notFound"));
     navigateTo(`/servers/${serverId.value}`);
     return;
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
 onMounted(fetchData);
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+const refreshProject = useLiveRefresh(() => fetchData(true));
+useChannelEvents(
+  computed(() => `team.${teamId.value}`),
+  [
+    "docker.project.updated",
+    "docker.project.deleted",
+    "docker.application.created",
+    "docker.application.deleted",
+    "docker.compose.created",
+    "docker.compose.deleted",
+    "docker.database.created",
+    "docker.database.deleted",
+  ],
+  (data, event) => {
+    if (data.server_id && data.server_id !== serverId.value) return;
+    const id =
+      data.project_id ||
+      (event.startsWith("docker.project.") ? data.id : undefined);
+    if (id !== projectId.value) return;
+    if (event === "docker.project.deleted") {
+      navigateTo(`/servers/${serverId.value}?tab=projects`);
+      return;
+    }
+    refreshProject();
+  },
+  { onReconnect: refreshProject },
+);
 
 // Shared bus the navbar's Environment button flips. Owned by the
 // navbar so it's reachable from any project tab; the Dialog renders

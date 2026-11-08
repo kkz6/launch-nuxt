@@ -15,7 +15,7 @@ export const useModelEvents = (
   filterFn: FilterFn | Ref<FilterFn>,
   onEvent: () => void,
 ) => {
-  const { subscribe } = useWebSocket()
+  const { subscribe, isConnected } = useWebSocket()
 
   const modelNameValue = computed(() => unref(modelName))
   const filterFnValue = computed(() => unref(filterFn))
@@ -49,6 +49,11 @@ export const useModelEvents = (
     },
     { immediate: true },
   )
+
+  // The server does not replay CRUD events missed while disconnected.
+  watch(isConnected, (connected, previous) => {
+    if (connected && previous === false) onEvent()
+  })
 
   tryOnUnmounted(() => {
     unsubscribes.forEach((unsub) => unsub())

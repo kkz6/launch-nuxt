@@ -2,7 +2,10 @@
 import {
   useSiteEvents,
   useDeploymentEvents,
+  useServerEvents,
+  useDockerProjectEvents,
 } from "~/composables/useChannelEvents";
+import { toast } from "vue-sonner";
 import type { Server, Site } from "~/types";
 import { serverService } from "~/services/serverService";
 
@@ -36,31 +39,49 @@ const isTerminalOpen = useState("serverTerminalOpen", () => false);
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 
-// Debounced silent refetch for WebSocket events
-let sitesFetchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-const debouncedFetchSites = () => {
-  if (sitesFetchTimeout) clearTimeout(sitesFetchTimeout);
-  sitesFetchTimeout = setTimeout(() => fetchSites(), 300);
-};
-
-// Subscribe to real-time site events
-useSiteEvents(teamId, (data) => {
-  if (!hasSitesTab.value) return;
-  const eventServerId = data.server_id || data.site?.server_id;
-  if (eventServerId === serverId.value) {
-    debouncedFetchSites();
+// Resource completion changes both the visible list and deletion eligibility.
+const refreshServerResources = useLiveRefresh(async () => {
+  const id = serverId.value;
+  try {
+    const response = await serverService.get(id);
+    if (serverId.value !== id) return;
+    server.value = response.data;
+    if (hasSitesTab.value) await fetchSites();
+  } catch {
+    // Retain the last successful state through a transient reconnect failure.
   }
 });
+const refreshSites = useLiveRefresh(async () => {
+  if (hasSitesTab.value) await fetchSites();
+});
 
-// Subscribe to real-time deployment events
+useSiteEvents(
+  teamId,
+  (data) => {
+    if ((data.server_id || data.site?.server_id) === serverId.value) {
+      refreshServerResources();
+    }
+  },
+  { onReconnect: refreshServerResources },
+);
+useDockerProjectEvents(teamId, (data) => {
+  if (data.server_id === serverId.value) refreshServerResources();
+});
+useServerEvents(teamId, (data, event) => {
+  if (data.server_id !== serverId.value) return;
+  if (event === "server.deleted") {
+    navigateTo("/servers");
+    return;
+  }
+  if (event === "server.deletion_failed") {
+    toast.error(data.message || data.error || t("server.pending.deleteFailed"));
+  }
+  refreshServerResources();
+});
 useDeploymentEvents(teamId, (data) => {
   if (!hasSitesTab.value) return;
   const siteExists = sites.value.some((site) => site.id === data.site_id);
-  const eventServerId = data.site?.server_id;
-  if (siteExists || eventServerId === serverId.value) {
-    debouncedFetchSites();
-  }
+  if (siteExists || data.site?.server_id === serverId.value) refreshSites();
 });
 
 // Watch for refresh trigger from navbar (e.g., after site creation)

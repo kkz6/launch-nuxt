@@ -53,6 +53,10 @@ const mountSites = (overrides = {}) =>
         TableHead: { template: "<th><slot /></th>" },
         TableHeader: { template: "<thead><slot /></thead>" },
         NuxtLink: { template: "<a><slot /></a>" },
+        TooltipProvider: slots,
+        Tooltip: slots,
+        TooltipTrigger: slots,
+        TooltipContent: { ...slots, name: "TooltipContent" },
         Icon: true,
       },
     },
@@ -108,6 +112,19 @@ describe("admin user resource controls", () => {
     expect(wrapper.text()).toContain("Laravel");
     expect(wrapper.text()).toContain("Automatic");
     expect(wrapper.text()).toContain("Disabled");
+    const action = wrapper.get(
+      'button[aria-label="Delete site app.example.com"]',
+    );
+    expect(action.text()).toBe("");
+    expect(action.attributes("title")).toBe("Delete site app.example.com");
+    expect(
+      wrapper
+        .findAllComponents({ name: "TooltipContent" })
+        .map((tooltip) => tooltip.text()),
+    ).toEqual([
+      "Delete site app.example.com",
+      "Delete site staging.example.com",
+    ]);
     await wrapper
       .get('button[aria-label="Delete site app.example.com"]')
       .trigger("click");
@@ -142,7 +159,9 @@ describe("admin user resource controls", () => {
     });
     expect(wrapper.text()).toContain("app.example.com");
     expect(wrapper.text()).toContain("Deletion requested");
-    expect(wrapper.get('[role="status"]').text()).toContain("Refresh");
+    expect(wrapper.get('[role="status"]').text()).toContain(
+      "updates automatically",
+    );
     expect(wrapper.find('button[aria-label^="Delete site"]').exists()).toBe(
       false,
     );
@@ -170,18 +189,22 @@ describe("admin user resource controls", () => {
     expect(wrapper.text()).toContain("app.example.com");
   });
 
-  it("disables resource mutations during another action and refreshes on request", async () => {
+  it("disables resource mutations during another action without a manual refresh control", () => {
     const wrapper = mountSites({ disabled: true });
     expect(
       wrapper
         .get('button[aria-label="Delete site app.example.com"]')
         .attributes("disabled"),
     ).toBeDefined();
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Refresh")!
-      .trigger("click");
-    expect(wrapper.emitted("refresh")).toHaveLength(1);
+    expect(
+      wrapper
+        .findAll("button")
+        .every(
+          (button) =>
+            button.text() === "" &&
+            button.attributes("aria-label")?.startsWith("Delete site "),
+        ),
+    ).toBe(true);
   });
 
   it("maps Regular user to explicit null and saves only changed roles", async () => {

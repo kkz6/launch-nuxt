@@ -95,13 +95,8 @@ watch(isEditDialogOpen, (open) => {
   }
 });
 
-// Debounced refetch for WebSocket events
-let cronFetchTimeout: ReturnType<typeof setTimeout> | null = null;
-
-useServerModelEvents("cron", serverId.value, () => {
-  if (cronFetchTimeout) clearTimeout(cronFetchTimeout);
-  cronFetchTimeout = setTimeout(() => fetchData(), 300);
-});
+const refreshSchedulers = useLiveRefresh(fetchData);
+useServerModelEvents("cron", serverId, refreshSchedulers);
 
 onMounted(fetchData);
 </script>

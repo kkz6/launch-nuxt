@@ -6,7 +6,12 @@ import UsersPage from "../../pages/admin/index.vue";
 import InvitationsPage from "../../pages/admin/invitations.vue";
 import { createI18nStub } from "../helpers/i18n";
 
+vi.mock("~/composables/useAdminLiveUpdates", () => ({
+  useAdminLiveUpdates: (...args: unknown[]) => mocks.liveUpdates(...args),
+}));
+
 const mocks = vi.hoisted(() => ({
+  liveUpdates: vi.fn(),
   plans: vi.fn(),
   createInvitation: vi.fn(),
   useAuth: vi.fn(),
@@ -142,7 +147,8 @@ describe("admin directory pages", () => {
     expect(table.props("rowActionsFilter")([{ name: "delete" }])).toEqual([]);
     table.vm.$emit("row-click", { id: "user-2" });
     expect(mocks.navigateTo).toHaveBeenCalledWith("/admin/users/user-2");
-    await wrapper.get("button").trigger("click");
+    expect(wrapper.find("button").exists()).toBe(false);
+    await mocks.liveUpdates.mock.calls[0][0]();
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
   });
 
@@ -157,6 +163,16 @@ describe("admin directory pages", () => {
       ]),
     ).toEqual([]);
     expect(mocks.plans).not.toHaveBeenCalled();
+    expect(wrapper.find("button").exists()).toBe(false);
+  });
+
+  it("updates invitations automatically when a live change arrives", async () => {
+    const wrapper = mountInvitations();
+    expect(wrapper.findAll("button").map((button) => button.text())).toEqual([
+      "Invite user",
+    ]);
+    await mocks.liveUpdates.mock.calls[0][0]();
+    expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 
   it("shows plan loading failure in the form and allows retry", async () => {

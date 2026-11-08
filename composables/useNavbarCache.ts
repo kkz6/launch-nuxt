@@ -36,7 +36,13 @@ export const useNavbarCache = () => {
     return null
   }
 
+  const clearCache = () => {
+    serverCache.value = null
+    siteCache.value = null
+  }
+
   return {
+    clearCache,
     cacheServer,
     cacheSite,
     getCachedServer,

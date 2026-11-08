@@ -75,7 +75,7 @@ const handleDelete = async () => {
   isDeleting.value = true;
   try {
     await serverService.delete(props.server.id);
-    toast.success(t("server.pending.deleted"));
+    toast.success(t("server.pending.deleteRequested"));
     emit("deleted", props.server.id);
     showDeleteDialog.value = false;
   } catch (error: unknown) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
 import { toast } from "vue-sonner";
 import { shallowRef } from "vue";
 import type { DateValue } from "reka-ui";
@@ -55,7 +56,7 @@ watch(locale, applyBreadcrumb);
 const { user } = useAuth();
 const isSuperAdmin = computed(() => user.value?.staff_role === "super_admin");
 
-const table = ref<{ refresh: () => void } | null>(null);
+const table = ref<{ refresh: () => Promise<void> } | null>(null);
 
 // Revoke is gated at super_admin on the backend; hide it in the UI for
 // non-super-admins.
@@ -177,6 +178,9 @@ const submitInvite = async () => {
     inviting.value = false;
   }
 };
+useAdminLiveUpdates(() => table.value?.refresh(), {
+  resources: ["invitation", "user", "subscription"],
+});
 </script>
 
 <template>
@@ -186,10 +190,6 @@ const submitInvite = async () => {
       :description="t('adminDirectory.invitations.description')"
     >
       <template #actions>
-        <Button variant="ghost" size="sm" @click="table?.refresh()">
-          <Icon name="lucide:refresh-cw" class="h-3.5 w-3.5" />
-          {{ t("adminDirectory.refresh") }}
-        </Button>
         <Button v-if="isSuperAdmin" size="sm" @click="openInvite">
           <Icon name="lucide:plus" class="h-4 w-4" />
           {{ t("admin.invitations.inviteUser") }}
@@ -209,7 +209,6 @@ const submitInvite = async () => {
       <div class="admin-directory">
         <DataTable
           ref="table"
-          borderless
           endpoint="/admin/invitations/table"
           :row-actions-filter="filterServerActions"
         />

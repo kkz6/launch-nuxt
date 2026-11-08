@@ -24,18 +24,25 @@ const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
 
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
 const fetchDatabases = async (silent = false) => {
+  const request = ++resourceRequest;
   if (!silent) isLoading.value = true;
   try {
     const res = await dockerService.databases.list(
       props.serverId,
       props.projectId,
     );
+    if (request !== resourceRequest) return;
     databases.value = res.data;
   } catch {
+    if (request !== resourceRequest) return;
     if (!silent) toast.error(t("workload.project.databases.loadFailed"));
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
@@ -127,6 +134,7 @@ const { user } = useAuth();
 const { canEdit, canDelete } = useCan();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 const channel = computed(() => `team.${teamId.value}`);
+const refreshDatabases = useLiveRefresh(() => fetchDatabases(true));
 useChannelEvents(
   channel,
   [
@@ -138,7 +146,12 @@ useChannelEvents(
     "docker.database.lifecycle_done",
     "docker.database.deleted",
   ],
-  () => fetchDatabases(true),
+  (data) => {
+    if (data.server_id && data.server_id !== props.serverId) return;
+    if (data.project_id && data.project_id !== props.projectId) return;
+    refreshDatabases();
+  },
+  { onReconnect: refreshDatabases },
 );
 
 onMounted(fetchDatabases);

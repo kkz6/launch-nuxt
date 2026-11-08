@@ -25,7 +25,7 @@ const deleteLoading = ref(false);
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
-const siteCount = ref(0);
+const siteCount = ref(Number(props.server.sites_count ?? 0));
 
 // Projects only exist on docker servers — backend returns
 // `projects_count` on the server response, defaulting to 0 for the
@@ -40,16 +40,34 @@ const canDelete = computed(() => {
   return true;
 });
 
-onMounted(async () => {
+const fetchSiteCount = async () => {
   try {
     const data = await $api<{ data: { count: number } }>(
       `/servers/${props.server.id}/site-count`,
     );
     siteCount.value = data.data?.count || 0;
   } catch {
-    siteCount.value = 0;
+    // Keep the last confirmed count while a background read is unavailable.
   }
-});
+};
+const refreshSiteCount = useLiveRefresh(fetchSiteCount);
+const { user } = useAuth();
+const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+useSiteEvents(
+  teamId,
+  (data) => {
+    if ((data.server_id || data.site?.server_id) === props.server.id)
+      refreshSiteCount();
+  },
+  { onReconnect: refreshSiteCount },
+);
+watch(
+  () => props.server.sites_count,
+  (count) => {
+    if (typeof count === "number") siteCount.value = count;
+  },
+);
+onMounted(fetchSiteCount);
 
 const updateServer = async () => {
   isLoading.value = true;
@@ -110,7 +128,7 @@ const deleteServer = async () => {
     await $api(`/servers/${props.server.id}`, {
       method: "DELETE",
     });
-    toast.success(t("server.pending.deleted"));
+    toast.success(t("server.pending.deleteRequested"));
     navigateTo("/servers");
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };

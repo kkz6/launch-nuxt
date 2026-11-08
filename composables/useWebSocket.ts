@@ -1,4 +1,6 @@
-type EventHandler = (data: unknown) => void;
+import { effectScope } from "vue";
+
+type EventHandler = (data: unknown, channel?: string) => void;
 
 interface WebSocketMessage {
   channel: string;
@@ -21,6 +23,7 @@ const handlers = ref<Map<string, Set<EventHandler>>>(new Map());
 const reconnectTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
 const reconnectAttempts = ref(0);
 let lifecycleInitialized = false;
+let connectionGeneration = 0;
 const maxReconnectAttempts = 10;
 const baseReconnectDelay = 1000; // 1 second
 
@@ -45,8 +48,11 @@ export const useWebSocket = () => {
     // Skip on server
     if (import.meta.server) return;
 
-    // Wait for auth to be initialized
+    // Discard an older async connect after logout, token rotation, or a
+    // manual reconnect; only the newest authentication may open a socket.
+    const generation = connectionGeneration;
     await waitForAuth();
+    if (generation !== connectionGeneration) return;
 
     // Don't connect if no token
     if (!token.value) return;
@@ -99,18 +105,20 @@ export const useWebSocket = () => {
       if (ws.value !== socket) return;
       try {
         const message: WebSocketMessage = JSON.parse(e.data);
-        const { event, data } = message;
+        const { event, data, channel } = message;
 
         // Call all handlers registered for this event
         const eventHandlers = handlers.value.get(event);
         if (eventHandlers) {
-          eventHandlers.forEach((handler) => handler(data));
+          eventHandlers.forEach((handler) => handler(data, channel));
         }
 
         // Also call wildcard handlers
         const wildcardHandlers = handlers.value.get("*");
         if (wildcardHandlers) {
-          wildcardHandlers.forEach((handler) => handler({ event, data }));
+          wildcardHandlers.forEach((handler) =>
+            handler({ event, data }, channel),
+          );
         }
       } catch (err) {
         console.error("[WebSocket] Failed to parse message:", err);
@@ -160,6 +168,7 @@ export const useWebSocket = () => {
   };
 
   const disconnect = () => {
+    connectionGeneration++;
     if (reconnectTimeout.value) {
       clearTimeout(reconnectTimeout.value);
       reconnectTimeout.value = null;
@@ -231,27 +240,36 @@ export const useWebSocket = () => {
   };
 
   // Auto-connect when auth is initialized and token is available
-  if (!lifecycleInitialized) {
+  if (!import.meta.server && !lifecycleInitialized) {
     lifecycleInitialized = true;
-    watch(
-      [isInitialized, token],
-      ([initialized, newToken]) => {
-        if (initialized && newToken) {
-          void connect();
-        } else if (initialized && !newToken) {
-          disconnect();
-        }
-      },
-      { immediate: true },
-    );
+    // Auth/locale watchers belong to the singleton connection rather than
+    // whichever page first requested it.
+    effectScope(true).run(() => {
+      watch(
+        [isInitialized, token],
+        ([initialized, newToken], previous) => {
+          if (initialized && newToken) {
+            if (previous?.[1] && newToken !== previous[1]) reconnect();
+            else void connect();
+          } else if (initialized && !newToken) {
+            disconnect();
+          }
+        },
+        { immediate: true },
+      );
 
-    // The handshake carries the locale because browsers cannot attach an
-    // Accept-Language header to WebSockets. Reconnect when it changes so
-    // subsequent control/error events use the newly selected language.
-    watch(effectiveLocale, (nextLocale, previousLocale) => {
-      if (nextLocale !== previousLocale && isInitialized.value && token.value) {
-        reconnect();
-      }
+      // The handshake carries the locale because browsers cannot attach an
+      // Accept-Language header to WebSockets. Reconnect when it changes so
+      // subsequent control/error events use the newly selected language.
+      watch(effectiveLocale, (nextLocale, previousLocale) => {
+        if (
+          nextLocale !== previousLocale &&
+          isInitialized.value &&
+          token.value
+        ) {
+          reconnect();
+        }
+      });
     });
 
     // Bring the connection back when conditions change.

@@ -62,6 +62,7 @@ beforeEach(() => {
   vi.stubGlobal("useI18n", createI18nStub);
   vi.stubGlobal("useDockerApplicationEvents", vi.fn());
   vi.stubGlobal("useServerModelEvents", vi.fn());
+  vi.stubGlobal("useLiveRefresh", (refresh: () => Promise<unknown>) => refresh);
 });
 
 afterEach(() => {

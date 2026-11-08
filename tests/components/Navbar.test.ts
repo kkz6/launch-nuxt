@@ -1,6 +1,7 @@
-import { flushPromises, shallowMount } from "@vue/test-utils";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { flushPromises, shallowMount, type VueWrapper } from "@vue/test-utils";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getServerTypeRules } from "../../composables/useServerTypeRules";
 import Navbar from "../../components/layout/Navbar.vue";
 
 const toastMocks = vi.hoisted(() => ({
@@ -13,6 +14,24 @@ vi.mock("~/composables/useChannelEvents", () => ({
   useDeploymentEvents: vi.fn(),
 }));
 
+const live = vi.hoisted(() => ({
+  resource: undefined as undefined | (() => Promise<void>),
+}));
+vi.mock("~/composables/useNavbarLiveUpdates", () => ({
+  useNavbarLiveUpdates: (
+    _team: unknown,
+    _context: unknown,
+    resource: () => Promise<void>,
+  ) => {
+    live.resource = resource;
+  },
+}));
+const currentRoute = reactive({
+  path: "/dashboard",
+  query: {} as Record<string, string | string[]>,
+});
+const cache = vi.fn();
+const clearCache = vi.fn(() => cache.mockReturnValue(null));
 const activeUser = ref({
   id: "user",
   name: "Team Owner",
@@ -49,8 +68,9 @@ const translations: Record<string, string> = {
 };
 const translate = vi.fn((key: string) => translations[key] ?? key);
 
-const mountNavbar = () =>
-  shallowMount(Navbar, {
+const wrappers: VueWrapper[] = [];
+const mountNavbar = () => {
+  const wrapper = shallowMount(Navbar, {
     global: {
       stubs: {
         Avatar: { template: "<div><slot /></div>" },
@@ -93,10 +113,17 @@ const mountNavbar = () =>
       },
     },
   });
+  wrappers.push(wrapper);
+  return wrapper;
+};
 
 describe("Navbar", () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    currentRoute.path = "/dashboard";
+    currentRoute.query = {};
+    cache.mockReset();
+    clearCache.mockClear();
     const states = new Map<string, ReturnType<typeof ref>>();
     activeUser.value = {
       id: "user",
@@ -115,6 +142,7 @@ describe("Navbar", () => {
     toastMocks.error.mockReset();
     vi.stubGlobal("$api", vi.fn().mockResolvedValue({ data: {} }));
     vi.stubGlobal("computed", computed);
+    vi.stubGlobal("getServerTypeRules", getServerTypeRules);
     vi.stubGlobal("nextTick", nextTick);
     vi.stubGlobal("onMounted", onMounted);
     vi.stubGlobal("ref", ref);
@@ -135,11 +163,12 @@ describe("Navbar", () => {
       setLocalePreference,
     }));
     vi.stubGlobal("useNavbarCache", () => ({
-      getCachedServer: vi.fn(),
+      getCachedServer: cache,
+      clearCache,
       getCachedSite: vi.fn(),
     }));
     vi.stubGlobal("usePageBreadcrumbState", () => ref(null));
-    vi.stubGlobal("useRoute", () => ({ path: "/dashboard", query: {} }));
+    vi.stubGlobal("useRoute", () => currentRoute);
     vi.stubGlobal("useRouter", () => ({ push: vi.fn() }));
     vi.stubGlobal("useSettingsSheet", () => ({ open: vi.fn() }));
     vi.stubGlobal("useState", (key: string, factory: () => unknown) => {
@@ -149,6 +178,7 @@ describe("Navbar", () => {
   });
 
   afterEach(async () => {
+    wrappers.splice(0).forEach((wrapper) => wrapper.unmount());
     await vi.runAllTimersAsync();
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -248,5 +278,96 @@ describe("Navbar", () => {
     expect(translate).toHaveBeenCalledWith("common.navigation.servers");
     expect(translate).toHaveBeenCalledWith("common.navigation.domains");
     expect(translate).toHaveBeenCalledWith("common.navigation.scripts");
+  });
+  it("refreshes cached header metadata when a resource event arrives", async () => {
+    currentRoute.path = "/servers/server-1";
+    cache.mockReturnValue({
+      name: "Old server",
+      status: "running",
+      type: "php",
+      connected: true,
+    });
+    const api = vi.fn().mockResolvedValue({
+      data: {
+        name: "Renamed server",
+        status: "running",
+        type: "php",
+        connected: true,
+      },
+    });
+    vi.stubGlobal("$api", api);
+    const wrapper = mountNavbar();
+    await flushPromises();
+    expect(wrapper.text()).toContain("Old server");
+    await live.resource?.();
+    await flushPromises();
+    expect(clearCache).toHaveBeenCalledOnce();
+    expect(api).toHaveBeenCalledWith("/servers/server-1");
+    expect(wrapper.text()).toContain("Renamed server");
+    wrapper.unmount();
+  });
+
+  it("does not let a slow previous route replace the current header", async () => {
+    currentRoute.path = "/servers/server-1";
+    let finishOld!: (value: unknown) => void;
+    const old = new Promise((resolve) => {
+      finishOld = resolve;
+    });
+    const api = vi.fn().mockImplementation((path: string) =>
+      path === "/servers/server-1"
+        ? old
+        : Promise.resolve({
+            data: {
+              name: "Current server",
+              status: "running",
+              type: "php",
+              connected: true,
+            },
+          }),
+    );
+    vi.stubGlobal("$api", api);
+    const wrapper = mountNavbar();
+    await nextTick();
+    currentRoute.path = "/servers/server-2";
+    await flushPromises();
+    expect(wrapper.text()).toContain("Current server");
+    finishOld({
+      data: {
+        name: "Previous server",
+        status: "running",
+        type: "php",
+        connected: true,
+      },
+    });
+    await flushPromises();
+    expect(wrapper.text()).toContain("Current server");
+    expect(wrapper.text()).not.toContain("Previous server");
+    wrapper.unmount();
+  });
+  it("uses a second shared tab row for user sections with the user's name first", async () => {
+    currentRoute.path = "/admin/users/customer";
+    currentRoute.query = { tab: "servers" };
+    vi.stubGlobal("usePageBreadcrumbState", () =>
+      ref({
+        path: currentRoute.path,
+        crumbs: [
+          { label: "Admin", to: "/admin/overview" },
+          { label: "Users", to: "/admin" },
+          { label: "Alex Morgan" },
+        ],
+      }),
+    );
+    const wrapper = mountNavbar();
+    await flushPromises();
+    const sections = wrapper.findComponent({ name: "LayoutTabStrip" });
+    expect(sections.attributes("active-key")).toBe("servers");
+    expect(
+      wrapper
+        .findComponent({ name: "AdminNavigation" })
+        .attributes("extendborder"),
+    ).toBe("true");
+    currentRoute.query = { tab: ["sites", "servers"] };
+    await nextTick();
+    expect(sections.attributes("active-key")).toBe("profile");
   });
 });

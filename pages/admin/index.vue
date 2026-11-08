@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
 import type { AdminUserRow } from "~/types";
 import DataTable from "~/components/data-table/DataTable.vue";
 import { TeamsCell } from "~/components/data-table/columns";
-import { Button } from "~/components/ui/button";
 
 definePageMeta({
   layout: "default",
@@ -10,7 +10,7 @@ definePageMeta({
 });
 
 const { locale, t } = useI18n();
-const table = ref<{ refresh: () => void } | null>(null);
+const table = ref<{ refresh: () => Promise<void> } | null>(null);
 
 const initials = (name: string): string =>
   name
@@ -39,6 +39,9 @@ watch(locale, applyBreadcrumb);
 const openUser = (row: AdminUserRow): void => {
   navigateTo(`/admin/users/${row.id}`);
 };
+useAdminLiveUpdates(() => table.value?.refresh(), {
+  resources: ["user", "team", "subscription", "site", "server", "docker"],
+});
 </script>
 
 <template>
@@ -46,14 +49,7 @@ const openUser = (row: AdminUserRow): void => {
     <AdminPageHeader
       :title="t('admin.common.users')"
       :description="t('adminDirectory.users.description')"
-    >
-      <template #actions>
-        <Button variant="ghost" size="sm" @click="table?.refresh()">
-          <Icon name="lucide:refresh-cw" class="h-3.5 w-3.5" />
-          {{ t("adminDirectory.refresh") }}
-        </Button>
-      </template>
-    </AdminPageHeader>
+    />
 
     <section aria-labelledby="user-directory-title" class="space-y-4">
       <div class="sr-only">
@@ -67,7 +63,6 @@ const openUser = (row: AdminUserRow): void => {
       <div class="admin-directory">
         <DataTable
           ref="table"
-          borderless
           endpoint="/admin/users/table"
           :row-actions-filter="() => []"
           @row-click="openUser"

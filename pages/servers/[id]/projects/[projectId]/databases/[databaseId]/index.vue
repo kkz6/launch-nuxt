@@ -64,23 +64,34 @@ const subTab = computed<SubTabId>(() => {
     : "general";
 });
 
-const fetchDatabase = async () => {
-  isLoading.value = true;
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
+const fetchDatabase = async (silent = false) => {
+  const request = ++resourceRequest;
+  if (!silent) isLoading.value = true;
   try {
     const res = await dockerService.databases.get(
       serverId.value,
       projectId.value,
       databaseId.value,
     );
+    if (request !== resourceRequest) return;
     db.value = res.data;
     useHead({ title: db.value.name });
-  } catch {
+  } catch (error: unknown) {
+    if (request !== resourceRequest) return;
+    const status =
+      (error as { status?: number; statusCode?: number }).status ||
+      (error as { statusCode?: number }).statusCode;
+    if (silent && status !== 404) return;
     toast.error(t("server.workload.databaseNotFound"));
     navigateTo(
       `/servers/${serverId.value}/projects/${projectId.value}?tab=databases`,
     );
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
@@ -89,6 +100,7 @@ const fetchDatabase = async () => {
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
 const channel = computed(() => `team.${teamId.value}`);
+const refreshDatabase = useLiveRefresh(() => fetchDatabase(true));
 useChannelEvents(
   channel,
   [
@@ -96,11 +108,21 @@ useChannelEvents(
     "docker.database.running",
     "docker.database.failed",
     "docker.database.lifecycle_done",
+    "docker.database.deleted",
   ],
-  (data) => {
-    if (data.id !== databaseId.value) return;
-    fetchDatabase();
+  (data, event) => {
+    if (data.server_id && data.server_id !== serverId.value) return;
+    if (data.project_id && data.project_id !== projectId.value) return;
+    if ((data.database_id || data.id) !== databaseId.value) return;
+    if (event === "docker.database.deleted") {
+      navigateTo(
+        `/servers/${serverId.value}/projects/${projectId.value}?tab=databases`,
+      );
+      return;
+    }
+    refreshDatabase();
   },
+  { onReconnect: refreshDatabase },
 );
 
 // Navbar fires lifecycle actions directly via dockerService and bumps

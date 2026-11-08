@@ -1090,6 +1090,7 @@
     },
     "pending": {
       "deleted": "サーバーを削除しました",
+      "deleteRequested": "サーバーの削除をリクエストしました",
       "deleteFailed": "サーバーを削除できませんでした",
       "viewLogs": "ログを表示",
       "provision": "プロビジョニング",

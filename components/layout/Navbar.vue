@@ -12,6 +12,7 @@ import {
   Globe,
   Terminal,
 } from "lucide-vue-next";
+import { useNavbarLiveUpdates } from "~/composables/useNavbarLiveUpdates";
 import { useDeploymentEvents } from "~/composables/useChannelEvents";
 import type { Deployment } from "~/types";
 import type { LocalePreference } from "~/types/locale";
@@ -30,8 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
-
-withDefaults(defineProps<{ compact?: boolean }>(), { compact: false });
+import AdminNavigation from "~/components/admin/Navigation.vue";
 
 const { t } = useI18n();
 const navLabel = (key: string) => t(`common.navigation.${key}`);
@@ -52,6 +52,50 @@ const isStaff = computed(
     user.value?.staff_role === "super_admin",
 );
 const showAdminContext = computed(() => route.path.startsWith("/admin"));
+const pageBreadcrumbState = usePageBreadcrumbState();
+const adminCrumbs = computed(() =>
+  pageBreadcrumbState.value?.path === route.path
+    ? pageBreadcrumbState.value.crumbs
+    : [],
+);
+// User sections use the same two-level navigation as server settings.
+const isAdminUserDetail = computed(() =>
+  /^\/admin\/users\/[^/]+\/?$/.test(route.path),
+);
+const adminUserTabs = computed(() => [
+  {
+    value: "profile",
+    label: adminCrumbs.value.at(-1)?.label || t("admin.common.user"),
+    icon: "lucide:user-round",
+  },
+  {
+    value: "teams",
+    label: t("admin.userDetail.tabs.teams"),
+    icon: "lucide:users-round",
+  },
+  {
+    value: "subscriptions",
+    label: t("admin.userDetail.tabs.subscriptions"),
+    icon: "lucide:credit-card",
+  },
+  {
+    value: "servers",
+    label: t("admin.userDetail.tabs.servers"),
+    icon: "lucide:server",
+  },
+  {
+    value: "sites",
+    label: t("admin.userDetail.tabs.sites"),
+    icon: "lucide:globe",
+  },
+]);
+const activeAdminUserTab = computed(() =>
+  typeof route.query.tab === "string" &&
+  adminUserTabs.value.some((tab) => tab.value === route.query.tab)
+    ? route.query.tab
+    : "profile",
+);
+
 // Check if current team is subscribed
 const isSubscribed = computed(
   () => user.value?.current_team?.is_subscribed ?? true,
@@ -1190,7 +1234,26 @@ const siteDetailTabs = computed(() => {
   return allSiteDetailTabs.value;
 });
 
-const { getCachedServer, getCachedSite } = useNavbarCache();
+const { getCachedServer, getCachedSite, clearCache } = useNavbarCache();
+const resourceRefreshKey = ref(0);
+const workloadRefreshKey = ref(0);
+let resourceRead: Promise<void> = Promise.resolve();
+let workloadRead: Promise<void> = Promise.resolve();
+useNavbarLiveUpdates(
+  teamId,
+  { serverId, siteId, projectId, workloadId, workloadKind },
+  async () => {
+    clearCache();
+    resourceRefreshKey.value++;
+    await nextTick();
+    await resourceRead;
+  },
+  async () => {
+    workloadRefreshKey.value++;
+    await nextTick();
+    await workloadRead;
+  },
+);
 
 // Shared state bus for the current server's public IP. The navbar
 // already fetches the server for the breadcrumb; broadcasting the IP
@@ -1226,114 +1289,128 @@ const applyServerData = (data: {
 // site-vs-server-only branches and treats project the same as
 // "server with extra resource".
 watch(
-  [serverId, siteId, projectId],
-  async ([sId, stId, pId]) => {
-    if (sId && !stId) {
-      // Server detail page - use cache if available, otherwise fetch
-      const cached = getCachedServer(sId);
-      if (cached) {
-        applyServerData(cached);
-      } else {
+  [serverId, siteId, projectId, resourceRefreshKey],
+  ([sId, stId, pId], _previous, onCleanup) => {
+    let current = true;
+    onCleanup(() => {
+      current = false;
+    });
+    resourceRead = (async () => {
+      if (sId && !stId) {
+        // Server detail page - use cache if available, otherwise fetch
+        const cached = getCachedServer(sId);
+        if (cached) {
+          applyServerData(cached);
+        } else {
+          try {
+            const response = await $api<{
+              data: {
+                name: string;
+                public_ipv4: string;
+                connected: boolean;
+                provider: string;
+                status: string;
+                type: string;
+                provision_command?: string;
+              };
+            }>(`/servers/${sId}`);
+            if (!current) return;
+            applyServerData(response.data);
+          } catch {
+            if (!current) return;
+            serverName.value = null;
+          }
+        }
+        // Clear site data
+        siteAddress.value = null;
+        siteType.value = null;
+      } else if (sId && stId) {
+        // Apply site cache immediately for instant tab filtering
+        const cachedSite = getCachedSite(stId);
+        if (cachedSite) {
+          siteAddress.value = cachedSite.address;
+          siteType.value = cachedSite.type;
+        }
+
+        // Fetch full data from API
         try {
-          const response = await $api<{
-            data: {
-              name: string;
-              public_ipv4: string;
-              connected: boolean;
-              provider: string;
-              status: string;
-              type: string;
-              provision_command?: string;
-            };
-          }>(`/servers/${sId}`);
-          applyServerData(response.data);
+          const [serverRes, siteRes] = await Promise.all([
+            $api<{
+              data: {
+                name: string;
+                public_ipv4: string;
+                connected: boolean;
+                provider: string;
+                status: string;
+                type: string;
+                provision_command?: string;
+              };
+            }>(`/servers/${sId}`),
+            $api<{ data: { address: string; type: string; url: string } }>(
+              `/servers/${sId}/sites/${stId}`,
+            ),
+          ]);
+          if (!current) return;
+          applyServerData(serverRes.data);
+          siteAddress.value = siteRes.data.address;
+          siteType.value = siteRes.data.type;
+          siteUrl.value = siteRes.data.url;
         } catch {
+          if (!current) return;
           serverName.value = null;
+          siteAddress.value = null;
         }
       }
-      // Clear site data
-      siteAddress.value = null;
-      siteType.value = null;
-    } else if (sId && stId) {
-      // Apply site cache immediately for instant tab filtering
-      const cachedSite = getCachedSite(stId);
-      if (cachedSite) {
-        siteAddress.value = cachedSite.address;
-        siteType.value = cachedSite.type;
-      }
 
-      // Fetch full data from API
-      try {
-        const [serverRes, siteRes] = await Promise.all([
-          $api<{
-            data: {
-              name: string;
-              public_ipv4: string;
-              connected: boolean;
-              provider: string;
-              status: string;
-              type: string;
-              provision_command?: string;
-            };
-          }>(`/servers/${sId}`),
-          $api<{ data: { address: string; type: string; url: string } }>(
-            `/servers/${sId}/sites/${stId}`,
-          ),
-        ]);
-        applyServerData(serverRes.data);
-        siteAddress.value = siteRes.data.address;
-        siteType.value = siteRes.data.type;
-        siteUrl.value = siteRes.data.url;
-      } catch {
-        serverName.value = null;
-        siteAddress.value = null;
-      }
-    }
+      if (!current) return;
 
-    // Project detail page — load the project (and server, if not
-    // already loaded by the branch above). The crumb keeps stale data
-    // around for an instant load on back/forward navigation; the
-    // ${projectId}` URL change forces a refresh.
-    if (sId && pId) {
-      try {
-        const [serverRes, projectRes] = await Promise.all([
-          $api<{
-            data: {
-              name: string;
-              public_ipv4: string;
-              connected: boolean;
-              provider: string;
-              status: string;
-              type: string;
-              provision_command?: string;
-            };
-          }>(`/servers/${sId}`),
-          $api<{ data: { name: string } }>(
-            `/servers/${sId}/docker/projects/${pId}`,
-          ),
-        ]);
-        applyServerData(serverRes.data);
-        projectName.value = projectRes.data.name;
-      } catch {
-        // Page-level guard will redirect on its own — just blank.
+      // Project detail page — load the project (and server, if not
+      // already loaded by the branch above). The crumb keeps stale data
+      // around for an instant load on back/forward navigation; the
+      // ${projectId}` URL change forces a refresh.
+      if (sId && pId) {
+        try {
+          const [serverRes, projectRes] = await Promise.all([
+            $api<{
+              data: {
+                name: string;
+                public_ipv4: string;
+                connected: boolean;
+                provider: string;
+                status: string;
+                type: string;
+                provision_command?: string;
+              };
+            }>(`/servers/${sId}`),
+            $api<{ data: { name: string } }>(
+              `/servers/${sId}/docker/projects/${pId}`,
+            ),
+          ]);
+          if (!current) return;
+          applyServerData(serverRes.data);
+          projectName.value = projectRes.data.name;
+        } catch {
+          if (!current) return;
+          // Page-level guard will redirect on its own — just blank.
+          projectName.value = null;
+        }
+      } else if (!pId) {
+        // Clear the project name when leaving the project subtree so a
+        // late navigation doesn't paint the previous breadcrumb.
         projectName.value = null;
       }
-    } else if (!pId) {
-      // Clear the project name when leaving the project subtree so a
-      // late navigation doesn't paint the previous breadcrumb.
-      projectName.value = null;
-    }
 
-    if (!sId) {
-      serverName.value = null;
-      serverProvider.value = null;
-      serverStatus.value = null;
-      serverType.value = null;
-      serverProvisionCommand.value = null;
-      siteAddress.value = null;
-      siteType.value = null;
-      currentServerPublicIp.value = null;
-    }
+      if (!sId) {
+        serverName.value = null;
+        serverProvider.value = null;
+        serverStatus.value = null;
+        serverType.value = null;
+        serverProvisionCommand.value = null;
+        siteAddress.value = null;
+        siteType.value = null;
+        currentServerPublicIp.value = null;
+      }
+    })();
   },
   { immediate: true },
 );
@@ -1348,48 +1425,63 @@ watch(
 // status — Running → Stopped flips the button in the chrome to
 // "Start" without waiting for a WS round-trip.
 watch(
-  [workloadKind, workloadId, serverId, projectId, workloadActionRefreshKey],
-  async ([kind, wId, sId, pId]) => {
-    if (!kind || !wId || !sId || !pId) {
-      workloadName.value = null;
-      workloadStatus.value = null;
-      workloadEngine.value = null;
-      workloadVersion.value = null;
-      workloadExternalPort.value = null;
-      return;
-    }
-    const path = `/servers/${sId}/docker/projects/${pId}/${
-      kind === "database"
-        ? "databases"
-        : kind === "application"
-          ? "applications"
-          : "composes"
-    }/${wId}`;
-    try {
-      const res = await $api<{
-        data: {
-          name: string;
-          status?: string;
-          engine?: string;
-          engine_version?: string;
-          external_port?: number | null;
-          build_location?: string | null;
-        };
-      }>(path);
-      workloadName.value = res.data.name;
-      workloadStatus.value = res.data.status ?? null;
-      workloadEngine.value = res.data.engine ?? null;
-      workloadVersion.value = res.data.engine_version ?? null;
-      workloadExternalPort.value = res.data.external_port ?? null;
-      workloadBuildLocation.value = res.data.build_location ?? null;
-    } catch {
-      workloadName.value = null;
-      workloadStatus.value = null;
-      workloadEngine.value = null;
-      workloadVersion.value = null;
-      workloadExternalPort.value = null;
-      workloadBuildLocation.value = null;
-    }
+  [
+    workloadKind,
+    workloadId,
+    serverId,
+    projectId,
+    workloadActionRefreshKey,
+    workloadRefreshKey,
+  ],
+  ([kind, wId, sId, pId], _previous, onCleanup) => {
+    let current = true;
+    onCleanup(() => {
+      current = false;
+    });
+    workloadRead = (async () => {
+      if (!kind || !wId || !sId || !pId) {
+        workloadName.value = null;
+        workloadStatus.value = null;
+        workloadEngine.value = null;
+        workloadVersion.value = null;
+        workloadExternalPort.value = null;
+        return;
+      }
+      const path = `/servers/${sId}/docker/projects/${pId}/${
+        kind === "database"
+          ? "databases"
+          : kind === "application"
+            ? "applications"
+            : "composes"
+      }/${wId}`;
+      try {
+        const res = await $api<{
+          data: {
+            name: string;
+            status?: string;
+            engine?: string;
+            engine_version?: string;
+            external_port?: number | null;
+            build_location?: string | null;
+          };
+        }>(path);
+        if (!current) return;
+        workloadName.value = res.data.name;
+        workloadStatus.value = res.data.status ?? null;
+        workloadEngine.value = res.data.engine ?? null;
+        workloadVersion.value = res.data.engine_version ?? null;
+        workloadExternalPort.value = res.data.external_port ?? null;
+        workloadBuildLocation.value = res.data.build_location ?? null;
+      } catch {
+        if (!current) return;
+        workloadName.value = null;
+        workloadStatus.value = null;
+        workloadEngine.value = null;
+        workloadVersion.value = null;
+        workloadExternalPort.value = null;
+        workloadBuildLocation.value = null;
+      }
+    })();
   },
   { immediate: true },
 );
@@ -1728,17 +1820,16 @@ const navigateTo = (path: string) => {
 
 <template>
   <nav
-    class="z-40 shrink-0"
-    :class="compact ? '' : 'w-full border-b border-divider bg-background/70 backdrop-blur-lg'"
+    class="z-40 w-full shrink-0 border-b border-divider bg-background/70 backdrop-blur-lg"
   >
-    <div class="flex items-center justify-between" :class="compact ? 'h-14' : 'h-16 px-4 lg:px-8'">
-      <NuxtLink v-if="!compact" to="/dashboard" class="flex items-center gap-2">
+    <div class="flex h-16 items-center justify-between px-4 lg:px-8">
+      <NuxtLink to="/dashboard" class="flex items-center gap-2">
         <span class="text-xl font-bold">launchctl</span>
       </NuxtLink>
 
       <!-- Subscription Banner -->
       <div
-        v-if="!compact && !isSubscribed"
+        v-if="!isSubscribed"
         class="group relative h-5 cursor-pointer overflow-hidden text-sm"
         @click="openSettingsSheet('billing')"
       >
@@ -1914,6 +2005,55 @@ const navigateTo = (path: string) => {
           </template>
         </ClientOnly>
       </div>
+    </div>
+
+    <div v-if="showAdminContext" class="px-4 lg:px-8">
+      <ol
+        v-if="adminCrumbs.length > 2"
+        :aria-label="t('adminShell.breadcrumb')"
+        class="flex min-w-0 items-center gap-2 pb-3 text-sm"
+      >
+        <li
+          v-for="(crumb, index) in adminCrumbs"
+          :key="index"
+          class="flex min-w-0 items-center gap-2"
+        >
+          <Icon
+            v-if="index"
+            name="lucide:chevron-right"
+            class="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <NuxtLink
+            v-if="crumb.to && index < adminCrumbs.length - 1"
+            :to="crumb.to"
+            class="truncate text-muted-foreground hover:text-foreground"
+            >{{ crumb.label }}</NuxtLink
+          >
+          <span
+            v-else
+            class="truncate font-medium"
+            :aria-current="
+              index === adminCrumbs.length - 1 ? 'page' : undefined
+            "
+            >{{ crumb.label }}</span
+          >
+        </li>
+      </ol>
+      <AdminNavigation :extend-border="isAdminUserDetail" />
+      <LayoutTabStrip
+        v-if="isAdminUserDetail"
+        :tabs="adminUserTabs"
+        :active-key="activeAdminUserTab"
+        :to-link="
+          (tab) => ({
+            path: route.path,
+            query: tab.value === 'profile' ? {} : { tab: tab.value },
+          })
+        "
+        :aria-label="t('admin.userDetail.sections')"
+        class="pt-1"
+      />
     </div>
 
     <!-- Global Navigation Tabs (Servers / Domains) -->

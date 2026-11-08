@@ -1,10 +1,11 @@
-import { flushPromises, shallowMount } from "@vue/test-utils";
-import { defineComponent, ref, watch } from "vue";
+import { enableAutoUnmount, flushPromises, mount } from "@vue/test-utils";
+import { defineComponent, reactive, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import AdminUserPage from "../../pages/admin/users/[id].vue";
 import { createI18nStub } from "../helpers/i18n";
 
 const mocks = vi.hoisted(() => ({
+  liveUpdates: vi.fn(),
   showUser: vi.fn(),
   userSites: vi.fn(),
   userServers: vi.fn(),
@@ -21,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   useAuth: vi.fn(),
 }));
+vi.mock("~/composables/useAdminLiveUpdates", () => ({
+  useAdminLiveUpdates: mocks.liveUpdates,
+}));
 vi.mock("~/services/adminService", () => ({ adminService: mocks }));
 vi.mock("~/composables/useAuth", () => ({ useAuth: mocks.useAuth }));
 vi.mock("~/composables/useImpersonation", () => ({
@@ -31,6 +35,10 @@ vi.mock("vue-sonner", () => ({
 }));
 
 const currentUser = ref({ id: "admin-1", staff_role: "super_admin" });
+const route = reactive({
+  params: { id: "user-1" },
+  query: {} as Record<string, unknown>,
+});
 const customer = (overrides: Record<string, unknown> = {}) => ({
   id: "user-1",
   name: "Anila",
@@ -50,26 +58,30 @@ const site = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 const slots = { template: "<div><slot /></div>" };
+enableAutoUnmount(afterEach);
 const mountPage = () =>
-  shallowMount(AdminUserPage, {
+  mount(AdminUserPage, {
+    attachTo: document.body,
     global: {
       stubs: {
         Icon: true,
+        UserSitesTable: true,
+        UserServersTable: true,
+        UserStaffRoleControl: true,
+        Input: true,
+        Label: true,
         Badge: slots,
         Avatar: slots,
         AvatarFallback: slots,
         SharedDateTooltip: true,
         NuxtLink: { template: "<a><slot /></a>" },
         Button: { template: "<button><slot /></button>" },
-        Tabs: {
-          ...slots,
-          name: "Tabs",
-          props: ["modelValue"],
-          emits: ["update:modelValue"],
-        },
-        TabsContent: slots,
-        TabsList: slots,
-        TabsTrigger: slots,
+        DropdownMenu: false,
+        DropdownMenuTrigger: false,
+        DropdownMenuContent: false,
+        DropdownMenuItem: false,
+        DropdownMenuSeparator: false,
+        Teleport: slots,
         SharedConfirmationDialog: defineComponent({
           setup(_, { expose }) {
             expose({ show: mocks.confirm });
@@ -81,13 +93,21 @@ const mountPage = () =>
   });
 type Page = ReturnType<typeof mountPage>;
 const deleteUserButton = (page: Page) =>
-  page.findAll("button").find((button) => button.text() === "Delete user")!;
+  page
+    .findAll('[role="menuitem"]')
+    .find((item) => item.text() === "Delete user")!;
+const openActions = async (page: Page) => {
+  await page
+    .get('button[aria-label="More actions"]')
+    .trigger("keydown", { key: "Enter" });
+  await flushPromises();
+};
 const sitesTable = (page: Page) =>
   page.findComponent({ name: "UserSitesTable" });
 const roleControl = (page: Page) =>
   page.findComponent({ name: "UserStaffRoleControl" });
-const activateTab = async (page: Page, tab: string) => {
-  page.findComponent({ name: "Tabs" }).vm.$emit("update:modelValue", tab);
+const activateTab = async (tab: string) => {
+  route.query = { tab };
   await flushPromises();
 };
 const requestDeleteSite = async (page: Page) => {
@@ -99,6 +119,7 @@ describe("admin user management", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     currentUser.value = { id: "admin-1", staff_role: "super_admin" };
+    route.query = {};
     mocks.useAuth.mockReturnValue({ user: currentUser });
     mocks.showUser.mockImplementation(async () => ({ data: customer() }));
     mocks.userSites.mockResolvedValue({ data: [site()] });
@@ -116,18 +137,142 @@ describe("admin user management", () => {
     vi.stubGlobal("useHead", vi.fn());
     vi.stubGlobal("setBreadcrumbs", vi.fn());
     vi.stubGlobal("watch", watch);
-    vi.stubGlobal("useRoute", () => ({ params: { id: "user-1" } }));
+    vi.stubGlobal("useRoute", () => route);
     vi.stubGlobal("useI18n", () => ({ ...createI18nStub(), te: () => true }));
     vi.stubGlobal("navigateTo", mocks.navigateTo);
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it("starts with the profile and shows only the query-selected resource section", async () => {
+    const page = mountPage();
+    await flushPromises();
+    expect(page.get("h1").text()).toBe("Anila");
+    expect(page.text()).toContain("anila@example.com");
+    expect(roleControl(page).exists()).toBe(true);
+    expect(sitesTable(page).exists()).toBe(false);
+    expect(page.find('[role="tablist"]').exists()).toBe(false);
+    expect(mocks.userSites).not.toHaveBeenCalled();
+    expect(mocks.userServers).not.toHaveBeenCalled();
+    expect(mocks.userSubscriptions).not.toHaveBeenCalled();
+
+    await activateTab("sites");
+    expect(page.get("h1").text()).toBe("Sites");
+    expect(page.get("h1").classes()).toContain("sr-only");
+    expect(page.find("header").exists()).toBe(false);
+    expect(page.text()).not.toContain("Spectate");
+    expect(page.find('button[aria-label="More actions"]').exists()).toBe(false);
+    expect(sitesTable(page).exists()).toBe(true);
+    expect(roleControl(page).exists()).toBe(false);
+    expect(page.text()).not.toContain("anila@example.com");
+    expect(mocks.userSites).toHaveBeenCalledOnce();
+    await activateTab("profile");
+    expect(roleControl(page).exists()).toBe(true);
+    expect(sitesTable(page).exists()).toBe(false);
+    await activateTab("sites");
+    expect(mocks.userSites).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ["sites", "userSites", "Sites"],
+    ["servers", "userServers", "Servers"],
+    ["subscriptions", "userSubscriptions", "Subscriptions"],
+  ] as const)(
+    "loads a direct link to %s without showing profile controls",
+    async (tab, method, heading) => {
+      route.query = { tab };
+      const page = mountPage();
+      await flushPromises();
+      expect(page.get("h1").text()).toBe(heading);
+      expect(page.get("h1").classes()).toContain("sr-only");
+      expect(page.find("header").exists()).toBe(false);
+      expect(page.text()).not.toContain("Spectate");
+      expect(page.find('button[aria-label="More actions"]').exists()).toBe(
+        false,
+      );
+      expect(roleControl(page).exists()).toBe(false);
+      expect(mocks[method]).toHaveBeenCalledWith("user-1");
+    },
+  );
+
+  it.each(["unknown", ["sites", "servers"]])(
+    "falls back to the profile for an invalid tab %j",
+    async (tab) => {
+      route.query = { tab };
+      const page = mountPage();
+      await flushPromises();
+      expect(page.get("h1").text()).toBe("Anila");
+      expect(roleControl(page).exists()).toBe(true);
+      expect(mocks.userSites).not.toHaveBeenCalled();
+      expect(mocks.userServers).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps Spectate visible and opens account actions from the keyboard", async () => {
+    const page = mountPage();
+    await flushPromises();
+    expect(page.findAll('[role="menuitem"]')).toHaveLength(0);
+    const spectate = page
+      .findAll("button")
+      .find((button) => button.text() === "Spectate")!;
+    expect(spectate.attributes("variant")).toBe("outline");
+    await openActions(page);
+    expect(
+      page.findAll('[role="menuitem"]').map((item) => item.text()),
+    ).toEqual(["Suspend", "Delete user"]);
+    expect(deleteUserButton(page).classes()).toContain("text-destructive");
+    await page.get('[role="menu"]').trigger("keydown", { key: "Escape" });
+    await flushPromises();
+    await spectate.trigger("click");
+    await flushPromises();
+    expect(mocks.start).toHaveBeenCalledWith("user-1", "Staff support session");
+  });
+
+  it.each([
+    ["active", "Suspend", "suspendUser"],
+    ["suspended", "Reactivate", "unsuspendUser"],
+  ] as const)(
+    "runs the appropriate account action for %s users",
+    async (status, label, method) => {
+      mocks.showUser.mockResolvedValueOnce({ data: customer({ status }) });
+      const page = mountPage();
+      await flushPromises();
+      await openActions(page);
+      const action = page
+        .findAll('[role="menuitem"]')
+        .find((item) => item.text() === label)!;
+      expect(action.classes()).not.toContain("text-destructive");
+      await action.trigger("click");
+      await flushPromises();
+      expect(mocks[method]).toHaveBeenCalledOnce();
+      expect(mocks[method]).toHaveBeenCalledWith("user-1");
+      expect(mocks.showUser).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("updates loaded resource tabs and counts after completed deletion without loading untouched tabs", async () => {
+    const page = mountPage();
+    await flushPromises();
+    await activateTab("sites");
+    await requestDeleteSite(page);
+    expect(sitesTable(page).props("pendingIds")).toEqual(["site-1"]);
+    mocks.userSites.mockResolvedValueOnce({ data: [] });
+    await mocks.liveUpdates.mock.calls[0][0]();
+    await flushPromises();
+    expect(sitesTable(page).props("sites")).toEqual([]);
+    expect(sitesTable(page).props("pendingIds")).toEqual([]);
+    expect(mocks.userServers).not.toHaveBeenCalled();
+    expect(mocks.userSubscriptions).not.toHaveBeenCalled();
+    expect(page.get("h1").text()).toBe("Sites");
+    page.unmount();
+  });
+
   it("hides staff mutations for support and rejects site actions", async () => {
     currentUser.value.staff_role = "support";
     const page = mountPage();
     await flushPromises();
-    await activateTab(page, "sites");
+    await activateTab("sites");
     expect(roleControl(page).exists()).toBe(false);
+    expect(page.find('button[aria-label="More actions"]').exists()).toBe(false);
     expect(deleteUserButton(page)).toBeUndefined();
     expect(sitesTable(page).props("canDelete")).toBe(false);
     await requestDeleteSite(page);
@@ -140,6 +285,7 @@ describe("admin user management", () => {
     const page = mountPage();
     await flushPromises();
     expect(roleControl(page).props("isSelf")).toBe(true);
+    expect(page.find('button[aria-label="More actions"]').exists()).toBe(false);
     expect(deleteUserButton(page)).toBeUndefined();
     roleControl(page).vm.$emit("save", null);
     await flushPromises();
@@ -153,7 +299,14 @@ describe("admin user management", () => {
     });
     const page = mountPage();
     await flushPromises();
-    expect(deleteUserButton(page).attributes("disabled")).toBeDefined();
+    await openActions(page);
+    expect(deleteUserButton(page).attributes("aria-disabled")).toBe("true");
+    expect(deleteUserButton(page).attributes("aria-describedby")).toBe(
+      "staff-deletion-help",
+    );
+    await deleteUserButton(page).trigger("click");
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+    expect(mocks.confirm).not.toHaveBeenCalled();
     expect(page.text()).toContain("Billing-history restrictions still apply");
     roleControl(page).vm.$emit("save", null);
     await flushPromises();
@@ -166,7 +319,7 @@ describe("admin user management", () => {
     );
     expect(mocks.updateStaffRole).toHaveBeenCalledWith("user-1", null);
     expect(mocks.showUser).toHaveBeenCalledTimes(2);
-    expect(deleteUserButton(page).attributes("disabled")).toBeUndefined();
+    expect(deleteUserButton(page).attributes("aria-disabled")).toBeUndefined();
   });
 
   it("does not change staff access after cancellation", async () => {
@@ -194,7 +347,8 @@ describe("admin user management", () => {
       "The last super admin cannot be demoted.",
     );
     expect(roleControl(page).props("role")).toBe("super_admin");
-    expect(deleteUserButton(page).attributes("disabled")).toBeDefined();
+    await openActions(page);
+    expect(deleteUserButton(page).attributes("aria-disabled")).toBe("true");
     expect(mocks.success).not.toHaveBeenCalled();
   });
 
@@ -206,6 +360,7 @@ describe("admin user management", () => {
     });
     const page = mountPage();
     await flushPromises();
+    await openActions(page);
     await deleteUserButton(page).trigger("click");
     await flushPromises();
     expect(mocks.confirm).toHaveBeenCalledWith(
@@ -224,7 +379,7 @@ describe("admin user management", () => {
   it("requires exact-domain confirmation and retains a queued site with duplicate deletion disabled", async () => {
     const page = mountPage();
     await flushPromises();
-    await activateTab(page, "sites");
+    await activateTab("sites");
     await requestDeleteSite(page);
     expect(mocks.confirm).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -245,7 +400,7 @@ describe("admin user management", () => {
     mocks.confirm.mockResolvedValueOnce({ ok: false });
     const page = mountPage();
     await flushPromises();
-    await activateTab(page, "sites");
+    await activateTab("sites");
     await requestDeleteSite(page);
     expect(mocks.deleteSite).not.toHaveBeenCalled();
     expect(sitesTable(page).props("pendingIds")).toEqual([]);
@@ -258,7 +413,7 @@ describe("admin user management", () => {
     });
     const page = mountPage();
     await flushPromises();
-    await activateTab(page, "sites");
+    await activateTab("sites");
     await requestDeleteSite(page);
     expect(sitesTable(page).props("errors")).toEqual({
       "site-1": "Could not queue site deletion.",
@@ -270,10 +425,10 @@ describe("admin user management", () => {
     expect(mocks.deleteSite).toHaveBeenCalledTimes(2);
   });
 
-  it("reconciles completed deletion and remote failure on refresh", async () => {
+  it("reconciles completed deletion and remote failure from live events", async () => {
     const page = mountPage();
     await flushPromises();
-    await activateTab(page, "sites");
+    await activateTab("sites");
     await requestDeleteSite(page);
     mocks.userSites.mockResolvedValueOnce({
       data: [
@@ -283,28 +438,34 @@ describe("admin user management", () => {
         }),
       ],
     });
-    sitesTable(page).vm.$emit("refresh");
+    await mocks.liveUpdates.mock.calls[0][0]();
     await flushPromises();
     expect(sitesTable(page).props("pendingIds")).toEqual([]);
     expect(sitesTable(page).props("sites")).toHaveLength(1);
     await requestDeleteSite(page);
     expect(mocks.deleteSite).toHaveBeenCalledTimes(2);
     mocks.userSites.mockResolvedValueOnce({ data: [] });
-    sitesTable(page).vm.$emit("refresh");
+    await mocks.liveUpdates.mock.calls[0][0]();
     await flushPromises();
     expect(sitesTable(page).props("pendingIds")).toEqual([]);
     expect(sitesTable(page).props("sites")).toEqual([]);
   });
 
-  it("keeps loaded sites and reports refresh failure", async () => {
+  it("keeps loaded sites after a failed live update and offers an error-only Retry action", async () => {
     const page = mountPage();
     await flushPromises();
-    await activateTab(page, "sites");
+    await activateTab("sites");
     mocks.userSites.mockRejectedValueOnce(new Error("offline"));
-    sitesTable(page).vm.$emit("refresh");
+    await mocks.liveUpdates.mock.calls[0][0]();
     await flushPromises();
     expect(sitesTable(page).props("sites")).toHaveLength(1);
     expect(page.get('[role="alert"]').text()).toContain("Failed to load");
+    expect(page.get('[role="alert"] button').text()).toBe("Retry");
+    mocks.userSites.mockResolvedValueOnce({ data: [] });
+    await page.get('[role="alert"] button').trigger("click");
+    await flushPromises();
+    expect(sitesTable(page).props("sites")).toEqual([]);
+    expect(page.find('[role="alert"]').exists()).toBe(false);
   });
 
   it("blocks duplicate requests while a site request is in flight", async () => {
@@ -317,10 +478,15 @@ describe("admin user management", () => {
     );
     const page = mountPage();
     await flushPromises();
-    await activateTab(page, "sites");
+    await activateTab("sites");
     await requestDeleteSite(page);
     expect(sitesTable(page).props("disabled")).toBe(true);
+    await activateTab("profile");
     expect(roleControl(page).props("disabled")).toBe(true);
+    expect(
+      page.get('button[aria-label="More actions"]').attributes("disabled"),
+    ).toBeDefined();
+    await activateTab("sites");
     await requestDeleteSite(page);
     expect(mocks.deleteSite).toHaveBeenCalledTimes(1);
     finish({ data: { status: "deletion_requested" } });

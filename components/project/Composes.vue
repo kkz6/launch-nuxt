@@ -20,18 +20,25 @@ const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
 
-const fetchComposes = async () => {
-  isLoading.value = true;
+let resourceRequest = 0;
+onScopeDispose(() => {
+  resourceRequest++;
+});
+const fetchComposes = async (silent = false) => {
+  const request = ++resourceRequest;
+  if (!silent) isLoading.value = true;
   try {
     const res = await dockerService.composes.list(
       props.serverId,
       props.projectId,
     );
+    if (request !== resourceRequest) return;
     composes.value = res.data;
   } catch {
-    toast.error(t("workload.project.composes.loadFailed"));
+    if (request !== resourceRequest) return;
+    if (!silent) toast.error(t("workload.project.composes.loadFailed"));
   } finally {
-    isLoading.value = false;
+    if (request === resourceRequest) isLoading.value = false;
   }
 };
 
@@ -108,10 +115,16 @@ const statusLabel = (status: string) => t(`workload.status.${status}`, status);
 // carries compose_id alongside id — see compose_service.go.
 const { user } = useAuth();
 const teamId = computed(() => user.value?.current_team_id?.toString() || "");
-useDockerComposeEvents(teamId, (data) => {
-  if (data.project_id && data.project_id !== props.projectId) return;
-  void fetchComposes();
-});
+const refreshComposes = useLiveRefresh(() => fetchComposes(true));
+useDockerComposeEvents(
+  teamId,
+  (data) => {
+    if (data.server_id && data.server_id !== props.serverId) return;
+    if (data.project_id && data.project_id !== props.projectId) return;
+    refreshComposes();
+  },
+  { onReconnect: refreshComposes },
+);
 
 onMounted(fetchComposes);
 </script>

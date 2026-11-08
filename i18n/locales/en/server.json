@@ -1090,6 +1090,7 @@
     },
     "pending": {
       "deleted": "Server deleted successfully",
+      "deleteRequested": "Server deletion requested",
       "deleteFailed": "Failed to delete server",
       "viewLogs": "View Logs",
       "provision": "Provision",

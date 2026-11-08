@@ -12,6 +12,7 @@
       "observability": "オブザーバビリティ",
       "cancel": "キャンセル",
       "delete": "削除",
+      "moreActions": "その他の操作",
       "on": "オン",
       "off": "オフ"
     },
@@ -182,6 +183,9 @@
       "deleting": "削除中…"
     },
     "userDetail": {
+      "sections": "ユーザーのセクション",
+      "providerColumn": "プロバイダー",
+      "viewServerNamed": "サーバー「{name}」を表示",
       "pageTitle": "管理 — {name}",
       "loadFailed": "ユーザーを読み込めませんでした",
       "loadTabFailed": "{resource}を読み込めませんでした",
@@ -235,8 +239,8 @@
       "searchSitesPlaceholder": "ドメインまたはサーバー名",
       "searchServers": "サーバーを検索",
       "searchServersPlaceholder": "名前、IP アドレス、プロバイダー",
-      "refresh": "更新",
-      "siteDeletionPendingHelp": "サイトの削除処理はバックグラウンドで実行されます。更新して進行状況を確認してください。削除が完了するまで行は表示されます。",
+      "retry": "再試行",
+      "siteDeletionPendingHelp": "サイトの削除処理はバックグラウンドで実行されます。変更時やライブ接続の再接続時に一覧は自動的に更新されます。削除が完了するまで行は表示されます。",
       "siteColumn": "サイト",
       "typeColumn": "種類",
       "tlsColumn": "TLS",

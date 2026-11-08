@@ -4,6 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import OverviewPage from "../../pages/admin/overview.vue";
 import { createI18nStub } from "../helpers/i18n";
 
+vi.mock("~/composables/useAdminLiveUpdates", () => ({
+  useAdminLiveUpdates: vi.fn(),
+}));
+
 const mocks = vi.hoisted(() => ({ overview: vi.fn(), error: vi.fn() }));
 vi.mock("~/services/adminService", () => ({
   adminService: { overview: mocks.overview },

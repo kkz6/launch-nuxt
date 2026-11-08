@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onScopeDispose } from "vue";
+import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
 import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
 import { toast } from "vue-sonner";
@@ -38,18 +40,25 @@ const overview = ref<AdminOverview | null>(null);
 const isLoading = ref(true);
 const loadError = ref<string | null>(null);
 
+let requestVersion = 0;
+onScopeDispose(() => {
+  requestVersion++;
+});
 const fetchOverview = async () => {
+  const version = ++requestVersion;
   isLoading.value = true;
   loadError.value = null;
   try {
     const response = await adminService.overview();
+    if (version !== requestVersion) return;
     overview.value = response.data;
   } catch (error: unknown) {
+    if (version !== requestVersion) return;
     const err = error as { data?: { message?: string } };
     loadError.value = err.data?.message || t("admin.overview.loadFailed");
-    toast.error(loadError.value);
+    if (!overview.value) toast.error(loadError.value);
   } finally {
-    isLoading.value = false;
+    if (version === requestVersion) isLoading.value = false;
   }
 };
 
@@ -115,6 +124,10 @@ const revenueDelta = computed(() => {
   if (previous === 0) return null;
   const pct = ((current - previous) / previous) * 100;
   return { pct: Math.abs(Math.round(pct)), up: pct >= 0 };
+});
+
+useAdminLiveUpdates(fetchOverview, {
+  resources: ["subscription", "team", "user", "invitation"],
 });
 
 onMounted(() => fetchOverview());
@@ -232,10 +245,7 @@ onMounted(() => fetchOverview());
       >
         <section aria-labelledby="revenue-heading" class="min-w-0">
           <div class="mb-6">
-            <h2
-              id="revenue-heading"
-              class="text-sm font-semibold"
-            >
+            <h2 id="revenue-heading" class="text-sm font-semibold">
               {{ t("admin.overview.revenueTrend") }}
             </h2>
             <p class="mt-1 text-xs leading-5 text-muted-foreground">
@@ -267,10 +277,7 @@ onMounted(() => fetchOverview());
           class="border-t border-border/70 pt-6 xl:border-l xl:border-t-0 xl:pl-7 xl:pt-0"
         >
           <div class="mb-6">
-            <h2
-              id="activity-heading"
-              class="text-sm font-semibold"
-            >
+            <h2 id="activity-heading" class="text-sm font-semibold">
               {{ t("adminShell.subscriptionActivity") }}
             </h2>
             <p class="mt-1 text-xs leading-5 text-muted-foreground">
@@ -345,10 +352,7 @@ onMounted(() => fetchOverview());
 
       <section aria-labelledby="payments-heading">
         <div class="mb-5">
-          <h2
-            id="payments-heading"
-            class="text-sm font-semibold"
-          >
+          <h2 id="payments-heading" class="text-sm font-semibold">
             {{ t("admin.overview.recentPayments") }}
           </h2>
           <p class="mt-1 text-xs leading-5 text-muted-foreground">

@@ -50,6 +50,7 @@ const mountTable = () =>
     props: { endpoint: "/admin/users/table", syncUrl: false },
     global: {
       stubs: {
+        Icon: true,
         Button: { template: "<button><slot /></button>" },
         CellRenderer: {
           props: ["value"],
@@ -119,6 +120,85 @@ describe("shared table request failures", () => {
     expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     expect(wrapper.text()).toContain("Updated user");
     expect(wrapper.text()).not.toContain("Anila");
+  });
+
+  it("does not let an older response restore rows removed by a newer live refresh", async () => {
+    let finishOld!: (value: unknown) => void;
+    get
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishOld = resolve;
+        }),
+      )
+      .mockResolvedValueOnce(response([]));
+    const wrapper = mountTable();
+    await flushPromises();
+    await wrapper.vm.refresh();
+    await flushPromises();
+    expect(wrapper.get('[data-testid="empty"]').text()).toBe("No users");
+    finishOld(response([{ id: "deleted-user", name: "Deleted user" }]));
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("Deleted user");
+    expect(wrapper.get('[data-testid="empty"]').text()).toBe("No users");
+    wrapper.unmount();
+  });
+
+  it("moves back to the last remaining page after live row deletion", async () => {
+    const page = (
+      currentPage: number,
+      lastPage: number,
+      rows = [{ id: "user-1", name: "Anila" }],
+    ) => ({
+      data: {
+        ...response(rows).data,
+        pagination: {
+          type: "full",
+          currentPage,
+          lastPage,
+          total: 16,
+          perPage: 15,
+        },
+      },
+    });
+    get.mockResolvedValueOnce(page(1, 2)).mockResolvedValueOnce(page(2, 2));
+    const wrapper = mountTable();
+    await flushPromises();
+    wrapper.findComponent({ name: "TablePagination" }).vm.$emit("page", 2);
+    await flushPromises();
+    get.mockResolvedValueOnce(page(2, 1, [])).mockResolvedValueOnce(page(1, 1));
+    await wrapper.vm.refresh();
+    await flushPromises();
+    expect(get.mock.calls.at(-1)?.[0]).toContain("page=1&limit=15");
+    expect(wrapper.text()).toContain("Anila");
+    wrapper.unmount();
+  });
+
+  it("keeps sorting available through a named header button and reports its direction", async () => {
+    const result = response();
+    get.mockResolvedValue({
+      data: {
+        ...result.data,
+        meta: {
+          ...result.data.meta,
+          columns: [{ ...result.data.meta.columns[0], sortable: true }],
+        },
+      },
+    });
+    const wrapper = mountTable();
+    await flushPromises();
+    const sort = wrapper.get("thead button");
+    expect(sort.text()).toBe("Name");
+    expect(sort.attributes("type")).toBe("button");
+    expect(wrapper.get("thead th").attributes("aria-sort")).toBe("none");
+    await sort.trigger("click");
+    await flushPromises();
+    expect(get.mock.calls.at(-1)?.[0]).toContain("sort=name%3Aasc");
+    expect(wrapper.get("thead th").attributes("aria-sort")).toBe("ascending");
+    await sort.trigger("click");
+    await flushPromises();
+    expect(get.mock.calls.at(-1)?.[0]).toContain("sort=name%3Adesc");
+    expect(wrapper.get("thead th").attributes("aria-sort")).toBe("descending");
+    wrapper.unmount();
   });
 
   it("keeps normal empty results distinct from errors", async () => {

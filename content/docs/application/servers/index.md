@@ -51,6 +51,12 @@ After creation, launchctl will automatically:
 
 The provisioning process typically takes 3-5 minutes.
 
+## Live resource updates
+
+Server lists and detail pages receive live updates for server status, sites, and Docker projects. Related resource counts and deletion availability update automatically after changes. A reconnect reloads the current state from the API, so changes made while the connection was unavailable are reconciled. The admin resource views update without a manual Refresh control. Failed requests offer **Retry** or **Try again**.
+
+Resources undergoing background deletion stay visible until the API confirms completion. Removing a site or Docker project updates its server’s counts; the server can be deleted only after all child resources are gone and its lifecycle state allows deletion.
+
 ## Server Features
 ### Server Types
 
