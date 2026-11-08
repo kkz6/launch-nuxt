@@ -467,22 +467,22 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="user" class="space-y-8">
+    <div v-else-if="user" class="space-y-6">
       <header class="space-y-5">
         <div
           class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
         >
           <div class="flex min-w-0 items-center gap-4">
-            <Avatar class="h-12 w-12 shrink-0 rounded-xl">
+            <Avatar class="h-10 w-10 shrink-0">
               <AvatarFallback
-                class="rounded-xl bg-primary/10 text-base font-semibold text-primary"
+                class="bg-muted text-sm font-medium"
                 >{{ initials }}</AvatarFallback
               >
             </Avatar>
             <div class="min-w-0 space-y-2">
               <div class="flex flex-wrap items-center gap-2">
                 <h1
-                  class="text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]"
+                  class="text-xl font-semibold"
                 >
                   {{ user.name }}
                 </h1>

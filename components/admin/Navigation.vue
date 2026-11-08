@@ -42,7 +42,7 @@ function isActive(to: string): boolean {
   <nav :aria-label="t('adminShell.navigation')" class="space-y-7">
     <div v-for="group in groups" :key="group.label">
       <p
-        class="mb-2.5 px-3 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground/80"
+        class="mb-2.5 px-3 text-xs font-medium text-muted-foreground/80"
       >
         {{ t(group.label) }}
       </p>
@@ -51,7 +51,7 @@ function isActive(to: string): boolean {
           <NuxtLink
             :to="item.to"
             :aria-current="isActive(item.to) ? 'page' : undefined"
-            class="group flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] transition-colors"
+            class="group flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors"
             :class="
               isActive(item.to)
                 ? 'bg-primary/10 font-semibold text-primary'

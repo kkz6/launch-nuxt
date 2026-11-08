@@ -224,7 +224,7 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="server" class="space-y-8">
+    <div v-else-if="server" class="space-y-6">
       <!-- Compact identity and configuration strip -->
       <section class="min-w-0 border-y border-border/70 py-5">
         <div class="flex flex-wrap items-center justify-between gap-4">
@@ -299,7 +299,7 @@ onMounted(load);
             <dt class="text-muted-foreground">
               {{ t("admin.serverDetail.publicIpv4") }}
             </dt>
-            <dd class="break-all font-mono text-[13px] font-medium">
+            <dd class="break-all font-mono text-sm font-medium">
               {{ server.public_ipv4 || "—" }}
             </dd>
           </div>

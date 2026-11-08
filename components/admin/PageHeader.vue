@@ -13,13 +13,13 @@ defineProps<{
       <slot name="title-leading" />
       <div class="min-w-0">
         <h1
-          class="break-words text-[26px] font-semibold leading-tight tracking-[-0.035em] text-foreground sm:text-[28px]"
+          class="break-words text-xl font-semibold text-foreground"
         >
           {{ title }}
         </h1>
         <p
           v-if="description"
-          class="mt-2 max-w-2xl text-[13px] leading-5 text-muted-foreground"
+          class="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground"
         >
           {{ description }}
         </p>

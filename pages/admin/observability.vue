@@ -465,7 +465,7 @@ function formatDecimal(value: number, digits: number): string {
           >
             <TabsTrigger
               value="recent"
-              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-[13px] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             >
               {{ t("admin.observability.recentQueries") }}
               <Badge variant="secondary" class="ml-2">
@@ -474,7 +474,7 @@ function formatDecimal(value: number, digits: number): string {
             </TabsTrigger>
             <TabsTrigger
               value="slow"
-              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-[13px] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             >
               {{ t("admin.observability.slowQueries") }}
               <Badge
@@ -488,7 +488,7 @@ function formatDecimal(value: number, digits: number): string {
             </TabsTrigger>
             <TabsTrigger
               value="n1"
-              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-[13px] data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+              class="shrink-0 rounded-none border-b-2 border-transparent px-0 pb-3 pt-1 text-sm data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             >
               {{ t("admin.observability.n1Detected") }}
               <Badge

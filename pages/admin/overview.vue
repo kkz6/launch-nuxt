@@ -121,7 +121,7 @@ onMounted(() => fetchOverview());
 </script>
 
 <template>
-  <div class="space-y-8">
+  <div class="space-y-6">
     <PageHeader
       :title="t('admin.common.overview')"
       :description="t('adminShell.overviewDescription')"
@@ -215,7 +215,7 @@ onMounted(() => fetchOverview());
           </dt>
           <dd class="mt-3">
             <p
-              class="break-words text-[26px] font-semibold leading-tight tracking-[-0.04em] tabular-nums sm:text-[30px]"
+              class="break-words text-2xl font-semibold tabular-nums"
               :class="index === 0 ? 'text-primary' : 'text-foreground'"
             >
               {{ stat.value }}
@@ -228,13 +228,13 @@ onMounted(() => fetchOverview());
       </dl>
 
       <div
-        class="grid gap-8 border-b border-border/70 pb-8 xl:grid-cols-[minmax(0,1fr)_260px]"
+        class="grid gap-6 border-b border-border/70 pb-6 xl:grid-cols-[minmax(0,1fr)_260px]"
       >
         <section aria-labelledby="revenue-heading" class="min-w-0">
           <div class="mb-6">
             <h2
               id="revenue-heading"
-              class="text-base font-semibold tracking-tight"
+              class="text-sm font-semibold"
             >
               {{ t("admin.overview.revenueTrend") }}
             </h2>
@@ -269,7 +269,7 @@ onMounted(() => fetchOverview());
           <div class="mb-6">
             <h2
               id="activity-heading"
-              class="text-base font-semibold tracking-tight"
+              class="text-sm font-semibold"
             >
               {{ t("adminShell.subscriptionActivity") }}
             </h2>
@@ -347,7 +347,7 @@ onMounted(() => fetchOverview());
         <div class="mb-5">
           <h2
             id="payments-heading"
-            class="text-base font-semibold tracking-tight"
+            class="text-sm font-semibold"
           >
             {{ t("admin.overview.recentPayments") }}
           </h2>
@@ -359,13 +359,13 @@ onMounted(() => fetchOverview());
           <table class="w-full text-sm">
             <TableHeader class="border-b border-border/70">
               <TableRow class="hover:bg-transparent">
-                <TableHead class="h-9 pl-0 text-[11px]">{{
+                <TableHead class="h-9 pl-0 text-xs">{{
                   t("admin.overview.team")
                 }}</TableHead>
-                <TableHead class="h-9 text-right text-[11px]">{{
+                <TableHead class="h-9 text-right text-xs">{{
                   t("admin.overview.amount")
                 }}</TableHead>
-                <TableHead class="h-9 pr-0 text-right text-[11px]">{{
+                <TableHead class="h-9 pr-0 text-right text-xs">{{
                   t("admin.overview.date")
                 }}</TableHead>
               </TableRow>
