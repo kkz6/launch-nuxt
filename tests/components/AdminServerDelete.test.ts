@@ -313,6 +313,25 @@ describe("admin server deletion", () => {
     },
   );
 
+  it("reconciles stale deletion eligibility after a refusal while keeping its error", async () => {
+    const message = "Remove every site before deleting this server";
+    mocks.deleteServer.mockRejectedValueOnce({ data: { message } });
+    mocks.showServer
+      .mockResolvedValueOnce({ data: server({ sites_count: 0 }) })
+      .mockResolvedValueOnce({ data: server({ sites_count: 1 }) });
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(deleteButton(wrapper).attributes("disabled")).toBeUndefined();
+    await deleteButton(wrapper).trigger("click");
+    await flushPromises();
+    expect(mocks.showServer).toHaveBeenCalledTimes(2);
+    expect(wrapper.get('[role="alert"]').text()).toBe(message);
+    expect(wrapper.text()).toContain("Remove the 1 site(s)");
+    expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(mocks.success).not.toHaveBeenCalled();
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
+  });
+
   it("offers a retry when the initial detail request fails", async () => {
     mocks.showServer.mockRejectedValueOnce(new Error("Network unavailable"));
     const wrapper = mountPage();

@@ -7,6 +7,8 @@ import { createI18nStub } from "../helpers/i18n";
 const mocks = vi.hoisted(() => ({
   liveUpdates: vi.fn(),
   showUser: vi.fn(),
+  showServer: vi.fn(),
+  deleteServer: vi.fn(),
   userSites: vi.fn(),
   userServers: vi.fn(),
   userSubscriptions: vi.fn(),
@@ -59,7 +61,7 @@ const site = (overrides: Record<string, unknown> = {}) => ({
 });
 const slots = { template: "<div><slot /></div>" };
 enableAutoUnmount(afterEach);
-const mountPage = () =>
+const mountPage = (stubs = {}) =>
   mount(AdminUserPage, {
     attachTo: document.body,
     global: {
@@ -88,6 +90,7 @@ const mountPage = () =>
             return () => null;
           },
         }),
+        ...stubs,
       },
     },
   });
@@ -352,6 +355,64 @@ describe("admin user management", () => {
     expect(mocks.userSubscriptions).toHaveBeenCalledTimes(2);
     expect(page.get("h1").text()).toBe("Sites");
     page.unmount();
+  });
+
+  it("reports a late server deletion failure after the detail drawer has closed", async () => {
+    route.query = { tab: "servers" };
+    const server = {
+      id: "server-1",
+      name: "Production",
+      provider: "hetzner",
+      status: "running",
+      connected: true,
+      sites_count: 0,
+      projects_count: 0,
+      owner: { team_name: "Customer team", user_id: "user-1" },
+    };
+    mocks.userServers.mockResolvedValue({ data: [server] });
+    mocks.showServer.mockResolvedValue({ data: server });
+    mocks.deleteServer.mockResolvedValue({
+      data: { status: "deletion_requested" },
+    });
+    vi.stubGlobal("useAuth", mocks.useAuth);
+    vi.stubGlobal("useStableMetadataLabels", () => ({
+      getServerTypeLabel: (type: string) => type,
+    }));
+    const page = mountPage({ UserServersTable: false });
+    await flushPromises();
+    await page
+      .get('button[aria-label="View server Production"]')
+      .trigger("click");
+    await flushPromises();
+    const sheet = page.getComponent({ name: "ServerDetailsSheet" });
+    expect(sheet.props("serverId")).toBe("server-1");
+    await page
+      .get('section[aria-labelledby="server-delete-heading"] button')
+      .trigger("click");
+    await flushPromises();
+    expect(mocks.deleteServer).toHaveBeenCalledWith("server-1", "Production");
+    expect(sheet.props("serverId")).toBeNull();
+    expect(page.findComponent({ name: "ServerDetail" }).exists()).toBe(false);
+    const [refresh, options] = mocks.liveUpdates.mock.calls.find(
+      ([, options]) => options.userId === "user-1",
+    )!;
+    options.onChange({ resource: "site", action: "deletion_failed" });
+    options.onChange({ resource: "server", action: "updated" });
+    expect(mocks.error).not.toHaveBeenCalled();
+    options.onChange({
+      resource: "server",
+      action: "deletion_failed",
+      server_id: "server-1",
+    });
+    await refresh();
+    await flushPromises();
+    expect(mocks.error).toHaveBeenCalledOnce();
+    expect(mocks.error).toHaveBeenCalledWith("Failed to delete server");
+    expect(
+      page.getComponent({ name: "UserServersTable" }).props("servers"),
+    ).toEqual([server]);
+    expect(route.query).toEqual({ tab: "servers" });
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
   });
 
   it("hides staff mutations for support and rejects site actions", async () => {

@@ -166,6 +166,7 @@ async function deleteServer(): Promise<void> {
     const err = error as { data?: { message?: string } };
     deleteError.value =
       err.data?.message || t("admin.serverDetail.deleteFailed");
+    if (!disposed) await load();
   } finally {
     deleteLoading.value = false;
   }

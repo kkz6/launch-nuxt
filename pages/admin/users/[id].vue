@@ -453,6 +453,11 @@ useAdminLiveUpdates(
     resources: ["user", "team", "subscription", "server", "site", "docker"],
     userId,
     paused: mutationBusy,
+    onChange(change) {
+      if (change.resource === "server" && change.action === "deletion_failed") {
+        toast.error(t("admin.serverDetail.deleteFailed"));
+      }
+    },
   },
 );
 
