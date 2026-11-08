@@ -182,10 +182,19 @@
       "deleteFailed": "Failed to delete server",
       "deleting": "Deleting…"
     },
+    "siteDetail": {
+      "title": "Site details",
+      "branch": "Repository branch",
+      "deletion": "Deletion",
+      "notRequested": "Not requested",
+      "deletionFailed": "Deletion failed",
+      "unavailable": "This site is no longer available."
+    },
     "userDetail": {
       "sections": "User sections",
       "providerColumn": "Provider",
       "viewServerNamed": "View server {name}",
+      "viewSiteNamed": "View site {address}",
       "pageTitle": "Admin — {name}",
       "loadFailed": "Failed to load user",
       "loadTabFailed": "Failed to load {resource}",

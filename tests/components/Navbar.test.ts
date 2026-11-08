@@ -98,7 +98,12 @@ const mountNavbar = () => {
         DropdownMenuTrigger: { template: "<div><slot /></div>" },
         Icon: true,
         LayoutActiveActions: true,
-        LayoutTabStrip: true,
+        LayoutTabStrip: {
+          name: "LayoutTabStrip",
+          props: ["tabs", "activeKey"],
+          template:
+            '<nav><span v-for="tab in tabs" :key="tab.value">{{ tab.label }}</span></nav>',
+        },
         NuxtLink: true,
         ServerCreateServerDialog: true,
         DnsAddDomain: true,
@@ -360,7 +365,14 @@ describe("Navbar", () => {
     const wrapper = mountNavbar();
     await flushPromises();
     const sections = wrapper.findComponent({ name: "LayoutTabStrip" });
-    expect(sections.attributes("active-key")).toBe("servers");
+    expect(sections.props("activeKey")).toBe("servers");
+    expect(
+      sections.props("tabs").map((tab: { value: string }) => tab.value),
+    ).toEqual(["profile", "teams", "servers", "sites"]);
+    expect(sections.props("tabs")[0].label).toBe("Alex Morgan");
+    currentRoute.query = { tab: "subscriptions" };
+    await nextTick();
+    expect(sections.props("activeKey")).toBe("profile");
     expect(
       wrapper
         .findComponent({ name: "AdminNavigation" })
@@ -368,6 +380,6 @@ describe("Navbar", () => {
     ).toBe("true");
     currentRoute.query = { tab: ["sites", "servers"] };
     await nextTick();
-    expect(sections.attributes("active-key")).toBe("profile");
+    expect(sections.props("activeKey")).toBe("profile");
   });
 });

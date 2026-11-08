@@ -57,6 +57,8 @@ Server lists and detail pages receive live updates for server status, sites, and
 
 Resources undergoing background deletion stay visible until the API confirms completion. Removing a site or Docker project updates its server’s counts; the server can be deleted only after all child resources are gone and its lifecycle state allows deletion.
 
+In **Admin → Servers**, server details group hardware and system configuration, connectivity and lifecycle timestamps, and ownership. The separate **Delete server** action is available to super administrators and keeps the same resource and confirmation requirements. From a user’s **Servers** tab, select the server name or **View server** icon to open those details in a drawer while keeping the current user tab and search.
+
 ## Server Features
 ### Server Types
 

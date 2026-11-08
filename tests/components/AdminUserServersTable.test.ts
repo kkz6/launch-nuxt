@@ -1,6 +1,7 @@
 import { shallowMount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import UserServersTable from "../../components/admin/UserServersTable.vue";
+import ServerDetailsSheet from "../../components/admin/ServerDetailsSheet.vue";
 import type { AdminServerSummary } from "../../types";
 import { createI18nStub } from "../helpers/i18n";
 
@@ -49,7 +50,7 @@ const mountTable = (overrides = {}) =>
           props: ["variant"],
           template: "<span><slot /></span>",
         },
-        Button: { template: "<span><slot /></span>" },
+        Button: { template: "<button><slot /></button>" },
         Table: { template: "<table><slot /></table>" },
         TableHeader: { template: "<thead><slot /></thead>" },
         TableHead: { template: "<th><slot /></th>" },
@@ -75,7 +76,7 @@ describe("admin user server table", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it("shows provider, IP, one status per server, and accessible detail links", () => {
+  it("shows provider, IP, one status per server, and accessible detail actions", () => {
     const wrapper = mountTable();
     expect(wrapper.findAll("th").map((head) => head.text())).toEqual([
       "Name",
@@ -97,13 +98,11 @@ describe("admin user server table", () => {
         .slice(0, 4)
         .map((cell) => cell.text()),
     ).toEqual(["Websites", "Custom Server", "—", "Failed"]);
-    expect(
-      wrapper.get('a[aria-label="View server Websites"]').attributes("href"),
-    ).toBe("/admin/servers/server-2");
-    expect(wrapper.get('a[aria-label="View server Websites"]').text()).toBe("");
-    expect(
-      wrapper.get('a[aria-label="View server Websites"]').attributes("title"),
-    ).toBe("View server Websites");
+    const view = wrapper.get('button[aria-label="View server Websites"]');
+    expect(view.attributes("aria-haspopup")).toBe("dialog");
+    expect(view.text()).toBe("");
+    expect(view.attributes("title")).toBe("View server Websites");
+    expect(wrapper.find("a").exists()).toBe(false);
     expect(
       wrapper
         .findAllComponents({ name: "TooltipContent" })
@@ -114,6 +113,29 @@ describe("admin user server table", () => {
         .findAllComponents({ name: "Badge" })
         .map((badge) => badge.props("variant")),
     ).toEqual(["green", "red"]);
+  });
+
+  it("opens details from either action and retains the user search when closed", async () => {
+    const navigate = vi.fn();
+    vi.stubGlobal("navigateTo", navigate);
+    const wrapper = mountTable();
+    await wrapper.get("input").setValue("Websites");
+    await wrapper.get("tbody tr td button").trigger("click");
+    const details = wrapper.getComponent(ServerDetailsSheet);
+    expect(details.props("serverId")).toBe("server-2");
+    details.vm.$emit("update:serverId", null);
+    await wrapper.vm.$nextTick();
+    expect(details.props("serverId")).toBeNull();
+    expect((wrapper.get("input").element as HTMLInputElement).value).toBe(
+      "Websites",
+    );
+    expect(wrapper.findAll("tbody tr")).toHaveLength(1);
+    await wrapper
+      .get('button[aria-label="View server Websites"]')
+      .trigger("click");
+    expect(details.props("serverId")).toBe("server-2");
+    expect(wrapper.find("a").exists()).toBe(false);
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it.each(["CUSTOM SERVER", " Websites "])(

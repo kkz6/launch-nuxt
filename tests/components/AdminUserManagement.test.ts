@@ -153,7 +153,8 @@ describe("admin user management", () => {
     expect(page.find('[role="tablist"]').exists()).toBe(false);
     expect(mocks.userSites).not.toHaveBeenCalled();
     expect(mocks.userServers).not.toHaveBeenCalled();
-    expect(mocks.userSubscriptions).not.toHaveBeenCalled();
+    expect(mocks.userSubscriptions).toHaveBeenCalledOnce();
+    expect(page.get("#user-subscriptions-title").text()).toBe("Subscriptions");
 
     await activateTab("sites");
     expect(page.get("h1").text()).toBe("Sites");
@@ -164,6 +165,7 @@ describe("admin user management", () => {
     expect(sitesTable(page).exists()).toBe(true);
     expect(roleControl(page).exists()).toBe(false);
     expect(page.text()).not.toContain("anila@example.com");
+    expect(page.find("#user-subscriptions-title").exists()).toBe(false);
     expect(mocks.userSites).toHaveBeenCalledOnce();
     await activateTab("profile");
     expect(roleControl(page).exists()).toBe(true);
@@ -175,7 +177,6 @@ describe("admin user management", () => {
   it.each([
     ["sites", "userSites", "Sites"],
     ["servers", "userServers", "Servers"],
-    ["subscriptions", "userSubscriptions", "Subscriptions"],
   ] as const)(
     "loads a direct link to %s without showing profile controls",
     async (tab, method, heading) => {
@@ -191,10 +192,11 @@ describe("admin user management", () => {
       );
       expect(roleControl(page).exists()).toBe(false);
       expect(mocks[method]).toHaveBeenCalledWith("user-1");
+      expect(mocks.userSubscriptions).not.toHaveBeenCalled();
     },
   );
 
-  it.each(["unknown", ["sites", "servers"]])(
+  it.each(["unknown", "subscriptions", ["sites", "servers"]])(
     "falls back to the profile for an invalid tab %j",
     async (tab) => {
       route.query = { tab };
@@ -202,6 +204,10 @@ describe("admin user management", () => {
       await flushPromises();
       expect(page.get("h1").text()).toBe("Anila");
       expect(roleControl(page).exists()).toBe(true);
+      expect(page.get("#user-subscriptions-title").text()).toBe(
+        "Subscriptions",
+      );
+      expect(mocks.userSubscriptions).toHaveBeenCalledWith("user-1");
       expect(mocks.userSites).not.toHaveBeenCalled();
       expect(mocks.userServers).not.toHaveBeenCalled();
     },
@@ -225,6 +231,88 @@ describe("admin user management", () => {
     await spectate.trigger("click");
     await flushPromises();
     expect(mocks.start).toHaveBeenCalledWith("user-1", "Staff support session");
+  });
+
+  it("shows subscription billing details on the name tab and reconciles status and active counts", async () => {
+    const subscription = {
+      team_id: "team-1",
+      team_name: "Production",
+      status: "active",
+      renews_at: "2026-12-01T00:00:00Z",
+      card_last_four: "4242",
+    };
+    mocks.userSubscriptions.mockResolvedValue({ data: [subscription] });
+    mocks.showUser.mockResolvedValueOnce({
+      data: customer({
+        teams: [{ id: "team-1", subscription: { status: "active" } }],
+      }),
+    });
+    const page = mountPage();
+    await flushPromises();
+    const section = page.get(
+      'section[aria-labelledby="user-subscriptions-title"]',
+    );
+    expect(section.text()).toContain("Production");
+    expect(section.text()).toContain("Active");
+    expect(section.text()).toContain("renews");
+    expect(section.text()).toContain("4242");
+    expect(section.get("shared-date-tooltip-stub").attributes("date")).toBe(
+      subscription.renews_at,
+    );
+    const activeCount = () =>
+      page
+        .findAll("dl > div")
+        .find((row) => row.get("dt").text() === "Active subs")!
+        .get("dd")
+        .text();
+    expect(activeCount()).toBe("1");
+    mocks.userSubscriptions.mockResolvedValueOnce({
+      data: [{ ...subscription, status: "past_due" }],
+    });
+    await mocks.liveUpdates.mock.calls[0][0]();
+    await flushPromises();
+    expect(section.text()).toContain("Past due");
+    expect(activeCount()).toBe("0");
+  });
+
+  it("shows a subscription load failure on the profile and retries without claiming an empty list", async () => {
+    mocks.userSubscriptions.mockRejectedValueOnce(new Error("offline"));
+    const page = mountPage();
+    await flushPromises();
+    const section = page.get(
+      'section[aria-labelledby="user-subscriptions-title"]',
+    );
+    expect(section.get('[role="alert"]').text()).toContain(
+      "Failed to load Subscriptions",
+    );
+    expect(section.text()).not.toContain("This user has no subscriptions.");
+    await section.get("button").trigger("click");
+    await flushPromises();
+    expect(mocks.userSubscriptions).toHaveBeenCalledTimes(2);
+    expect(section.find('[role="alert"]').exists()).toBe(false);
+    expect(section.text()).toContain("This user has no subscriptions.");
+  });
+
+  it("retains subscription rows if a live refresh fails and allows retry", async () => {
+    mocks.userSubscriptions.mockResolvedValue({
+      data: [{ team_id: "team-1", team_name: "Production", status: "active" }],
+    });
+    const page = mountPage();
+    await flushPromises();
+    mocks.userSubscriptions.mockRejectedValueOnce(new Error("offline"));
+    await mocks.liveUpdates.mock.calls[0][0]();
+    await flushPromises();
+    const section = page.get(
+      'section[aria-labelledby="user-subscriptions-title"]',
+    );
+    expect(section.text()).toContain("Production");
+    expect(section.get('[role="alert"]').text()).toContain(
+      "Failed to load Subscriptions",
+    );
+    await section.get("button").trigger("click");
+    await flushPromises();
+    expect(section.find('[role="alert"]').exists()).toBe(false);
+    expect(section.text()).toContain("Production");
   });
 
   it.each([
@@ -261,7 +349,7 @@ describe("admin user management", () => {
     expect(sitesTable(page).props("sites")).toEqual([]);
     expect(sitesTable(page).props("pendingIds")).toEqual([]);
     expect(mocks.userServers).not.toHaveBeenCalled();
-    expect(mocks.userSubscriptions).not.toHaveBeenCalled();
+    expect(mocks.userSubscriptions).toHaveBeenCalledTimes(2);
     expect(page.get("h1").text()).toBe("Sites");
     page.unmount();
   });

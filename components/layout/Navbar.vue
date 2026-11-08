@@ -74,11 +74,6 @@ const adminUserTabs = computed(() => [
     icon: "lucide:users-round",
   },
   {
-    value: "subscriptions",
-    label: t("admin.userDetail.tabs.subscriptions"),
-    icon: "lucide:credit-card",
-  },
-  {
     value: "servers",
     label: t("admin.userDetail.tabs.servers"),
     icon: "lucide:server",

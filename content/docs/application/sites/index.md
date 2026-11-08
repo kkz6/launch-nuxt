@@ -116,6 +116,12 @@ For Laravel sites with queues:
 - **Restart**: Restart PHP-FPM for the site
 - **Delete**: Remove the site from the server
 
+### Inspect a site as an administrator
+
+Open **Admin → Users → user → Sites** and select a site’s domain or its **View site** icon. A detail drawer shows the domain, owning server, site type, TLS setting, repository branch and creation date when available, and deletion state. The drawer stays in sync with the list’s live updates; if the site is removed, it shows that the site is no longer available. Select the server name to inspect its details in the same user context.
+
+The drawer is read-only. Super administrators can delete a site using the separate **Delete site** row action.
+
 ### Delete a site as an administrator
 
 Open **Admin → Users → user → Sites**. Search by domain or server name, then select **Delete site** on the intended row. This action requires **Super admin** access. Type the exact site domain in the confirmation dialog.

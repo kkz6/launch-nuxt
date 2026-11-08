@@ -1,6 +1,8 @@
 import { shallowMount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import UserSitesTable from "../../components/admin/UserSitesTable.vue";
+import SiteDetailsSheet from "../../components/admin/SiteDetailsSheet.vue";
+import ServerDetailsSheet from "../../components/admin/ServerDetailsSheet.vue";
 import UserStaffRoleControl from "../../components/admin/UserStaffRoleControl.vue";
 import { createI18nStub } from "../helpers/i18n";
 import type { AdminSiteSummary } from "../../types";
@@ -122,7 +124,9 @@ describe("admin user resource controls", () => {
         .findAllComponents({ name: "TooltipContent" })
         .map((tooltip) => tooltip.text()),
     ).toEqual([
+      "View site app.example.com",
       "Delete site app.example.com",
+      "View site staging.example.com",
       "Delete site staging.example.com",
     ]);
     await wrapper
@@ -150,7 +154,7 @@ describe("admin user resource controls", () => {
     expect(wrapper.findAll('button[aria-label^="Delete site"]')).toHaveLength(
       0,
     );
-    expect(wrapper.text()).not.toContain("Action");
+    expect(wrapper.findAll('button[aria-label^="View site"]')).toHaveLength(2);
   });
 
   it("retains pending sites with a status and no duplicate delete button", () => {
@@ -165,6 +169,7 @@ describe("admin user resource controls", () => {
     expect(wrapper.find('button[aria-label^="Delete site"]').exists()).toBe(
       false,
     );
+    expect(wrapper.find('button[aria-label^="View site"]').exists()).toBe(true);
   });
 
   it("shows a retryable remote-cleanup failure and request errors beside the retained site", async () => {
@@ -197,14 +202,61 @@ describe("admin user resource controls", () => {
         .attributes("disabled"),
     ).toBeDefined();
     expect(
+      wrapper.findAll("button").some((button) => button.text() === "Refresh"),
+    ).toBe(false);
+    expect(
       wrapper
-        .findAll("button")
-        .every(
-          (button) =>
-            button.text() === "" &&
-            button.attributes("aria-label")?.startsWith("Delete site "),
-        ),
-    ).toBe(true);
+        .get('button[aria-label="View site app.example.com"]')
+        .attributes("disabled"),
+    ).toBeUndefined();
+  });
+
+  it("opens live site details by icon or domain without emitting a delete", async () => {
+    const wrapper = mountSites();
+    const view = wrapper.get('button[aria-label="View site app.example.com"]');
+    expect(view.text()).toBe("");
+    expect(view.attributes("title")).toBe("View site app.example.com");
+    await view.trigger("click");
+    const details = wrapper.getComponent(SiteDetailsSheet);
+    expect(details.props("open")).toBe(true);
+    expect(details.props("site")).toEqual(site());
+    expect(wrapper.emitted("delete")).toBeUndefined();
+    const updated = site({
+      repository_branch: "release",
+      uninstallation_requested_at: "2026-11-08T10:00:00Z",
+    });
+    await wrapper.setProps({ sites: [updated] });
+    expect(details.props("site")).toEqual(updated);
+    expect(details.props("pending")).toBe(true);
+    details.vm.$emit("update:open", false);
+    await wrapper.vm.$nextTick();
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "app.example.com")!
+      .trigger("click");
+    expect(details.props("open")).toBe(true);
+    await wrapper.setProps({ sites: [] });
+    expect(details.props("site")).toBeNull();
+  });
+
+  it("opens the server in a sheet from the row or site details and preserves user context", async () => {
+    const wrapper = mountSites();
+    expect(wrapper.find('a[href^="/admin/servers/"]').exists()).toBe(false);
+    await wrapper
+      .get('button[aria-label="View server Production"]')
+      .trigger("click");
+    const serverDetails = wrapper.getComponent(ServerDetailsSheet);
+    expect(serverDetails.props("serverId")).toBe("server-1");
+    serverDetails.vm.$emit("update:serverId", null);
+    await wrapper
+      .get('button[aria-label="View site app.example.com"]')
+      .trigger("click");
+    const details = wrapper.getComponent(SiteDetailsSheet);
+    details.vm.$emit("viewServer", "server-1");
+    await wrapper.vm.$nextTick();
+    expect(details.props("open")).toBe(false);
+    expect(serverDetails.props("serverId")).toBe("server-1");
+    expect(wrapper.emitted("delete")).toBeUndefined();
   });
 
   it("maps Regular user to explicit null and saves only changed roles", async () => {

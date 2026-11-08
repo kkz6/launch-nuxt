@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
 import type { AdminServerSummary } from "~/types";
+import ServerDetailsSheet from "~/components/admin/ServerDetailsSheet.vue";
 import { Badge, type BadgeVariants } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -27,6 +28,7 @@ const props = defineProps<{
 }>();
 const { t, te } = useI18n();
 const search = ref("");
+const selectedServerId = ref<string | null>(null);
 const providerLabels = computed<Record<string, string>>(() => ({
   digitalocean: "DigitalOcean",
   hetzner: "Hetzner",
@@ -115,11 +117,12 @@ const statusVariant = (
             class="transition-colors duration-150 last:border-b-0 hover:bg-muted/20"
           >
             <TableCell class="py-2 font-medium">
-              <NuxtLink
-                :to="`/admin/servers/${server.id}`"
-                class="underline-offset-4 hover:underline"
-                >{{ server.name }}</NuxtLink
-              >
+              <button
+                type="button"
+                aria-haspopup="dialog"
+                class="text-left underline-offset-4 hover:underline"
+                @click="selectedServerId = server.id"
+              >{{ server.name }}</button>
             </TableCell>
             <TableCell class="py-2 text-muted-foreground">{{
               providerLabel(server.provider)
@@ -140,27 +143,24 @@ const statusVariant = (
                       variant="ghost"
                       size="icon-sm"
                       class="text-muted-foreground"
-                      as-child
+                      aria-haspopup="dialog"
+                      :aria-label="
+                        t('admin.userDetail.viewServerNamed', {
+                          name: server.name,
+                        })
+                      "
+                      :title="
+                        t('admin.userDetail.viewServerNamed', {
+                          name: server.name,
+                        })
+                      "
+                      @click="selectedServerId = server.id"
                     >
-                      <NuxtLink
-                        :to="`/admin/servers/${server.id}`"
-                        :aria-label="
-                          t('admin.userDetail.viewServerNamed', {
-                            name: server.name,
-                          })
-                        "
-                        :title="
-                          t('admin.userDetail.viewServerNamed', {
-                            name: server.name,
-                          })
-                        "
-                      >
-                        <Icon
-                          name="lucide:arrow-up-right"
-                          class="h-4 w-4"
-                          aria-hidden="true"
-                        />
-                      </NuxtLink>
+                      <Icon
+                        name="lucide:panel-right-open"
+                        class="h-4 w-4"
+                        aria-hidden="true"
+                      />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -184,5 +184,6 @@ const statusVariant = (
           : t("admin.userDetail.noServers")
       }}
     </p>
+    <ServerDetailsSheet v-model:server-id="selectedServerId" />
   </div>
 </template>

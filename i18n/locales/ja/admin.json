@@ -182,10 +182,19 @@
       "deleteFailed": "サーバーを削除できませんでした",
       "deleting": "削除中…"
     },
+    "siteDetail": {
+      "title": "サイトの詳細",
+      "branch": "リポジトリのブランチ",
+      "deletion": "削除",
+      "notRequested": "未リクエスト",
+      "deletionFailed": "削除に失敗",
+      "unavailable": "このサイトは利用できなくなりました。"
+    },
     "userDetail": {
       "sections": "ユーザーのセクション",
       "providerColumn": "プロバイダー",
       "viewServerNamed": "サーバー「{name}」を表示",
+      "viewSiteNamed": "サイト「{address}」を表示",
       "pageTitle": "管理 — {name}",
       "loadFailed": "ユーザーを読み込めませんでした",
       "loadTabFailed": "{resource}を読み込めませんでした",

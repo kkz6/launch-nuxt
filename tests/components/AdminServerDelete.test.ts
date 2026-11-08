@@ -49,6 +49,7 @@ const mountPage = () =>
       stubs: {
         Icon: true,
         AdminPageHeader: false,
+        ServerDetail: false,
         Badge: true,
         Avatar: true,
         AvatarFallback: true,
@@ -311,6 +312,20 @@ describe("admin server deletion", () => {
       expect(mocks.success).not.toHaveBeenCalled();
     },
   );
+
+  it("offers a retry when the initial detail request fails", async () => {
+    mocks.showServer.mockRejectedValueOnce(new Error("Network unavailable"));
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      "Failed to load server",
+    );
+    expect(wrapper.find("#server-delete-heading").exists()).toBe(false);
+    await wrapper.get('[role="alert"] button').trigger("click");
+    await flushPromises();
+    expect(wrapper.get("h1").text()).toBe("production-web");
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
+  });
 
   it("does not offer deletion when the server cannot be loaded", async () => {
     mocks.showServer.mockRejectedValueOnce({ statusCode: 404 });

@@ -172,11 +172,11 @@ function statusBadge(
 }
 
 // Lazy-loaded resource tabs. Each fetches on first activation and caches.
-type TabKey = "profile" | "teams" | "subscriptions" | "servers" | "sites";
+type TabKey = "profile" | "teams" | "servers" | "sites";
+type ResourceKey = TabKey | "subscriptions";
 const activeTab = computed<TabKey>(() => {
   const tab = route.query.tab;
-  return typeof tab === "string" &&
-    ["teams", "subscriptions", "servers", "sites"].includes(tab)
+  return typeof tab === "string" && ["teams", "servers", "sites"].includes(tab)
     ? (tab as TabKey)
     : "profile";
 });
@@ -185,14 +185,14 @@ const servers = ref<AdminServerSummary[]>([]);
 const sites = ref<AdminSiteSummary[]>([]);
 const subscriptions = ref<AdminSubscriptionSummary[]>([]);
 
-const loaded = ref<Record<TabKey, boolean>>({
+const loaded = ref<Record<ResourceKey, boolean>>({
   profile: true,
   teams: true,
   subscriptions: false,
   servers: false,
   sites: false,
 });
-const loadingTab = ref<Record<TabKey, boolean>>({
+const loadingTab = ref<Record<ResourceKey, boolean>>({
   profile: false,
   teams: false,
   subscriptions: false,
@@ -200,8 +200,8 @@ const loadingTab = ref<Record<TabKey, boolean>>({
   sites: false,
 });
 
-const tabErrors = ref<Partial<Record<TabKey, string>>>({});
-const tabVersions: Record<TabKey, number> = {
+const tabErrors = ref<Partial<Record<ResourceKey, string>>>({});
+const tabVersions: Record<ResourceKey, number> = {
   profile: 0,
   teams: 0,
   subscriptions: 0,
@@ -209,7 +209,7 @@ const tabVersions: Record<TabKey, number> = {
   sites: 0,
 };
 
-async function loadTab(tab: TabKey, force = false): Promise<void> {
+async function loadTab(tab: ResourceKey, force = false): Promise<void> {
   if (
     tab === "profile" ||
     tab === "teams" ||
@@ -444,7 +444,7 @@ useAdminLiveUpdates(
   async () => {
     await Promise.all([
       load(),
-      ...(["servers", "sites", "subscriptions"] as TabKey[])
+      ...(["servers", "sites", "subscriptions"] as ResourceKey[])
         .filter((tab) => loaded.value[tab] || loadingTab.value[tab])
         .map((tab) => loadTab(tab, true)),
     ]);
@@ -456,7 +456,11 @@ useAdminLiveUpdates(
   },
 );
 
-watch(activeTab, (tab) => void loadTab(tab), { immediate: true });
+watch(
+  activeTab,
+  (tab) => void loadTab(tab === "profile" ? "subscriptions" : tab),
+  { immediate: true },
+);
 onMounted(load);
 </script>
 
@@ -638,6 +642,86 @@ onMounted(load);
       >
         {{ t("admin.userDetail.demoteBeforeDelete") }}
       </p>
+      <!-- Subscriptions -->
+      <section
+        v-if="activeTab === 'profile'"
+        aria-labelledby="user-subscriptions-title"
+        class="space-y-3"
+      >
+        <h2 id="user-subscriptions-title" class="text-sm font-semibold">
+          {{ t("admin.userDetail.tabs.subscriptions") }}
+        </h2>
+        <div
+          v-if="tabErrors.subscriptions"
+          role="alert"
+          class="flex items-center justify-between gap-3 text-sm text-destructive"
+        >
+          <p>{{ tabErrors.subscriptions }}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="loadingTab.subscriptions"
+            @click="loadTab('subscriptions', true)"
+          >
+            {{ t("admin.userDetail.retry") }}
+          </Button>
+        </div>
+        <div
+          v-if="loadingTab.subscriptions && !loaded.subscriptions"
+          class="flex items-center justify-center py-6"
+          role="status"
+          :aria-label="t('server.common.loading')"
+        >
+          <Icon
+            name="lucide:loader-2"
+            class="h-6 w-6 animate-spin text-muted-foreground"
+          />
+        </div>
+        <div v-else-if="subscriptions.length" class="divide-y divide-border/60">
+          <div
+            v-for="(sub, i) in subscriptions"
+            :key="`${sub.team_id}-${i}`"
+            class="flex items-center justify-between gap-4 py-3"
+          >
+            <div class="flex items-center gap-3">
+              <div>
+                <p class="text-sm font-medium">{{ sub.team_name }}</p>
+                <p class="text-xs text-muted-foreground">
+                  <template
+                    v-if="sub.status === 'on_trial' && sub.trial_ends_at"
+                  >
+                    {{ t("admin.userDetail.trialEnds") }}
+                    <SharedDateTooltip :date="sub.trial_ends_at" />
+                  </template>
+                  <template v-else-if="sub.ends_at">
+                    {{ t("admin.userDetail.ends") }}
+                    <SharedDateTooltip :date="sub.ends_at" />
+                  </template>
+                  <template v-else-if="sub.renews_at">
+                    {{ t("admin.userDetail.renews") }}
+                    <SharedDateTooltip :date="sub.renews_at" />
+                  </template>
+                  <template v-if="sub.card_last_four">
+                    · •••• {{ sub.card_last_four }}
+                  </template>
+                </p>
+              </div>
+            </div>
+            <Badge
+              :variant="statusBadge(sub.status, sub.trial_ends_at).variant"
+            >
+              {{ statusBadge(sub.status, sub.trial_ends_at).label }}
+            </Badge>
+          </div>
+        </div>
+        <p
+          v-else-if="!tabErrors.subscriptions"
+          class="py-3 text-sm text-muted-foreground"
+        >
+          {{ t("admin.userDetail.noSubscriptions") }}
+        </p>
+      </section>
+
       <!-- User resources -->
       <div v-if="activeTab !== 'profile'" class="min-w-0 flex-1">
         <h1 class="sr-only">{{ t(`admin.userDetail.tabs.${activeTab}`) }}</h1>
@@ -704,82 +788,6 @@ onMounted(load);
             />
             <p class="text-sm text-muted-foreground">
               {{ t("admin.userDetail.noTeams") }}
-            </p>
-          </div>
-        </section>
-
-        <!-- Subscriptions -->
-        <section
-          v-if="activeTab === 'subscriptions'"
-          :aria-label="t('admin.userDetail.tabs.subscriptions')"
-        >
-          <div
-            v-if="loadingTab.subscriptions && !loaded.subscriptions"
-            class="flex items-center justify-center py-16"
-          >
-            <Icon
-              name="lucide:loader-2"
-              class="h-6 w-6 animate-spin text-muted-foreground"
-            />
-          </div>
-          <div
-            v-else-if="subscriptions.length"
-            class="divide-y divide-border/60"
-          >
-            <div
-              v-for="(sub, i) in subscriptions"
-              :key="`${sub.team_id}-${i}`"
-              class="flex items-center justify-between gap-4 py-4"
-            >
-              <div class="flex items-center gap-3">
-                <div
-                  class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted/60"
-                >
-                  <Icon
-                    name="lucide:credit-card"
-                    class="h-4 w-4 text-muted-foreground"
-                  />
-                </div>
-                <div>
-                  <p class="text-sm font-medium">{{ sub.team_name }}</p>
-                  <p class="text-xs text-muted-foreground">
-                    <template
-                      v-if="sub.status === 'on_trial' && sub.trial_ends_at"
-                    >
-                      {{ t("admin.userDetail.trialEnds") }}
-                      <SharedDateTooltip :date="sub.trial_ends_at" />
-                    </template>
-                    <template v-else-if="sub.ends_at">
-                      {{ t("admin.userDetail.ends") }}
-                      <SharedDateTooltip :date="sub.ends_at" />
-                    </template>
-                    <template v-else-if="sub.renews_at">
-                      {{ t("admin.userDetail.renews") }}
-                      <SharedDateTooltip :date="sub.renews_at" />
-                    </template>
-                    <template v-if="sub.card_last_four">
-                      · •••• {{ sub.card_last_four }}
-                    </template>
-                  </p>
-                </div>
-              </div>
-              <Badge
-                :variant="statusBadge(sub.status, sub.trial_ends_at).variant"
-              >
-                {{ statusBadge(sub.status, sub.trial_ends_at).label }}
-              </Badge>
-            </div>
-          </div>
-          <div
-            v-else
-            class="flex flex-col items-center justify-center gap-3 py-16 text-center"
-          >
-            <Icon
-              name="lucide:credit-card"
-              class="h-8 w-8 text-muted-foreground/50"
-            />
-            <p class="text-sm text-muted-foreground">
-              {{ t("admin.userDetail.noSubscriptions") }}
             </p>
           </div>
         </section>
