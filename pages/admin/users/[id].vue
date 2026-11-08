@@ -5,6 +5,7 @@ import { toast } from "vue-sonner";
 import type {
   AdminTeam,
   AdminUserRow,
+  AdminStaffRole,
   AdminServerSummary,
   AdminSiteSummary,
   AdminSubscriptionSummary,
@@ -16,17 +17,10 @@ import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { Avatar, AvatarFallback } from "~/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "~/components/ui/alert-dialog";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import UserSitesTable from "~/components/admin/UserSitesTable.vue";
+import UserStaffRoleControl from "~/components/admin/UserStaffRoleControl.vue";
 
 definePageMeta({
   layout: "default",
@@ -36,19 +30,6 @@ definePageMeta({
 const route = useRoute();
 const userId = route.params.id as string;
 const { locale, t, te } = useI18n();
-const { getSiteTypeLabel } = useStableMetadataLabels();
-
-const tlsSettingLabel = (value: string): string => {
-  const keys: Record<string, string> = {
-    auto: "site.ssl.automatic",
-    off: "site.ssl.disabled",
-    stored: "site.ssl.stored",
-    custom: "site.ssl.custom",
-  };
-  const key = keys[value];
-  return key ? t(key) : value;
-};
-
 const { user: currentUser } = useAuth();
 const isSuperAdmin = computed(
   () => currentUser.value?.staff_role === "super_admin",
@@ -60,7 +41,19 @@ const { start } = useImpersonation();
 const user = ref<AdminUserRow | null>(null);
 const isLoading = ref(true);
 const notFound = ref(false);
-const busy = ref<"suspend" | "unsuspend" | "delete" | "spectate" | null>(null);
+const busy = ref<
+  "suspend" | "unsuspend" | "delete" | "spectate" | "role" | null
+>(null);
+const actionErrorMessage = ref("");
+const roleError = ref("");
+const siteDeleteBusy = ref<string | null>(null);
+const siteDeleteErrors = ref<Record<string, string>>({});
+const requestedSiteIds = ref<string[]>([]);
+const confirmationDialog = ref<InstanceType<
+  typeof import("~/components/shared/ConfirmationDialog.vue").default
+> | null>(null);
+const mutationBusy = computed(() => !!busy.value || !!siteDeleteBusy.value);
+const serverSearch = ref("");
 
 useHead({
   title: () =>
@@ -202,6 +195,14 @@ type TabKey = "teams" | "subscriptions" | "servers" | "sites";
 const activeTab = ref<TabKey>("teams");
 
 const servers = ref<AdminServerSummary[]>([]);
+const filteredServers = computed(() => {
+  const query = serverSearch.value.trim().toLocaleLowerCase();
+  return servers.value.filter((server) =>
+    `${server.name} ${server.public_ipv4 || ""} ${server.provider}`
+      .toLocaleLowerCase()
+      .includes(query),
+  );
+});
 const sites = ref<AdminSiteSummary[]>([]);
 const subscriptions = ref<AdminSubscriptionSummary[]>([]);
 
@@ -218,8 +219,14 @@ const loadingTab = ref<Record<TabKey, boolean>>({
   sites: false,
 });
 
-async function loadTab(tab: TabKey): Promise<void> {
-  if (tab === "teams" || loaded.value[tab] || loadingTab.value[tab]) {
+const tabErrors = ref<Partial<Record<TabKey, string>>>({});
+
+async function loadTab(tab: TabKey, force = false): Promise<void> {
+  if (
+    tab === "teams" ||
+    (loaded.value[tab] && !force) ||
+    loadingTab.value[tab]
+  ) {
     return;
   }
 
@@ -231,17 +238,21 @@ async function loadTab(tab: TabKey): Promise<void> {
     } else if (tab === "sites") {
       const res = await adminService.userSites(userId);
       sites.value = res.data ?? [];
+      requestedSiteIds.value = requestedSiteIds.value.filter((id) =>
+        sites.value.some(
+          (site) => site.id === id && !site.uninstallation_failed_at,
+        ),
+      );
     } else if (tab === "subscriptions") {
       const res = await adminService.userSubscriptions(userId);
       subscriptions.value = res.data ?? [];
     }
     loaded.value[tab] = true;
+    tabErrors.value[tab] = "";
   } catch {
-    toast.error(
-      t("admin.userDetail.loadTabFailed", {
-        resource: t(`admin.userDetail.tabs.${tab}`),
-      }),
-    );
+    tabErrors.value[tab] = t("admin.userDetail.loadTabFailed", {
+      resource: t(`admin.userDetail.tabs.${tab}`),
+    });
   } finally {
     loadingTab.value[tab] = false;
   }
@@ -273,10 +284,12 @@ async function load(): Promise<void> {
 
 function actionError(error: unknown, fallback: string): void {
   const err = error as { data?: { message?: string } };
-  toast.error(err.data?.message || fallback);
+  actionErrorMessage.value = err.data?.message || fallback;
 }
 
 async function suspend(): Promise<void> {
+  if (!isSuperAdmin.value || isSelf.value || mutationBusy.value) return;
+  actionErrorMessage.value = "";
   busy.value = "suspend";
   try {
     await adminService.suspendUser(userId);
@@ -290,6 +303,8 @@ async function suspend(): Promise<void> {
 }
 
 async function unsuspend(): Promise<void> {
+  if (!isSuperAdmin.value || isSelf.value || mutationBusy.value) return;
+  actionErrorMessage.value = "";
   busy.value = "unsuspend";
   try {
     await adminService.unsuspendUser(userId);
@@ -303,6 +318,25 @@ async function unsuspend(): Promise<void> {
 }
 
 async function remove(): Promise<void> {
+  if (
+    !isSuperAdmin.value ||
+    isSelf.value ||
+    user.value?.staff_role ||
+    mutationBusy.value ||
+    !user.value ||
+    !confirmationDialog.value
+  )
+    return;
+  const result = await confirmationDialog.value.show({
+    title: t("admin.userDetail.deleteTitle"),
+    description: t("admin.userDetail.deleteDescription", {
+      name: user.value.name,
+    }),
+    confirmText: t("admin.userDetail.deleteUser"),
+    destructive: true,
+  });
+  if (!result.ok || mutationBusy.value) return;
+  actionErrorMessage.value = "";
   busy.value = "delete";
   try {
     await adminService.deleteUser(userId);
@@ -315,6 +349,8 @@ async function remove(): Promise<void> {
 }
 
 async function spectate(): Promise<void> {
+  if (mutationBusy.value) return;
+  actionErrorMessage.value = "";
   busy.value = "spectate";
   try {
     await start(userId, t("admin.userDetail.supportSessionReason"));
@@ -324,11 +360,93 @@ async function spectate(): Promise<void> {
   }
 }
 
+async function changeStaffRole(role: AdminStaffRole | null): Promise<void> {
+  if (
+    !isSuperAdmin.value ||
+    isSelf.value ||
+    mutationBusy.value ||
+    !user.value ||
+    !confirmationDialog.value ||
+    role === (user.value.staff_role ?? null)
+  )
+    return;
+  const label = role
+    ? t(`admin.statuses.staffRole.${role}`)
+    : t("admin.userDetail.regularUser");
+  const result = await confirmationDialog.value.show({
+    title: t("admin.userDetail.changeRoleTitle"),
+    description: t("admin.userDetail.changeRoleDescription", {
+      email: user.value.email,
+      role: label,
+    }),
+    warning: t(
+      role
+        ? "admin.userDetail.grantStaffWarning"
+        : "admin.userDetail.removeStaffWarning",
+    ),
+    confirmText: t("admin.userDetail.saveRole"),
+    destructive: role === null,
+  });
+  if (!result.ok || mutationBusy.value) return;
+  busy.value = "role";
+  roleError.value = "";
+  try {
+    const response = await adminService.updateStaffRole(userId, role);
+    user.value.staff_role = response.data.staff_role;
+    await load();
+    toast.success(t("admin.userDetail.roleUpdated"));
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } };
+    roleError.value =
+      err.data?.message || t("admin.userDetail.roleUpdateFailed");
+  } finally {
+    busy.value = null;
+  }
+}
+
+async function removeSite(site: AdminSiteSummary): Promise<void> {
+  if (
+    !isSuperAdmin.value ||
+    mutationBusy.value ||
+    requestedSiteIds.value.includes(site.id) ||
+    (site.uninstallation_requested_at && !site.uninstallation_failed_at) ||
+    !confirmationDialog.value
+  )
+    return;
+  const result = await confirmationDialog.value.show({
+    title: t("admin.userDetail.deleteSite"),
+    description: t("admin.userDetail.deleteSiteDescription", {
+      address: site.address,
+      server: site.server_name,
+    }),
+    warning: t("admin.userDetail.deleteSiteWarning"),
+    inputVerificationText: site.address,
+    helpText: t("admin.userDetail.deleteSiteHelp"),
+    confirmText: t("admin.userDetail.deleteSite"),
+    destructive: true,
+  });
+  if (!result.ok || mutationBusy.value) return;
+  siteDeleteBusy.value = site.id;
+  siteDeleteErrors.value[site.id] = "";
+  try {
+    await adminService.deleteSite(site.id, site.address);
+    requestedSiteIds.value.push(site.id);
+    toast.success(t("admin.userDetail.siteDeletionRequested"));
+  } catch (error: unknown) {
+    const err = error as { data?: { message?: string } };
+    siteDeleteErrors.value[site.id] =
+      err.data?.message || t("admin.userDetail.siteDeletionFailed");
+  } finally {
+    siteDeleteBusy.value = null;
+  }
+}
+
 onMounted(load);
 </script>
 
 <template>
   <div class="pb-10">
+    <SharedConfirmationDialog ref="confirmationDialog" />
     <div v-if="isLoading" class="flex items-center justify-center py-16">
       <Icon
         name="lucide:loader-2"
@@ -349,53 +467,92 @@ onMounted(load);
       </Button>
     </div>
 
-    <div v-else-if="user" class="flex flex-col gap-8 lg:flex-row">
-      <!-- Left rail: identity, key facts, actions -->
-      <aside
-        class="shrink-0 space-y-5 lg:sticky lg:top-4 lg:w-72 lg:self-start lg:border-r lg:pr-8"
-      >
-        <div class="space-y-3">
-          <Avatar class="h-16 w-16">
-            <AvatarFallback class="text-lg font-semibold">
-              {{ initials }}
-            </AvatarFallback>
-          </Avatar>
-          <div class="space-y-1.5">
-            <h1 class="text-xl font-semibold tracking-tight">
-              {{ user.name }}
-            </h1>
-            <div class="flex flex-wrap items-center gap-2">
-              <Badge :variant="statusVariant" class="capitalize">
-                {{ userStatusLabel }}
-              </Badge>
-              <span
-                v-if="user.staff_role"
-                class="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground"
-              >
-                <Icon name="lucide:shield" class="h-3.5 w-3.5" />
-                {{ staffRoleLabel }}
-              </span>
+    <div v-else-if="user" class="space-y-6">
+      <header class="space-y-5 rounded-xl border bg-card p-5 shadow-sm sm:p-6">
+        <div
+          class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+        >
+          <div class="flex min-w-0 items-center gap-3">
+            <Avatar class="h-12 w-12 shrink-0">
+              <AvatarFallback class="font-semibold">{{
+                initials
+              }}</AvatarFallback>
+            </Avatar>
+            <div class="min-w-0 space-y-1">
+              <div class="flex flex-wrap items-center gap-2">
+                <h1 class="text-2xl font-semibold tracking-tight">
+                  {{ user.name }}
+                </h1>
+                <Badge :variant="statusVariant">{{ userStatusLabel }}</Badge>
+                <Badge v-if="user.staff_role" variant="secondary">{{
+                  staffRoleLabel
+                }}</Badge>
+              </div>
+              <p class="break-all text-sm text-muted-foreground">
+                {{ user.email }}
+              </p>
             </div>
-            <p class="break-all text-sm text-muted-foreground">
-              {{ user.email }}
-            </p>
+          </div>
+          <div class="flex shrink-0 flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="mutationBusy"
+              @click="spectate"
+            >
+              <Icon
+                :name="busy === 'spectate' ? 'lucide:loader-2' : 'lucide:eye'"
+                class="h-4 w-4"
+                :class="{ 'animate-spin': busy === 'spectate' }"
+              />
+              {{ t("admin.userDetail.spectate") }}
+            </Button>
+            <template v-if="isSuperAdmin && !isSelf">
+              <Button
+                v-if="!isSuspended"
+                variant="outline"
+                size="sm"
+                :disabled="mutationBusy"
+                @click="suspend"
+                >{{ t("admin.userDetail.suspend") }}</Button
+              >
+              <Button
+                v-else
+                variant="outline"
+                size="sm"
+                :disabled="mutationBusy"
+                @click="unsuspend"
+                >{{ t("admin.userDetail.unsuspend") }}</Button
+              >
+              <Button
+                variant="ghost"
+                size="sm"
+                class="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                :disabled="mutationBusy || !!user.staff_role"
+                :aria-describedby="
+                  user.staff_role ? 'staff-deletion-help' : undefined
+                "
+                @click="remove"
+              >
+                {{ t("admin.userDetail.deleteUser") }}
+              </Button>
+            </template>
           </div>
         </div>
-
-        <dl class="space-y-2.5 border-t pt-4 text-sm">
-          <div class="flex items-center justify-between gap-3">
+        <dl class="flex flex-wrap gap-x-8 gap-y-3 border-t pt-4 text-sm">
+          <div class="flex items-center gap-2">
             <dt class="text-muted-foreground">
               {{ t("admin.userDetail.tabs.teams") }}
             </dt>
             <dd class="font-medium">{{ formatNumber(user.teams.length) }}</dd>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
             <dt class="text-muted-foreground">
               {{ t("admin.userDetail.activeSubscriptionsShort") }}
             </dt>
             <dd class="font-medium">{{ formatNumber(activeSubs) }}</dd>
           </div>
-          <div class="flex items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
             <dt class="text-muted-foreground">
               {{ t("admin.userDetail.joined") }}
             </dt>
@@ -403,110 +560,42 @@ onMounted(load);
               <SharedDateTooltip
                 v-if="user.created_at"
                 :date="user.created_at"
-              />
-              <span v-else>—</span>
+              /><span v-else>—</span>
             </dd>
           </div>
         </dl>
+        <p
+          v-if="actionErrorMessage"
+          role="alert"
+          class="text-sm text-destructive"
+        >
+          {{ actionErrorMessage }}
+        </p>
+      </header>
+      <div v-if="isSuperAdmin" class="space-y-2">
+        <UserStaffRoleControl
+          :role="user.staff_role"
+          :is-self="isSelf"
+          :disabled="mutationBusy"
+          :busy="busy === 'role'"
+          :error="roleError"
+          @save="changeStaffRole"
+        />
+        <p
+          v-if="user.staff_role && !isSelf"
+          id="staff-deletion-help"
+          class="px-1 text-sm text-muted-foreground"
+        >
+          {{ t("admin.userDetail.demoteBeforeDelete") }}
+        </p>
+      </div>
 
-        <div class="flex flex-col gap-1.5 border-t pt-4">
-          <Button
-            variant="outline"
-            size="sm"
-            class="justify-start"
-            :disabled="busy === 'spectate'"
-            @click="spectate"
-          >
-            <Icon
-              :name="busy === 'spectate' ? 'lucide:loader-2' : 'lucide:eye'"
-              class="h-4 w-4"
-              :class="{ 'animate-spin': busy === 'spectate' }"
-            />
-            {{ t("admin.userDetail.spectate") }}
-          </Button>
-
-          <template v-if="isSuperAdmin && !isSelf">
-            <Button
-              v-if="!isSuspended"
-              variant="outline"
-              size="sm"
-              class="justify-start"
-              :disabled="busy === 'suspend'"
-              @click="suspend"
-            >
-              <Icon
-                :name="busy === 'suspend' ? 'lucide:loader-2' : 'lucide:ban'"
-                class="h-4 w-4"
-                :class="{ 'animate-spin': busy === 'suspend' }"
-              />
-              {{ t("admin.userDetail.suspend") }}
-            </Button>
-            <Button
-              v-else
-              variant="outline"
-              size="sm"
-              class="justify-start"
-              :disabled="busy === 'unsuspend'"
-              @click="unsuspend"
-            >
-              <Icon
-                :name="
-                  busy === 'unsuspend'
-                    ? 'lucide:loader-2'
-                    : 'lucide:circle-check'
-                "
-                class="h-4 w-4"
-                :class="{ 'animate-spin': busy === 'unsuspend' }"
-              />
-              {{ t("admin.userDetail.unsuspend") }}
-            </Button>
-
-            <AlertDialog>
-              <AlertDialogTrigger as-child>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="justify-start text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  :disabled="busy === 'delete'"
-                >
-                  <Icon name="lucide:trash-2" class="h-4 w-4" />
-                  {{ t("admin.common.delete") }}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>
-                    {{ t("admin.userDetail.deleteTitle") }}
-                  </AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {{
-                      t("admin.userDetail.deleteDescription", {
-                        name: user.name,
-                      })
-                    }}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>
-                    {{ t("admin.common.cancel") }}
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    @click="remove"
-                  >
-                    {{ t("admin.userDetail.deleteUser") }}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </template>
-        </div>
-      </aside>
-
-      <!-- Right content: resource tabs -->
-      <div class="min-w-0 flex-1">
+      <!-- User resources -->
+      <div
+        class="min-w-0 flex-1 rounded-xl border bg-card p-4 shadow-sm sm:p-6"
+      >
         <Tabs :model-value="activeTab" @update:model-value="onTabChange">
-          <TabsList>
+          <TabsList class="mb-5 max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="teams">
               {{ t("admin.userDetail.tabs.teams") }}
               <span class="ml-1.5 text-xs text-muted-foreground">
@@ -541,6 +630,21 @@ onMounted(load);
               </span>
             </TabsTrigger>
           </TabsList>
+
+          <div
+            v-if="tabErrors[activeTab]"
+            role="alert"
+            class="my-3 flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+          >
+            <p>{{ tabErrors[activeTab] }}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              :disabled="loadingTab[activeTab]"
+              @click="loadTab(activeTab, true)"
+              >{{ t("admin.userDetail.refresh") }}</Button
+            >
+          </div>
 
           <!-- Teams -->
           <TabsContent value="teams">
@@ -664,7 +768,18 @@ onMounted(load);
           </TabsContent>
 
           <!-- Servers -->
-          <TabsContent value="servers">
+          <TabsContent value="servers" class="space-y-4">
+            <div class="max-w-sm space-y-1.5">
+              <Label for="admin-server-search">{{
+                t("admin.userDetail.searchServers")
+              }}</Label>
+              <Input
+                id="admin-server-search"
+                v-model="serverSearch"
+                type="search"
+                :placeholder="t('admin.userDetail.searchServersPlaceholder')"
+              />
+            </div>
             <div
               v-if="loadingTab.servers"
               class="flex items-center justify-center border-t py-16"
@@ -674,9 +789,9 @@ onMounted(load);
                 class="h-6 w-6 animate-spin text-muted-foreground"
               />
             </div>
-            <div v-else-if="servers.length" class="divide-y border-t">
+            <div v-else-if="filteredServers.length" class="divide-y border-t">
               <NuxtLink
-                v-for="server in servers"
+                v-for="server in filteredServers"
                 :key="server.id"
                 :to="`/admin/servers/${server.id}`"
                 class="flex items-center justify-between gap-4 px-2 py-3.5 transition-colors hover:bg-muted/50"
@@ -712,70 +827,28 @@ onMounted(load);
                 class="h-8 w-8 text-muted-foreground/50"
               />
               <p class="text-sm text-muted-foreground">
-                {{ t("admin.userDetail.noServers") }}
+                {{
+                  serverSearch.trim()
+                    ? t("admin.userDetail.noMatchingServers")
+                    : t("admin.userDetail.noServers")
+                }}
               </p>
             </div>
           </TabsContent>
 
           <!-- Sites -->
           <TabsContent value="sites">
-            <div
-              v-if="loadingTab.sites"
-              class="flex items-center justify-center border-t py-16"
-            >
-              <Icon
-                name="lucide:loader-2"
-                class="h-6 w-6 animate-spin text-muted-foreground"
-              />
-            </div>
-            <div v-else-if="sites.length" class="divide-y border-t">
-              <div
-                v-for="site in sites"
-                :key="site.id"
-                class="flex items-center justify-between gap-4 py-3.5"
-              >
-                <div class="flex items-center gap-3">
-                  <div
-                    class="flex h-9 w-9 items-center justify-center rounded-full bg-muted"
-                  >
-                    <Icon
-                      name="lucide:globe"
-                      class="h-4 w-4 text-muted-foreground"
-                    />
-                  </div>
-                  <div>
-                    <p class="text-sm font-medium">{{ site.address }}</p>
-                    <p class="text-xs text-muted-foreground">
-                      {{
-                        t("admin.userDetail.onServer", {
-                          server: site.server_name,
-                        })
-                      }}
-                    </p>
-                  </div>
-                </div>
-                <div class="flex items-center gap-1.5">
-                  <Badge variant="secondary" class="capitalize">
-                    {{ getSiteTypeLabel(site.type, site.type) }}
-                  </Badge>
-                  <Badge variant="outline" class="uppercase">
-                    {{ tlsSettingLabel(site.tls_setting) }}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-            <div
-              v-else
-              class="flex flex-col items-center justify-center gap-2 border-t py-16 text-center"
-            >
-              <Icon
-                name="lucide:globe"
-                class="h-8 w-8 text-muted-foreground/50"
-              />
-              <p class="text-sm text-muted-foreground">
-                {{ t("admin.userDetail.noSites") }}
-              </p>
-            </div>
+            <UserSitesTable
+              :sites="sites"
+              :loading="loadingTab.sites"
+              :can-delete="isSuperAdmin"
+              :disabled="mutationBusy"
+              :busy-id="siteDeleteBusy"
+              :pending-ids="requestedSiteIds"
+              :errors="siteDeleteErrors"
+              @delete="removeSite"
+              @refresh="loadTab('sites', true)"
+            />
           </TabsContent>
         </Tabs>
       </div>

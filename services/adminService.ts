@@ -1,5 +1,6 @@
 import type {
   AdminUserRow,
+  AdminStaffRole,
   AdminServerSummary,
   AdminSiteSummary,
   AdminSubscriptionSummary,
@@ -92,6 +93,23 @@ export const adminService = {
   userSites: (id: string | number) => {
     const { get } = useApi();
     return get<ApiResponse<AdminSiteSummary[]>>(`/admin/users/${id}/sites`);
+  },
+
+  deleteSite: (id: string, confirmationDomain: string) => {
+    const { fetch } = useApi();
+    return fetch<
+      ApiResponse<{ site_id: string; status: "deletion_requested" }>
+    >(`/admin/sites/${id}`, {
+      method: "DELETE",
+      body: { confirmation_domain: confirmationDomain },
+    });
+  },
+
+  updateStaffRole: (id: string | number, staffRole: AdminStaffRole | null) => {
+    const { patch } = useApi();
+    return patch<
+      ApiResponse<{ id: string; staff_role: AdminStaffRole | null }>
+    >(`/admin/users/${id}/staff-role`, { staff_role: staffRole });
   },
 
   failureLog: (id: string | number, kind: string) => {
@@ -238,10 +256,9 @@ export const adminService = {
 
   observabilitySlowQueries: (params: { limit?: number } = {}) => {
     const { get } = useApi();
-    return get<ApiResponse<QueryEntry[]>>(
-      "/admin/observability/queries/slow",
-      { query: params },
-    );
+    return get<ApiResponse<QueryEntry[]>>("/admin/observability/queries/slow", {
+      query: params,
+    });
   },
 
   observabilityN1: (params: { limit?: number } = {}) => {

@@ -806,11 +806,13 @@ export interface AdminTeam {
   subscription?: AdminTeamSubscription | null;
 }
 
+export type AdminStaffRole = "support" | "super_admin";
+
 export interface AdminUserRow {
   id: string;
   name: string;
   email: string;
-  staff_role?: string | null;
+  staff_role?: AdminStaffRole | null;
   status: string;
   created_at?: string | null;
   teams: AdminTeam[];
@@ -847,6 +849,8 @@ export interface AdminSiteSummary {
   type: string;
   tls_setting: string;
   repository_branch?: string | null;
+  uninstallation_requested_at?: string | null;
+  uninstallation_failed_at?: string | null;
   created_at?: string | null;
 }
 
