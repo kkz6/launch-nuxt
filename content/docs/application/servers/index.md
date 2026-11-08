@@ -59,6 +59,8 @@ Resources undergoing background deletion stay visible until the API confirms com
 
 In **Admin → Servers**, server details group hardware and system configuration, connectivity and lifecycle timestamps, and ownership. The separate **Delete server** action is available to super administrators and keeps the same resource and confirmation requirements. From a user’s **Servers** tab, select the server name or **View server** icon to open those details in a drawer while keeping the current user tab and search.
 
+The directory uses the same server card layout as the application. Select the **Search servers** icon at the right of the admin tabs to search across teams, then choose a result to open its detail drawer. The directory keeps the current search; reopen the palette to change or clear it.
+
 ## Server Features
 ### Server Types
 

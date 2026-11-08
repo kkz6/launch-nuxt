@@ -19,6 +19,12 @@ import type { LocalePreference } from "~/types/locale";
 import { isLocalePreference } from "~/utils/locale";
 import { Button } from "~/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -52,6 +58,13 @@ const isStaff = computed(
     user.value?.staff_role === "super_admin",
 );
 const showAdminContext = computed(() => route.path.startsWith("/admin"));
+const isAdminServerDirectory = computed(() =>
+  /^\/admin\/servers\/?$/.test(route.path),
+);
+const adminServerSearchOpen = useState<boolean>(
+  "adminServerSearchOpen",
+  () => false,
+);
 const pageBreadcrumbState = usePageBreadcrumbState();
 const adminCrumbs = computed(() =>
   pageBreadcrumbState.value?.path === route.path
@@ -2035,7 +2048,35 @@ const navigateTo = (path: string) => {
           >
         </li>
       </ol>
-      <AdminNavigation :extend-border="isAdminUserDetail" />
+      <div v-if="isAdminServerDirectory" class="flex items-center gap-3">
+        <AdminNavigation class="min-w-0 flex-1" />
+        <div class="flex shrink-0 items-center">
+          <TooltipProvider :delay-duration="200">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-haspopup="dialog"
+                  :aria-label="t('admin.userDetail.searchServers')"
+                  :title="t('admin.userDetail.searchServers')"
+                  @click="adminServerSearchOpen = true"
+                >
+                  <Icon
+                    name="lucide:search"
+                    class="h-4 w-4"
+                    aria-hidden="true"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{
+                t("admin.userDetail.searchServers")
+              }}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      </div>
+      <AdminNavigation v-else :extend-border="isAdminUserDetail" />
       <LayoutTabStrip
         v-if="isAdminUserDetail"
         :tabs="adminUserTabs"

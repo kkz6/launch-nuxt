@@ -48,6 +48,7 @@ const setLocalePreference = vi.fn(async (preference: "auto" | "en" | "ja") => {
   return preference === "auto" ? "en" : preference;
 });
 const translations: Record<string, string> = {
+  "admin.userDetail.searchServers": "Search servers",
   "common.language": "Language",
   "common.languageAutomatic": "Automatic",
   "common.english": "English",
@@ -68,6 +69,7 @@ const translations: Record<string, string> = {
 };
 const translate = vi.fn((key: string) => translations[key] ?? key);
 
+const states = new Map<string, ReturnType<typeof ref>>();
 const wrappers: VueWrapper[] = [];
 const mountNavbar = () => {
   const wrapper = shallowMount(Navbar, {
@@ -96,6 +98,13 @@ const mountNavbar = () => {
         DropdownMenuSubContent: { template: "<div><slot /></div>" },
         DropdownMenuSubTrigger: { template: "<div><slot /></div>" },
         DropdownMenuTrigger: { template: "<div><slot /></div>" },
+        TooltipProvider: { template: "<div><slot /></div>" },
+        Tooltip: { template: "<div><slot /></div>" },
+        TooltipTrigger: { template: "<div><slot /></div>" },
+        TooltipContent: {
+          name: "TooltipContent",
+          template: "<span><slot /></span>",
+        },
         Icon: true,
         LayoutActiveActions: true,
         LayoutTabStrip: {
@@ -129,7 +138,7 @@ describe("Navbar", () => {
     currentRoute.query = {};
     cache.mockReset();
     clearCache.mockClear();
-    const states = new Map<string, ReturnType<typeof ref>>();
+    states.clear();
     activeUser.value = {
       id: "user",
       name: "Team Owner",
@@ -349,6 +358,49 @@ describe("Navbar", () => {
     expect(wrapper.text()).not.toContain("Previous server");
     wrapper.unmount();
   });
+  it.each(["/admin/servers", "/admin/servers/"])(
+    "opens server search from an icon with a tooltip at the end of the admin tabs on %s",
+    async (path) => {
+      currentRoute.path = path;
+      const wrapper = mountNavbar();
+      const button = wrapper.get('button[aria-label="Search servers"]');
+      expect(button.text()).toBe("");
+      expect(button.attributes("title")).toBe("Search servers");
+      expect(button.attributes("aria-haspopup")).toBe("dialog");
+      expect(button.attributes("variant")).toBe("ghost");
+      expect(button.attributes("size")).toBe("icon-sm");
+      expect(wrapper.getComponent({ name: "TooltipContent" }).text()).toBe(
+        "Search servers",
+      );
+      const navigation = wrapper.getComponent({ name: "AdminNavigation" });
+      expect(navigation.classes()).toEqual(
+        expect.arrayContaining(["min-w-0", "flex-1"]),
+      );
+      expect(navigation.element.parentElement?.contains(button.element)).toBe(
+        true,
+      );
+      expect(navigation.element.parentElement?.classList.contains("flex")).toBe(
+        true,
+      );
+      expect(states.get("adminServerSearchOpen")?.value).toBe(false);
+      await button.trigger("click");
+      expect(states.get("adminServerSearchOpen")?.value).toBe(true);
+    },
+  );
+
+  it.each([
+    "/admin",
+    "/admin/servers/server-1",
+    "/admin/users/customer",
+    "/servers",
+  ])("hides the admin server search action on %s", (path) => {
+    currentRoute.path = path;
+    const wrapper = mountNavbar();
+    expect(wrapper.find('button[aria-label="Search servers"]').exists()).toBe(
+      false,
+    );
+  });
+
   it("uses a second shared tab row for user sections with the user's name first", async () => {
     currentRoute.path = "/admin/users/customer";
     currentRoute.query = { tab: "servers" };
