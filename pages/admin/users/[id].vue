@@ -542,7 +542,7 @@ onMounted(load);
             </template>
           </div>
         </div>
-        <dl class="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:pl-16">
+        <dl class="flex flex-wrap gap-x-6 gap-y-2 text-xs sm:pl-14">
           <div class="flex items-center gap-2">
             <dt class="text-muted-foreground">
               {{ t("admin.userDetail.tabs.teams") }}
