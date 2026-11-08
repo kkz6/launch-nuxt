@@ -401,6 +401,38 @@ describe("Navbar", () => {
     );
   });
 
+  it("keeps the admin navigation mounted across directory and user routes", async () => {
+    currentRoute.path = "/admin/servers";
+    const wrapper = mountNavbar();
+    const navigation = wrapper.getComponent({ name: "AdminNavigation" });
+    const instance = navigation.vm;
+    expect(wrapper.find('button[aria-label="Search servers"]').exists()).toBe(
+      true,
+    );
+
+    for (const path of [
+      "/admin/failures",
+      "/admin/users/customer",
+      "/admin/servers",
+    ]) {
+      currentRoute.path = path;
+      await nextTick();
+      const currentNavigation = wrapper.getComponent({
+        name: "AdminNavigation",
+      });
+      expect(currentNavigation.vm).toBe(instance);
+      expect(wrapper.find('button[aria-label="Search servers"]').exists()).toBe(
+        path === "/admin/servers",
+      );
+      expect(currentNavigation.attributes("extendborder")).toBe(
+        String(path === "/admin/users/customer"),
+      );
+      expect(wrapper.findComponent({ name: "LayoutTabStrip" }).exists()).toBe(
+        path === "/admin/users/customer",
+      );
+    }
+  });
+
   it("uses a second shared tab row for user sections with the user's name first", async () => {
     currentRoute.path = "/admin/users/customer";
     currentRoute.query = { tab: "servers" };

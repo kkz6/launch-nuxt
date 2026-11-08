@@ -2048,9 +2048,14 @@ const navigateTo = (path: string) => {
           >
         </li>
       </ol>
-      <div v-if="isAdminServerDirectory" class="flex items-center gap-3">
-        <AdminNavigation class="min-w-0 flex-1" />
-        <div class="flex shrink-0 items-center">
+      <div
+        :class="isAdminServerDirectory ? 'flex items-center gap-3' : undefined"
+      >
+        <AdminNavigation
+          :class="isAdminServerDirectory ? 'min-w-0 flex-1' : undefined"
+          :extend-border="isAdminUserDetail"
+        />
+        <div v-if="isAdminServerDirectory" class="flex shrink-0 items-center">
           <TooltipProvider :delay-duration="200">
             <Tooltip>
               <TooltipTrigger as-child>
@@ -2076,7 +2081,6 @@ const navigateTo = (path: string) => {
           </TooltipProvider>
         </div>
       </div>
-      <AdminNavigation v-else :extend-border="isAdminUserDetail" />
       <LayoutTabStrip
         v-if="isAdminUserDetail"
         :tabs="adminUserTabs"
