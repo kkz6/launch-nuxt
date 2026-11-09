@@ -403,11 +403,15 @@ describe("admin user management", () => {
       resource: "server",
       action: "deletion_failed",
       server_id: "server-1",
+      error_code: "provider_forbidden",
+      error: "raw-provider-error-with-secret",
     });
     await refresh();
     await flushPromises();
     expect(mocks.error).toHaveBeenCalledOnce();
-    expect(mocks.error).toHaveBeenCalledWith("Failed to delete server");
+    expect(mocks.error).toHaveBeenCalledWith(
+      "The cloud provider denied deletion. Check the connection permissions and try again.",
+    );
     expect(
       page.getComponent({ name: "UserServersTable" }).props("servers"),
     ).toEqual([server]);

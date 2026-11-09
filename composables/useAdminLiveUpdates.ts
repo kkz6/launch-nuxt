@@ -14,6 +14,7 @@ export type AdminResource =
 export interface AdminResourceChange {
   resource: AdminResource;
   action: string;
+  error_code?: "provider_unauthorized" | "provider_forbidden";
   user_id?: string;
   server_id?: string;
   site_id?: string;

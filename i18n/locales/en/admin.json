@@ -180,6 +180,14 @@
       "deleteRequested": "Server deletion requested",
       "deleted": "Server deleted",
       "deleteFailed": "Failed to delete server",
+      "deleteProviderUnauthorized": "The cloud provider rejected the saved credentials. Update the provider connection and try again.",
+      "deleteProviderForbidden": "The cloud provider denied deletion. Check the connection permissions and try again.",
+      "removeRecordTitle": "Remove from launchctl",
+      "removeRecordDescription": "Remove \"{name}\" from launchctl? This action cannot be undone.",
+      "removeRecordImpact": "Only the launchctl record will be removed. The cloud server, its files, services, and provider billing remain unchanged.",
+      "removeRecordHelp": "Type the server name to confirm removing its launchctl record:",
+      "removedRecord": "Server removed from launchctl",
+      "removeRecordFailed": "Failed to remove the server from launchctl",
       "deleting": "Deleting…"
     },
     "siteDetail": {

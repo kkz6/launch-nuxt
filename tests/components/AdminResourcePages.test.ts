@@ -261,9 +261,13 @@ describe("admin resource page presentation", () => {
       resource: "server",
       action: "deletion_failed",
       server_id: "server-1",
+      error_code: "provider_unauthorized",
+      error: "raw-provider-error-with-secret",
     });
     await refresh();
-    expect(mocks.error).toHaveBeenCalledWith("Failed to delete server");
+    expect(mocks.error).toHaveBeenCalledWith(
+      "The cloud provider rejected the saved credentials. Update the provider connection and try again.",
+    );
     expect(mocks.refresh).toHaveBeenCalledOnce();
     expect(wrapper.text()).toContain("production-web");
     expect(navigate).not.toHaveBeenCalled();

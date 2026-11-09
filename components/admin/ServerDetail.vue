@@ -2,6 +2,7 @@
 import { computed, onMounted, onScopeDispose, ref } from "vue";
 import { toast } from "vue-sonner";
 import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
+import { serverDeletionErrorKey } from "~/utils/serverDeletion";
 import type { AdminServerDetail } from "~/types";
 import { adminService } from "~/services/adminService";
 import { Badge } from "~/components/ui/badge";
@@ -27,6 +28,7 @@ const isLoading = ref(true);
 const notFound = ref(false);
 const loadError = ref(false);
 const deleteLoading = ref(false);
+const removalMode = ref<"delete" | "remove_record">("delete");
 const deleteError = ref("");
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
@@ -126,46 +128,77 @@ async function load(): Promise<void> {
   }
 }
 
-async function deleteServer(): Promise<void> {
+async function deleteServer(
+  mode: "delete" | "remove_record" = "delete",
+): Promise<void> {
   if (
     !isSuperAdmin.value ||
     !server.value ||
+    (mode === "remove_record" && server.value.provider === "custom_server") ||
     deletionBlockedReason.value ||
     deleteLoading.value ||
     !confirmationDialog.value
   )
     return;
 
+  const removeRecord = mode === "remove_record";
+  const confirmationName = server.value.name;
+  const actionTitle = t(
+    removeRecord
+      ? "admin.serverDetail.removeRecordTitle"
+      : "admin.serverDetail.deleteTitle",
+  );
   deleteError.value = "";
   const result = await confirmationDialog.value.show({
-    title: t("admin.serverDetail.deleteTitle"),
-    description: t("admin.serverDetail.deleteDescription", {
-      name: server.value.name,
-    }),
-    warning: deletionImpact.value,
-    confirmText: t("admin.serverDetail.deleteTitle"),
+    title: actionTitle,
+    description: t(
+      removeRecord
+        ? "admin.serverDetail.removeRecordDescription"
+        : "admin.serverDetail.deleteDescription",
+      {
+        name: confirmationName,
+      },
+    ),
+    warning: removeRecord
+      ? t("admin.serverDetail.removeRecordImpact")
+      : deletionImpact.value,
+    confirmText: actionTitle,
     cancelText: t("admin.common.cancel"),
     destructive: true,
-    helpText: t("admin.serverDetail.deleteHelp"),
-    inputVerificationText: server.value.name,
+    helpText: t(
+      removeRecord
+        ? "admin.serverDetail.removeRecordHelp"
+        : "admin.serverDetail.deleteHelp",
+    ),
+    inputVerificationText: confirmationName,
   });
   if (!result.ok || deleteLoading.value) return;
 
   deleteLoading.value = true;
+  removalMode.value = mode;
   try {
-    const res = await adminService.deleteServer(serverId, server.value.name);
+    const res = removeRecord
+      ? await adminService.removeServerRecord(serverId, confirmationName)
+      : await adminService.deleteServer(serverId, confirmationName);
     toast.success(
       t(
-        res.data.status === "deleted"
-          ? "admin.serverDetail.deleted"
-          : "admin.serverDetail.deleteRequested",
+        removeRecord
+          ? "admin.serverDetail.removedRecord"
+          : res.data.status === "deleted"
+            ? "admin.serverDetail.deleted"
+            : "admin.serverDetail.deleteRequested",
       ),
     );
     emit("deleted");
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
     deleteError.value =
-      err.data?.message || t("admin.serverDetail.deleteFailed");
+      err.data?.message ||
+      t(
+        removeRecord
+          ? "admin.serverDetail.removeRecordFailed"
+          : "admin.serverDetail.deleteFailed",
+      );
     if (!disposed) await load();
   } finally {
     deleteLoading.value = false;
@@ -178,7 +211,7 @@ useAdminLiveUpdates(load, {
   paused: deleteLoading,
   onChange(change) {
     if (change.resource === "server" && change.action === "deletion_failed") {
-      deleteError.value = t("admin.serverDetail.deleteFailed");
+      deleteError.value = t(serverDeletionErrorKey(change.error_code));
       toast.error(deleteError.value);
     }
   },
@@ -457,10 +490,10 @@ onMounted(load);
           size="sm"
           class="border-destructive/25 text-destructive hover:bg-destructive/5 hover:text-destructive"
           :disabled="deleteLoading || !!deletionBlockedReason"
-          @click="deleteServer"
+          @click="deleteServer()"
         >
           <Icon
-            v-if="deleteLoading"
+            v-if="deleteLoading && removalMode === 'delete'"
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
@@ -470,6 +503,28 @@ onMounted(load);
               : t("admin.serverDetail.deleteTitle")
           }}
         </Button>
+        <div
+          v-if="server.provider !== 'custom_server'"
+          class="space-y-3 border-t pt-4"
+        >
+          <p class="text-sm text-muted-foreground">
+            {{ t("admin.serverDetail.removeRecordImpact") }}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            class="border-destructive/25 text-destructive hover:bg-destructive/5 hover:text-destructive"
+            :disabled="deleteLoading || !!deletionBlockedReason"
+            @click="deleteServer('remove_record')"
+          >
+            <Icon
+              v-if="deleteLoading && removalMode === 'remove_record'"
+              name="lucide:loader-2"
+              class="mr-2 h-4 w-4 animate-spin"
+            />
+            {{ t("admin.serverDetail.removeRecordTitle") }}
+          </Button>
+        </div>
       </section>
     </div>
   </div>

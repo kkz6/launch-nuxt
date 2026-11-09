@@ -114,6 +114,20 @@ describe("admin live invalidation", () => {
     expect(onChange).toHaveBeenCalledOnce();
   });
 
+  it("forwards provider failure codes with the matching invalidation", async () => {
+    const onChange = vi.fn();
+    const { refresh } = start(vi.fn(), { onChange });
+    const failed = change({
+      resource: "server",
+      action: "deletion_failed",
+      error_code: "provider_unauthorized",
+    });
+    receive(failed, "admin.resources");
+    expect(onChange).toHaveBeenCalledWith(failed);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(refresh).toHaveBeenCalledOnce();
+  });
+
   it("reconciles after reconnect and cleans up channel, event handler and queued work", async () => {
     const { scope, refresh } = start();
     connected.value = false;

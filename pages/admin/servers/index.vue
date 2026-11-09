@@ -5,6 +5,7 @@ import { enUS, ja } from "date-fns/locale";
 import { toast } from "vue-sonner";
 import { ListboxFilter } from "reka-ui";
 import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
+import { serverDeletionErrorKey } from "~/utils/serverDeletion";
 import { useTable } from "~/composables/useTable";
 import { getProviderIcon } from "~/composables/useServerTypeRules";
 import TablePagination from "~/components/data-table/TablePagination.vue";
@@ -127,7 +128,7 @@ useAdminLiveUpdates(refresh, {
   resources: ["server", "site", "docker", "user", "team"],
   onChange(change) {
     if (change.resource === "server" && change.action === "deletion_failed") {
-      toast.error(t("admin.serverDetail.deleteFailed"));
+      toast.error(t(serverDeletionErrorKey(change.error_code)));
     }
   },
 });

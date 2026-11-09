@@ -180,6 +180,14 @@
       "deleteRequested": "サーバーの削除を要求しました",
       "deleted": "サーバーを削除しました",
       "deleteFailed": "サーバーを削除できませんでした",
+      "deleteProviderUnauthorized": "保存されている認証情報がクラウドプロバイダーに拒否されました。プロバイダー接続を更新して、もう一度お試しください。",
+      "deleteProviderForbidden": "クラウドプロバイダーが削除を拒否しました。接続の権限を確認して、もう一度お試しください。",
+      "removeRecordTitle": "launchctl から登録を削除",
+      "removeRecordDescription": "「{name}」の登録を launchctl から削除しますか？この操作は取り消せません。",
+      "removeRecordImpact": "削除されるのは launchctl の登録のみです。クラウドサーバー、ファイル、サービス、プロバイダーの課金は変更されません。",
+      "removeRecordHelp": "登録の削除を確認するため、サーバー名を入力してください：",
+      "removedRecord": "launchctl からサーバーの登録を削除しました",
+      "removeRecordFailed": "launchctl からサーバーの登録を削除できませんでした",
       "deleting": "削除中…"
     },
     "siteDetail": {

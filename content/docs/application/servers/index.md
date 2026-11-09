@@ -200,3 +200,9 @@ In **Admin → Servers**, open the server and select **Delete server**. This adm
 - **Cloud server:** uses the saved provider credentials and the provider API to request deletion of the instance and its data in the background. A successful request is not proof of completion. If provider deletion fails, the server record is retained so the failure can be investigated and deletion retried. The admin server list and user page report delayed failures through live updates.
 
 AWS instance deletion is currently unsupported; its deletion job fails and retains the server record. Deletion cannot be undone.
+
+### Remove from launchctl
+
+If cloud provider access has been revoked and you only want to remove the server from launchctl, open its admin details and select **Remove from launchctl**. This separate action requires `super_admin` access, the exact server name, no remaining sites or Docker projects, and a lifecycle state that allows deletion.
+
+This removes only the launchctl record and makes no provider request. The cloud machine, its data, and provider billing are unchanged; manage them directly with the provider. Use **Delete server** when you intend to destroy the cloud instance.

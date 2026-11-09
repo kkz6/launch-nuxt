@@ -211,6 +211,17 @@ export const adminService = {
     });
   },
 
+  removeServerRecord: (id: string | number, confirmationName: string) => {
+    const { fetch } = useApi();
+    return fetch<ApiResponse<{ server_id: string; status: "removed" }>>(
+      `/admin/servers/${id}/record`,
+      {
+        method: "DELETE",
+        body: { confirmation_name: confirmationName },
+      },
+    );
+  },
+
   serverLogs: (serverId: string) => {
     const { get } = useApi();
     return get<PaginatedAdminResponse<ServerLog>>(

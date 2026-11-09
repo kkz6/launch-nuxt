@@ -3,6 +3,7 @@ import { computed, onMounted, onScopeDispose, ref } from "vue";
 import { differenceInCalendarDays } from "date-fns";
 import { toast } from "vue-sonner";
 import { useAdminLiveUpdates } from "~/composables/useAdminLiveUpdates";
+import { serverDeletionErrorKey } from "~/utils/serverDeletion";
 import type {
   AdminTeam,
   AdminUserRow,
@@ -455,7 +456,7 @@ useAdminLiveUpdates(
     paused: mutationBusy,
     onChange(change) {
       if (change.resource === "server" && change.action === "deletion_failed") {
-        toast.error(t("admin.serverDetail.deleteFailed"));
+        toast.error(t(serverDeletionErrorKey(change.error_code)));
       }
     },
   },
