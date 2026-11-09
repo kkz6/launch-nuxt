@@ -55,6 +55,10 @@ beforeEach(() => {
   vi.stubGlobal("computed", computed);
   vi.stubGlobal("onMounted", onMounted);
   vi.stubGlobal("useI18n", createI18nStub);
+  vi.stubGlobal("useCan", () => ({
+    canEdit: ref(true),
+    canManageTeam: ref(true),
+  }));
   vi.stubGlobal("useAuth", () => ({ user: ref(null) }));
   vi.stubGlobal("useRequestURL", () => new URL("https://launchctl.io"));
   vi.stubGlobal("$api", api);

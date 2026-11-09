@@ -13,6 +13,7 @@ const props = withDefaults(defineProps<Props>(), {
   autoDeployment: false,
 });
 const { t } = useI18n();
+const { canEdit } = useCan();
 
 const emit = defineEmits<{
   updated: [];
@@ -30,6 +31,7 @@ watch(
 );
 
 const toggleAutodeploy = async (enabled: boolean) => {
+  if (!canEdit.value || isLoading.value) return;
   isLoading.value = true;
   try {
     await $api(`/servers/${props.serverId}/sites/${props.siteId}/autodeploy`, {
@@ -51,7 +53,7 @@ const toggleAutodeploy = async (enabled: boolean) => {
 </script>
 
 <template>
-  <div class="flex items-center gap-2">
+  <div v-if="canEdit" class="flex items-center gap-2">
     <Switch
       :model-value="isEnabled"
       :disabled="isLoading"

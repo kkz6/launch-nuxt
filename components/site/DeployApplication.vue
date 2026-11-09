@@ -33,6 +33,7 @@ const props = withDefaults(defineProps<Props>(), {
   isDeploying: false,
 });
 const { t } = useI18n();
+const { canEdit } = useCan();
 
 // `deployed` carries the freshly-created deployment so parents can update
 // site.latest_deployment optimistically rather than waiting for the
@@ -53,6 +54,7 @@ watch(
 );
 
 const deploy = async () => {
+  if (!canEdit.value || isLoading.value) return;
   isLoading.value = true;
   try {
     const res = await $api<{ data: Deployment }>(
@@ -78,7 +80,7 @@ const modifierKey = computed(() => {
 </script>
 
 <template>
-  <AlertDialog v-model:open="isOpen">
+  <AlertDialog v-if="canEdit" v-model:open="isOpen">
     <template v-if="asIcon">
       <TooltipProvider :delay-duration="0">
         <Tooltip>

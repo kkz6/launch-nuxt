@@ -20,6 +20,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 const { t } = useI18n();
+const { canEdit } = useCan();
 const emit = defineEmits<{
   (e: "updated"): void;
 }>();
@@ -194,6 +195,7 @@ const confirmationDialog = ref<InstanceType<
 > | null>(null);
 
 const rotateToken = async () => {
+  if (!canEdit.value || isRotating.value) return;
   isRotating.value = true;
   try {
     await dockerService.composes.rotateGhaToken(
@@ -213,6 +215,7 @@ const rotateToken = async () => {
 };
 
 const resyncWorkflow = async () => {
+  if (!canEdit.value || isResyncing.value) return;
   isResyncing.value = true;
   try {
     await dockerService.composes.resyncGhaWorkflow(
@@ -240,6 +243,7 @@ watch(
 );
 const isTogglingAutoDeploy = ref(false);
 const setAutoDeploy = async (enabled: boolean) => {
+  if (!canEdit.value || isTogglingAutoDeploy.value) return;
   const prev = autoDeploy.value;
   autoDeploy.value = enabled;
   isTogglingAutoDeploy.value = true;
@@ -268,7 +272,7 @@ const setAutoDeploy = async (enabled: boolean) => {
 };
 
 const disableGHA = async () => {
-  if (!confirmationDialog.value) return;
+  if (!canEdit.value || !confirmationDialog.value) return;
   const result = await confirmationDialog.value.show({
     title: t("workload.githubActions.disableTitle"),
     description: t("workload.githubActions.disableDescription"),
@@ -276,7 +280,7 @@ const disableGHA = async () => {
     cancelText: t("workload.githubActions.keepEnabled"),
     destructive: true,
   });
-  if (!result.ok) return;
+  if (!result.ok || !canEdit.value) return;
   isDisabling.value = true;
   try {
     await dockerService.composes.disableGha(
@@ -497,7 +501,7 @@ useDockerComposeEvents(teamId, (data, event) => {
     </section>
 
     <!-- Maintenance -->
-    <section class="space-y-3">
+    <section v-if="canEdit" class="space-y-3">
       <div class="border-b pb-2">
         <h3
           class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
@@ -614,7 +618,7 @@ useDockerComposeEvents(teamId, (data, event) => {
     </section>
 
     <!-- Danger zone (boxed) -->
-    <div class="rounded-lg border border-red-500/30 bg-red-500/5">
+    <div v-if="canEdit" class="rounded-lg border border-red-500/30 bg-red-500/5">
       <div class="border-b border-red-500/20 px-4 py-2.5">
         <h3
           class="text-xs font-semibold uppercase tracking-wider text-red-700 dark:text-red-400"

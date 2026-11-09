@@ -14,6 +14,7 @@ const { setCurrentTeamId } = useApi();
 const { refreshActiveTeam } = useActiveTeamRefresh();
 const { teams, loading, loadTeams } = useTeams();
 const createOpen = ref(false);
+const isSwitching = ref(false);
 const repeatedNames = computed(() => duplicateTeamNames(teams.value));
 
 const localizedTeamQualifier = (team: Team) => {
@@ -38,12 +39,16 @@ const fetchTeams = async () => {
 };
 
 const switchTeam = async (teamId: string) => {
-  if (teamId === String(user.value?.current_team_id)) return;
+  if (isSwitching.value || teamId === String(user.value?.current_team_id)) return;
+  isSwitching.value = true;
   const team = teams.value.find((item) => item.id === teamId);
   try {
     await $api(`/teams/${teamId}/switch`, { method: "POST" });
+    // The old team's role must not authorize controls against the new team.
+    if (user.value) user.value.role = undefined;
     setCurrentTeamId(teamId);
-    await fetchUser();
+    const updatedUser = await fetchUser();
+    if (!updatedUser) throw new Error("Could not load the selected team");
     refreshActiveTeam();
     await navigateTo("/dashboard");
     toast.success(
@@ -53,6 +58,8 @@ const switchTeam = async (teamId: string) => {
     );
   } catch {
     toast.error(t("common.teams.switchFailed"));
+  } finally {
+    isSwitching.value = false;
   }
 };
 
@@ -71,6 +78,7 @@ void fetchTeams();
       <DropdownMenuItem
         v-for="team in teams"
         :key="team.id"
+        :disabled="isSwitching"
         class="cursor-pointer justify-between gap-2 rounded-md px-2 py-1.5 text-sm"
         @click="switchTeam(team.id)"
       >
@@ -86,6 +94,7 @@ void fetchTeams();
         />
       </DropdownMenuItem>
       <DropdownMenuItem
+        :disabled="isSwitching"
         class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
         @click="createOpen = true"
       >

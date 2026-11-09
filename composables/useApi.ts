@@ -1,4 +1,5 @@
 import { useLocalePreference } from "~/composables/useLocalePreference";
+import { localizePermissionError } from "~/utils/permissionError";
 
 const ACCESS_TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "auth_refresh_token";
@@ -61,6 +62,7 @@ export const useApi = () => {
   const config = useRuntimeConfig();
   const baseURL = config.public.apiBase as string;
   const { getEffectiveLocale } = useLocalePreference();
+  const i18n = useNuxtApp().$i18n as { t(key: string): string };
 
   const getCookieValue = (key: string): string | null => {
     if (import.meta.server) return null;
@@ -176,6 +178,13 @@ export const useApi = () => {
         ...(teamId ? { "X-Team-ID": teamId } : {}),
         ...options.headers,
       },
+      onResponseError({
+        response,
+      }: {
+        response: { status: number; _data?: unknown };
+      }) {
+        localizePermissionError(response, (key) => i18n.t(key));
+      },
     };
 
     try {
@@ -282,6 +291,7 @@ export function useApiQuery<T>(
     getEffectiveLocale,
   } = useApi();
   const config = useRuntimeConfig();
+  const i18n = useNuxtApp().$i18n as { t(key: string): string };
   const token = getAccessToken();
   const teamId = getCurrentTeamId();
 
@@ -302,13 +312,15 @@ export function useApiQuery<T>(
       ...options.headers,
     },
     onResponseError({ response }) {
+      localizePermissionError(response, (key) => i18n.t(key));
       if (response.status === 401) {
         clearTokens();
         redirectToLogin();
       }
 
       const data = response._data as
-        { code?: string; message?: string } | undefined;
+        | { code?: string; message?: string }
+        | undefined;
       if (hasInvalidTeamContext(data)) {
         clearCurrentTeamId();
         navigateTo("/servers");

@@ -7,6 +7,7 @@ import Deployments from "../../components/site/Deployments.vue";
 import { useDeploymentEvents } from "~/composables/useChannelEvents";
 import type { Deployment } from "~/types";
 import { createI18nStub } from "../helpers/i18n";
+import { useCan } from "../../composables/useCan";
 
 vi.mock("~/composables/useChannelEvents", () => ({
   useDeploymentEvents: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("vue-sonner", () => ({
 }));
 
 const api = vi.fn();
+const user = ref({ current_team_id: "team-id", role: "owner" });
 const triggeredDeployment = ref<Deployment | null>(null);
 const previousDeployment = {
   id: "previous-deployment",
@@ -41,6 +43,7 @@ let wrapper: ReturnType<typeof mount>;
 
 beforeEach(() => {
   vi.useFakeTimers();
+  user.value = { current_team_id: "team-id", role: "owner" };
   vi.mocked(useDeploymentEvents).mockClear();
   triggeredDeployment.value = null;
   api.mockReset().mockImplementation((path: string) => {
@@ -64,8 +67,10 @@ beforeEach(() => {
   vi.stubGlobal("definePageMeta", vi.fn());
   vi.stubGlobal("useHead", vi.fn());
   vi.stubGlobal("useI18n", createI18nStub);
+  vi.stubGlobal("useCan", useCan);
+  vi.stubGlobal("useImpersonation", () => ({ isImpersonating: ref(false) }));
   vi.stubGlobal("useAuth", () => ({
-    user: ref({ current_team_id: "team-id" }),
+    user,
   }));
   vi.stubGlobal("useRequestURL", () => new URL("https://launchctl.io"));
   vi.stubGlobal("useRoute", () => ({
@@ -119,6 +124,25 @@ afterEach(() => {
 });
 
 describe("manual site deployment flow", () => {
+  it("hides Deploy after switching from an owned team to a Member team", async () => {
+    await flushPromises();
+    expect(wrapper.find('[data-test="confirm-deploy"]').exists()).toBe(true);
+    user.value = { current_team_id: "client", role: "member" };
+    await flushPromises();
+    expect(wrapper.find('[data-test="confirm-deploy"]').exists()).toBe(false);
+    expect(wrapper.findComponent(Deployments).exists()).toBe(true);
+  });
+
+  it("does not deploy when the role changes before the confirmation click", async () => {
+    await flushPromises();
+    const confirm = wrapper.get('[data-test="confirm-deploy"]');
+    user.value = { current_team_id: "client", role: "member" };
+    await confirm.trigger("click");
+    expect(
+      api.mock.calls.some(([, options]) => options?.method === "POST"),
+    ).toBe(false);
+  });
+
   it("shows the new commit when Deploy returns, without refreshing the page", async () => {
     await flushPromises();
     let resolveDeploy!: (value: { data: unknown }) => void;

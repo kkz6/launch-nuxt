@@ -10,10 +10,8 @@ import type { TeamRole } from "~/types";
 //   editor          → create / update / deploy, but NOT delete
 //   admin / owner   → full, including delete + team management
 //
-// Roles come from /auth/user (user.role). A staff member impersonating
-// is intentionally NOT special-cased here — impersonation is read-only
-// and enforced server-side, so the UI should reflect the impersonated
-// user's actual team role.
+// Roles come from /auth/user. Spectate sessions remain read-only even when
+// the target user owns the team. Unknown roles hide write actions until loaded.
 
 const ROLE_RANK: Record<TeamRole, number> = {
   owner: 4,
@@ -24,22 +22,16 @@ const ROLE_RANK: Record<TeamRole, number> = {
 
 export const useCan = () => {
   const { user } = useAuth();
+  const { isImpersonating } = useImpersonation();
 
   // Raw role of the caller in their current team, or undefined when the
   // backend hasn't provided it (e.g. older API, or the role response not
   // yet rolled out).
   const role = computed<TeamRole | undefined>(() => user.value?.role);
 
-  // Fail OPEN when the role is unknown. The gate is purely cosmetic — the
-  // backend always enforces permissions via middleware.Can(...) — so an
-  // absent role degrades to today's behaviour (all buttons visible, writes
-  // still 403 for members) rather than locking admins/owners out of the UI
-  // during a frontend-ahead-of-backend deploy window. Once the role is
-  // present, gating applies normally.
+  // This controls presentation only; the API still authorizes every request.
   const atLeast = (min: TeamRole) => {
-    if (!role.value) {
-      return true;
-    }
+    if (isImpersonating.value || !role.value) return false;
     return (ROLE_RANK[role.value] ?? 0) >= (ROLE_RANK[min] ?? 0);
   };
 
@@ -48,7 +40,7 @@ export const useCan = () => {
   const canDelete = computed(() => atLeast("admin")); // destructive actions
   const canManageTeam = computed(() => atLeast("admin")); // members / invites / settings
   const isOwner = computed(() => role.value === "owner");
-  const isReadOnly = computed(() => !canEdit.value); // members only
+  const isReadOnly = computed(() => !canEdit.value); // members, unresolved roles, and Spectate
 
   return {
     role,

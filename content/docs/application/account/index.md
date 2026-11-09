@@ -187,6 +187,8 @@ In **Invitations → Invite user**, choose a plan and use the calendar to select
 
 Open **Admin → Users** and select a user. A second navigation row starts with the user’s name, followed by **Teams**, **Servers**, and **Sites**. The name tab contains account details, **Staff access**, and **Subscriptions**; resource tabs open directly to their content. **Spectate** and the account actions appear only on the name tab. There, super administrators can open **More actions** (the ellipsis button) to **Suspend**, **Reactivate**, or **Delete user**. Site deletion is available on the intended site row.
 
+**Spectate** always opens a read-only session: you can inspect the account, but cannot deploy or change its resources. Exit Spectate to make changes using your own account and its permissions in the selected team. See [team roles](/docs/application/teams#member-roles).
+
 Super administrators can change **Staff access** to **Regular user**, **Support**, or **Super admin**, select **Save role**, and confirm the change. Regular user removes access to the admin panel; it does not change team permissions. Role changes are audited and apply to subsequent admin requests.
 
 You cannot change your own staff role or demote the last super administrator. Ask another super administrator to change your role when needed. Support staff can view user details but cannot change roles or delete users or sites.

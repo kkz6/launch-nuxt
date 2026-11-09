@@ -14,6 +14,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const { t } = useI18n();
+const { canEdit, canManageTeam } = useCan();
 const emit = defineEmits<{
   "update:site": [site: Site];
 }>();
@@ -171,7 +172,7 @@ const secondFinishedIndex = computed(() => {
 });
 
 const canRollback = (deployment: Deployment, index: number) => {
-  if (!props.site.zero_downtime_deployment) return false;
+  if (!canEdit.value || !props.site.zero_downtime_deployment) return false;
   if (deployment.status !== "finished") return false;
   // Only allow rollback to the second most recent finished deployment (the last successful one before current)
   if (index !== secondFinishedIndex.value) return false;
@@ -201,7 +202,7 @@ const fetchDeployments = async () => {
 };
 
 const handleRollback = async (deployment: Deployment) => {
-  if (!confirmationDialog.value) return;
+  if (!canEdit.value || !confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
     title: t("site.deployments.rollbackTitle"),
@@ -210,12 +211,12 @@ const handleRollback = async (deployment: Deployment) => {
     cancelText: t("site.common.cancel"),
   });
 
-  if (!result.ok) return;
+  if (!result.ok || !canEdit.value) return;
 
   rollingBackId.value = deployment.id;
   try {
     await $api(
-      `/servers/${props.serverId}/sites/${props.siteId}/deployments/${deployment.id}/rollback`,
+      `/servers/${props.serverId}/sites/${props.siteId}/rollback/${deployment.id}`,
       {
         method: "POST",
       },
@@ -242,7 +243,7 @@ const deployWebhookUrl = computed(
 const isRegenerating = ref(false);
 
 const handleRegenerateToken = async () => {
-  if (!confirmationDialog.value) return;
+  if (!canManageTeam.value || !confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
     title: t("site.deployments.regenerateTitle"),
@@ -251,7 +252,7 @@ const handleRegenerateToken = async () => {
     cancelText: t("site.common.cancel"),
   });
 
-  if (!result.ok) return;
+  if (!result.ok || !canManageTeam.value) return;
 
   isRegenerating.value = true;
   try {
@@ -301,7 +302,10 @@ onMounted(fetchDeployments);
     </div>
 
     <template v-else>
-      <div class="mb-4 rounded-lg border bg-card p-4">
+      <div
+        v-if="canEdit && site.deploy_token"
+        class="mb-4 rounded-lg border bg-card p-4"
+      >
         <p class="mb-2 text-sm text-muted-foreground">
           {{ t("site.deployments.webhookDescription") }}
         </p>
@@ -320,6 +324,7 @@ onMounted(fetchDeployments);
             <Icon name="lucide:copy" class="block size-4" />
           </Button>
           <Button
+            v-if="canManageTeam"
             variant="ghost"
             size="sm"
             :title="t('site.deployments.regenerate')"

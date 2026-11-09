@@ -3,6 +3,8 @@ title: Deployment Commands
 description: Deploy, wait, inspect logs, roll back and cancel queued deployments
 ---
 
+Deploying, rolling back, and cancelling queued deployments require Editor, Admin, or Owner access in the selected team. Members can inspect deployment history and logs. Check `lctl whoami --json` and the selected team after switching accounts or teams; permissions do not carry across teams. Spectate sessions are always read-only. Ask the team owner to change your role if needed.
+
 ## Trigger and wait
 
 ```bash

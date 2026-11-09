@@ -2,6 +2,8 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { computed, onMounted, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TeamSwitcher from "../../components/shared/TeamSwitcher.vue";
+import { useCan } from "../../composables/useCan";
+import type { TeamRole } from "~/types";
 
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
@@ -17,7 +19,11 @@ vi.mock("vue-sonner", () => ({
   toast: { success: mocks.success, error: mocks.error },
 }));
 
-const user = ref({ id: "user", current_team_id: "personal" });
+const user = ref({
+  id: "user",
+  current_team_id: "personal",
+  role: "owner" as TeamRole | undefined,
+});
 const states = new Map<string, ReturnType<typeof ref<number>>>();
 const teams = [
   {
@@ -88,6 +94,7 @@ const mountSwitcher = () =>
 describe("team switcher", () => {
   beforeEach(() => {
     states.clear();
+    user.value = { id: "user", current_team_id: "personal", role: "owner" };
     teamState.value = [];
     teamLoading.value = true;
     loadTeams.mockClear();
@@ -95,7 +102,14 @@ describe("team switcher", () => {
       if (url === "/teams") return Promise.resolve({ data: teams });
       return Promise.resolve({ data: null });
     });
-    mocks.fetchUser.mockReset().mockResolvedValue(undefined);
+    mocks.fetchUser.mockReset().mockImplementation(async () => {
+      user.value = {
+        id: "user",
+        current_team_id: "01TEAM123456",
+        role: "member",
+      };
+      return user.value;
+    });
     mocks.setCurrentTeamId.mockReset();
     mocks.reconnect.mockReset();
     mocks.navigateTo.mockReset().mockResolvedValue(undefined);
@@ -110,6 +124,7 @@ describe("team switcher", () => {
       setCurrentTeamId: mocks.setCurrentTeamId,
     }));
     vi.stubGlobal("useAuth", () => ({ user, fetchUser: mocks.fetchUser }));
+    vi.stubGlobal("useImpersonation", () => ({ isImpersonating: ref(false) }));
     vi.stubGlobal("useI18n", () => ({ t: translate }));
     vi.stubGlobal("useWebSocket", () => ({ reconnect: mocks.reconnect }));
     vi.stubGlobal("useTeams", () => ({
@@ -161,6 +176,105 @@ describe("team switcher", () => {
     ]);
     expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
     expect(mocks.success).toHaveBeenCalledWith("Switched to Launch");
+  });
+
+  it("clears the old role before changing team context and waits for the new role", async () => {
+    let finishFetch!: () => void;
+    mocks.fetchUser.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishFetch = () => {
+            user.value = {
+              id: "user",
+              current_team_id: "01TEAM123456",
+              role: "member",
+            };
+            resolve(user.value);
+          };
+        }),
+    );
+    const access = useCan();
+    const wrapper = mountSwitcher();
+    await flushPromises();
+    expect(access.canEdit.value).toBe(true);
+    mocks.setCurrentTeamId.mockImplementation(() => {
+      expect(access.canEdit.value).toBe(false);
+      expect(user.value.role).toBeUndefined();
+    });
+
+    const switching = setupState(wrapper).switchTeam("01TEAM123456");
+    await flushPromises();
+    expect(access.canEdit.value).toBe(false);
+    expect(
+      wrapper
+        .findAll("button")
+        .every((button) => button.attributes("disabled") !== undefined),
+    ).toBe(true);
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
+    await setupState(wrapper).switchTeam("another-team");
+    expect(
+      mocks.api.mock.calls.filter(([, options]) => options?.method === "POST"),
+    ).toHaveLength(1);
+
+    finishFetch();
+    await switching;
+    expect(user.value.role).toBe("member");
+    expect(access.canEdit.value).toBe(false);
+    expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
+    wrapper.unmount();
+  });
+
+  it.each(["reject", "empty"])(
+    "does not restore the old rights when fetching the selected team fails: %s",
+    async (failure) => {
+      const wrapper = mountSwitcher();
+      await flushPromises();
+      if (failure === "reject")
+        mocks.fetchUser.mockRejectedValueOnce(new Error("profile failed"));
+      else mocks.fetchUser.mockResolvedValueOnce(null);
+      const access = useCan();
+      await setupState(wrapper).switchTeam("01TEAM123456");
+      expect(access.canEdit.value).toBe(false);
+      expect(user.value.role).toBeUndefined();
+      expect(mocks.setCurrentTeamId).toHaveBeenCalledWith("01TEAM123456");
+      expect(mocks.success).not.toHaveBeenCalled();
+      expect(mocks.error).toHaveBeenCalledWith("Failed to switch team");
+      wrapper.unmount();
+    },
+  );
+
+  it("retains the original role if the switch itself is rejected", async () => {
+    const wrapper = mountSwitcher();
+    await flushPromises();
+    mocks.api.mockRejectedValueOnce(new Error("not a team member"));
+    const access = useCan();
+    await setupState(wrapper).switchTeam("01TEAM123456");
+    expect(access.canEdit.value).toBe(true);
+    expect(user.value.role).toBe("owner");
+    expect(mocks.setCurrentTeamId).not.toHaveBeenCalled();
+    expect(mocks.fetchUser).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it("ignores concurrent clicks until the team switch finishes", async () => {
+    let finishSwitch!: () => void;
+    const wrapper = mountSwitcher();
+    await flushPromises();
+    mocks.api.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishSwitch = () => resolve({ data: null });
+        }),
+    );
+    const switching = setupState(wrapper).switchTeam("01TEAM123456");
+    await setupState(wrapper).switchTeam("another-team");
+    expect(
+      mocks.api.mock.calls.filter(([, options]) => options?.method === "POST"),
+    ).toHaveLength(1);
+    finishSwitch();
+    await switching;
+    expect(mocks.fetchUser).toHaveBeenCalledOnce();
+    wrapper.unmount();
   });
 
   it("does not switch the already active team", async () => {

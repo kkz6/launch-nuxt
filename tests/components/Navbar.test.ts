@@ -41,6 +41,8 @@ const activeUser = ref({
   onboarded: true,
   locale: null,
 });
+const canEdit = ref(true);
+const canDelete = ref(true);
 const localePreference = ref<"auto" | "en" | "ja">("auto");
 const updateLocale = vi.fn();
 const setLocalePreference = vi.fn(async (preference: "auto" | "en" | "ja") => {
@@ -139,6 +141,8 @@ describe("Navbar", () => {
     cache.mockReset();
     clearCache.mockClear();
     states.clear();
+    canEdit.value = true;
+    canDelete.value = true;
     activeUser.value = {
       id: "user",
       name: "Team Owner",
@@ -167,8 +171,8 @@ describe("Navbar", () => {
       updateLocale,
     }));
     vi.stubGlobal("useCan", () => ({
-      canEdit: ref(true),
-      canDelete: ref(true),
+      canEdit,
+      canDelete,
     }));
     vi.stubGlobal("useColorMode", () => ({ preference: "system" }));
     vi.stubGlobal("useI18n", () => ({ t: translate }));
@@ -197,6 +201,57 @@ describe("Navbar", () => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
+
+  it("removes site Deploy and Terminal when the selected team becomes read-only", async () => {
+    currentRoute.path = "/servers/server/sites/site";
+    vi.mocked($api).mockResolvedValue({
+      data: { id: "server", name: "Server", connected: true, type: "laravel" },
+    });
+    const wrapper = mountNavbar();
+    await flushPromises();
+    expect(
+      wrapper.findComponent({ name: "SiteDeployApplication" }).exists(),
+    ).toBe(true);
+    expect(wrapper.text()).toContain("common.actions.terminal");
+    canEdit.value = false;
+    canDelete.value = false;
+    await nextTick();
+    expect(
+      wrapper.findComponent({ name: "SiteDeployApplication" }).exists(),
+    ).toBe(false);
+    expect(wrapper.text()).not.toContain("common.actions.terminal");
+    expect(wrapper.findComponent({ name: "SharedLogsSheet" }).exists()).toBe(
+      true,
+    );
+  });
+
+  it.each(["applications", "databases"])(
+    "preserves read actions while hiding %s lifecycle controls",
+    async (kind) => {
+      currentRoute.path = `/servers/server/projects/project/${kind}/workload`;
+      vi.mocked($api).mockResolvedValue({
+        data: {
+          name: "Workload",
+          connected: true,
+          status: "running",
+          type: "docker",
+        },
+      });
+      const wrapper = mountNavbar();
+      await flushPromises();
+      expect(wrapper.text()).toContain("common.actions.stop");
+      canEdit.value = false;
+      await nextTick();
+      expect(wrapper.text()).not.toContain("common.actions.stop");
+      expect(wrapper.text()).not.toContain("common.actions.deploy");
+      expect(wrapper.text()).not.toContain("common.actions.terminal");
+      expect(wrapper.text()).toContain(
+        kind === "applications"
+          ? "common.actions.viewLogs"
+          : "common.actions.connectionInfo",
+      );
+    },
+  );
 
   it("uses the shared team switcher", async () => {
     const wrapper = mountNavbar();

@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 import type { ToasterProps } from "vue-sonner"
 import { reactiveOmit } from "@vueuse/core"
-import { CheckIcon, InfoIcon, Loader2Icon, XIcon, AlertTriangleIcon } from "lucide-vue-next"
+import { CheckIcon, InfoIcon, Loader2Icon, XIcon, AlertTriangleIcon, CircleAlertIcon } from "lucide-vue-next"
 import { Toaster as Sonner } from "vue-sonner"
 
 const props = defineProps<ToasterProps>()
@@ -10,10 +10,10 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
 
 <template>
   <Sonner
-    class="toaster group"
+    class="toaster group font-sans"
     :toast-options="{
       classes: {
-        toast: 'group toast group-[.toaster]:text-foreground group-[.toaster]:border group-[.toaster]:shadow-md group-[.toaster]:rounded-lg',
+        toast: 'group toast group-[.toaster]:text-foreground group-[.toaster]:border group-[.toaster]:shadow-sm group-[.toaster]:rounded-lg',
         title: 'group-[.toast]:font-medium group-[.toast]:text-sm',
         description: 'group-[.toast]:text-muted-foreground group-[.toast]:text-sm',
         actionButton: 'group-[.toast]:bg-primary group-[.toast]:text-primary-foreground group-[.toast]:rounded-md group-[.toast]:text-sm group-[.toast]:font-medium',
@@ -32,7 +32,7 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
       <AlertTriangleIcon class="h-[18px] w-[18px] text-amber-600 dark:text-amber-400" :stroke-width="2.5" />
     </template>
     <template #error-icon>
-      <XIcon class="h-[18px] w-[18px] text-red-600 dark:text-red-400" :stroke-width="2.5" />
+      <CircleAlertIcon class="h-[18px] w-[18px] text-destructive" :stroke-width="2" />
     </template>
     <template #loading-icon>
       <Loader2Icon class="h-[18px] w-[18px] animate-spin text-muted-foreground" />
@@ -46,62 +46,12 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
 <style>
 /* Base toast styles */
 [data-sonner-toast] {
-  padding: 12px 14px !important;
+  padding: 12px 38px 12px 14px !important;
   gap: 10px !important;
   overflow: hidden;
   border-color: hsl(var(--border)) !important;
   background: hsl(var(--background)) !important;
   position: relative;
-}
-
-/* Progress bar at bottom */
-[data-sonner-toast]::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  height: 2px;
-  width: 100%;
-  pointer-events: none;
-  transform-origin: left;
-  animation: toast-progress linear forwards;
-  animation-duration: var(--toast-duration, 4000ms);
-  background: hsl(var(--muted-foreground) / 0.3);
-  z-index: 2;
-}
-
-/* Success progress bar */
-[data-sonner-toast][data-type="success"]::after {
-  background: hsl(152 76% 52% / 0.6);
-}
-
-/* Error progress bar */
-[data-sonner-toast][data-type="error"]::after {
-  background: hsl(0 84% 60% / 0.6);
-}
-
-/* Warning progress bar */
-[data-sonner-toast][data-type="warning"]::after {
-  background: hsl(38 92% 50% / 0.6);
-}
-
-/* Info progress bar */
-[data-sonner-toast][data-type="info"]::after {
-  background: hsl(217 91% 60% / 0.6);
-}
-
-@keyframes toast-progress {
-  from {
-    transform: scaleX(1);
-  }
-  to {
-    transform: scaleX(0);
-  }
-}
-
-/* Pause progress on hover */
-[data-sonner-toast]:hover::after {
-  animation-play-state: paused;
 }
 
 /* Close button styling */
@@ -116,7 +66,7 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
   border: none !important;
   box-shadow: none !important;
   color: hsl(var(--muted-foreground)) !important;
-  opacity: 0;
+  opacity: 0.65;
   transition: opacity 150ms, color 150ms;
   padding: 4px !important;
   width: auto !important;
@@ -124,14 +74,16 @@ const delegatedProps = reactiveOmit(props, "toastOptions")
   border-radius: 4px !important;
 }
 
-[data-sonner-toast]:hover [data-close-button] {
-  opacity: 0.5;
-}
-
-[data-sonner-toast] [data-close-button]:hover {
+[data-sonner-toast] [data-close-button]:hover,
+[data-sonner-toast] [data-close-button]:focus-visible {
   opacity: 1 !important;
   color: hsl(var(--foreground)) !important;
   background: hsl(var(--muted) / 0.8) !important;
+}
+
+[data-sonner-toast] [data-close-button]:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }
 
 /* Toast content needs to be above the bg overlay */

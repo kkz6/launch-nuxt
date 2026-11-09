@@ -28,6 +28,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 const { t, locale } = useI18n();
+const { canEdit } = useCan();
 const dateLocale = computed(() => (locale.value === "ja" ? "ja-JP" : "en-US"));
 
 // Card-per-row list — same shape components/application/Deployments.vue
@@ -71,6 +72,7 @@ const fetchDeployments = async (silent = false) => {
 };
 
 const triggerDeploy = async () => {
+  if (!canEdit.value || isDeploying.value) return;
   isDeploying.value = true;
   try {
     const res = await dockerService.composes.deploy(
@@ -98,6 +100,7 @@ const triggerDeploy = async () => {
 // we just show a toast and let the WS status events drive the badge.
 const isReloading = ref(false);
 const triggerReload = async () => {
+  if (!canEdit.value || isReloading.value || isDeploying.value) return;
   isReloading.value = true;
   try {
     await dockerService.composes.reload(
@@ -266,6 +269,7 @@ const canRemoveFromGitHub = computed(
 );
 
 const openDelete = (d: DockerDeployment) => {
+  if (!canEdit.value) return;
   deleteTarget.value = d;
   alsoDeleteGitHub.value = false;
   deleteOpen.value = true;
@@ -273,7 +277,7 @@ const openDelete = (d: DockerDeployment) => {
 
 const confirmDelete = async () => {
   const d = deleteTarget.value;
-  if (!d) return;
+  if (!canEdit.value || !d || deleting.value) return;
   deleting.value = true;
   try {
     await dockerService.composes.deleteDeployment(
@@ -358,7 +362,7 @@ onMounted(fetchDeployments);
           {{ t("workload.deployments.composeDescription") }}
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div v-if="canEdit" class="flex items-center gap-2">
         <Button
           variant="outline"
           :disabled="isReloading || isDeploying"
@@ -480,6 +484,7 @@ onMounted(fetchDeployments);
                 {{ t("workload.deployments.viewLogs") }}
               </Button>
               <Button
+                v-if="canEdit"
                 variant="ghost"
                 size="sm"
                 class="text-muted-foreground hover:text-destructive"
@@ -500,7 +505,7 @@ onMounted(fetchDeployments);
     </template>
 
     <!-- Delete deployment confirmation -->
-    <Dialog v-model:open="deleteOpen">
+    <Dialog v-if="canEdit" v-model:open="deleteOpen">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{{ t("workload.deployments.deleteTitle") }}</DialogTitle>

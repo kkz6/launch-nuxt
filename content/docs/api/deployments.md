@@ -123,9 +123,14 @@ Both `POST` and `GET` are supported, and successful triggers return `204 No Cont
 Regenerating the token invalidates the previous URL; update any integrations
 that use it.
 
+Treat the full URL as a credential. Site detail responses include deployment credentials only for Editor, Admin, or Owner sessions with deployment access; Member and Spectate sessions do not receive them. Site lists and shared WebSocket messages never include deployment credentials. Token regeneration requires Admin or Owner access.
+
 ## Required Permissions
 
-| Endpoint         | Permission  |
-| ---------------- | ----------- |
-| GET /deployments | sites:read  |
-| POST /deploy     | sites:write |
+| Action | Minimum team role |
+|--------|-------------------|
+| Read deployment history and details | Member |
+| Deploy, roll back, cancel queued deployments, or change auto-deploy settings | Editor |
+| Regenerate a deployment token | Admin |
+
+Higher roles inherit these permissions. Spectate sessions remain read-only. Switching teams applies the selected team's role; it does not carry permissions from the previous team.

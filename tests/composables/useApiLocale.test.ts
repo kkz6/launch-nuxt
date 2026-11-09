@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useApi, useApiQuery } from "../../composables/useApi";
+import { translateForLocale } from "../helpers/i18n";
 
 const localeMocks = vi.hoisted(() => ({
   getEffectiveLocale: vi.fn(() => "ja"),
@@ -26,6 +27,15 @@ describe("API locale headers", () => {
     vi.stubGlobal("useFetch", useFetchMock);
     vi.stubGlobal("useRuntimeConfig", () => ({
       public: { apiBase: "https://api.example.test" },
+    }));
+    vi.stubGlobal("useNuxtApp", () => ({
+      $i18n: {
+        t: (key: string) =>
+          translateForLocale(
+            localeMocks.getEffectiveLocale() as "en" | "ja",
+            key,
+          ),
+      },
     }));
     vi.stubGlobal("useCookie", (key: string) => {
       if (!cookies.has(key)) cookies.set(key, { value: null });
@@ -136,5 +146,131 @@ describe("API locale headers", () => {
 
     expect(cookies.get("current_team_id")?.value).toBeNull();
     expect(navigateToMock).toHaveBeenCalledWith("/servers");
+  });
+
+  it.each([
+    ["permission.denied", "common.permissions.denied"],
+    ["permission.read_only", "common.permissions.readOnly"],
+  ])(
+    "localizes %s without changing the denial or team context",
+    async (code, key) => {
+      cookies.set("current_team_id", { value: "team-id" });
+      const response = {
+        status: 403,
+        _data: { code, message: "Raw permission message" },
+      };
+      const error = { response, data: response._data };
+      fetchMock.mockImplementation(async (_url, options) => {
+        options.onResponseError({ response });
+        throw error;
+      });
+
+      await expect(
+        useApi().post("/servers/server/sites/site/deploy"),
+      ).rejects.toBe(error);
+
+      expect(error.data).toEqual({
+        code,
+        message: translateForLocale("ja", key),
+      });
+      expect(error.response.status).toBe(403);
+      expect(cookies.get("current_team_id")?.value).toBe("team-id");
+      expect(navigateToMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    [
+      "your team role (Member) lacks permission for this action",
+      "common.permissions.denied",
+    ],
+    [
+      "your team role lacks permission for this action",
+      "common.permissions.denied",
+    ],
+    ["Read-only impersonation session", "common.permissions.readOnly"],
+    [
+      "read-only session cannot modify resources",
+      "common.permissions.readOnly",
+    ],
+  ])("recognizes the legacy denial %s", async (message, key) => {
+    localeMocks.getEffectiveLocale.mockReturnValue("en");
+    const response = { status: 403, _data: { message } };
+    fetchMock.mockImplementation(async (_url, options) => {
+      options.onResponseError({ response });
+      throw { response, data: response._data };
+    });
+
+    await expect(useApi().post("/resource")).rejects.toMatchObject({
+      data: { message: translateForLocale("en", key) },
+    });
+  });
+
+  it.each([
+    [
+      403,
+      {
+        code: "billing.subscription_required",
+        message: "Your subscription is inactive",
+      },
+    ],
+    [403, { message: "Your account is suspended" }],
+    [403, { message: "resource does not belong to your team" }],
+    [
+      403,
+      {
+        code: "account.frozen",
+        message: "your team role (Member) lacks permission for this action",
+      },
+    ],
+    [422, { code: "permission.denied", message: "Validation failed" }],
+  ])("preserves unrelated response %s %j", async (status, data) => {
+    const response = { status, _data: { ...data } };
+    const error = { response, data: response._data };
+    fetchMock.mockImplementation(async (_url, options) => {
+      options.onResponseError({ response });
+      throw error;
+    });
+
+    await expect(useApi().post("/resource")).rejects.toBe(error);
+    expect(error.data).toEqual(data);
+  });
+
+  it("keeps permission copy on the retried request after token refresh", async () => {
+    cookies.set("auth_token", { value: "expired" });
+    cookies.set("auth_refresh_token", { value: "refresh-token" });
+    fetchMock
+      .mockRejectedValueOnce({ response: { status: 401 } })
+      .mockResolvedValueOnce({ data: { access_token: "new-token" } })
+      .mockImplementationOnce(async (_url, options) => {
+        const response = {
+          status: 403,
+          _data: { code: "permission.denied", message: "Raw denial" },
+        };
+        options.onResponseError({ response });
+        throw { response, data: response._data };
+      });
+
+    await expect(useApi().post("/resource")).rejects.toMatchObject({
+      data: { message: translateForLocale("ja", "common.permissions.denied") },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("localizes permission failures in query responses", () => {
+    useApiQuery("/resource");
+    const options = useFetchMock.mock.calls[0]?.[1];
+    const response = {
+      status: 403,
+      _data: { code: "permission.read_only", message: "Raw denial" },
+    };
+
+    options.onResponseError({ response });
+
+    expect(response._data.message).toBe(
+      translateForLocale("ja", "common.permissions.readOnly"),
+    );
+    expect(response._data.code).toBe("permission.read_only");
+    expect(navigateToMock).not.toHaveBeenCalled();
   });
 });

@@ -31,6 +31,8 @@ Each launchctl account can have multiple teams:
 1. Click team selector in navigation
 2. Select the team to switch to
 
+Your permissions come from your role in the selected team. Being an Owner or Admin in one team does not grant that access in another team.
+
 ## Team Members
 ### Inviting Members
 
@@ -46,9 +48,12 @@ The invitee receives an email to join your team.
 
 | Role | Permissions |
 |------|-------------|
-| Owner | Full access, can delete team |
-| Admin | Full access, cannot delete team |
-| Member | Access to servers and sites |
+| Owner | All team actions, including team settings, member role changes, and team deletion |
+| Admin | Create, update, and deploy resources; delete servers/sites, reboot servers, and manage provider connections and invitations |
+| Editor | Create and update resources; deploy, roll back, and manage deployment settings |
+| Member | Read-only access to team resources |
+
+Deployments require Editor, Admin, or Owner access. If you are a Member, ask the team owner to update your role. Platform staff access is separate from team roles; **Spectate** remains read-only regardless of either role.
 
 ### Managing Members
 

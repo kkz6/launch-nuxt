@@ -89,6 +89,11 @@ GET /v1/user
 ```
 
 ## Required Permissions
+
+Authorization uses the caller's role in the selected team: Member is read-only, Editor can deploy and edit resources, and Admin/Owner can perform restricted actions such as deleting servers/sites. Team settings and member role changes require Owner access. See [team roles](/docs/application/teams#member-roles).
+
+A denied team-role action returns `403` with code `permission.denied`. Spectate writes return `403` with code `permission.read_only`, regardless of the target user's team role. Switching accounts or teams does not retain the previous context's permissions.
+
 | Endpoint | Permission |
 |----------|------------|
 | GET /teams | teams:read |

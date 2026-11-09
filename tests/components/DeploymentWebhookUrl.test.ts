@@ -1,5 +1,5 @@
 import { flushPromises, shallowMount } from "@vue/test-utils";
-import { computed, onMounted, ref } from "vue";
+import { computed, defineComponent, onMounted, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Deployments from "../../components/site/Deployments.vue";
 import type { Site } from "../../types";
@@ -9,6 +9,16 @@ vi.mock("~/composables/useChannelEvents", () => ({
   useDeploymentEvents: vi.fn(),
 }));
 vi.mock("vue-sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+const confirm = vi.fn();
+const confirmationDialog = defineComponent({
+  setup(_, { expose }) {
+    expose({ show: confirm });
+    return () => null;
+  },
+});
+const canEdit = ref(true);
+const canManageTeam = ref(true);
 
 const mountDeployments = () =>
   shallowMount(Deployments, {
@@ -20,7 +30,7 @@ const mountDeployments = () =>
     global: {
       stubs: {
         Icon: true,
-        SharedConfirmationDialog: true,
+        SharedConfirmationDialog: confirmationDialog,
         SharedDateTooltip: true,
         SiteDeploymentLogs: true,
         Button: { template: "<button><slot /></button>" },
@@ -31,10 +41,14 @@ const mountDeployments = () =>
 describe("deployment webhook URL", () => {
   const clipboard = vi.fn().mockResolvedValue(undefined);
   beforeEach(() => {
+    confirm.mockReset();
+    canEdit.value = true;
+    canManageTeam.value = true;
     vi.stubGlobal("ref", ref);
     vi.stubGlobal("computed", computed);
     vi.stubGlobal("onMounted", onMounted);
     vi.stubGlobal("useI18n", createI18nStub);
+    vi.stubGlobal("useCan", () => ({ canEdit, canManageTeam }));
     vi.stubGlobal("useAuth", () => ({ user: ref(null) }));
     vi.stubGlobal(
       "useRequestURL",
@@ -51,6 +65,111 @@ describe("deployment webhook URL", () => {
     clipboard.mockClear();
   });
   afterEach(() => vi.unstubAllGlobals());
+
+  it("hides deployment credentials and token rotation for a read-only team", async () => {
+    canEdit.value = false;
+    canManageTeam.value = false;
+    const wrapper = mountDeployments();
+    await flushPromises();
+    expect(wrapper.find("code").exists()).toBe(false);
+    expect(wrapper.find('button[title="Copy"]').exists()).toBe(false);
+    expect(wrapper.find('button[title="Regenerate"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain("Deployments");
+  });
+
+  it("allows Editors to copy a deploy webhook but only admins to rotate it", async () => {
+    canManageTeam.value = false;
+    const wrapper = mountDeployments();
+    await flushPromises();
+    expect(wrapper.find("code").exists()).toBe(true);
+    expect(wrapper.find('button[title="Regenerate"]').exists()).toBe(false);
+    canManageTeam.value = true;
+    await flushPromises();
+    expect(wrapper.find('button[title="Regenerate"]').exists()).toBe(true);
+  });
+
+  it("lets Editors roll back using the registered deployment endpoint", async () => {
+    canManageTeam.value = false;
+    confirm.mockResolvedValue({ ok: true });
+    vi.mocked($api).mockResolvedValue({
+      data: [
+        {
+          id: "current",
+          status: "finished",
+          created_at: "2026-11-01T00:00:00Z",
+        },
+        {
+          id: "previous",
+          status: "finished",
+          created_at: "2026-10-31T00:00:00Z",
+        },
+      ],
+    });
+    const wrapper = mountDeployments();
+    await wrapper.setProps({
+      site: { deploy_token: "token", zero_downtime_deployment: true } as Site,
+    });
+    await flushPromises();
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Rollback")!
+      .trigger("click");
+    await flushPromises();
+    expect($api).toHaveBeenCalledWith(
+      "/servers/server-id/sites/site-id/rollback/previous",
+      { method: "POST" },
+    );
+    wrapper.unmount();
+  });
+
+  it.each(["rollback", "regenerate"])(
+    "rechecks permissions after confirming %s",
+    async (action) => {
+      let accept!: (result: { ok: boolean }) => void;
+      confirm.mockReturnValue(
+        new Promise((resolve) => {
+          accept = resolve;
+        }),
+      );
+      vi.mocked($api).mockResolvedValue({
+        data: [
+          {
+            id: "current",
+            status: "finished",
+            created_at: "2026-11-01T00:00:00Z",
+          },
+          {
+            id: "previous",
+            status: "finished",
+            created_at: "2026-10-31T00:00:00Z",
+          },
+        ],
+      });
+      const wrapper = mountDeployments();
+      await wrapper.setProps({
+        site: { deploy_token: "token", zero_downtime_deployment: true } as Site,
+      });
+      await flushPromises();
+      const button =
+        action === "rollback"
+          ? wrapper
+              .findAll("button")
+              .find((button) => button.text() === "Rollback")!
+          : wrapper.get('button[title="Regenerate"]');
+      await button.trigger("click");
+      expect(confirm).toHaveBeenCalledOnce();
+      canEdit.value = false;
+      canManageTeam.value = false;
+      accept({ ok: true });
+      await flushPromises();
+      expect(
+        vi
+          .mocked($api)
+          .mock.calls.some(([, options]) => options?.method === "POST"),
+      ).toBe(false);
+      wrapper.unmount();
+    },
+  );
 
   it("displays and copies the frontend proxy URL", async () => {
     const wrapper = mountDeployments();

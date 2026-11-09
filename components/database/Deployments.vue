@@ -12,6 +12,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 const { t } = useI18n();
+const { canEdit } = useCan();
 const { effectiveLocale } = useLocalePreference();
 
 // Lifecycle-history rows. Same polymorphic table the application +
@@ -39,7 +40,7 @@ const fetchDeployments = async (silent = false) => {
 };
 
 const lifecycle = async (action: DockerDatabaseLifecycleAction) => {
-  if (lifecycleInFlight.value) return;
+  if (!canEdit.value || lifecycleInFlight.value) return;
   lifecycleInFlight.value = action;
   try {
     await dockerService.databases.lifecycle(
@@ -210,7 +211,7 @@ onMounted(fetchDeployments);
           {{ t("workload.database.deployments.description") }}
         </p>
       </div>
-      <div class="flex items-center gap-2">
+      <div v-if="canEdit" class="flex items-center gap-2">
         <Button
           v-if="database.status !== 'running'"
           variant="outline"

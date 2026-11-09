@@ -32,6 +32,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const { t } = useI18n();
+const { canEdit } = useCan();
 
 const emit = defineEmits<{
   updated: [];
@@ -128,7 +129,7 @@ watch(isOpen, (open) => {
 });
 
 const onSubmit = handleSubmit(async (values) => {
-  if (!confirmationDialog.value) return;
+  if (!canEdit.value || !confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
     title: t("site.deploymentSettings.confirmTitle"),
@@ -142,6 +143,7 @@ const onSubmit = handleSubmit(async (values) => {
     return;
   }
 
+  if (!canEdit.value) return;
   isLoading.value = true;
 
   try {
@@ -175,7 +177,7 @@ const onSubmit = handleSubmit(async (values) => {
 </script>
 
 <template>
-  <Dialog v-model:open="isOpen" @update:open="handleClose">
+  <Dialog v-if="canEdit" v-model:open="isOpen" @update:open="handleClose">
     <DialogTrigger as-child>
       <Button>{{ t("site.deploymentSettings.title") }}</Button>
     </DialogTrigger>

@@ -30,6 +30,7 @@ interface Props {
 }
 const props = defineProps<Props>();
 const { t } = useI18n();
+const { canEdit } = useCan();
 
 interface DeploymentState {
   deployments: DockerDeployment[];
@@ -104,6 +105,7 @@ const fetchDeployments = async (silent = false) => {
 };
 
 const triggerDeploy = async () => {
+  if (!canEdit.value || isDeploying.value) return;
   isDeploying.value = true;
   try {
     const res = await dockerService.applications.deploy(
@@ -249,6 +251,7 @@ const canRemoveFromGitHub = computed(
 );
 
 const openDelete = (d: DockerDeployment) => {
+  if (!canEdit.value) return;
   deleteTarget.value = d;
   alsoDeleteGitHub.value = false;
   deleteOpen.value = true;
@@ -256,7 +259,7 @@ const openDelete = (d: DockerDeployment) => {
 
 const confirmDelete = async () => {
   const d = deleteTarget.value;
-  if (!d) return;
+  if (!canEdit.value || !d || deleting.value) return;
   deleting.value = true;
   try {
     await dockerService.applications.deleteDeployment(
@@ -349,7 +352,7 @@ onMounted(fetchDeployments);
           {{ t("workload.deployments.applicationDescription") }}
         </p>
       </div>
-      <Button :disabled="isDeploying" @click="triggerDeploy">
+      <Button v-if="canEdit" :disabled="isDeploying" @click="triggerDeploy">
         <Icon
           v-if="isDeploying"
           name="lucide:loader-2"
@@ -487,6 +490,7 @@ onMounted(fetchDeployments);
                 {{ t("workload.deployments.viewLogs") }}
               </Button>
               <Button
+                v-if="canEdit"
                 variant="ghost"
                 size="sm"
                 class="text-muted-foreground hover:text-destructive"
@@ -506,7 +510,7 @@ onMounted(fetchDeployments);
       </div>
     </template>
 
-    <Dialog v-model:open="deleteOpen">
+    <Dialog v-if="canEdit" v-model:open="deleteOpen">
       <DialogContent class="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{{ t("workload.deployments.deleteTitle") }}</DialogTitle>

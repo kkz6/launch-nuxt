@@ -953,6 +953,7 @@ const runApplicationAction = async (
   action: "deploy" | "reload" | "rebuild" | "stop" | "start",
 ) => {
   if (
+    !canEdit.value ||
     !serverId.value ||
     !projectId.value ||
     !workloadId.value ||
@@ -1015,6 +1016,7 @@ const viewWorkloadLogs = () => {
 
 const runDatabaseLifecycle = async (action: "start" | "stop" | "restart") => {
   if (
+    !canEdit.value ||
     !serverId.value ||
     !projectId.value ||
     !workloadId.value ||
@@ -1687,6 +1689,7 @@ const onDockerProjectCreated = () => {
 // Terminal state (shared with server detail page)
 const isTerminalOpen = useState("serverTerminalOpen", () => false);
 const openTerminal = () => {
+  if (!canEdit.value) return;
   isTerminalOpen.value = true;
 };
 
@@ -2203,7 +2206,7 @@ const navigateTo = (path: string) => {
             {{ actionLabel("provision") }}
           </Button>
           <Button
-            v-if="serverConnected"
+            v-if="canEdit && serverConnected"
             variant="outline"
             size="sm"
             @click="openTerminal"
@@ -2329,7 +2332,7 @@ const navigateTo = (path: string) => {
             :site-id="siteId"
           />
           <Button
-            v-if="serverConnected"
+            v-if="canEdit && serverConnected"
             variant="outline"
             size="sm"
             @click="openTerminal"
@@ -2339,6 +2342,7 @@ const navigateTo = (path: string) => {
           </Button>
           <SiteDeployApplication
             v-if="
+              canEdit &&
               serverId &&
               siteId &&
               siteType &&
@@ -2611,15 +2615,20 @@ const navigateTo = (path: string) => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" class="w-44">
-              <DropdownMenuItem v-if="serverConnected" @select="openTerminal">
+              <DropdownMenuItem
+                v-if="canEdit && serverConnected"
+                @select="openTerminal"
+              >
                 <Terminal class="mr-2 h-4 w-4" />
                 {{ actionLabel("terminal") }}
               </DropdownMenuItem>
 
               <template v-if="workloadKind === 'database'">
-                <DropdownMenuSeparator v-if="serverConnected" />
+                <DropdownMenuSeparator v-if="canEdit && serverConnected" />
                 <DropdownMenuItem
-                  v-if="workloadStatus && workloadStatus !== 'running'"
+                  v-if="
+                    canEdit && workloadStatus && workloadStatus !== 'running'
+                  "
                   :disabled="workloadActionInFlight !== null"
                   @select="runDatabaseLifecycle('start')"
                 >
@@ -2637,7 +2646,7 @@ const navigateTo = (path: string) => {
                   {{ actionLabel("start") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="workloadStatus === 'running'"
+                  v-if="canEdit && workloadStatus === 'running'"
                   :disabled="workloadActionInFlight !== null"
                   @select="runDatabaseLifecycle('stop')"
                 >
@@ -2655,6 +2664,7 @@ const navigateTo = (path: string) => {
                   {{ actionLabel("stop") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  v-if="canEdit"
                   :disabled="workloadActionInFlight !== null"
                   @select="runDatabaseLifecycle('restart')"
                 >
@@ -2677,7 +2687,7 @@ const navigateTo = (path: string) => {
                   the compose YAML viewer uses, so the dialog has
                   access to the already-loaded database row.
                 -->
-                <DropdownMenuSeparator />
+                <DropdownMenuSeparator v-if="canEdit" />
                 <DropdownMenuItem @select="openDatabaseConnectionDialog">
                   <Icon name="lucide:link" class="mr-2 h-4 w-4" />
                   {{ actionLabel("connectionInfo") }}
@@ -2696,8 +2706,9 @@ const navigateTo = (path: string) => {
                 Rebuild always; Reload only when running.
               -->
               <template v-if="workloadKind === 'application'">
-                <DropdownMenuSeparator v-if="serverConnected" />
+                <DropdownMenuSeparator v-if="canEdit && serverConnected" />
                 <DropdownMenuItem
+                  v-if="canEdit"
                   :disabled="workloadActionInFlight !== null"
                   @select="runApplicationAction('deploy')"
                 >
@@ -2715,7 +2726,7 @@ const navigateTo = (path: string) => {
                   {{ actionLabel("deploy") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="workloadStatus === 'running'"
+                  v-if="canEdit && workloadStatus === 'running'"
                   :disabled="workloadActionInFlight !== null"
                   @select="runApplicationAction('reload')"
                 >
@@ -2733,6 +2744,7 @@ const navigateTo = (path: string) => {
                   {{ actionLabel("reload") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
+                  v-if="canEdit"
                   :disabled="workloadActionInFlight !== null"
                   @select="runApplicationAction('rebuild')"
                 >
@@ -2740,7 +2752,9 @@ const navigateTo = (path: string) => {
                   {{ actionLabel("rebuild") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="workloadStatus && workloadStatus !== 'running'"
+                  v-if="
+                    canEdit && workloadStatus && workloadStatus !== 'running'
+                  "
                   :disabled="workloadActionInFlight !== null"
                   @select="runApplicationAction('start')"
                 >
@@ -2758,7 +2772,7 @@ const navigateTo = (path: string) => {
                   {{ actionLabel("start") }}
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  v-if="workloadStatus === 'running'"
+                  v-if="canEdit && workloadStatus === 'running'"
                   :disabled="workloadActionInFlight !== null"
                   @select="runApplicationAction('stop')"
                 >
@@ -2777,7 +2791,7 @@ const navigateTo = (path: string) => {
                 </DropdownMenuItem>
 
                 <!-- Logs moved here from the tab strip. -->
-                <DropdownMenuSeparator />
+                <DropdownMenuSeparator v-if="canEdit" />
                 <DropdownMenuItem @select="viewWorkloadLogs">
                   <Icon name="lucide:scroll" class="mr-2 h-4 w-4" />
                   {{ actionLabel("viewLogs") }}
@@ -2795,7 +2809,7 @@ const navigateTo = (path: string) => {
                 already-loaded compose row (avoids a second fetch).
               -->
               <template v-if="workloadKind === 'compose'">
-                <DropdownMenuSeparator v-if="serverConnected" />
+                <DropdownMenuSeparator v-if="canEdit && serverConnected" />
                 <DropdownMenuItem @select="openComposeYamlDialog">
                   <Icon name="lucide:file-code" class="mr-2 h-4 w-4" />
                   {{ actionLabel("viewYaml") }}
