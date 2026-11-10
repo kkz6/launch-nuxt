@@ -311,6 +311,7 @@ export interface CertificateStatusResult {
 
 export interface Deployment {
   id: string;
+  release_name?: string | null;
   site_id: string;
   user_id: string | null;
   task_id: string;

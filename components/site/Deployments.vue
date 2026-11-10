@@ -32,6 +32,7 @@ const TERMINAL_DEPLOYMENT_EVENTS = new Set([
   "deployment.rollback.completed",
   "deployment.rollback.failed",
 ]);
+const notifiedRollbackWarnings = new Set<string>();
 
 // Coalesce lifecycle refreshes without delaying them on every progress tick.
 let deployFetchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -68,6 +69,15 @@ const synthesizePending = (
 useDeploymentEvents(teamId, (data, event) => {
   if (data.site_id !== props.siteId) return;
   if (typeof data.deployment_id !== "string") return;
+
+  if (
+    event === "deployment.rollback.completed" &&
+    data.post_actions_pending === true &&
+    !notifiedRollbackWarnings.has(data.deployment_id)
+  ) {
+    notifiedRollbackWarnings.add(data.deployment_id);
+    toast.warning(t("site.deployments.rollbackPostActionsPending"));
+  }
 
   const isTerminal = TERMINAL_DEPLOYMENT_EVENTS.has(event);
 
@@ -163,21 +173,60 @@ const hasActiveDeployment = computed(() => {
   return deployments.value.some((d) => isInProgress(d.status));
 });
 
-const secondFinishedIndex = computed(() => {
-  let count = 0;
-  return deployments.value.findIndex((d) => {
-    if (d.status === "finished") count++;
-    return count === 2;
+// Rollbacks reuse an existing release. History can therefore contain multiple
+// successful records for the same code; choose the previous distinct release.
+const rollbackTarget = computed(() => {
+  const byId = new Map(
+    deployments.value.map((deployment) => [deployment.id, deployment]),
+  );
+  const releaseReferences = (deployment: Deployment): Set<string> | null => {
+    const references = new Set<string>();
+    const visited = new Set<string>();
+    let current = deployment;
+    let hasRecordedRelease = false;
+    while (!visited.has(current.id)) {
+      visited.add(current.id);
+      references.add(`deployment:${current.id}`);
+      if (current.release_name) {
+        references.add(`release:${current.release_name}`);
+        hasRecordedRelease = true;
+      }
+      const targetId = current.commit_data?.rollback_to;
+      if (!targetId) return references;
+      references.add(`deployment:${targetId}`);
+      const target = byId.get(targetId);
+      // A dangling legacy reference cannot prove which release it represents.
+      if (!target) return hasRecordedRelease ? references : null;
+      current = target;
+    }
+    return null;
+  };
+  const finished = deployments.value.filter(
+    (deployment) => deployment.status === "finished",
+  );
+  if (finished.length < 2) return;
+  const currentRelease = releaseReferences(finished[0]);
+  if (!currentRelease) return;
+  const target = finished.slice(1).find((deployment) => {
+    const release = releaseReferences(deployment);
+    return (
+      release &&
+      ![...release].some((reference) => currentRelease.has(reference))
+    );
   });
+  // Old rollback tasks do not record a recoverable release directory. Do not
+  // offer a target that the server cannot resolve, or silently choose another.
+  if (target?.commit_data?.rollback_to && !target.release_name) return;
+  return target;
 });
 
-const canRollback = (deployment: Deployment, index: number) => {
-  if (!canEdit.value || !props.site.zero_downtime_deployment) return false;
-  if (deployment.status !== "finished") return false;
-  // Only allow rollback to the second most recent finished deployment (the last successful one before current)
-  if (index !== secondFinishedIndex.value) return false;
-  return true;
-};
+const canRollback = (deployment: Deployment) =>
+  canEdit.value &&
+  props.site.zero_downtime_deployment &&
+  deployment.id === rollbackTarget.value?.id;
+
+const canStartRollback = (deployment: Deployment) =>
+  canRollback(deployment) && !hasActiveDeployment.value && !rollingBackId.value;
 
 const fetchDeployments = async () => {
   const fetchId = ++latestFetchId;
@@ -202,7 +251,7 @@ const fetchDeployments = async () => {
 };
 
 const handleRollback = async (deployment: Deployment) => {
-  if (!canEdit.value || !confirmationDialog.value) return;
+  if (!canStartRollback(deployment) || !confirmationDialog.value) return;
 
   const result = await confirmationDialog.value.show({
     title: t("site.deployments.rollbackTitle"),
@@ -211,7 +260,7 @@ const handleRollback = async (deployment: Deployment) => {
     cancelText: t("site.common.cancel"),
   });
 
-  if (!result.ok || !canEdit.value) return;
+  if (!result.ok || !canStartRollback(deployment)) return;
 
   rollingBackId.value = deployment.id;
   try {
@@ -223,8 +272,9 @@ const handleRollback = async (deployment: Deployment) => {
     );
     toast.success(t("site.deployments.rollbackStarted"));
     await fetchDeployments();
-  } catch {
-    toast.error(t("site.deployments.rollbackFailed"));
+  } catch (error) {
+    const err = error as { data?: { message?: string } };
+    toast.error(err.data?.message || t("site.deployments.rollbackFailed"));
   } finally {
     rollingBackId.value = null;
   }
@@ -353,7 +403,7 @@ onMounted(fetchDeployments);
 
       <div v-else class="rounded-lg border bg-card">
         <div
-          v-for="(deployment, index) in deployments"
+          v-for="deployment in deployments"
           :key="deployment.id"
           class="flex items-center justify-between gap-2 border-b p-4 last:border-b-0"
         >
@@ -412,7 +462,7 @@ onMounted(fetchDeployments);
             </div>
             <div class="flex flex-row items-center gap-2">
               <Button
-                v-if="canRollback(deployment, index)"
+                v-if="canRollback(deployment)"
                 variant="outline"
                 size="sm"
                 :disabled="
