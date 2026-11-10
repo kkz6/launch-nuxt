@@ -4,12 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Deployments from "../../components/site/Deployments.vue";
 import { useDeploymentEvents } from "~/composables/useChannelEvents";
 import type { Deployment, Site } from "~/types";
+import { toast } from "vue-sonner";
 import { createI18nStub } from "../helpers/i18n";
 
 vi.mock("~/composables/useChannelEvents", () => ({
   useDeploymentEvents: vi.fn(),
 }));
-vi.mock("vue-sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("vue-sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
+}));
 
 const deployment = (id = "deploy-new") =>
   ({
@@ -51,6 +54,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.mocked(useDeploymentEvents).mockClear();
   api.mockReset().mockResolvedValue({ data: [] });
+  vi.mocked(toast.warning).mockClear();
   vi.stubGlobal("ref", ref);
   vi.stubGlobal("computed", computed);
   vi.stubGlobal("onMounted", onMounted);
@@ -70,6 +74,39 @@ afterEach(() => {
 });
 
 describe("site deployment live metadata", () => {
+  it("warns once when rollback restores code but worker restarts remain pending", async () => {
+    wrapper = mountDeployments();
+    await flushPromises();
+    const handler = vi.mocked(useDeploymentEvents).mock.calls[0][1];
+    const payload = {
+      site_id: "site-id",
+      deployment_id: "deploy-new",
+      status: "finished",
+      post_actions_pending: true,
+    };
+    handler(payload, "deployment.rollback.completed");
+    handler(payload, "deployment.rollback.completed");
+    await vi.advanceTimersByTimeAsync(300);
+    expect(toast.warning).toHaveBeenCalledOnce();
+    expect(toast.warning).toHaveBeenCalledWith(
+      "Code restored, but worker restart could not be queued.",
+    );
+    expect(api).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not warn when rollback completes without pending worker restarts", async () => {
+    wrapper = mountDeployments();
+    await flushPromises();
+    const handler = vi.mocked(useDeploymentEvents).mock.calls[0][1];
+    handler(
+      { site_id: "site-id", deployment_id: "deploy-new", status: "finished" },
+      "deployment.rollback.completed",
+    );
+    await vi.advanceTimersByTimeAsync(300);
+    expect(toast.warning).not.toHaveBeenCalled();
+    expect(api).toHaveBeenCalledTimes(2);
+  });
+
   it("shows commit details and logs immediately from the parent's Deploy response", async () => {
     wrapper = mountDeployments();
     await flushPromises();
