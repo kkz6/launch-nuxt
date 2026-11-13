@@ -52,7 +52,7 @@ const { open: openSettings } = useSettingsSheet();
 interface Plan {
   value: string;
   title: string;
-  specs?: string;
+  regions?: string[];
 }
 
 interface Region {
@@ -83,7 +83,6 @@ const serviceProviders = computed<Record<string, string>>(() => ({
   hetzner: "Hetzner",
   linode: "Linode",
   vultr: "Vultr",
-  aws: "AWS",
   custom_server: t("server.create.customServer"),
 }));
 
@@ -157,8 +156,25 @@ const filteredProviders = computed(() => {
 const currentPlans = computed(() => {
   const provider = values.service_provider;
   if (!provider) return [];
-  return plans.value[provider]?.plans || [];
+  return (plans.value[provider]?.plans || []).filter(
+    (option) =>
+      !values.region ||
+      !option.regions ||
+      option.regions.includes(values.region),
+  );
 });
+
+watch(
+  () => values.region,
+  () => {
+    if (
+      values.plan &&
+      !currentPlans.value.some((option) => option.value === values.plan)
+    ) {
+      setFieldValue("plan", "");
+    }
+  },
+);
 
 const currentRegions = computed(() => {
   const provider = values.service_provider;

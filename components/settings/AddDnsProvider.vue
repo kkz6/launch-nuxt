@@ -32,18 +32,12 @@ const provider = ref("");
 const label = ref("");
 const credentials = ref({
   api_token: "",
-  access_key: "",
-  secret_key: "",
+  account_id: "",
 });
 const errors = ref<Record<string, string>>({});
 
 const providers = [
   { value: "cloudflare", label: "Cloudflare", icon: "simple-icons:cloudflare" },
-  {
-    value: "route53",
-    label: "Amazon Route 53",
-    icon: "simple-icons:amazonaws",
-  },
   {
     value: "digitalocean",
     label: "DigitalOcean DNS",
@@ -51,15 +45,12 @@ const providers = [
   },
 ];
 
-const needsApiToken = computed(() =>
-  ["cloudflare", "digitalocean"].includes(provider.value),
-);
-const needsAwsCredentials = computed(() => provider.value === "route53");
+const needsAccountId = computed(() => provider.value === "cloudflare");
 
 const resetForm = () => {
   provider.value = "";
   label.value = "";
-  credentials.value = { api_token: "", access_key: "", secret_key: "" };
+  credentials.value = { api_token: "", account_id: "" };
   errors.value = {};
 };
 
@@ -77,23 +68,15 @@ const validate = () => {
     );
   }
 
-  if (needsApiToken.value && !credentials.value.api_token.trim()) {
+  if (!credentials.value.api_token.trim()) {
     errors.value.api_token = t(
       "settings.connectionDialogs.validation.apiTokenRequired",
     );
   }
-
-  if (needsAwsCredentials.value) {
-    if (!credentials.value.access_key.trim()) {
-      errors.value.access_key = t(
-        "settings.connectionDialogs.validation.accessKeyRequired",
-      );
-    }
-    if (!credentials.value.secret_key.trim()) {
-      errors.value.secret_key = t(
-        "settings.connectionDialogs.validation.secretKeyRequired",
-      );
-    }
+  if (needsAccountId.value && !credentials.value.account_id.trim()) {
+    errors.value.account_id = t(
+      "settings.connectionDialogs.validation.accountIdRequired",
+    );
   }
 
   return Object.keys(errors.value).length === 0;
@@ -105,23 +88,16 @@ const onSubmit = async () => {
   isLoading.value = true;
 
   try {
-    const body: Record<string, string> = {
-      provider: provider.value,
-      label: label.value,
-    };
-
-    if (needsApiToken.value) {
-      body.api_token = credentials.value.api_token;
-    }
-
-    if (needsAwsCredentials.value) {
-      body.access_key = credentials.value.access_key;
-      body.secret_key = credentials.value.secret_key;
-    }
-
     await $api("/dns-providers", {
       method: "POST",
-      body,
+      body: {
+        provider: provider.value,
+        profile: label.value.trim(),
+        token: credentials.value.api_token.trim(),
+        account_id: needsAccountId.value
+          ? credentials.value.account_id.trim()
+          : undefined,
+      },
     });
 
     toast.success(t("settings.connectionDialogs.dns.connected"));
@@ -134,7 +110,8 @@ const onSubmit = async () => {
     };
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        errors.value[field] = messages[0];
+        const input = { profile: "label", token: "api_token" }[field] || field;
+        errors.value[input] = messages[0];
       }
     } else {
       toast.error(
@@ -209,7 +186,7 @@ watch(open, (isOpen) => {
         </div>
 
         <!-- API Token (for Cloudflare, DigitalOcean) -->
-        <div v-if="needsApiToken" class="space-y-2">
+        <div class="space-y-2">
           <Label for="api_token">{{
             t("settings.connectionDialogs.apiToken")
           }}</Label>
@@ -224,39 +201,15 @@ watch(open, (isOpen) => {
           </p>
         </div>
 
-        <!-- AWS Credentials (for Route 53) -->
-        <template v-if="needsAwsCredentials">
-          <div class="space-y-2">
-            <Label for="access_key">{{
-              t("settings.connectionDialogs.accessKeyId")
-            }}</Label>
-            <Input
-              id="access_key"
-              v-model="credentials.access_key"
-              placeholder="AKIAIOSFODNN7EXAMPLE"
-            />
-            <p v-if="errors.access_key" class="text-sm text-destructive">
-              {{ errors.access_key }}
-            </p>
-          </div>
-
-          <div class="space-y-2">
-            <Label for="secret_key">{{
-              t("settings.connectionDialogs.secretAccessKey")
-            }}</Label>
-            <Input
-              id="secret_key"
-              v-model="credentials.secret_key"
-              type="password"
-              :placeholder="
-                t('settings.connectionDialogs.secretKeyPlaceholder')
-              "
-            />
-            <p v-if="errors.secret_key" class="text-sm text-destructive">
-              {{ errors.secret_key }}
-            </p>
-          </div>
-        </template>
+        <div v-if="needsAccountId" class="space-y-2">
+          <Label for="account_id">{{
+            t("settings.connectionDialogs.dns.accountId")
+          }}</Label>
+          <Input id="account_id" v-model="credentials.account_id" />
+          <p v-if="errors.account_id" class="text-sm text-destructive">
+            {{ errors.account_id }}
+          </p>
+        </div>
 
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">
