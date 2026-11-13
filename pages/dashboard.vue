@@ -14,6 +14,7 @@ const { locale, t } = useI18n();
 useHead(() => ({ title: t("public.dashboard.pageTitle") }));
 
 const { user } = useAuth();
+const { isImpersonating } = useImpersonation();
 const { open: openSettingsSheet } = useSettingsSheet();
 
 const hasTeam = computed(() => !!user.value?.current_team_id);
@@ -200,7 +201,7 @@ const getUserInitials = (name: string): string => {
       <p class="text-sm text-muted-foreground">
         {{ t("public.dashboard.teamRequiredDescription") }}
       </p>
-      <SettingsCreateTeam>
+      <SettingsCreateTeam v-if="!isImpersonating">
         <Button>{{ t("settings.teamDialogs.create") }}</Button>
       </SettingsCreateTeam>
     </div>
