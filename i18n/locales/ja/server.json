@@ -265,6 +265,8 @@
     },
     "list": {
       "title": "サーバー",
+      "loadFailed": "サーバーを読み込めませんでした。",
+      "retry": "再試行",
       "emptyTitle": "サーバーがまだ追加されていません",
       "emptyDescription": "「サーバーを作成」をクリックして始めましょう",
       "provisionQueued": "プロビジョニングをキューに追加しました",

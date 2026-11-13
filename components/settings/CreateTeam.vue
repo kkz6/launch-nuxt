@@ -17,6 +17,7 @@ import type { Team } from "~/types";
 const { t } = useI18n();
 const { updateTeam } = useTeams();
 const { user, fetchUser } = useAuth();
+const { isImpersonating } = useImpersonation();
 
 const open = defineModel<boolean>("open", { default: false });
 const isLoading = ref(false);
@@ -28,7 +29,7 @@ const validName = computed(
 );
 
 const canSubmit = computed(() => {
-  return validName.value && !isLoading.value;
+  return validName.value && !isLoading.value && !isImpersonating.value;
 });
 
 watch(open, (isOpen) => {
@@ -45,9 +46,16 @@ const onSubmit = async () => {
       body: { name: trimmedName.value },
     });
     updateTeam(team);
-    if (!user.value?.current_team_id) await fetchUser();
     toast.success(t("settings.teamDialogs.created"));
     open.value = false;
+    if (!user.value?.current_team_id) {
+      try {
+        await $api(`/teams/${team.id}/switch`, { method: "POST" });
+        await fetchUser();
+      } catch {
+        toast.error(t("common.teams.switchFailed"));
+      }
+    }
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
       const fetchError = error as { data?: { message?: string } };

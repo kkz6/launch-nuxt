@@ -64,10 +64,8 @@ export const useAuth = () => {
     newUser: User | null,
     options: UserLocaleSyncOptions = {},
   ): Promise<void> => {
+    setCurrentTeamId(newUser?.current_team_id ?? null);
     user.value = newUser;
-    if (newUser?.current_team_id) {
-      setCurrentTeamId(newUser.current_team_id);
-    }
 
     if (newUser) {
       try {
