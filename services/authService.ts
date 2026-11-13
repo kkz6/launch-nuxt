@@ -50,7 +50,10 @@ export const authService = {
    */
   register: (data: RegisterData) => {
     const { post } = useApi()
-    return post<ApiResponse<LoginResponse>>('/auth/register', data)
+    return post<ApiResponse<LoginResponse>>('/auth/register', {
+      ...data,
+      create_personal_team: true,
+    })
   },
 
   /**

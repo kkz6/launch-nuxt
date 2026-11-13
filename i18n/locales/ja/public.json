@@ -20,9 +20,11 @@
         "afternoon": "こんにちは",
         "evening": "こんばんは"
       },
+      "teamRequired": "チームを設定",
+      "teamRequiredDescription": "チームを作成するか、アカウントメニューから既存のチームを選択してください。",
       "subscriptionRequired": "サブスクリプションが必要です",
-      "subscriptionDescription": "サブスクリプションは現在無効です。すべての機能を利用してサーバーを管理するには、お支払い方法を追加してください。",
-      "addPaymentMethod": "お支払い方法を追加",
+      "subscriptionDescription": "サーバーを追加・管理するには、チームのプランを選択してください。",
+      "viewPlans": "プランを見る",
       "contactSupport": "サポートに問い合わせる",
       "subscriptionIncludes": "サブスクリプションに含まれる機能：",
       "benefits": {

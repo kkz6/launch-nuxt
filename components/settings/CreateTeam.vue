@@ -18,6 +18,8 @@ const emit = defineEmits<{
   created: [];
 }>();
 const { t } = useI18n();
+const { user, fetchUser } = useAuth();
+const { isImpersonating } = useImpersonation();
 
 const open = defineModel<boolean>("open", { default: false });
 const isLoading = ref(false);
@@ -31,7 +33,9 @@ const schema = computed(() =>
 );
 
 const canSubmit = computed(() => {
-  return name.value.trim().length > 0 && !isLoading.value;
+  return (
+    name.value.trim().length > 0 && !isLoading.value && !isImpersonating.value
+  );
 });
 
 const resetForm = () => {
@@ -59,11 +63,11 @@ const validate = () => {
 };
 
 const onSubmit = async () => {
-  if (!validate()) return;
+  if (isImpersonating.value || isLoading.value || !validate()) return;
 
   isLoading.value = true;
   try {
-    await $api("/teams", {
+    const { data: team } = await $api<{ data: { id: string } }>("/teams", {
       method: "POST",
       body: { name: name.value.trim() },
     });
@@ -71,6 +75,14 @@ const onSubmit = async () => {
     open.value = false;
     resetForm();
     emit("created");
+    if (!user.value?.current_team_id) {
+      try {
+        await $api(`/teams/${team.id}/switch`, { method: "POST" });
+        await fetchUser();
+      } catch {
+        toast.error(t("common.teams.switchFailed"));
+      }
+    }
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
       const fetchError = error as { data?: { message?: string } };
