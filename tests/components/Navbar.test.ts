@@ -82,7 +82,12 @@ const mountNavbar = () => {
         AvatarImage: true,
         Button: { template: "<button><slot /></button>" },
         ClientOnly: { template: "<div><slot /></div>" },
-        DropdownMenu: { template: "<div><slot /></div>" },
+        DropdownMenu: {
+          name: "DropdownMenuRoot",
+          props: ["open"],
+          emits: ["update:open"],
+          template: "<div><slot /></div>",
+        },
         DropdownMenuContent: { template: "<div><slot /></div>" },
         DropdownMenuItem: { template: "<div><slot /></div>" },
         DropdownMenuRadioGroup: {
@@ -122,9 +127,14 @@ const mountNavbar = () => {
         ServerAddSite: true,
         ServerDockerCreateProject: true,
         SharedLogsSheet: true,
-        SharedTeamSwitcher: { template: '<div data-test="team-switcher" />' },
+        SharedTeamSwitcher: {
+          name: "SharedTeamSwitcher",
+          emits: ["create-team"],
+          template: '<div data-test="team-switcher" />',
+        },
         SiteDeployApplication: true,
         SettingsSheet: true,
+        SettingsCreateTeam: true,
         ServerProvisionCommandDialog: true,
       },
     },
@@ -258,6 +268,19 @@ describe("Navbar", () => {
     await flushPromises();
     await vi.runAllTimersAsync();
     expect(wrapper.find('[data-test="team-switcher"]').exists()).toBe(true);
+  });
+
+  it("keeps the New Team dialog open when the account menu closes", async () => {
+    const wrapper = mountNavbar();
+    const menu = wrapper.findComponent({ name: "DropdownMenuRoot" });
+    const switcher = wrapper.findComponent({ name: "SharedTeamSwitcher" });
+    const dialog = wrapper.findComponent({ name: "SettingsCreateTeam" });
+    switcher.vm.$emit("create-team");
+    await nextTick();
+    expect(dialog.attributes("open")).toBe("true");
+    menu.vm.$emit("update:open", false);
+    await nextTick();
+    expect(dialog.attributes("open")).toBe("true");
   });
 
   it("renders Automatic, English, and Japanese locale choices", async () => {

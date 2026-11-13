@@ -65,11 +65,11 @@ const resetForm = () => {
   errors.value = {};
 };
 
-const handleClose = (isOpen: boolean) => {
+watch(open, (isOpen) => {
   if (!isOpen) {
     resetForm();
   }
-};
+});
 
 const validate = () => {
   const result = schema.value.safeParse({
@@ -89,10 +89,9 @@ const validate = () => {
 };
 
 const onSubmit = async () => {
+  if (!canSubmit.value || !props.teamId) return;
   const data = validate();
   if (!data) return;
-
-  if (!props.teamId) return;
 
   isLoading.value = true;
   try {
@@ -102,11 +101,18 @@ const onSubmit = async () => {
     });
     toast.success(t("settings.teamDialogs.invitationSent"));
     open.value = false;
-    resetForm();
     emit("invited");
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
-      const fetchError = error as { data?: { message?: string } };
+      const fetchError = error as {
+        data?: { code?: string; message?: string };
+      };
+      if (fetchError.data?.code === "team.invitation_email_failed") {
+        toast.error(t("settings.teamDialogs.invitationDeliveryFailed"));
+        open.value = false;
+        emit("invited");
+        return;
+      }
       toast.error(
         fetchError.data?.message || t("settings.teamDialogs.invitationFailed"),
       );
@@ -120,7 +126,7 @@ const onSubmit = async () => {
 </script>
 
 <template>
-  <Dialog v-model:open="open" @update:open="handleClose">
+  <Dialog v-model:open="open">
     <DialogContent class="sm:max-w-md">
       <DialogHeader>
         <DialogTitle>{{ t("settings.teamDialogs.inviteTitle") }}</DialogTitle>

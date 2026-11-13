@@ -238,7 +238,8 @@
       "download": "ダウンロード"
     },
     "teamDialogs": {
-      "nameRequired": "チーム名を入力してください",
+      "invitationDeliveryFailed": "招待は保留中ですが、メールを送信できませんでした。「再送」で再試行してください。",
+      "nameLength": "チーム名は2〜255文字で入力してください。",
       "created": "チームを作成しました",
       "createFailed": "チームを作成できませんでした",
       "createTitle": "チームを作成",
@@ -264,6 +265,16 @@
       "sendInvitation": "招待を送信"
     },
     "teams": {
+      "removeMember": "削除",
+      "removeMemberTitle": "{name}さんを削除しますか？",
+      "removeMemberDescription": "このメンバーはチームとそのリソースにアクセスできなくなります。",
+      "removeMemberSuccess": "メンバーを削除しました",
+      "removeMemberFailed": "メンバーを削除できませんでした",
+      "leaveTeam": "チームから退出",
+      "leaveTeamTitle": "{name}から退出しますか？",
+      "leaveTeamDescription": "このチームとそのリソースにアクセスできなくなります。",
+      "leaveTeamSuccess": "チームから退出しました",
+      "leaveTeamFailed": "チームから退出できませんでした",
       "roles": {
         "owner": "オーナー",
         "ownerDescription": "チームのすべての機能を利用できます。",

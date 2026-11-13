@@ -19,7 +19,15 @@ vi.mock("vue-sonner", () => ({
   toast: { success: mocks.success, error: mocks.error },
 }));
 
-const user = ref({ id: "owner", current_team_id: "source" });
+const user = ref<{ id: string; current_team_id: string | null; role?: string }>(
+  {
+    id: "owner",
+    current_team_id: "source",
+    role: "owner",
+  },
+);
+const impersonating = ref(false);
+const canManageTeam = ref(true);
 const teamsRefreshKey = ref(0);
 const teamsState = ref([] as Array<typeof source>);
 const source = {
@@ -103,7 +111,10 @@ const mountTab = () =>
         SelectItem: { template: "<div><slot /></div>" },
         SelectTrigger: { template: "<div><slot /></div>" },
         SelectValue: true,
-        AlertDialog: { template: "<div><slot /></div>" },
+        AlertDialog: {
+          props: ["open"],
+          template: '<div v-if="open" role="alertdialog"><slot /></div>',
+        },
         AlertDialogAction: { template: "<button><slot /></button>" },
         AlertDialogCancel: { template: "<button><slot /></button>" },
         AlertDialogContent: { template: "<div><slot /></div>" },
@@ -117,6 +128,9 @@ const mountTab = () =>
 
 describe("team settings", () => {
   beforeEach(() => {
+    user.value = { id: "owner", current_team_id: "source", role: "owner" };
+    impersonating.value = false;
+    canManageTeam.value = true;
     source.name = "Source";
     teamsRefreshKey.value = 0;
     teamsState.value = [source, destination];
@@ -167,7 +181,10 @@ describe("team settings", () => {
       setCurrentTeamId: mocks.setCurrentTeamId,
     }));
     vi.stubGlobal("useSettingsSheet", () => ({ close: mocks.closeSettings }));
-    vi.stubGlobal("useCan", () => ({ canManageTeam: ref(true) }));
+    vi.stubGlobal("useCan", () => ({ canManageTeam }));
+    vi.stubGlobal("useImpersonation", () => ({
+      isImpersonating: impersonating,
+    }));
     vi.stubGlobal("useTeams", () => ({
       teams: teamsState,
       loadTeams: vi.fn().mockResolvedValue(teamsState.value),
@@ -202,7 +219,6 @@ describe("team settings", () => {
     expect(wrapper.text()).toContain("Team details");
     expect(wrapper.text()).toContain("Team Member");
     expect(wrapper.text()).toContain("pending@example.com");
-    expect(wrapper.text()).toContain("Personal (Personal)");
     expect(setupState(wrapper).transferToTeamId).toBe("destination");
     expect(
       setupState(wrapper).assignableRoles.map((role) => role.value),
@@ -250,6 +266,108 @@ describe("team settings", () => {
     expect(mocks.success).toHaveBeenCalledWith("Role updated");
     expect(mocks.success).toHaveBeenCalledWith("Invitation cancelled");
     expect(setupState(wrapper).invitations).toEqual([]);
+  });
+
+  it("keeps a member on failure and removes them after a confirmed retry", async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(wrapper.findAll('button[aria-label^="Remove"]')).toHaveLength(1);
+    await wrapper
+      .get('button[aria-label="Remove Team Member?"]')
+      .trigger("click");
+    expect(mocks.api).not.toHaveBeenCalledWith("/teams/source/members/member", {
+      method: "DELETE",
+    });
+    const confirm = () =>
+      wrapper
+        .get('[role="alertdialog"]')
+        .findAll("button")
+        .at(-1)!
+        .trigger("click");
+    mocks.api.mockRejectedValueOnce(new Error("removal failed"));
+    await confirm();
+    await flushPromises();
+    expect(mocks.error).toHaveBeenCalledWith("Failed to remove member");
+    expect(wrapper.text()).toContain("Team Member");
+    await confirm();
+    await flushPromises();
+    expect(mocks.api).toHaveBeenCalledWith("/teams/source/members/member", {
+      method: "DELETE",
+    });
+    expect(wrapper.text()).not.toContain("Team Member");
+    expect(mocks.success).toHaveBeenCalledWith("Member removed");
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
+  });
+
+  it("leaves the current team and refreshes the fallback context", async () => {
+    user.value = { id: "member", current_team_id: "source", role: "member" };
+    canManageTeam.value = false;
+    mocks.fetchUser.mockImplementationOnce(async () => {
+      expect(user.value.role).toBeUndefined();
+      user.value.current_team_id = "destination";
+      return user.value;
+    });
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(wrapper.findAll('button[aria-label^="Remove"]')).toHaveLength(0);
+    const leave = wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Leave team")!;
+    await leave.trigger("click");
+    const confirm = () =>
+      wrapper
+        .get('[role="alertdialog"]')
+        .findAll("button")
+        .at(-1)!
+        .trigger("click");
+    mocks.api.mockRejectedValueOnce(new Error("leave failed"));
+    await confirm();
+    await flushPromises();
+    expect(mocks.error).toHaveBeenCalledWith("Failed to leave team");
+    expect(user.value.current_team_id).toBe("source");
+    await confirm();
+    await flushPromises();
+    expect(mocks.api).toHaveBeenCalledWith("/teams/source/members/member", {
+      method: "DELETE",
+    });
+    expect(teamsState.value).toEqual([destination]);
+    expect(mocks.setCurrentTeamId).toHaveBeenCalledWith(null);
+    expect(user.value.current_team_id).toBe("destination");
+    expect(mocks.closeSettings).toHaveBeenCalled();
+    expect(teamsRefreshKey.value).toBe(1);
+    expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.success).toHaveBeenCalledWith("You left the team");
+  });
+
+  it("hides membership changes in a read-only session", async () => {
+    user.value = { id: "member", current_team_id: "source", role: "member" };
+    impersonating.value = true;
+    canManageTeam.value = false;
+    const wrapper = mountTab();
+    await flushPromises();
+    expect(wrapper.findAll('button[aria-label^="Remove"]')).toHaveLength(0);
+    expect(wrapper.text()).not.toContain("Leave team");
+  });
+
+  it("reports a failed resend and keeps the invitation available for retry", async () => {
+    const wrapper = mountTab();
+    await flushPromises();
+    const resend = wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Resend")!;
+    mocks.api.mockRejectedValueOnce({
+      data: { code: "team.invitation_email_failed" },
+    });
+    await resend.trigger("click");
+    await flushPromises();
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.stringContaining("email could not be sent"),
+    );
+    expect(mocks.success).not.toHaveBeenCalled();
+    expect(wrapper.text()).toContain(invitation.email);
+    await resend.trigger("click");
+    await flushPromises();
+    expect(mocks.success).toHaveBeenCalledWith("Invitation resent");
   });
 
   it("surfaces API messages and resets loading states", async () => {

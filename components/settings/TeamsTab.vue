@@ -44,6 +44,7 @@ const { t } = useI18n();
 const { setCurrentTeamId } = useApi();
 const { close: closeSettings } = useSettingsSheet();
 const { canManageTeam } = useCan();
+const { isImpersonating } = useImpersonation();
 const { teams, loadTeams, updateTeam, removeTeam } = useTeams();
 const { refreshActiveTeam } = useActiveTeamRefresh();
 
@@ -58,6 +59,9 @@ const isDeleteOpen = ref(false);
 const isRenaming = ref(false);
 const isDeleting = ref(false);
 const resendingId = ref<string | null>(null);
+const memberToRemove = ref<TeamMember | null>(null);
+const isMembershipDialogOpen = ref(false);
+const isRemovingMember = ref(false);
 
 const roles = computed(() => [
   {
@@ -86,7 +90,21 @@ const assignableRoles = computed(() =>
 );
 
 const isOwner = computed(
-  () => currentTeam.value?.user_id === String(user.value?.id),
+  () =>
+    canManageTeam.value &&
+    currentTeam.value?.id === user.value?.current_team_id &&
+    currentTeam.value?.user_id === String(user.value?.id),
+);
+const canLeaveTeam = computed(
+  () =>
+    !isImpersonating.value &&
+    !!user.value &&
+    !!currentTeam.value &&
+    currentTeam.value.id === String(user.value.current_team_id) &&
+    currentTeam.value.user_id !== String(user.value.id),
+);
+const membershipAction = computed(() =>
+  memberToRemove.value ? "removeMember" : "leaveTeam",
 );
 const transferTeams = computed(() =>
   teams.value.filter(
@@ -115,20 +133,32 @@ const fetchTeamMembers = async () => {
     const teamId = user.value?.current_team_id;
     if (!teamId) return;
 
-    const [teamResponse, membersResponse, invitationsResponse] =
-      await Promise.all([
-        $api<{ data: Team }>(`/teams/${teamId}`),
-        $api<{ data: TeamMember[] }>(`/teams/${teamId}/members`),
-        $api<{ data: TeamInvitation[] }>(`/teams/${teamId}/invitations`).catch(
-          () => ({ data: [] as TeamInvitation[] }),
-        ),
-        loadTeams(),
-      ]);
+    const [teamResponse, membersResponse] = await Promise.all([
+      $api<{ data: Team }>(`/teams/${teamId}`),
+      $api<{ data: TeamMember[] }>(`/teams/${teamId}/members`),
+    ]);
+    if (teamId !== user.value?.current_team_id) return;
     currentTeam.value = teamResponse.data;
     teamName.value = teamResponse.data.name;
     members.value = membersResponse.data;
-    invitations.value = invitationsResponse.data;
-    transferToTeamId.value = transferTeams.value[0]?.id || "";
+
+    await Promise.all([
+      canManageTeam.value
+        ? $api<{ data: TeamInvitation[] }>(`/teams/${teamId}/invitations`).then(
+            ({ data }) => {
+              if (teamId === user.value?.current_team_id)
+                invitations.value = data;
+            },
+          )
+        : undefined,
+      isOwner.value
+        ? loadTeams().then(() => {
+            if (teamId === user.value?.current_team_id) {
+              transferToTeamId.value = transferTeams.value[0]?.id || "";
+            }
+          })
+        : undefined,
+    ]);
   } catch {
     toast.error(t("settings.teams.loadFailed"));
   } finally {
@@ -161,7 +191,14 @@ const renameTeam = async () => {
 };
 
 const deleteTeam = async () => {
-  if (!currentTeam.value || !transferToTeamId.value) return;
+  if (
+    !currentTeam.value ||
+    !isOwner.value ||
+    currentTeam.value.personal_team ||
+    isDeleting.value ||
+    !transferTeams.value.some((team) => team.id === transferToTeamId.value)
+  )
+    return;
   isDeleting.value = true;
   try {
     const deletedTeamId = currentTeam.value.id;
@@ -171,6 +208,7 @@ const deleteTeam = async () => {
     });
     removeTeam(deletedTeamId);
     updateTeam(response.data);
+    if (user.value) user.value.role = undefined;
     setCurrentTeamId(response.data.id);
     await fetchUser();
     refreshActiveTeam();
@@ -185,7 +223,53 @@ const deleteTeam = async () => {
   }
 };
 
+const confirmMembershipChange = (member: TeamMember | null) => {
+  memberToRemove.value = member;
+  isMembershipDialogOpen.value = true;
+};
+
+const changeMembership = async () => {
+  const teamId = currentTeam.value?.id;
+  const member = memberToRemove.value;
+  const memberId = member?.id ?? user.value?.id;
+  if (
+    !teamId ||
+    !memberId ||
+    isRemovingMember.value ||
+    (member ? !isOwner.value || member.role === "owner" : !canLeaveTeam.value)
+  )
+    return;
+
+  const action = membershipAction.value;
+  isRemovingMember.value = true;
+  try {
+    await $api(`/teams/${teamId}/members/${memberId}`, { method: "DELETE" });
+    isMembershipDialogOpen.value = false;
+    if (member) {
+      members.value = members.value.filter((item) => item.id !== memberId);
+    } else {
+      removeTeam(teamId);
+      if (user.value && String(user.value.current_team_id) === teamId) {
+        user.value.role = undefined;
+        user.value.current_team = undefined;
+        user.value.current_team_id = null;
+        setCurrentTeamId(null);
+        closeSettings();
+        await fetchUser();
+        refreshActiveTeam();
+        await navigateTo("/dashboard");
+      }
+    }
+    toast.success(t(`settings.teams.${action}Success`));
+  } catch (error) {
+    toast.error(errorMessage(error, t(`settings.teams.${action}Failed`)));
+  } finally {
+    isRemovingMember.value = false;
+  }
+};
+
 const resendInvitation = async (invitationId: string) => {
+  if (resendingId.value) return;
   resendingId.value = invitationId;
   try {
     await $api(
@@ -195,8 +279,15 @@ const resendInvitation = async (invitationId: string) => {
       },
     );
     toast.success(t("settings.teams.invitationResent"));
-  } catch {
-    toast.error(t("settings.teams.invitationResendFailed"));
+  } catch (error) {
+    const code = (error as { data?: { code?: string } } | null)?.data?.code;
+    toast.error(
+      t(
+        code === "team.invitation_email_failed"
+          ? "settings.teamDialogs.invitationDeliveryFailed"
+          : "settings.teams.invitationResendFailed",
+      ),
+    );
   } finally {
     resendingId.value = null;
   }
@@ -338,26 +429,44 @@ onMounted(fetchTeamMembers);
               </div>
             </div>
 
-            <Select
-              :model-value="member.role"
-              :disabled="!isOwner || member.role === 'owner'"
-              @update:model-value="
-                (value) => updateMemberRole(member.id, value as string)
-              "
-            >
-              <SelectTrigger class="w-28 text-sm"
-                ><SelectValue
-              /></SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="role in assignableRoles"
-                  :key="role.value"
-                  :value="role.value"
-                >
-                  {{ role.label }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <Select
+                :model-value="member.role"
+                :disabled="!isOwner || member.role === 'owner'"
+                @update:model-value="
+                  (value) => updateMemberRole(member.id, value as string)
+                "
+              >
+                <SelectTrigger class="w-28 text-sm"
+                  ><SelectValue
+                /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem
+                    v-for="role in assignableRoles"
+                    :key="role.value"
+                    :value="role.value"
+                  >
+                    {{ role.label }}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                v-if="
+                  isOwner &&
+                  !isCurrentUser(member.id) &&
+                  member.role !== 'owner'
+                "
+                variant="ghost"
+                size="sm"
+                class="text-destructive hover:text-destructive"
+                :aria-label="
+                  t('settings.teams.removeMemberTitle', { name: member.name })
+                "
+                @click="confirmMembershipChange(member)"
+              >
+                {{ t("settings.teams.removeMember") }}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -394,7 +503,7 @@ onMounted(fetchTeamMembers);
               <Button
                 variant="ghost"
                 size="sm"
-                :disabled="resendingId === invitation.id"
+                :disabled="resendingId !== null"
                 @click="resendInvitation(invitation.id)"
               >
                 <Icon
@@ -455,6 +564,11 @@ onMounted(fetchTeamMembers);
           </Button>
         </div>
       </div>
+      <div v-if="canLeaveTeam" class="flex justify-end px-6 pt-6">
+        <Button variant="destructive" @click="confirmMembershipChange(null)">
+          {{ t("settings.teams.leaveTeam") }}
+        </Button>
+      </div>
     </template>
 
     <SettingsInviteMember
@@ -462,6 +576,37 @@ onMounted(fetchTeamMembers);
       :team-id="currentTeam?.id"
       @invited="fetchTeamMembers"
     />
+
+    <AlertDialog
+      :open="isMembershipDialogOpen"
+      @update:open="!isRemovingMember && (isMembershipDialogOpen = $event)"
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{
+            t(`settings.teams.${membershipAction}Title`, {
+              name: memberToRemove?.name || currentTeam?.name,
+            })
+          }}</AlertDialogTitle>
+          <AlertDialogDescription>{{
+            t(`settings.teams.${membershipAction}Description`)
+          }}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isRemovingMember">{{
+            t("settings.teams.cancel")
+          }}</AlertDialogCancel>
+          <Button
+            type="button"
+            variant="destructive"
+            :disabled="isRemovingMember"
+            @click="changeMembership"
+          >
+            {{ t(`settings.teams.${membershipAction}`) }}
+          </Button>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     <AlertDialog v-model:open="isDeleteOpen">
       <AlertDialogContent>

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
-import * as z from "zod";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -13,64 +12,42 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import type { Team } from "~/types";
 
-const emit = defineEmits<{
-  created: [];
-}>();
 const { t } = useI18n();
+const { updateTeam } = useTeams();
+const { user, fetchUser } = useAuth();
 
 const open = defineModel<boolean>("open", { default: false });
 const isLoading = ref(false);
 const name = ref("");
-const errors = ref<{ name?: string }>({});
-
-const schema = computed(() =>
-  z.object({
-    name: z.string().min(1, t("settings.teamDialogs.nameRequired")),
-  }),
+const trimmedName = computed(() => name.value.trim());
+const nameLength = computed(() => Array.from(trimmedName.value).length);
+const validName = computed(
+  () => nameLength.value >= 2 && nameLength.value <= 255,
 );
 
 const canSubmit = computed(() => {
-  return name.value.trim().length > 0 && !isLoading.value;
+  return validName.value && !isLoading.value;
 });
 
-const resetForm = () => {
-  name.value = "";
-  errors.value = {};
-};
-
-const handleClose = (isOpen: boolean) => {
-  if (!isOpen) {
-    resetForm();
-  }
-};
-
-const validate = () => {
-  const result = schema.value.safeParse({ name: name.value.trim() });
-  if (!result.success) {
-    const fieldErrors = result.error.flatten().fieldErrors;
-    errors.value = {
-      name: fieldErrors.name?.[0],
-    };
-    return false;
-  }
-  errors.value = {};
-  return true;
-};
+watch(open, (isOpen) => {
+  if (!isOpen) name.value = "";
+});
 
 const onSubmit = async () => {
-  if (!validate()) return;
+  if (!canSubmit.value) return;
 
   isLoading.value = true;
   try {
-    await $api("/teams", {
+    const { data: team } = await $api<{ data: Team }>("/teams", {
       method: "POST",
-      body: { name: name.value.trim() },
+      body: { name: trimmedName.value },
     });
+    updateTeam(team);
+    if (!user.value?.current_team_id) await fetchUser();
     toast.success(t("settings.teamDialogs.created"));
     open.value = false;
-    resetForm();
-    emit("created");
   } catch (error: unknown) {
     if (error && typeof error === "object" && "data" in error) {
       const fetchError = error as { data?: { message?: string } };
@@ -87,7 +64,7 @@ const onSubmit = async () => {
 </script>
 
 <template>
-  <Dialog v-model:open="open" @update:open="handleClose">
+  <Dialog v-model:open="open">
     <DialogTrigger v-if="$slots.default" as-child>
       <slot />
     </DialogTrigger>
@@ -109,9 +86,13 @@ const onSubmit = async () => {
             v-model="name"
             :placeholder="t('settings.teamDialogs.teamNamePlaceholder')"
             autocomplete="off"
+            :aria-invalid="nameLength > 0 && !validName"
           />
-          <p v-if="errors.name" class="text-sm text-destructive">
-            {{ errors.name }}
+          <p
+            v-if="nameLength > 0 && !validName"
+            class="text-sm text-destructive"
+          >
+            {{ t("settings.teamDialogs.nameLength") }}
           </p>
         </div>
 
