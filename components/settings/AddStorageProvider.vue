@@ -36,6 +36,7 @@ const credentials = ref({
   bucket: "",
   region: "",
   endpoint: "",
+  token: "",
 });
 const errors = ref<Record<string, string>>({});
 
@@ -48,69 +49,10 @@ const providers = [
   },
   { value: "backblaze", label: "Backblaze B2", icon: "simple-icons:backblaze" },
   { value: "wasabi", label: "Wasabi", icon: "lucide:database" },
+  { value: "dropbox", label: "Dropbox", icon: "simple-icons:dropbox" },
 ];
 
-const s3Regions = computed(() => [
-  {
-    value: "us-east-1",
-    label: t("settings.connectionDialogs.regions.usEastVirginia"),
-  },
-  {
-    value: "us-east-2",
-    label: t("settings.connectionDialogs.regions.usEastOhio"),
-  },
-  {
-    value: "us-west-1",
-    label: t("settings.connectionDialogs.regions.usWestCalifornia"),
-  },
-  {
-    value: "us-west-2",
-    label: t("settings.connectionDialogs.regions.usWestOregon"),
-  },
-  {
-    value: "eu-west-1",
-    label: t("settings.connectionDialogs.regions.euIreland"),
-  },
-  {
-    value: "eu-west-2",
-    label: t("settings.connectionDialogs.regions.euLondon"),
-  },
-  {
-    value: "eu-central-1",
-    label: t("settings.connectionDialogs.regions.euFrankfurt"),
-  },
-  {
-    value: "ap-southeast-1",
-    label: t("settings.connectionDialogs.regions.apSingapore"),
-  },
-  {
-    value: "ap-southeast-2",
-    label: t("settings.connectionDialogs.regions.apSydney"),
-  },
-  {
-    value: "ap-northeast-1",
-    label: t("settings.connectionDialogs.regions.apTokyo"),
-  },
-]);
-
-const spacesRegions = computed(() => [
-  { value: "nyc3", label: t("settings.connectionDialogs.regions.newYork3") },
-  {
-    value: "sfo3",
-    label: t("settings.connectionDialogs.regions.sanFrancisco3"),
-  },
-  { value: "ams3", label: t("settings.connectionDialogs.regions.amsterdam3") },
-  { value: "sgp1", label: t("settings.connectionDialogs.regions.singapore1") },
-  { value: "fra1", label: t("settings.connectionDialogs.regions.frankfurt1") },
-]);
-
-const currentRegions = computed(() => {
-  if (provider.value === "s3") return s3Regions.value;
-  if (provider.value === "spaces") return spacesRegions.value;
-  return [];
-});
-
-const showRegion = computed(() => ["s3", "spaces"].includes(provider.value));
+const isDropbox = computed(() => provider.value === "dropbox");
 const showEndpoint = computed(() =>
   ["backblaze", "wasabi"].includes(provider.value),
 );
@@ -124,6 +66,7 @@ const resetForm = () => {
     bucket: "",
     region: "",
     endpoint: "",
+    token: "",
   };
   errors.value = {};
 };
@@ -141,6 +84,14 @@ const validate = () => {
       "settings.connectionDialogs.validation.labelRequired",
     );
   }
+  if (isDropbox.value) {
+    if (!credentials.value.token.trim()) {
+      errors.value.token = t(
+        "settings.connectionDialogs.validation.apiTokenRequired",
+      );
+    }
+    return Object.keys(errors.value).length === 0;
+  }
   if (!credentials.value.access_key.trim()) {
     errors.value.access_key = t(
       "settings.connectionDialogs.validation.accessKeyRequired",
@@ -156,7 +107,7 @@ const validate = () => {
       "settings.connectionDialogs.validation.bucketRequired",
     );
   }
-  if (showRegion.value && !credentials.value.region) {
+  if (!credentials.value.region.trim()) {
     errors.value.region = t(
       "settings.connectionDialogs.validation.regionRequired",
     );
@@ -178,18 +129,35 @@ const onSubmit = async () => {
   try {
     await $api("/storage-providers", {
       method: "POST",
-      body: {
-        provider: provider.value,
-        label: label.value,
-        access_key: credentials.value.access_key,
-        secret_key: credentials.value.secret_key,
-        bucket: credentials.value.bucket,
-        region: credentials.value.region || undefined,
-        endpoint: credentials.value.endpoint || undefined,
-      },
+      body: isDropbox.value
+        ? {
+            provider: "dropbox",
+            label: label.value.trim(),
+            token: credentials.value.token.trim(),
+          }
+        : {
+            provider: "s3",
+            label: label.value.trim(),
+            key: credentials.value.access_key.trim(),
+            secret: credentials.value.secret_key.trim(),
+            bucket: credentials.value.bucket.trim(),
+            region: credentials.value.region.trim(),
+            endpoint:
+              provider.value === "spaces"
+                ? `https://${credentials.value.region.trim()}.digitaloceanspaces.com`
+                : showEndpoint.value
+                  ? credentials.value.endpoint.trim()
+                  : undefined,
+          },
     });
 
-    toast.success(t("settings.connectionDialogs.storage.connected"));
+    toast.success(
+      t(
+        isDropbox.value
+          ? "settings.connectionDialogs.storage.connected"
+          : "settings.connectionDialogs.storage.saved",
+      ),
+    );
     emit("created");
     open.value = false;
     resetForm();
@@ -199,7 +167,9 @@ const onSubmit = async () => {
     };
     if (err.data?.errors) {
       for (const [field, messages] of Object.entries(err.data.errors)) {
-        errors.value[field] = messages[0];
+        const input =
+          { key: "access_key", secret: "secret_key" }[field] || field;
+        errors.value[input] = messages[0];
       }
     } else {
       toast.error(
@@ -275,85 +245,91 @@ watch(open, (isOpen) => {
           </p>
         </div>
 
-        <div class="space-y-2">
-          <Label for="access_key">{{
-            t("settings.connectionDialogs.accessKey")
+        <div v-if="isDropbox" class="space-y-2">
+          <Label for="token">{{
+            t("settings.connectionDialogs.apiToken")
           }}</Label>
-          <Input
-            id="access_key"
-            v-model="credentials.access_key"
-            :placeholder="t('settings.connectionDialogs.accessKeyPlaceholder')"
-          />
-          <p v-if="errors.access_key" class="text-sm text-destructive">
-            {{ errors.access_key }}
+          <Input id="token" v-model="credentials.token" type="password" />
+          <p v-if="errors.token" class="text-sm text-destructive">
+            {{ errors.token }}
           </p>
         </div>
+        <template v-else>
+          <div class="space-y-2">
+            <Label for="access_key">{{
+              t("settings.connectionDialogs.accessKey")
+            }}</Label>
+            <Input
+              id="access_key"
+              v-model="credentials.access_key"
+              :placeholder="
+                t('settings.connectionDialogs.accessKeyPlaceholder')
+              "
+            />
+            <p v-if="errors.access_key" class="text-sm text-destructive">
+              {{ errors.access_key }}
+            </p>
+          </div>
 
-        <div class="space-y-2">
-          <Label for="secret_key">{{
-            t("settings.connectionDialogs.secretKey")
-          }}</Label>
-          <Input
-            id="secret_key"
-            v-model="credentials.secret_key"
-            type="password"
-            :placeholder="t('settings.connectionDialogs.secretKeyPlaceholder')"
-          />
-          <p v-if="errors.secret_key" class="text-sm text-destructive">
-            {{ errors.secret_key }}
-          </p>
-        </div>
+          <div class="space-y-2">
+            <Label for="secret_key">{{
+              t("settings.connectionDialogs.secretKey")
+            }}</Label>
+            <Input
+              id="secret_key"
+              v-model="credentials.secret_key"
+              type="password"
+              :placeholder="
+                t('settings.connectionDialogs.secretKeyPlaceholder')
+              "
+            />
+            <p v-if="errors.secret_key" class="text-sm text-destructive">
+              {{ errors.secret_key }}
+            </p>
+          </div>
 
-        <div class="space-y-2">
-          <Label for="bucket">{{
-            t("settings.connectionDialogs.bucketName")
-          }}</Label>
-          <Input
-            id="bucket"
-            v-model="credentials.bucket"
-            placeholder="my-bucket"
-          />
-          <p v-if="errors.bucket" class="text-sm text-destructive">
-            {{ errors.bucket }}
-          </p>
-        </div>
+          <div class="space-y-2">
+            <Label for="bucket">{{
+              t("settings.connectionDialogs.bucketName")
+            }}</Label>
+            <Input
+              id="bucket"
+              v-model="credentials.bucket"
+              placeholder="my-bucket"
+            />
+            <p v-if="errors.bucket" class="text-sm text-destructive">
+              {{ errors.bucket }}
+            </p>
+          </div>
 
-        <div v-if="showRegion" class="space-y-2">
-          <Label>{{ t("settings.connectionDialogs.region") }}</Label>
-          <Select v-model="credentials.region">
-            <SelectTrigger>
-              <SelectValue
-                :placeholder="t('settings.connectionDialogs.selectRegion')"
-              />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="r in currentRegions"
-                :key="r.value"
-                :value="r.value"
-              >
-                {{ r.label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          <p v-if="errors.region" class="text-sm text-destructive">
-            {{ errors.region }}
-          </p>
-        </div>
+          <div class="space-y-2">
+            <Label for="region">{{
+              t("settings.connectionDialogs.region")
+            }}</Label>
+            <Input
+              id="region"
+              v-model="credentials.region"
+              :placeholder="provider === 'spaces' ? 'nyc3' : 'us-east-1'"
+            />
+            <p v-if="errors.region" class="text-sm text-destructive">
+              {{ errors.region }}
+            </p>
+          </div>
 
-        <div v-if="showEndpoint" class="space-y-2">
-          <Label for="endpoint">{{
-            t("settings.connectionDialogs.endpointUrl")
-          }}</Label>
-          <Input
-            id="endpoint"
-            v-model="credentials.endpoint"
-            placeholder="https://s3.us-west-001.backblazeb2.com"
-          />
-          <p v-if="errors.endpoint" class="text-sm text-destructive">
-            {{ errors.endpoint }}
-          </p>
-        </div>
+          <div v-if="showEndpoint" class="space-y-2">
+            <Label for="endpoint">{{
+              t("settings.connectionDialogs.endpointUrl")
+            }}</Label>
+            <Input
+              id="endpoint"
+              v-model="credentials.endpoint"
+              placeholder="https://s3.us-west-001.backblazeb2.com"
+            />
+            <p v-if="errors.endpoint" class="text-sm text-destructive">
+              {{ errors.endpoint }}
+            </p>
+          </div>
+        </template>
 
         <DialogFooter>
           <Button type="button" variant="outline" @click="open = false">

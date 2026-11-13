@@ -427,6 +427,7 @@
       "connect": "Connect",
       "connectFailed": "Failed to connect provider",
       "dns": {
+        "accountId": "Account ID",
         "connected": "DNS provider connected",
         "description": "Connect a DNS provider for automatic DNS management",
         "labelPlaceholder": "My Cloudflare Account",
@@ -484,6 +485,7 @@
       },
       "storage": {
         "connected": "Storage provider connected",
+        "saved": "Storage settings saved. Bucket access has not been verified.",
         "description": "Connect a storage provider for backups and file storage",
         "labelPlaceholder": "My S3 Bucket",
         "title": "Connect Storage Provider"
@@ -498,6 +500,7 @@
         "nameRequired": "Name is required",
         "passwordRequired": "Password is required",
         "profileRequired": "Profile name is required",
+        "accountIdRequired": "Account ID is required",
         "regionRequired": "Region is required",
         "secretKeyRequired": "Secret key is required",
         "selectProvider": "Please select a provider",

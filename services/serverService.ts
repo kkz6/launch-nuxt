@@ -27,7 +27,7 @@ export interface CreateServerOptions {
   plans: Record<
     string,
     {
-      plans: { value: string; title: string; specs?: string }[];
+      plans: { value: string; title: string; regions?: string[] }[];
       regions: { value: string; title: string }[];
     }
   >;

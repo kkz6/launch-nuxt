@@ -71,13 +71,15 @@ interface StorageProvider {
 }
 
 const storageProviderLabels: Record<string, string> = {
-  s3: "Amazon S3",
+  s3: "S3-compatible storage",
+  dropbox: "Dropbox",
   spaces: "DigitalOcean Spaces",
   backblaze: "Backblaze B2",
   wasabi: "Wasabi",
 };
 const storageProviderIcons: Record<string, string> = {
   s3: "simple-icons:amazons3",
+  dropbox: "simple-icons:dropbox",
   spaces: "simple-icons:digitalocean",
   backblaze: "simple-icons:backblaze",
   wasabi: "lucide:database",
@@ -85,7 +87,7 @@ const storageProviderIcons: Record<string, string> = {
 
 interface DnsProvider {
   id: string;
-  label: string;
+  profile: string;
   provider: string;
   created_at: string;
 }
@@ -376,7 +378,7 @@ const deleteDnsProvider = async (provider: DnsProvider) => {
   const result = await confirmationDialog.value.show({
     title: t("settings.connections.dns.deleteTitle"),
     description: t("settings.connections.dns.deleteDescription", {
-      name: provider.label,
+      name: provider.profile,
     }),
     confirmText: t("settings.connections.delete"),
     cancelText: t("settings.connections.cancel"),
@@ -931,7 +933,7 @@ onMounted(() => {
                 class="h-5 w-5"
               />
               <div>
-                <span class="text-sm font-medium">{{ provider.label }}</span>
+                <span class="text-sm font-medium">{{ provider.profile }}</span>
                 <p class="text-xs text-muted-foreground">
                   {{
                     dnsProviderLabels[provider.provider] || provider.provider

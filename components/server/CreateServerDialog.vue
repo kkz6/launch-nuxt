@@ -36,7 +36,7 @@ import {
 interface Plan {
   value: string;
   title: string;
-  specs?: string;
+  regions?: string[];
 }
 
 interface Region {
@@ -91,7 +91,6 @@ const serviceProviders = computed<Record<string, string>>(() => ({
   hetzner: "Hetzner",
   linode: "Linode",
   vultr: "Vultr",
-  aws: "AWS",
   custom_server: t("server.create.customServer"),
 }));
 
@@ -179,7 +178,19 @@ const filteredProviders = computed(() => {
 const currentPlans = computed(() => {
   const provider = serviceProvider.value;
   if (!provider || !plans.value[provider]) return [];
-  return plans.value[provider]?.plans || [];
+  return (plans.value[provider]?.plans || []).filter(
+    (option) =>
+      !region.value || !option.regions || option.regions.includes(region.value),
+  );
+});
+
+watch(region, () => {
+  if (
+    plan.value &&
+    !currentPlans.value.some((option) => option.value === plan.value)
+  ) {
+    plan.value = "";
+  }
 });
 
 const currentRegions = computed(() => {

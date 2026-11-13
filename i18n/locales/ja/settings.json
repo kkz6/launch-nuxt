@@ -427,6 +427,7 @@
       "connect": "接続",
       "connectFailed": "プロバイダーへの接続に失敗しました",
       "dns": {
+        "accountId": "アカウント ID",
         "connected": "DNS プロバイダーを接続しました",
         "description": "DNS を自動管理するための DNS プロバイダーを接続します",
         "labelPlaceholder": "マイ Cloudflare アカウント",
@@ -484,6 +485,7 @@
       },
       "storage": {
         "connected": "ストレージプロバイダーを接続しました",
+        "saved": "ストレージ設定を保存しました。バケットへのアクセスは未確認です。",
         "description": "バックアップとファイル保存に使用するストレージプロバイダーを接続します",
         "labelPlaceholder": "マイ S3 バケット",
         "title": "ストレージプロバイダーを接続"
@@ -498,6 +500,7 @@
         "nameRequired": "名前は必須です",
         "passwordRequired": "パスワードは必須です",
         "profileRequired": "プロファイル名は必須です",
+        "accountIdRequired": "アカウント ID は必須です",
         "regionRequired": "リージョンは必須です",
         "secretKeyRequired": "シークレットキーは必須です",
         "selectProvider": "プロバイダーを選択してください",
