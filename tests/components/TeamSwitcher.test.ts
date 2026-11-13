@@ -24,7 +24,7 @@ const user = ref({
   current_team_id: "personal",
   role: "owner" as TeamRole | undefined,
 });
-const states = new Map<string, ReturnType<typeof ref<number>>>();
+const states = new Map<string, ReturnType<typeof ref<number | boolean>>>();
 const teams = [
   {
     id: "personal",
@@ -143,14 +143,17 @@ describe("team switcher", () => {
         ]) {
           const state = states.get(key) || ref(0);
           states.set(key, state);
-          state.value = (state.value ?? 0) + 1;
+          state.value = Number(state.value ?? 0) + 1;
         }
       },
     }));
-    vi.stubGlobal("useState", (key: string, factory: () => number) => {
-      if (!states.has(key)) states.set(key, ref(factory()));
-      return states.get(key);
-    });
+    vi.stubGlobal(
+      "useState",
+      (key: string, factory: () => number | boolean) => {
+        if (!states.has(key)) states.set(key, ref(factory()));
+        return states.get(key);
+      },
+    );
   });
 
   afterEach(() => {
@@ -171,9 +174,11 @@ describe("team switcher", () => {
     expect(mocks.setCurrentTeamId).toHaveBeenCalledWith("01TEAM123456");
     expect(mocks.fetchUser).toHaveBeenCalled();
     expect(mocks.reconnect).toHaveBeenCalled();
-    expect([...states.values()].map((state) => state.value)).toEqual([
-      1, 1, 1, 1,
-    ]);
+    expect(
+      [...states.values()]
+        .filter((state) => typeof state.value === "number")
+        .map((state) => state.value),
+    ).toEqual([1, 1, 1, 1]);
     expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
     expect(mocks.success).toHaveBeenCalledWith("Switched to Launch");
   });
