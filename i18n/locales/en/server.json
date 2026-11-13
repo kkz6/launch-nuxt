@@ -265,6 +265,8 @@
     },
     "list": {
       "title": "Servers",
+      "loadFailed": "Could not load servers.",
+      "retry": "Retry",
       "emptyTitle": "No servers added yet",
       "emptyDescription": "Click Create Server to get started",
       "provisionQueued": "Provisioning has been queued",

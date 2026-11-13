@@ -5,6 +5,7 @@ import { storeToRefs } from "pinia";
 import { toast } from "vue-sonner";
 import type { Server } from "~/types";
 import { serverService } from "~/services/serverService";
+import { Button } from "~/components/ui/button";
 import { useServersStore } from "~/stores/useServersStore";
 import {
   Tooltip,
@@ -27,7 +28,10 @@ useHead(() => ({ title: t("server.list.title") }));
 // where every page had its own fetch+merge+subscribe — see
 // stores/useServersStore.ts for the rationale.
 const serversStore = useServersStore();
-const { servers, isLoading, hasFetched } = storeToRefs(serversStore);
+const { servers, isLoading, hasFetched, hasLoadError } =
+  storeToRefs(serversStore);
+
+const loadServers = () => serversStore.fetchAll().catch(() => {});
 
 // Provision dialog state
 const showProvisionDialog = ref(false);
@@ -59,7 +63,7 @@ const onCardClick = (server: Server) => {
 // A delete request may only queue remote cleanup. Keep the row until the
 // canonical list or server.deleted confirms completion.
 const handleServerDeleted = (_serverId: string) => {
-  void serversStore.fetchAll().catch(() => {});
+  void loadServers();
 };
 const { user: liveUser } = useAuth();
 const liveTeamId = computed(
@@ -97,9 +101,7 @@ const needsPendingActions = (server: Server): boolean => {
 
 // Watch for refresh trigger (e.g., after team switch)
 const serversRefreshKey = useState("serversRefreshKey", () => 0);
-watch(serversRefreshKey, () => {
-  serversStore.fetchAll();
-});
+watch(serversRefreshKey, loadServers);
 
 const getProviderIcon = (provider: string): string => {
   const name = provider?.toLowerCase() || "";
@@ -237,7 +239,7 @@ const { cacheServer } = useNavbarCache();
 // background — no spinner flash on return visits.
 onMounted(() => {
   if (!serversStore.hasFetched) {
-    serversStore.fetchAll();
+    void loadServers();
   } else {
     serversStore.ensureSubscribed();
   }
@@ -246,19 +248,19 @@ onMounted(() => {
 
 <template>
   <div class="pb-10">
-    <!--
-      The spinner condition includes `!hasFetched` so the very first
-      render frame after a hard refresh shows the loader, not the
-      "No servers" empty state. Without the guard, the initial render
-      saw `isLoading=false` (the store hasn't started fetching yet —
-      onMounted runs *after* the first paint) and `servers=[]`, so the
-      empty state flashed for one frame before fetchAll() flipped
-      isLoading to true. `hasFetched` flips to true once at the end of
-      the first successful fetch and stays true, so subsequent refetches
-      (from WS reconcile, manual retry, etc.) behave the same as before.
-    -->
     <div
-      v-if="isLoading || !hasFetched"
+      v-if="hasLoadError"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4"
+      role="status"
+    >
+      <p class="text-sm">{{ t("server.list.loadFailed") }}</p>
+      <Button variant="outline" size="sm" @click="loadServers">
+        {{ t("server.list.retry") }}
+      </Button>
+    </div>
+
+    <div
+      v-if="isLoading || (!hasFetched && !hasLoadError)"
       class="flex items-center justify-center py-12"
     >
       <Icon
@@ -268,7 +270,7 @@ onMounted(() => {
     </div>
 
     <div
-      v-else-if="servers.length === 0"
+      v-else-if="hasFetched && !hasLoadError && servers.length === 0"
       class="flex h-[50vh] w-full flex-col items-center justify-center space-y-4 rounded-lg border bg-card"
     >
       <Icon name="lucide:server" class="h-16 w-16 text-muted-foreground" />
@@ -280,7 +282,10 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div
+      v-else-if="servers.length"
+      class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+    >
       <!-- All cards are plain divs. Only running cards get the click
            handler that navigates to the detail page; non-running cards get
            pointer-events-none so they look inert. Inner action buttons

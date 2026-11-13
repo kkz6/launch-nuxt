@@ -1,3 +1,4 @@
+import { ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useApi, useApiQuery } from "../../composables/useApi";
 import { translateForLocale } from "../helpers/i18n";
@@ -14,10 +15,16 @@ const cookies = new Map<string, { value: string | null }>();
 const fetchMock = vi.fn();
 const useFetchMock = vi.fn((url, options) => ({ url, options }));
 const navigateToMock = vi.fn();
+const activeUser = ref<{
+  current_team_id: string | null;
+  current_team?: { is_subscribed: boolean };
+  role?: string;
+} | null>(null);
 
 describe("API locale headers", () => {
   beforeEach(() => {
     cookies.clear();
+    activeUser.value = null;
     fetchMock.mockReset();
     useFetchMock.mockClear();
     navigateToMock.mockReset();
@@ -42,6 +49,7 @@ describe("API locale headers", () => {
       return cookies.get(key);
     });
     vi.stubGlobal("navigateTo", navigateToMock);
+    vi.stubGlobal("useState", () => activeUser);
   });
 
   afterEach(() => vi.unstubAllGlobals());
@@ -113,6 +121,7 @@ describe("API locale headers", () => {
 
   it("uses stable error codes to clear an invalid team context", async () => {
     cookies.set("current_team_id", { value: "team-id" });
+    activeUser.value = { current_team_id: "team-id" };
     fetchMock.mockRejectedValue({
       response: { status: 400 },
       data: {
@@ -126,7 +135,43 @@ describe("API locale headers", () => {
     });
 
     expect(cookies.get("current_team_id")?.value).toBeNull();
-    expect(navigateToMock).toHaveBeenCalledWith("/servers");
+    expect(activeUser.value.current_team_id).toBeNull();
+    expect(navigateToMock).toHaveBeenCalledWith("/dashboard", {
+      replace: true,
+    });
+  });
+
+  it("keeps the new team when an older request fails", async () => {
+    cookies.set("current_team_id", { value: "old-team" });
+    fetchMock.mockImplementationOnce(async () => {
+      cookies.get("current_team_id")!.value = "new-team";
+      activeUser.value = { current_team_id: "new-team" };
+      throw { data: { code: "team.not_member" } };
+    });
+    await expect(useApi().get("/servers")).rejects.toMatchObject({
+      data: { code: "team.not_member" },
+    });
+    expect(cookies.get("current_team_id")?.value).toBe("new-team");
+    expect(activeUser.value?.current_team_id).toBe("new-team");
+    expect(navigateToMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the subscription prompt when the API rejects stale subscription status", async () => {
+    cookies.set("current_team_id", { value: "team-id" });
+    activeUser.value = {
+      current_team_id: "team-id",
+      current_team: { is_subscribed: true },
+    };
+    fetchMock.mockRejectedValueOnce({ response: { status: 402 } });
+
+    await expect(useApi().get("/servers")).rejects.toMatchObject({
+      response: { status: 402 },
+    });
+    expect(activeUser.value.current_team?.is_subscribed).toBe(false);
+    expect(cookies.get("current_team_id")?.value).toBe("team-id");
+    expect(navigateToMock).toHaveBeenCalledWith("/dashboard", {
+      replace: true,
+    });
   });
 
   it("uses stable error codes in useApiQuery response handling", () => {
@@ -145,7 +190,9 @@ describe("API locale headers", () => {
     });
 
     expect(cookies.get("current_team_id")?.value).toBeNull();
-    expect(navigateToMock).toHaveBeenCalledWith("/servers");
+    expect(navigateToMock).toHaveBeenCalledWith("/dashboard", {
+      replace: true,
+    });
   });
 
   it.each([

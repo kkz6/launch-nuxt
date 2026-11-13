@@ -18,6 +18,7 @@ const emit = defineEmits<{
   created: [];
 }>();
 const { t } = useI18n();
+const { user, fetchUser } = useAuth();
 
 const open = defineModel<boolean>("open", { default: false });
 const isLoading = ref(false);
@@ -67,6 +68,7 @@ const onSubmit = async () => {
       method: "POST",
       body: { name: name.value.trim() },
     });
+    if (!user.value?.current_team_id) await fetchUser();
     toast.success(t("settings.teamDialogs.created"));
     open.value = false;
     resetForm();

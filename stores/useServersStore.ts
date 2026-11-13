@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { effectScope } from 'vue'
+import { effectScope, watch } from 'vue'
 import { serverService } from '~/services/serverService'
 import type { Server } from '~/types'
 
@@ -35,16 +35,17 @@ import type { Server } from '~/types'
  * - Consumers don't need to call it themselves — `fetchAll()` calls it
  *   for them. If a component renders before any fetch (uncommon), it
  *   can call `ensureSubscribed()` directly.
- * - There's no `unsubscribe()` because the store lives for the session.
- *   The underlying WS connection handles team switches by reconnecting
- *   (the URL contains the team_id), at which point we re-fetch.
+ * - The store clears cached servers when the active account or team changes.
  */
 export const useServersStore = defineStore('servers', () => {
   const servers = ref<Server[]>([])
   const isLoading = ref(false)
   const hasFetched = ref(false)
+  const hasLoadError = ref(false)
   let subscribed = false
   let deletionVersion = 0
+  let teamVersion = 0
+  const { user } = useAuth()
   // Own effect scope for the WS subscription. useServerEvents registers
   // cleanup via onScopeDispose; without our own scope it would attach
   // to whichever component happened to be active when ensureSubscribed
@@ -117,14 +118,27 @@ export const useServersStore = defineStore('servers', () => {
   const fetchAll = async () => {
     ensureSubscribed()
     const requestDeletionVersion = deletionVersion
+    const requestTeamVersion = teamVersion
     isLoading.value = true
+    hasLoadError.value = false
     try {
       const response = await serverService.list()
-      if (requestDeletionVersion !== deletionVersion) return
+      if (
+        requestTeamVersion !== teamVersion ||
+        requestDeletionVersion !== deletionVersion
+      ) return
       replaceAll(response.data)
       hasFetched.value = true
+    } catch (error) {
+      if (
+        requestTeamVersion === teamVersion &&
+        requestDeletionVersion === deletionVersion
+      ) {
+        hasLoadError.value = true
+      }
+      throw error
     } finally {
-      isLoading.value = false
+      if (requestTeamVersion === teamVersion) isLoading.value = false
     }
   }
 
@@ -141,7 +155,6 @@ export const useServersStore = defineStore('servers', () => {
 
     subscriptionScope = effectScope(true) // detached: lives with the store
     subscriptionScope.run(() => {
-      const { user } = useAuth()
       const teamId = computed(() => user.value?.current_team_id?.toString() || '')
 
       useServerEvents(teamId, (data, event) => {
@@ -280,21 +293,46 @@ export const useServersStore = defineStore('servers', () => {
   }
 
   const backgroundRefetch = async () => {
+    if (
+      !user.value?.current_team_id ||
+      user.value.current_team?.is_subscribed === false
+    ) return
     const requestDeletionVersion = deletionVersion
+    const requestTeamVersion = teamVersion
     try {
       const response = await serverService.list()
-      if (requestDeletionVersion !== deletionVersion) return
+      if (
+        requestTeamVersion !== teamVersion ||
+        requestDeletionVersion !== deletionVersion
+      ) return
       replaceAll(response.data)
+      hasFetched.value = true
+      hasLoadError.value = false
     } catch {
       // Silent — the next interactive fetch will surface errors.
     }
   }
+
+  watch(
+    [() => user.value?.id, () => user.value?.current_team_id],
+    () => {
+      teamVersion++
+      if (refetchTimer) clearTimeout(refetchTimer)
+      refetchTimer = null
+      servers.value = []
+      hasFetched.value = false
+      hasLoadError.value = false
+      isLoading.value = false
+    },
+    { flush: 'sync' },
+  )
 
   return {
     // state
     servers,
     isLoading,
     hasFetched,
+    hasLoadError,
     // getters
     getById,
     byStatus,

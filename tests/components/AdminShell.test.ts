@@ -64,6 +64,10 @@ beforeEach(() => {
   vi.stubGlobal("useI18n", () => createI18nStub());
   vi.stubGlobal("useColorMode", () => ({ preference: "light" }));
   vi.stubGlobal("useAuth", () => ({
+    user: ref({
+      current_team_id: "team-1",
+      current_team: { is_subscribed: true },
+    }),
     isAuthenticated: authenticated,
     isInitialized: initialized,
   }));

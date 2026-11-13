@@ -106,7 +106,9 @@ const activeAdminUserTab = computed(() =>
 
 // Check if current team is subscribed
 const isSubscribed = computed(
-  () => user.value?.current_team?.is_subscribed ?? true,
+  () =>
+    !!user.value?.current_team_id &&
+    user.value.current_team?.is_subscribed !== false,
 );
 
 // Global navigation tabs
@@ -1840,7 +1842,7 @@ const navigateTo = (path: string) => {
 
       <!-- Subscription Banner -->
       <div
-        v-if="!isSubscribed"
+        v-if="user?.current_team_id && !isSubscribed"
         class="group relative h-5 cursor-pointer overflow-hidden text-sm"
         @click="openSettingsSheet('billing')"
       >
@@ -1858,7 +1860,7 @@ const navigateTo = (path: string) => {
       </div>
 
       <div class="flex items-center space-x-2">
-        <LayoutActiveActions />
+        <LayoutActiveActions v-if="isSubscribed" />
         <!-- User Menu (with Teams) -->
         <ClientOnly>
           <DropdownMenu v-model:open="isOpen">
@@ -2135,7 +2137,9 @@ const navigateTo = (path: string) => {
           />
         </nav>
         <div class="flex shrink-0 items-center">
-          <ServerCreateServerDialog v-if="route.path === '/servers'" />
+          <ServerCreateServerDialog
+            v-if="isSubscribed && route.path === '/servers'"
+          />
           <DnsAddDomain
             v-if="route.path === '/dns'"
             :providers="[]"

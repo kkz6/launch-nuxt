@@ -20,9 +20,11 @@
         "afternoon": "Good afternoon",
         "evening": "Good evening"
       },
+      "teamRequired": "Set up your team",
+      "teamRequiredDescription": "Create a team or select one from the account menu to get started.",
       "subscriptionRequired": "Subscription required",
-      "subscriptionDescription": "Your subscription is currently inactive. Add a payment method to access all features and manage your servers.",
-      "addPaymentMethod": "Add payment method",
+      "subscriptionDescription": "Choose a plan for your team to start adding and managing servers.",
+      "viewPlans": "View plans",
       "contactSupport": "Contact support",
       "subscriptionIncludes": "What you'll get with a subscription:",
       "benefits": {
