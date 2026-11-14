@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import AddDnsProvider from "../../components/settings/AddDnsProvider.vue";
 import AddStorageProvider from "../../components/settings/AddStorageProvider.vue";
+import AddServerProvider from "../../components/settings/AddServerProvider.vue";
 import { createI18nStub } from "../helpers/i18n";
 
 const api = vi.fn().mockResolvedValue({});
@@ -22,7 +23,10 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 const renderForm = async (
-  component: typeof AddDnsProvider | typeof AddStorageProvider,
+  component:
+    | typeof AddDnsProvider
+    | typeof AddStorageProvider
+    | typeof AddServerProvider,
   provider: string,
   fields: Record<string, string>,
 ) => {
@@ -72,6 +76,28 @@ it("sends Cloudflare's account ID along with the DNS profile and token", async (
       profile: "Production DNS",
       token: "test-token",
       account_id: "test-account",
+    },
+  });
+  expect(wrapper.emitted("created")).toHaveLength(1);
+});
+
+it("connects Contabo using the four API credentials", async () => {
+  const wrapper = await renderForm(AddServerProvider, "contabo", {
+    profile: "Contabo account",
+    "contabo-client_id": "client-id",
+    "contabo-client_secret": "client-secret",
+    "contabo-api_user": "contabo@example.com",
+    "contabo-api_password": "api-password",
+  });
+  expect(api).toHaveBeenCalledWith("/server-providers", {
+    method: "POST",
+    body: {
+      provider: "contabo",
+      profile: "Contabo account",
+      client_id: "client-id",
+      client_secret: "client-secret",
+      api_user: "contabo@example.com",
+      api_password: "api-password",
     },
   });
   expect(wrapper.emitted("created")).toHaveLength(1);

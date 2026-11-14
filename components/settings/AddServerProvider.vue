@@ -47,6 +47,7 @@ const providers = [
   { value: "vultr", label: "Vultr", icon: "simple-icons:vultr" },
   { value: "linode", label: "Linode", icon: "simple-icons:linode" },
   { value: "hetzner", label: "Hetzner", icon: "simple-icons:hetzner" },
+  { value: "contabo", label: "Contabo", icon: "lucide:server" },
   {
     value: "aws",
     label: "Amazon Web Services",
@@ -101,6 +102,20 @@ const needsApiToken = computed(() =>
   ["digitalocean", "vultr", "linode", "hetzner"].includes(provider.value),
 );
 const needsAwsCredentials = computed(() => provider.value === "aws");
+const needsContaboCredentials = computed(() => provider.value === "contabo");
+const contaboFields = [
+  { key: "client_id", label: "clientId", type: "text" },
+  { key: "client_secret", label: "clientSecret", type: "password" },
+  { key: "api_user", label: "apiUser", type: "email" },
+  { key: "api_password", label: "apiPassword", type: "password" },
+] as const;
+const emptyContaboCredentials = () => ({
+  client_id: "",
+  client_secret: "",
+  api_user: "",
+  api_password: "",
+});
+const contaboCredentials = ref(emptyContaboCredentials());
 
 const resetForm = () => {
   provider.value = "";
@@ -111,6 +126,7 @@ const resetForm = () => {
     secret_key: "",
     region: "",
   };
+  contaboCredentials.value = emptyContaboCredentials();
   errors.value = {};
 };
 
@@ -152,6 +168,13 @@ const validate = () => {
     }
   }
 
+  if (needsContaboCredentials.value) {
+    for (const { key } of contaboFields) {
+      if (!contaboCredentials.value[key].trim()) {
+        errors.value[key] = t("settings.connections.contabo.required");
+      }
+    }
+  }
   return Object.keys(errors.value).length === 0;
 };
 
@@ -174,6 +197,9 @@ const onSubmit = async () => {
       body.access_key = credentials.value.access_key;
       body.secret_key = credentials.value.secret_key;
       body.region = credentials.value.region;
+    }
+    if (needsContaboCredentials.value) {
+      Object.assign(body, contaboCredentials.value);
     }
 
     await $api("/server-providers", {
@@ -284,6 +310,31 @@ watch(open, (isOpen) => {
             {{ errors.api_token }}
           </p>
         </div>
+
+        <template v-if="needsContaboCredentials">
+          <p class="text-sm text-muted-foreground">
+            {{ t("settings.connections.contabo.credentialsHelp") }}
+          </p>
+          <div
+            v-for="field in contaboFields"
+            :key="field.key"
+            class="space-y-2"
+          >
+            <Label :for="'contabo-' + field.key">
+              {{ t("settings.connections.contabo." + field.label) }}
+            </Label>
+            <Input
+              :id="'contabo-' + field.key"
+              v-model="contaboCredentials[field.key]"
+              :type="field.type"
+              autocomplete="off"
+              required
+            />
+            <p v-if="errors[field.key]" class="text-sm text-destructive">
+              {{ errors[field.key] }}
+            </p>
+          </div>
+        </template>
 
         <!-- AWS Credentials -->
         <template v-if="needsAwsCredentials">

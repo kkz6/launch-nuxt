@@ -46,6 +46,7 @@ const serverProviderLabels: Record<string, string> = {
   linode: "Linode",
   vultr: "Vultr",
   hetzner: "Hetzner",
+  contabo: "Contabo",
   custom: "settings.connections.customProvider",
 };
 
@@ -817,13 +818,20 @@ onMounted(() => {
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              @click="deleteServerProvider(provider)"
-            >
-              <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
-            </Button>
+            <div class="flex items-center gap-2">
+              <SettingsImportContaboVps
+                v-if="provider.provider === 'contabo' && provider.connected"
+                :account-id="provider.id"
+                :profile="provider.profile"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                @click="deleteServerProvider(provider)"
+              >
+                <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
+              </Button>
+            </div>
           </div>
           <SettingsAddServerProvider @created="fetchServerProviders" />
         </div>

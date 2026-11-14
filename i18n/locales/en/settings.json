@@ -519,6 +519,32 @@
       }
     },
     "connections": {
+      "contabo": {
+        "clientId": "Client ID",
+        "clientSecret": "Client secret",
+        "apiUser": "API username (email)",
+        "apiPassword": "API password",
+        "required": "This field is required.",
+        "credentialsHelp": "Find these credentials in Contabo under Account → Security & Access. Use your Contabo API password.",
+        "browse": "Browse VPSs",
+        "title": "Contabo VPSs",
+        "loading": "Loading Contabo VPSs…",
+        "loadFailed": "Could not load Contabo VPSs.",
+        "retry": "Retry",
+        "empty": "No instances on this page.",
+        "alreadyImported": "Already imported",
+        "ineligible": "Requires a running Linux VPS with public IPv4",
+        "previous": "Previous",
+        "next": "Next",
+        "import": "Import VPS",
+        "importing": "Importing…",
+        "back": "Back to VPSs",
+        "chooseOs": "Select the installed Ubuntu version",
+        "sshPort": "SSH port",
+        "setupHelp": "Select the Ubuntu version already installed. After import, run the SSH setup command on the VPS. Connecting then starts Launchctl provisioning, which installs software and configures the server. Use a VPS you have prepared for Launchctl.",
+        "imported": "VPS imported. Complete SSH setup to manage it.",
+        "importFailed": "Could not import this VPS."
+      },
       "customProvider": "Custom Provider",
       "cancel": "Cancel",
       "certificates": {
