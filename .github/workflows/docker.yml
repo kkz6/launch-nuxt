@@ -53,18 +53,30 @@ jobs:
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
 
-      - name: Dispatch deploy to launch-deploy
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: peter-evans/repository-dispatch@v4
+  deploy:
+    name: Dispatch frontend deploy
+    needs: build-and-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: frontend-production
+    permissions: {}
+
+    steps:
+      - name: Create a short-lived deployment token
+        id: deploy-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          # Fine-grained PAT with `Actions: Read & write` on kkz6/launch-deploy.
-          # Stored as a secret in this repo. No code access.
-          token: ${{ secrets.DEPLOY_DISPATCH_TOKEN }}
-          repository: kkz6/launch-deploy
-          event-type: deploy-nuxt
-          client-payload: |
-            {
-              "image_tag": "${{ github.sha }}",
-              "source_repo": "${{ github.repository }}",
-              "source_sha": "${{ github.sha }}"
-            }
+          client-id: ${{ vars.FRONTEND_DEPLOY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.FRONTEND_DEPLOY_APP_PRIVATE_KEY }}
+          owner: kkz6
+          repositories: launch-deploy
+          permission-actions: write
+
+      - name: Dispatch deploy to launch-deploy
+        env:
+          GH_TOKEN: ${{ steps.deploy-token.outputs.token }}
+        run: |
+          deploy_url=$(gh api --method POST repos/kkz6/launch-deploy/actions/workflows/deploy.yml/dispatches \
+            -f ref=main -f 'inputs[destination]=nuxt' -f "inputs[image_tag]=$GITHUB_SHA" \
+            -F return_run_details=true --jq .html_url)
+          echo "[Production deploy]($deploy_url)" >> "$GITHUB_STEP_SUMMARY"
