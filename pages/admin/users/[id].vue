@@ -51,10 +51,8 @@ const notFound = ref(false);
 const busy = ref<
   "suspend" | "unsuspend" | "delete" | "spectate" | "role" | null
 >(null);
-const actionErrorMessage = ref("");
 const roleError = ref("");
 const siteDeleteBusy = ref<string | null>(null);
-const siteDeleteErrors = ref<Record<string, string>>({});
 const requestedSiteIds = ref<string[]>([]);
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
@@ -284,12 +282,11 @@ async function load(): Promise<void> {
 
 function actionError(error: unknown, fallback: string): void {
   const err = error as { data?: { message?: string } };
-  actionErrorMessage.value = err.data?.message || fallback;
+  toast.error(err.data?.message || fallback);
 }
 
 async function suspend(): Promise<void> {
   if (!isSuperAdmin.value || isSelf.value || mutationBusy.value) return;
-  actionErrorMessage.value = "";
   busy.value = "suspend";
   try {
     await adminService.suspendUser(userId);
@@ -304,7 +301,6 @@ async function suspend(): Promise<void> {
 
 async function unsuspend(): Promise<void> {
   if (!isSuperAdmin.value || isSelf.value || mutationBusy.value) return;
-  actionErrorMessage.value = "";
   busy.value = "unsuspend";
   try {
     await adminService.unsuspendUser(userId);
@@ -327,30 +323,50 @@ async function remove(): Promise<void> {
     !confirmationDialog.value
   )
     return;
-  const result = await confirmationDialog.value.show({
-    title: t("admin.userDetail.deleteTitle"),
-    description: t("admin.userDetail.deleteDescription", {
-      name: user.value.name,
-    }),
-    confirmText: t("admin.userDetail.deleteUser"),
-    destructive: true,
-  });
-  if (!result.ok || mutationBusy.value) return;
-  actionErrorMessage.value = "";
+  const name = user.value.name;
   busy.value = "delete";
   try {
-    await adminService.deleteUser(userId);
+    const { data } = await adminService.previewUserDeletion(userId);
+    const warning = data.billing_warning;
+    if (disposed) return;
+    const result = await confirmationDialog.value?.show({
+      title: t("admin.userDetail.deleteTitle", { name }),
+      description: t("admin.userDetail.deleteDescription"),
+      warning: warning
+        ? t(
+            warning === "user_has_paid_order"
+              ? "admin.userDetail.deletePaidOrder"
+              : "admin.userDetail.deletePaidSubscription",
+          )
+        : undefined,
+      confirmText: t(
+        warning
+          ? "admin.userDetail.deleteUserAnyway"
+          : "admin.userDetail.deleteUser",
+      ),
+      destructive: true,
+    });
+    if (!result?.ok || disposed) return;
+    await adminService.deleteUser(userId, warning || undefined);
     toast.success(t("admin.userDetail.deleted"));
     navigateTo("/admin");
   } catch (error: unknown) {
-    actionError(error, t("admin.userDetail.deleteFailed"));
+    const code = (error as { data?: { code?: string } }).data?.code;
+    if (
+      code === "user_has_paid_order" ||
+      code === "user_has_paid_subscription"
+    ) {
+      toast.error(t("admin.userDetail.deleteBillingChanged"));
+    } else {
+      actionError(error, t("admin.userDetail.deleteFailed"));
+    }
+  } finally {
     busy.value = null;
   }
 }
 
 async function spectate(): Promise<void> {
   if (mutationBusy.value) return;
-  actionErrorMessage.value = "";
   busy.value = "spectate";
   try {
     await start(userId, t("admin.userDetail.supportSessionReason"));
@@ -414,28 +430,39 @@ async function removeSite(site: AdminSiteSummary): Promise<void> {
   )
     return;
   const result = await confirmationDialog.value.show({
-    title: t("admin.userDetail.deleteSite"),
+    title: t("admin.userDetail.deleteSiteTitle"),
     description: t("admin.userDetail.deleteSiteDescription", {
       address: site.address,
       server: site.server_name,
     }),
-    warning: t("admin.userDetail.deleteSiteWarning"),
     inputVerificationText: site.address,
     helpText: t("admin.userDetail.deleteSiteHelp"),
-    confirmText: t("admin.userDetail.deleteSite"),
+    confirmText: t("admin.userDetail.uninstallSite"),
+    alternateConfirmText: t("admin.userDetail.removeSite"),
     destructive: true,
   });
   if (!result.ok || mutationBusy.value) return;
   siteDeleteBusy.value = site.id;
-  siteDeleteErrors.value[site.id] = "";
   try {
-    await adminService.deleteSite(site.id, site.address);
-    requestedSiteIds.value.push(site.id);
-    toast.success(t("admin.userDetail.siteDeletionRequested"));
+    if (result.alternate) {
+      await adminService.removeSiteRecord(site.id, site.address);
+      sites.value = sites.value.filter(({ id }) => id !== site.id);
+      toast.success(t("admin.userDetail.siteRemoved"));
+      await loadTab("sites", true);
+    } else {
+      await adminService.deleteSite(site.id, site.address);
+      requestedSiteIds.value.push(site.id);
+      toast.success(t("admin.userDetail.siteDeletionRequested"));
+    }
   } catch (error: unknown) {
-    const err = error as { data?: { message?: string } };
-    siteDeleteErrors.value[site.id] =
-      err.data?.message || t("admin.userDetail.siteDeletionFailed");
+    actionError(
+      error,
+      t(
+        result.alternate
+          ? "admin.userDetail.siteRemovalFailed"
+          : "admin.userDetail.siteDeletionFailed",
+      ),
+    );
   } finally {
     siteDeleteBusy.value = null;
   }
@@ -457,6 +484,13 @@ useAdminLiveUpdates(
     onChange(change) {
       if (change.resource === "server" && change.action === "deletion_failed") {
         toast.error(t(serverDeletionErrorKey(change.error_code)));
+      }
+      if (
+        change.resource === "site" &&
+        change.action === "deletion_failed" &&
+        sites.value.some(({ id }) => id === change.site_id)
+      ) {
+        toast.error(t("admin.userDetail.siteDeletionFailed"));
       }
     },
   },
@@ -618,13 +652,6 @@ onMounted(load);
             </dd>
           </div>
         </dl>
-        <p
-          v-if="actionErrorMessage"
-          role="alert"
-          class="text-sm text-destructive"
-        >
-          {{ actionErrorMessage }}
-        </p>
       </header>
       <div
         v-if="isSuperAdmin && activeTab === 'profile'"
@@ -822,7 +849,6 @@ onMounted(load);
             :disabled="mutationBusy"
             :busy-id="siteDeleteBusy"
             :pending-ids="requestedSiteIds"
-            :errors="siteDeleteErrors"
             @delete="removeSite"
           />
         </section>

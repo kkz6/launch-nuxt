@@ -39,7 +39,6 @@ const mountSites = (overrides = {}) =>
       canDelete: true,
       busyId: null,
       pendingIds: [],
-      errors: {},
       ...overrides,
     },
     global: {
@@ -172,7 +171,7 @@ describe("admin user resource controls", () => {
     expect(wrapper.find('button[aria-label^="View site"]').exists()).toBe(true);
   });
 
-  it("shows a retryable remote-cleanup failure and request errors beside the retained site", async () => {
+  it("shows a retryable remote-cleanup failure beside the retained site", () => {
     const wrapper = mountSites({
       sites: [
         site({
@@ -181,16 +180,13 @@ describe("admin user resource controls", () => {
         }),
       ],
     });
-    expect(wrapper.get('[role="alert"]').text()).toContain(
-      "Site deletion failed",
-    );
+    expect(wrapper.text()).toContain("Uninstall failed");
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     expect(
       wrapper
         .get('button[aria-label="Delete site app.example.com"]')
         .attributes("disabled"),
     ).toBeUndefined();
-    await wrapper.setProps({ errors: { "site-1": "Queue unavailable" } });
-    expect(wrapper.get('[role="alert"]').text()).toBe("Queue unavailable");
     expect(wrapper.text()).toContain("app.example.com");
   });
 

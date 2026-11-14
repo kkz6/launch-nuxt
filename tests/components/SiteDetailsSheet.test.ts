@@ -100,11 +100,8 @@ describe("admin site details", () => {
     });
     expect(wrapper.text()).not.toContain("Deletion requested");
     expect(wrapper.text()).toContain("app.example.com");
-    expect(wrapper.get('[role="alert"]').text()).toContain(
-      "Site deletion failed",
-    );
-    await wrapper.setProps({ error: "Queue unavailable" });
-    expect(wrapper.get('[role="alert"]').text()).toBe("Queue unavailable");
+    expect(wrapper.text()).toContain("Uninstall failed");
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     await wrapper.setProps({ site: null });
     expect(wrapper.text()).toContain("This site is no longer available.");
     expect(wrapper.find("dl").exists()).toBe(false);

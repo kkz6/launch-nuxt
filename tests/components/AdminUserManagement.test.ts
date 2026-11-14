@@ -8,12 +8,14 @@ const mocks = vi.hoisted(() => ({
   liveUpdates: vi.fn(),
   showUser: vi.fn(),
   showServer: vi.fn(),
-  deleteServer: vi.fn(),
+  uninstallServer: vi.fn(),
   userSites: vi.fn(),
   userServers: vi.fn(),
   userSubscriptions: vi.fn(),
   updateStaffRole: vi.fn(),
   deleteSite: vi.fn(),
+  removeSiteRecord: vi.fn(),
+  previewUserDeletion: vi.fn(),
   deleteUser: vi.fn(),
   suspendUser: vi.fn(),
   unsuspendUser: vi.fn(),
@@ -135,6 +137,9 @@ describe("admin user management", () => {
       data: { site_id: "site-1", status: "deletion_requested" },
     });
     mocks.deleteUser.mockResolvedValue({ success: true });
+    mocks.previewUserDeletion.mockResolvedValue({
+      data: { billing_warning: "" },
+    });
     mocks.confirm.mockResolvedValue({ ok: true });
     vi.stubGlobal("definePageMeta", vi.fn());
     vi.stubGlobal("useHead", vi.fn());
@@ -371,7 +376,7 @@ describe("admin user management", () => {
     };
     mocks.userServers.mockResolvedValue({ data: [server] });
     mocks.showServer.mockResolvedValue({ data: server });
-    mocks.deleteServer.mockResolvedValue({
+    mocks.uninstallServer.mockResolvedValue({
       data: { status: "deletion_requested" },
     });
     vi.stubGlobal("useAuth", mocks.useAuth);
@@ -390,7 +395,10 @@ describe("admin user management", () => {
       .get('section[aria-labelledby="server-delete-heading"] button')
       .trigger("click");
     await flushPromises();
-    expect(mocks.deleteServer).toHaveBeenCalledWith("server-1", "Production");
+    expect(mocks.uninstallServer).toHaveBeenCalledWith(
+      "server-1",
+      "Production",
+    );
     expect(sheet.props("serverId")).toBeNull();
     expect(page.findComponent({ name: "ServerDetail" }).exists()).toBe(false);
     const [refresh, options] = mocks.liveUpdates.mock.calls.find(
@@ -460,7 +468,7 @@ describe("admin user management", () => {
     await deleteUserButton(page).trigger("click");
     expect(mocks.deleteUser).not.toHaveBeenCalled();
     expect(mocks.confirm).not.toHaveBeenCalled();
-    expect(page.text()).toContain("Billing-history restrictions still apply");
+    expect(page.text()).toContain("Change staff access to Regular user");
     roleControl(page).vm.$emit("save", null);
     await flushPromises();
     expect(mocks.confirm).toHaveBeenCalledWith(
@@ -505,7 +513,7 @@ describe("admin user management", () => {
     expect(mocks.success).not.toHaveBeenCalled();
   });
 
-  it("shows paid-history deletion refusals without navigating or claiming success", async () => {
+  it("shows unexpected deletion refusals as a toast", async () => {
     mocks.deleteUser.mockRejectedValueOnce({
       data: {
         message: "Users with paid subscription history cannot be deleted.",
@@ -522,11 +530,84 @@ describe("admin user management", () => {
         destructive: true,
       }),
     );
-    expect(page.get('[role="alert"]').text()).toContain(
-      "paid subscription history",
+    expect(mocks.error).toHaveBeenCalledWith(
+      "Users with paid subscription history cannot be deleted.",
     );
+    expect(page.find('[role="alert"]').exists()).toBe(false);
     expect(mocks.navigateTo).not.toHaveBeenCalled();
     expect(mocks.success).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["user_has_paid_order", "paid order", true],
+    ["user_has_paid_subscription", "current or past paid subscription", true],
+    ["user_has_paid_order", "paid order", false],
+  ])(
+    "shows %s before sending any delete request (confirmed: %s)",
+    async (code, reason, confirmed) => {
+      mocks.previewUserDeletion.mockResolvedValueOnce({
+        data: { billing_warning: code },
+      });
+      mocks.confirm.mockImplementationOnce(async () => {
+        expect(mocks.deleteUser).not.toHaveBeenCalled();
+        return { ok: confirmed };
+      });
+      const page = mountPage();
+      await flushPromises();
+      await openActions(page);
+      await deleteUserButton(page).trigger("click");
+      await flushPromises();
+      expect(mocks.previewUserDeletion).toHaveBeenCalledWith("user-1");
+      expect(mocks.confirm).toHaveBeenCalledOnce();
+      expect(mocks.confirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: "Delete Anila?",
+          warning: expect.stringContaining(reason),
+          confirmText: "Delete anyway",
+        }),
+      );
+      if (confirmed) {
+        expect(mocks.deleteUser).toHaveBeenCalledOnce();
+        expect(mocks.deleteUser).toHaveBeenCalledWith("user-1", code);
+        expect(mocks.success).toHaveBeenCalledWith("User deleted");
+        expect(mocks.navigateTo).toHaveBeenCalledWith("/admin");
+      } else {
+        expect(mocks.deleteUser).not.toHaveBeenCalled();
+        expect(mocks.navigateTo).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it("shows a toast and sends no delete request if the preview fails", async () => {
+    mocks.previewUserDeletion.mockRejectedValueOnce({
+      data: { message: "Preview unavailable" },
+    });
+    const page = mountPage();
+    await flushPromises();
+    await openActions(page);
+    await deleteUserButton(page).trigger("click");
+    await flushPromises();
+    expect(mocks.error).toHaveBeenCalledWith("Preview unavailable");
+    expect(mocks.confirm).not.toHaveBeenCalled();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it("asks the operator to review again if billing history changes after the preview", async () => {
+    mocks.deleteUser.mockRejectedValueOnce({
+      data: { code: "user_has_paid_order" },
+    });
+    const page = mountPage();
+    await flushPromises();
+    await openActions(page);
+    await deleteUserButton(page).trigger("click");
+    await flushPromises();
+    expect(mocks.deleteUser).toHaveBeenCalledOnce();
+    expect(mocks.deleteUser).toHaveBeenCalledWith("user-1", undefined);
+    expect(mocks.confirm).toHaveBeenCalledOnce();
+    expect(mocks.error).toHaveBeenCalledWith(
+      expect.stringContaining("Billing history changed"),
+    );
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
   });
 
   it("requires exact-domain confirmation and retains a queued site with duplicate deletion disabled", async () => {
@@ -538,6 +619,8 @@ describe("admin user management", () => {
       expect.objectContaining({
         inputVerificationText: "app.example.com",
         description: expect.stringContaining("Production"),
+        confirmText: "Uninstall site",
+        alternateConfirmText: "Remove site",
         destructive: true,
       }),
     );
@@ -547,6 +630,25 @@ describe("admin user management", () => {
     expect(mocks.success).toHaveBeenCalledWith("Deletion requested");
     await requestDeleteSite(page);
     expect(mocks.deleteSite).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes the site record without requesting an uninstall", async () => {
+    const page = mountPage();
+    await flushPromises();
+    await activateTab("sites");
+    mocks.confirm.mockResolvedValueOnce({ ok: true, alternate: true });
+    mocks.removeSiteRecord.mockResolvedValueOnce({
+      data: { status: "removed" },
+    });
+    mocks.userSites.mockResolvedValueOnce({ data: [] });
+    await requestDeleteSite(page);
+    expect(mocks.removeSiteRecord).toHaveBeenCalledWith(
+      "site-1",
+      "app.example.com",
+    );
+    expect(mocks.deleteSite).not.toHaveBeenCalled();
+    expect(sitesTable(page).props("sites")).toEqual([]);
+    expect(mocks.success).toHaveBeenCalledWith("Site removed from Launchctl");
   });
 
   it("leaves the site unchanged when confirmation is cancelled", async () => {
@@ -568,9 +670,7 @@ describe("admin user management", () => {
     await flushPromises();
     await activateTab("sites");
     await requestDeleteSite(page);
-    expect(sitesTable(page).props("errors")).toEqual({
-      "site-1": "Could not queue site deletion.",
-    });
+    expect(mocks.error).toHaveBeenCalledWith("Could not queue site deletion.");
     expect(sitesTable(page).props("pendingIds")).toEqual([]);
     expect(sitesTable(page).props("sites")).toHaveLength(1);
     expect(mocks.success).not.toHaveBeenCalled();

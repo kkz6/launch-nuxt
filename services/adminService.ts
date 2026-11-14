@@ -72,6 +72,10 @@ interface FailuresResponse extends ApiResponse<AdminFailuresResponse> {
 /**
  * Admin (staff back-office) service. All endpoints require a staff JWT.
  */
+export type UserDeletionWarning =
+  | "user_has_paid_order"
+  | "user_has_paid_subscription";
+
 export const adminService = {
   users: (params: PaginationParams = {}) => {
     const { get } = useApi();
@@ -103,6 +107,14 @@ export const adminService = {
       method: "DELETE",
       body: { confirmation_domain: confirmationDomain },
     });
+  },
+
+  removeSiteRecord: (id: string, confirmationDomain: string) => {
+    const { fetch } = useApi();
+    return fetch<ApiResponse<{ site_id: string; status: "removed" }>>(
+      `/admin/sites/${id}/record`,
+      { method: "DELETE", body: { confirmation_domain: confirmationDomain } },
+    );
   },
 
   updateStaffRole: (id: string | number, staffRole: AdminStaffRole | null) => {
@@ -152,9 +164,21 @@ export const adminService = {
     );
   },
 
-  deleteUser: (id: string | number) => {
-    const { delete: del } = useApi();
-    return del<ApiResponse<{ id: string }>>(`/admin/users/${id}`);
+  previewUserDeletion: (id: string | number) => {
+    const { get } = useApi();
+    return get<ApiResponse<{ billing_warning: UserDeletionWarning | "" }>>(
+      `/admin/users/${id}/deletion-preview`,
+    );
+  },
+
+  deleteUser: (id: string | number, billingWarning?: UserDeletionWarning) => {
+    const { fetch } = useApi();
+    return fetch<ApiResponse<{ id: string }>>(`/admin/users/${id}`, {
+      method: "DELETE",
+      body: billingWarning
+        ? { billing_confirmation: billingWarning }
+        : undefined,
+    });
   },
 
   invitations: (params: PaginationParams = {}) => {
@@ -206,6 +230,19 @@ export const adminService = {
         status: "deleted" | "deletion_requested";
       }>
     >(`/admin/servers/${id}`, {
+      method: "DELETE",
+      body: { confirmation_name: confirmationName },
+    });
+  },
+
+  uninstallServer: (id: string | number, confirmationName: string) => {
+    const { fetch } = useApi();
+    return fetch<
+      ApiResponse<{
+        server_id: string;
+        status: "deleted" | "deletion_requested" | "removed_offline";
+      }>
+    >(`/admin/servers/${id}/uninstall`, {
       method: "DELETE",
       body: { confirmation_name: confirmationName },
     });

@@ -24,6 +24,11 @@ Manage server provisioning, configuration, and monitoring through the API.
 
 The response envelope contains `data.server_id` and `data.status`: `deleted` for a custom server record removed immediately, or `deletion_requested` for an asynchronous cloud deletion. The server's owning team is resolved by the API. Remove all sites and Docker projects first; starting, provisioning, and deleting servers are blocked. See [Delete Server](/docs/application/servers#delete-server) for provider impact and the AWS limitation.
 
+Two other routes accept the same confirmation body:
+
+- `DELETE /admin/servers/{id}/uninstall` checks SSH before using the existing deletion flow. If the host is unreachable, it removes the local records and returns `removed_offline`.
+- `DELETE /admin/servers/{id}/record` removes the server and its associated site and project records from Launchctl and returns `removed`. It makes no SSH or provider request.
+
 ## List Servers
 ```http
 GET /v1/servers

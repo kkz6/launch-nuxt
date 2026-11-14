@@ -29,7 +29,6 @@ const props = defineProps<{
   disabled?: boolean;
   busyId: string | null;
   pendingIds: string[];
-  errors: Record<string, string>;
 }>();
 const emit = defineEmits<{ delete: [site: AdminSiteSummary] }>();
 const { t } = useI18n();
@@ -142,20 +141,12 @@ const tlsLabel = (value: string): string =>
               <Badge v-if="isPending(site)" variant="secondary" class="mt-1">{{
                 t("admin.userDetail.siteDeletionRequested")
               }}</Badge>
-              <p
-                v-if="errors[site.id]"
-                role="alert"
-                class="mt-1 text-xs font-normal text-destructive"
-              >
-                {{ errors[site.id] }}
-              </p>
-              <p
+              <Badge
                 v-else-if="site.uninstallation_failed_at"
-                role="alert"
-                class="mt-1 text-xs font-normal text-destructive"
+                variant="red"
+                class="mt-1"
+                >{{ t("admin.siteDetail.deletionFailed") }}</Badge
               >
-                {{ t("admin.userDetail.siteDeletionFailed") }}
-              </p>
             </TableCell>
             <TableCell
               class="col-span-2 block break-words px-0 pt-0 pb-2 text-xs md:table-cell md:max-w-xs md:px-4 md:py-2"
@@ -286,7 +277,6 @@ const tlsLabel = (value: string): string =>
       v-model:open="siteDetailOpen"
       :site="selectedSite"
       :pending="selectedSite ? isPending(selectedSite) : false"
-      :error="selectedSiteId ? errors[selectedSiteId] : undefined"
       @view-server="openServer"
     />
     <ServerDetailsSheet v-model:server-id="selectedServerId" />
