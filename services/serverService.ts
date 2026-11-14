@@ -467,6 +467,18 @@ export const serverService = {
 /**
  * Server providers service
  */
+export interface ContaboVPS {
+  id: string;
+  name: string;
+  ip?: string;
+  region: string;
+  plan: string;
+  status: string;
+  os_type: string;
+  can_import: boolean;
+  imported_server_id?: string;
+}
+
 export const serverProviderService = {
   list: () => {
     const { get } = useApi();
@@ -479,6 +491,33 @@ export const serverProviderService = {
       provider,
       ...credentials,
     });
+  },
+
+  listContaboInstances: (accountId: string, page: number) => {
+    const { get } = useApi();
+    return get<
+      ApiResponse<{
+        instances: ContaboVPS[];
+        page: number;
+        total_pages: number;
+      }>
+    >(`/server-providers/${accountId}/contabo/instances?page=${page}`);
+  },
+
+  importContaboInstance: (
+    accountId: string,
+    data: {
+      instance_id: string;
+      type: string;
+      operating_system: string;
+      port: number;
+    },
+  ) => {
+    const { post } = useApi();
+    return post<ApiResponse<Server>>(
+      `/server-providers/${accountId}/contabo/import`,
+      data,
+    );
   },
 
   disconnect: (id: number) => {

@@ -519,6 +519,32 @@
       }
     },
     "connections": {
+      "contabo": {
+        "clientId": "クライアント ID",
+        "clientSecret": "クライアントシークレット",
+        "apiUser": "API ユーザー名（メールアドレス）",
+        "apiPassword": "API パスワード",
+        "required": "この項目は必須です。",
+        "credentialsHelp": "Contabo の「アカウント」→「セキュリティとアクセス」で認証情報を確認し、API パスワードを使用してください。",
+        "browse": "VPS を表示",
+        "title": "Contabo VPS 一覧",
+        "loading": "Contabo の VPS を読み込んでいます…",
+        "loadFailed": "Contabo の VPS を読み込めませんでした。",
+        "retry": "再試行",
+        "empty": "このページにインスタンスはありません。",
+        "alreadyImported": "インポート済み",
+        "ineligible": "稼働中でパブリック IPv4 を持つ Linux VPS が必要です",
+        "previous": "前へ",
+        "next": "次へ",
+        "import": "VPS をインポート",
+        "importing": "インポート中…",
+        "back": "VPS 一覧に戻る",
+        "chooseOs": "インストール済みの Ubuntu を選択",
+        "sshPort": "SSH ポート",
+        "setupHelp": "インストール済みの Ubuntu バージョンを選択してください。インポート後、VPS で SSH 設定コマンドを実行します。接続すると Launchctl がソフトウェアのインストールとサーバーの構成を開始します。Launchctl 用に準備した VPS を使用してください。",
+        "imported": "VPS をインポートしました。管理を開始するには SSH 設定を完了してください。",
+        "importFailed": "この VPS をインポートできませんでした。"
+      },
       "customProvider": "カスタムプロバイダー",
       "cancel": "キャンセル",
       "certificates": {
