@@ -218,6 +218,7 @@
       "deleteTitle": "Delete {name}?",
       "deleteDescription": "This permanently removes the account and its owned teams and resources from Launchctl.",
       "deleteUserAnyway": "Delete anyway",
+      "acknowledgeBilling": "I’ve reviewed the billing warning and want to permanently delete this account.",
       "deletePaidOrder": "This customer has a paid order. Subscription cancellation and payment refunds are handled separately.",
       "deletePaidSubscription": "This customer has a current or past paid subscription. Subscription cancellation and payment refunds are handled separately.",
       "deleteBillingChanged": "Billing history changed. Open Delete user again to review the warning.",

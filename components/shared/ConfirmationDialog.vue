@@ -14,6 +14,7 @@ import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
 
 const { t } = useI18n();
+const checkboxId = useId();
 
 interface ConfirmationOptions {
   title: string;
@@ -30,6 +31,7 @@ interface ConfirmationOptions {
   checkbox?: {
     label: string;
     checked: boolean;
+    required?: boolean;
   };
 }
 
@@ -70,12 +72,15 @@ const show = (opts: ConfirmationOptions): Promise<ConfirmationResult> => {
   });
 };
 
-const isConfirmDisabled = computed(() => {
-  if (options.value.inputVerificationText) {
-    return options.value.inputVerificationText !== verifiedText.value;
-  }
-  return false;
-});
+const isConfirmDisabled = computed(
+  () =>
+    Boolean(
+      options.value.inputVerificationText &&
+      options.value.inputVerificationText !== verifiedText.value,
+    ) ||
+    (options.value.checkbox?.required === true &&
+      !checkboxState.value?.checked),
+);
 
 const finish = (result: ConfirmationResult) => {
   const resolve = resolvePromise;
@@ -194,13 +199,17 @@ defineExpose({ show });
               @keyup="handleKeyUp"
             />
 
-            <div v-if="checkboxState" class="flex items-center space-x-2">
+            <div v-if="checkboxState" class="flex items-start gap-2">
               <Checkbox
-                id="checkbox"
-                :checked="checkboxState.checked"
-                @update:checked="checkboxState!.checked = $event as boolean"
+                :id="checkboxId"
+                :model-value="checkboxState.checked"
+                :aria-required="options.checkbox?.required"
+                class="mt-0.5"
+                @update:model-value="checkboxState.checked = $event === true"
               />
-              <Label for="checkbox">{{ checkboxState.label }}</Label>
+              <Label :for="checkboxId" class="cursor-pointer leading-snug">
+                {{ checkboxState.label }}
+              </Label>
             </div>
           </div>
         </section>

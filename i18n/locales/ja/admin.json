@@ -218,6 +218,7 @@
       "deleteTitle": "{name} を削除しますか？",
       "deleteDescription": "アカウントと所有するチームやリソースを Launchctl から完全に削除します。",
       "deleteUserAnyway": "それでも削除",
+      "acknowledgeBilling": "支払いに関する警告を確認し、このアカウントを完全に削除することに同意します。",
       "deletePaidOrder": "このお客様には支払い済みの注文があります。サブスクリプションの解約や返金は別途手続きが必要です。",
       "deletePaidSubscription": "このお客様には現在または過去の有料サブスクリプションがあります。サブスクリプションの解約や返金は別途手続きが必要です。",
       "deleteBillingChanged": "支払い履歴が変更されました。「ユーザーを削除」を開き直して警告を確認してください。",
