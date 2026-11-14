@@ -238,7 +238,7 @@
       "download": "Download"
     },
     "teamDialogs": {
-      "nameRequired": "Team name is required",
+      "nameLength": "Enter a team name between 2 and 255 characters.",
       "created": "Team created successfully",
       "createFailed": "Failed to create team",
       "createTitle": "Create Team",
@@ -255,6 +255,7 @@
       "roleRequired": "Please select a role",
       "invitationSent": "Invitation sent",
       "invitationFailed": "Failed to send invitation",
+      "invitationDeliveryFailed": "The invitation is pending, but its email could not be sent. Use Resend to try again.",
       "inviteTitle": "Invite Member",
       "inviteDescription": "Send an invitation to join your team",
       "email": "Email",
@@ -285,6 +286,16 @@
       "invitationCancelFailed": "Failed to cancel invitation",
       "roleUpdated": "Role updated",
       "roleUpdateFailed": "Failed to update role",
+      "removeMember": "Remove",
+      "removeMemberTitle": "Remove {name}?",
+      "removeMemberDescription": "This member will lose access to the team and its resources.",
+      "removeMemberSuccess": "Member removed",
+      "removeMemberFailed": "Failed to remove member",
+      "leaveTeam": "Leave team",
+      "leaveTeamTitle": "Leave {name}?",
+      "leaveTeamDescription": "You will lose access to this team and its resources.",
+      "leaveTeamSuccess": "You left the team",
+      "leaveTeamFailed": "Failed to leave team",
       "detailsTitle": "Team details",
       "detailsDescription": "Change the name shown to everyone in this team.",
       "teamName": "Team name",
@@ -427,6 +438,7 @@
       "connect": "Connect",
       "connectFailed": "Failed to connect provider",
       "dns": {
+        "accountId": "Account ID",
         "connected": "DNS provider connected",
         "description": "Connect a DNS provider for automatic DNS management",
         "labelPlaceholder": "My Cloudflare Account",
@@ -484,6 +496,7 @@
       },
       "storage": {
         "connected": "Storage provider connected",
+        "saved": "Storage settings saved. Bucket access has not been verified.",
         "description": "Connect a storage provider for backups and file storage",
         "labelPlaceholder": "My S3 Bucket",
         "title": "Connect Storage Provider"
@@ -498,6 +511,7 @@
         "nameRequired": "Name is required",
         "passwordRequired": "Password is required",
         "profileRequired": "Profile name is required",
+        "accountIdRequired": "Account ID is required",
         "regionRequired": "Region is required",
         "secretKeyRequired": "Secret key is required",
         "selectProvider": "Please select a provider",

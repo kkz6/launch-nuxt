@@ -32,12 +32,19 @@ export default defineNuxtRouteMiddleware(async (to) => {
     return navigateTo("/login");
   }
 
-  // Check subscription status - redirect non-subscribed users to dashboard
-  // Allow /settings/billing for payment return redirects
-  const isSubscribed = user.value?.current_team?.is_subscribed ?? true;
-  const allowedPaths = ["/dashboard", "/settings/billing"];
-
-  if (!isSubscribed && !allowedPaths.includes(to.path)) {
-    return navigateTo("/dashboard");
+  const path = to.path.replace(/\/$/, "");
+  const needsWorkspace =
+    /^\/(servers|sites|dns|scripts|onboarding|platform|settings\/billing)(\/|$)/.test(
+      path,
+    );
+  if (needsWorkspace && !user.value.current_team_id) {
+    return navigateTo("/dashboard", { replace: true });
+  }
+  if (
+    needsWorkspace &&
+    path !== "/settings/billing" &&
+    user.value.current_team?.is_subscribed === false
+  ) {
+    return navigateTo("/dashboard", { replace: true });
   }
 });

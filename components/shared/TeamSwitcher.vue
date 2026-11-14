@@ -12,9 +12,10 @@ const { user, fetchUser } = useAuth();
 const { t } = useI18n();
 const { setCurrentTeamId } = useApi();
 const { refreshActiveTeam } = useActiveTeamRefresh();
+const { isImpersonating } = useImpersonation();
 const { teams, loading, loadTeams } = useTeams();
-const createOpen = ref(false);
-const isSwitching = ref(false);
+const emit = defineEmits<{ createTeam: [] }>();
+const isSwitching = useState("teams.switching", () => false);
 const repeatedNames = computed(() => duplicateTeamNames(teams.value));
 
 const localizedTeamQualifier = (team: Team) => {
@@ -39,7 +40,12 @@ const fetchTeams = async () => {
 };
 
 const switchTeam = async (teamId: string) => {
-  if (isSwitching.value || teamId === String(user.value?.current_team_id)) return;
+  if (
+    isImpersonating.value ||
+    isSwitching.value ||
+    teamId === String(user.value?.current_team_id)
+  )
+    return;
   isSwitching.value = true;
   const team = teams.value.find((item) => item.id === teamId);
   try {
@@ -78,9 +84,9 @@ void fetchTeams();
       <DropdownMenuItem
         v-for="team in teams"
         :key="team.id"
-        :disabled="isSwitching"
+        :disabled="isSwitching || isImpersonating"
         class="cursor-pointer justify-between gap-2 rounded-md px-2 py-1.5 text-sm"
-        @click="switchTeam(team.id)"
+        @select="switchTeam(team.id)"
       >
         <span class="min-w-0 flex-1">
           <span class="block truncate">{{ team.name }}</span>
@@ -94,14 +100,14 @@ void fetchTeams();
         />
       </DropdownMenuItem>
       <DropdownMenuItem
+        v-if="!isImpersonating"
         :disabled="isSwitching"
         class="cursor-pointer gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground"
-        @click="createOpen = true"
+        @select="emit('createTeam')"
       >
         <Plus class="h-3.5 w-3.5" />
         <span>{{ t("common.teams.new") }}</span>
       </DropdownMenuItem>
     </DropdownMenuGroup>
-    <SettingsCreateTeam v-model:open="createOpen" @created="loadTeams(true)" />
   </template>
 </template>

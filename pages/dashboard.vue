@@ -2,6 +2,7 @@
 import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
 import { useSiteQueueEvents } from "~/composables/useChannelEvents";
+import { Button } from "~/components/ui/button";
 
 definePageMeta({
   layout: "default",
@@ -13,11 +14,12 @@ const { locale, t } = useI18n();
 useHead(() => ({ title: t("public.dashboard.pageTitle") }));
 
 const { user } = useAuth();
+const { isImpersonating } = useImpersonation();
 const { open: openSettingsSheet } = useSettingsSheet();
 
-// Check subscription status
+const hasTeam = computed(() => !!user.value?.current_team_id);
 const isSubscribed = computed(
-  () => user.value?.current_team?.is_subscribed ?? true,
+  () => hasTeam.value && user.value?.current_team?.is_subscribed !== false,
 );
 
 // Time-based greeting
@@ -99,6 +101,7 @@ watch(dashboardRefreshKey, () => {
 });
 
 const fetchDashboard = async () => {
+  if (!isSubscribed.value) return;
   try {
     const response = await $api<DashboardResponse>("/dashboard");
     servers.value = response.data.servers;
@@ -114,6 +117,10 @@ const fetchDashboard = async () => {
 const route = useRoute();
 const router = useRouter();
 
+watch(isSubscribed, (subscribed) => {
+  if (subscribed) void fetchDashboard();
+});
+
 onMounted(() => {
   fetchDashboard();
   // Landing here from a git-provider install callback (?settings=connections)
@@ -121,12 +128,14 @@ onMounted(() => {
   // then drops the param so a refresh doesn't reopen the sheet.
   const tab = route.query.settings;
   if (typeof tab === "string" && tab) {
-    openSettingsSheet(tab);
+    if (hasTeam.value || tab !== "billing") openSettingsSheet(tab);
     void router.replace({ query: { ...route.query, settings: undefined } });
   }
 });
 
-const teamId = computed(() => user.value?.current_team_id?.toString() || "");
+const teamId = computed(() =>
+  isSubscribed.value ? String(user.value?.current_team_id) : "",
+);
 useSiteQueueEvents(teamId, (_data, event) => {
   if (event === "queues.synced" || event === "queues.failed") {
     fetchDashboard();
@@ -182,8 +191,22 @@ const getUserInitials = (name: string): string => {
 
 <template>
   <div class="pb-10">
-    <!-- Subscription Required State -->
-    <div v-if="!isSubscribed">
+    <div
+      v-if="!hasTeam"
+      class="mx-auto mt-6 w-full max-w-xl space-y-4 rounded-lg border bg-card p-8 text-center"
+    >
+      <h1 class="text-lg font-semibold">
+        {{ t("public.dashboard.teamRequired") }}
+      </h1>
+      <p class="text-sm text-muted-foreground">
+        {{ t("public.dashboard.teamRequiredDescription") }}
+      </p>
+      <SettingsCreateTeam v-if="!isImpersonating">
+        <Button>{{ t("settings.teamDialogs.create") }}</Button>
+      </SettingsCreateTeam>
+    </div>
+
+    <div v-else-if="!isSubscribed">
       <div class="mb-6">
         <h1 class="text-xl font-semibold">{{ greeting }}, {{ firstName }}</h1>
       </div>
@@ -210,7 +233,7 @@ const getUserInitials = (name: string): string => {
               @click="openSettingsSheet('billing')"
             >
               <Icon name="lucide:credit-card" class="h-4 w-4" />
-              {{ t("public.dashboard.addPaymentMethod") }}
+              {{ t("public.dashboard.viewPlans") }}
             </button>
             <a
               href="mailto:support@launchctl.io"

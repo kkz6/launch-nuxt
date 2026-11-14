@@ -1,5 +1,6 @@
 import { useLocalePreference } from "~/composables/useLocalePreference";
 import { localizePermissionError } from "~/utils/permissionError";
+import type { User } from "~/types";
 
 const ACCESS_TOKEN_KEY = "auth_token";
 const REFRESH_TOKEN_KEY = "auth_refresh_token";
@@ -57,6 +58,19 @@ const hasInvalidTeamContext = (
   data: { code?: string; message?: string } | undefined,
 ): boolean =>
   data?.code === "team.context_required" || data?.code === "team.not_member";
+
+const recoverTeamContext = (
+  user: User | null,
+  clearCurrentTeamId: () => void,
+) => {
+  clearCurrentTeamId();
+  if (user) {
+    user.current_team_id = null;
+    user.current_team = undefined;
+    user.role = undefined;
+  }
+  navigateTo("/dashboard", { replace: true });
+};
 
 export const useApi = () => {
   const config = useRuntimeConfig();
@@ -164,6 +178,7 @@ export const useApi = () => {
   ): Promise<T> => {
     const token = getAccessToken();
     const teamId = getCurrentTeamId();
+    const activeUser = useState<User | null>("auth_user", () => null);
 
     const fetchOptions = {
       baseURL,
@@ -210,10 +225,18 @@ export const useApi = () => {
         }
       }
 
-      if (hasInvalidTeamContext(errorResponse?.data)) {
-        clearCurrentTeamId();
-        navigateTo("/servers");
-        throw error;
+      const isCurrentRequest =
+        token === getAccessToken() && teamId === getCurrentTeamId();
+      if (isCurrentRequest && hasInvalidTeamContext(errorResponse?.data)) {
+        recoverTeamContext(activeUser.value, clearCurrentTeamId);
+      } else if (
+        isCurrentRequest &&
+        errorResponse?.response?.status === 402 &&
+        activeUser.value?.current_team &&
+        String(activeUser.value.current_team_id) === teamId
+      ) {
+        activeUser.value.current_team.is_subscribed = false;
+        navigateTo("/dashboard", { replace: true });
       }
 
       throw error;
@@ -294,6 +317,7 @@ export function useApiQuery<T>(
   const i18n = useNuxtApp().$i18n as { t(key: string): string };
   const token = getAccessToken();
   const teamId = getCurrentTeamId();
+  const activeUser = useState<User | null>("auth_user", () => null);
 
   return useFetch(url, {
     baseURL: config.public.apiBase as string,
@@ -321,9 +345,12 @@ export function useApiQuery<T>(
       const data = response._data as
         | { code?: string; message?: string }
         | undefined;
-      if (hasInvalidTeamContext(data)) {
-        clearCurrentTeamId();
-        navigateTo("/servers");
+      if (
+        token === getAccessToken() &&
+        teamId === getCurrentTeamId() &&
+        hasInvalidTeamContext(data)
+      ) {
+        recoverTeamContext(activeUser.value, clearCurrentTeamId);
       }
     },
   });

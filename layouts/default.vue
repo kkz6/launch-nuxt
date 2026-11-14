@@ -8,7 +8,7 @@ defineProps<{
   title?: string;
 }>();
 
-const { isAuthenticated, isInitialized } = useAuth();
+const { user, isAuthenticated, isInitialized } = useAuth();
 const { isImpersonating, impersonatedName, stop } = useImpersonation();
 const { t } = useI18n();
 const colorMode = useColorMode();
@@ -50,6 +50,12 @@ onMounted(() => {
 const showAuthedShell = computed(
   () => isMounted.value && isInitialized.value && isAuthenticated.value,
 );
+const showPlatformUpdates = computed(
+  () =>
+    showAuthedShell.value &&
+    !!user.value?.current_team_id &&
+    user.value.current_team?.is_subscribed !== false,
+);
 </script>
 
 <template>
@@ -86,7 +92,7 @@ const showAuthedShell = computed(
           {{ t("common.impersonation.exit") }}
         </button>
       </div>
-      <LayoutPlatformUpdateBanner v-if="showAuthedShell" />
+      <LayoutPlatformUpdateBanner v-if="showPlatformUpdates" />
       <LayoutNavbar v-if="showAuthedShell" />
       <header v-else class="shrink-0 border-b px-4 lg:px-8">
         <div class="flex h-16 items-center">

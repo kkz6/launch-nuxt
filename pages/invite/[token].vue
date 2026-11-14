@@ -55,6 +55,7 @@ onMounted(async () => {
 });
 
 const handleSubmit = async () => {
+  if (loading.value || invitationLoading.value) return;
   loading.value = true;
   errors.value = {};
 

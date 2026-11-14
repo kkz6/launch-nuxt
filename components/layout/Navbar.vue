@@ -106,7 +106,9 @@ const activeAdminUserTab = computed(() =>
 
 // Check if current team is subscribed
 const isSubscribed = computed(
-  () => user.value?.current_team?.is_subscribed ?? true,
+  () =>
+    !!user.value?.current_team_id &&
+    user.value.current_team?.is_subscribed !== false,
 );
 
 // Global navigation tabs
@@ -1802,6 +1804,14 @@ const handleLocalePreferenceChange = (value: unknown): Promise<void> => {
 };
 
 const isOpen = ref(false);
+const createTeamOpen = ref(false);
+const accountMenuTrigger = ref<InstanceType<typeof DropdownMenuTrigger> | null>(
+  null,
+);
+
+watch(createTeamOpen, (open) => {
+  if (!open) requestAnimationFrame(() => accountMenuTrigger.value?.$el.focus());
+});
 
 const openSettings = () => {
   isOpen.value = false;
@@ -1840,7 +1850,7 @@ const navigateTo = (path: string) => {
 
       <!-- Subscription Banner -->
       <div
-        v-if="!isSubscribed"
+        v-if="user?.current_team_id && !isSubscribed"
         class="group relative h-5 cursor-pointer overflow-hidden text-sm"
         @click="openSettingsSheet('billing')"
       >
@@ -1858,12 +1868,13 @@ const navigateTo = (path: string) => {
       </div>
 
       <div class="flex items-center space-x-2">
-        <LayoutActiveActions />
+        <LayoutActiveActions v-if="isSubscribed" />
         <!-- User Menu (with Teams) -->
         <ClientOnly>
           <DropdownMenu v-model:open="isOpen">
-            <DropdownMenuTrigger as-child>
-              <div
+            <DropdownMenuTrigger ref="accountMenuTrigger" as-child>
+              <button
+                type="button"
                 class="group flex h-9 cursor-pointer items-center gap-1 rounded-full py-0.5 pl-0.5 pr-2 transition-colors duration-150 hover:bg-muted/50"
               >
                 <Avatar class="h-8 w-8 border-2 border-background shadow-sm">
@@ -1876,10 +1887,14 @@ const navigateTo = (path: string) => {
                 <ChevronDown
                   class="ml-1 h-3.5 w-3.5 text-muted-foreground transition-transform duration-150 group-hover:translate-y-0.5"
                 />
-              </div>
+              </button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" class="w-52 p-1">
+            <DropdownMenuContent
+              align="end"
+              class="w-52 p-1"
+              @close-auto-focus="createTeamOpen && $event.preventDefault()"
+            >
               <!-- User Info -->
               <div class="px-2 py-1.5">
                 <p class="text-sm font-medium">{{ user?.name }}</p>
@@ -1887,7 +1902,7 @@ const navigateTo = (path: string) => {
               </div>
               <DropdownMenuSeparator class="my-1" />
 
-              <SharedTeamSwitcher />
+              <SharedTeamSwitcher @create-team="createTeamOpen = true" />
               <DropdownMenuSeparator class="my-1" />
 
               <!-- Menu Items -->
@@ -2005,6 +2020,8 @@ const navigateTo = (path: string) => {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          <SettingsCreateTeam v-model:open="createTeamOpen" />
 
           <template #fallback>
             <div
@@ -2135,7 +2152,9 @@ const navigateTo = (path: string) => {
           />
         </nav>
         <div class="flex shrink-0 items-center">
-          <ServerCreateServerDialog v-if="route.path === '/servers'" />
+          <ServerCreateServerDialog
+            v-if="isSubscribed && route.path === '/servers'"
+          />
           <DnsAddDomain
             v-if="route.path === '/dns'"
             :providers="[]"
