@@ -344,9 +344,17 @@ async function remove(): Promise<void> {
           ? "admin.userDetail.deleteUserAnyway"
           : "admin.userDetail.deleteUser",
       ),
+      checkbox: warning
+        ? {
+            label: t("admin.userDetail.acknowledgeBilling"),
+            checked: false,
+            required: true,
+          }
+        : undefined,
       destructive: true,
     });
-    if (!result?.ok || disposed) return;
+    if (!result?.ok || disposed || (warning && !result.checkbox?.checked))
+      return;
     await adminService.deleteUser(userId, warning || undefined);
     toast.success(t("admin.userDetail.deleted"));
     navigateTo("/admin");

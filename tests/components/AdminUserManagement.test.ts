@@ -550,7 +550,7 @@ describe("admin user management", () => {
       });
       mocks.confirm.mockImplementationOnce(async () => {
         expect(mocks.deleteUser).not.toHaveBeenCalled();
-        return { ok: confirmed };
+        return { ok: confirmed, checkbox: { checked: confirmed } };
       });
       const page = mountPage();
       await flushPromises();
@@ -564,6 +564,11 @@ describe("admin user management", () => {
           title: "Delete Anila?",
           warning: expect.stringContaining(reason),
           confirmText: "Delete anyway",
+          checkbox: {
+            label: expect.stringContaining("reviewed the billing warning"),
+            checked: false,
+            required: true,
+          },
         }),
       );
       if (confirmed) {
@@ -577,6 +582,22 @@ describe("admin user management", () => {
       }
     },
   );
+
+  it("requires an explicit acknowledgment for a paid customer", async () => {
+    mocks.previewUserDeletion.mockResolvedValueOnce({
+      data: { billing_warning: "user_has_paid_order" },
+    });
+    mocks.confirm.mockResolvedValueOnce({
+      ok: true,
+      checkbox: { checked: false },
+    });
+    const page = mountPage();
+    await flushPromises();
+    await openActions(page);
+    await deleteUserButton(page).trigger("click");
+    await flushPromises();
+    expect(mocks.deleteUser).not.toHaveBeenCalled();
+  });
 
   it("shows a toast and sends no delete request if the preview fails", async () => {
     mocks.previewUserDeletion.mockRejectedValueOnce({
