@@ -93,7 +93,11 @@ useDeploymentEvents(
     if (event.startsWith("deployment.runtime.")) {
       refreshingRuntime.value = event === "deployment.runtime.started";
       if (event === "deployment.runtime.completed") {
-        toast.success(t("site.deployments.runtimeRefreshed"));
+        if (data.post_actions_pending === true) {
+          toast.warning(t("site.deployments.runtimeWorkerRestartPending"));
+        } else {
+          toast.success(t("site.deployments.runtimeRefreshed"));
+        }
       } else if (event === "deployment.runtime.failed") {
         toast.error(t("site.deployments.runtimeRefreshFailed"));
       }

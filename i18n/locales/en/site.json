@@ -341,6 +341,7 @@
       "runtimeRefreshing": "Refreshing PHP runtime…",
       "runtimeRefreshDescription": "Reload the selected PHP-FPM service to clear cached code. Other sites using this PHP version also reload.",
       "runtimeRefreshed": "PHP runtime refreshed",
+      "runtimeWorkerRestartPending": "PHP runtime refreshed, but worker restart could not be queued.",
       "runtimeRefreshFailed": "PHP runtime refresh failed. Check the server task logs before retrying.",
       "regenerateTitle": "Regenerate deploy token?",
       "regenerateDescription": "This will invalidate the current webhook URL. Any CI/CD pipelines using the old URL will stop working.",

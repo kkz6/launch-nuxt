@@ -341,6 +341,7 @@
       "runtimeRefreshing": "PHP ランタイムを更新しています…",
       "runtimeRefreshDescription": "選択した PHP-FPM サービスを再読み込みし、キャッシュされたコードを消去します。同じ PHP バージョンを使用する他のサイトも再読み込みされます。",
       "runtimeRefreshed": "PHP ランタイムを更新しました",
+      "runtimeWorkerRestartPending": "PHP ランタイムは更新されましたが、ワーカーの再起動をキューに登録できませんでした。",
       "runtimeRefreshFailed": "PHP ランタイムを更新できませんでした。再試行する前にサーバータスクのログを確認してください。",
       "regenerateTitle": "デプロイトークンを再生成しますか？",
       "regenerateDescription": "現在の Webhook URL は無効になります。古い URL を使用している CI/CD パイプラインは動作しなくなります。",

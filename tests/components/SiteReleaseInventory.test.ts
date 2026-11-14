@@ -388,6 +388,25 @@ describe("PHP runtime recovery", () => {
     expect(liveBadges()).toHaveLength(1);
   });
 
+  it("warns when PHP reload succeeds but worker restart cannot be queued", async () => {
+    wrapper = mountDeployments();
+    await flushPromises();
+    await runtimeButton()!.trigger("click");
+    await flushPromises();
+    sendEvent("deployment.runtime.completed", {
+      task_id: "runtime-task",
+      post_actions_pending: true,
+    });
+    await vi.advanceTimersByTimeAsync(300);
+    expect(toast.warning).toHaveBeenCalledWith(
+      "PHP runtime refreshed, but worker restart could not be queued.",
+    );
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(runtimeButton()!.attributes("disabled")).toBeUndefined();
+    expect(liveBadges()).toHaveLength(1);
+  });
+
   it("reports runtime failure and permits a retry without requiring release inventory", async () => {
     getInventory.mockResolvedValue({ data: unavailable("unavailable") });
     wrapper = mountDeployments();
