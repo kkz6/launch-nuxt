@@ -28,8 +28,7 @@ const isLoading = ref(true);
 const notFound = ref(false);
 const loadError = ref(false);
 const deleteLoading = ref(false);
-const removalMode = ref<"delete" | "remove_record">("delete");
-const deleteError = ref("");
+const removalMode = ref<"uninstall" | "remove_record">("uninstall");
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
@@ -41,12 +40,12 @@ const deletionImpact = computed(() =>
       : "admin.serverDetail.deleteCloudImpact",
   ),
 );
-const deletionBlockedReason = computed(() => {
+const deletionBusy = computed(() =>
+  ["starting", "provisioning", "deleting"].includes(server.value?.status ?? ""),
+);
+const uninstallRequirements = computed(() => {
   const value = server.value;
-  if (!value) return "";
-  if (["starting", "provisioning", "deleting"].includes(value.status)) {
-    return t("admin.serverDetail.deleteBusy");
-  }
+  if (!value?.connected) return "";
   if (value.sites_count > 0) {
     return t("admin.serverDetail.deleteSites", { count: value.sites_count });
   }
@@ -129,13 +128,12 @@ async function load(): Promise<void> {
 }
 
 async function deleteServer(
-  mode: "delete" | "remove_record" = "delete",
+  mode: "uninstall" | "remove_record",
 ): Promise<void> {
   if (
     !isSuperAdmin.value ||
     !server.value ||
-    (mode === "remove_record" && server.value.provider === "custom_server") ||
-    deletionBlockedReason.value ||
+    deletionBusy.value ||
     deleteLoading.value ||
     !confirmationDialog.value
   )
@@ -146,9 +144,8 @@ async function deleteServer(
   const actionTitle = t(
     removeRecord
       ? "admin.serverDetail.removeRecordTitle"
-      : "admin.serverDetail.deleteTitle",
+      : "admin.serverDetail.uninstallTitle",
   );
-  deleteError.value = "";
   const result = await confirmationDialog.value.show({
     title: actionTitle,
     description: t(
@@ -161,7 +158,7 @@ async function deleteServer(
     ),
     warning: removeRecord
       ? t("admin.serverDetail.removeRecordImpact")
-      : deletionImpact.value,
+      : `${deletionImpact.value} ${t("admin.serverDetail.uninstallOfflineImpact")}`,
     confirmText: actionTitle,
     cancelText: t("admin.common.cancel"),
     destructive: true,
@@ -179,26 +176,31 @@ async function deleteServer(
   try {
     const res = removeRecord
       ? await adminService.removeServerRecord(serverId, confirmationName)
-      : await adminService.deleteServer(serverId, confirmationName);
-    toast.success(
-      t(
-        removeRecord
-          ? "admin.serverDetail.removedRecord"
-          : res.data.status === "deleted"
-            ? "admin.serverDetail.deleted"
-            : "admin.serverDetail.deleteRequested",
-      ),
-    );
+      : await adminService.uninstallServer(serverId, confirmationName);
+    if (res.data.status === "removed_offline") {
+      toast.warning(t("admin.serverDetail.removedOffline"));
+    } else {
+      toast.success(
+        t(
+          removeRecord
+            ? "admin.serverDetail.removedRecord"
+            : res.data.status === "deleted"
+              ? "admin.serverDetail.deleted"
+              : "admin.serverDetail.deleteRequested",
+        ),
+      );
+    }
     emit("deleted");
   } catch (error: unknown) {
     const err = error as { data?: { message?: string } };
-    deleteError.value =
+    toast.error(
       err.data?.message ||
-      t(
-        removeRecord
-          ? "admin.serverDetail.removeRecordFailed"
-          : "admin.serverDetail.deleteFailed",
-      );
+        t(
+          removeRecord
+            ? "admin.serverDetail.removeRecordFailed"
+            : "admin.serverDetail.deleteFailed",
+        ),
+    );
     if (!disposed) await load();
   } finally {
     deleteLoading.value = false;
@@ -211,8 +213,7 @@ useAdminLiveUpdates(load, {
   paused: deleteLoading,
   onChange(change) {
     if (change.resource === "server" && change.action === "deletion_failed") {
-      deleteError.value = t(serverDeletionErrorKey(change.error_code));
-      toast.error(deleteError.value);
+      toast.error(t(serverDeletionErrorKey(change.error_code)));
     }
   },
 });
@@ -476,37 +477,35 @@ onMounted(load);
           {{ t("admin.serverDetail.deleteTitle") }}
         </h2>
         <p class="text-sm text-muted-foreground">{{ deletionImpact }}</p>
-        <p class="text-sm text-muted-foreground">
-          {{ t("admin.serverDetail.deleteRequirements") }}
-        </p>
-        <p v-if="deletionBlockedReason" class="text-sm text-muted-foreground">
-          {{ deletionBlockedReason }}
-        </p>
-        <p v-if="deleteError" role="alert" class="text-sm text-destructive">
-          {{ deleteError }}
+        <p
+          v-if="deletionBusy || uninstallRequirements"
+          class="text-sm text-muted-foreground"
+        >
+          {{
+            deletionBusy
+              ? t("admin.serverDetail.deleteBusy")
+              : uninstallRequirements
+          }}
         </p>
         <Button
           variant="outline"
           size="sm"
           class="border-destructive/25 text-destructive hover:bg-destructive/5 hover:text-destructive"
-          :disabled="deleteLoading || !!deletionBlockedReason"
-          @click="deleteServer()"
+          :disabled="deleteLoading || deletionBusy"
+          @click="deleteServer('uninstall')"
         >
           <Icon
-            v-if="deleteLoading && removalMode === 'delete'"
+            v-if="deleteLoading && removalMode === 'uninstall'"
             name="lucide:loader-2"
             class="mr-2 h-4 w-4 animate-spin"
           />
           {{
             server.status === "deleting"
               ? t("admin.serverDetail.deleting")
-              : t("admin.serverDetail.deleteTitle")
+              : t("admin.serverDetail.uninstallTitle")
           }}
         </Button>
-        <div
-          v-if="server.provider !== 'custom_server'"
-          class="space-y-3 border-t pt-4"
-        >
+        <div class="space-y-3 border-t pt-4">
           <p class="text-sm text-muted-foreground">
             {{ t("admin.serverDetail.removeRecordImpact") }}
           </p>
@@ -514,7 +513,7 @@ onMounted(load);
             variant="outline"
             size="sm"
             class="border-destructive/25 text-destructive hover:bg-destructive/5 hover:text-destructive"
-            :disabled="deleteLoading || !!deletionBlockedReason"
+            :disabled="deleteLoading || deletionBusy"
             @click="deleteServer('remove_record')"
           >
             <Icon

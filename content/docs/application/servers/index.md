@@ -57,7 +57,7 @@ Server lists and detail pages receive live updates for server status, sites, and
 
 Resources undergoing background deletion stay visible until the API confirms completion. Removing a site or Docker project updates its server’s counts; the server can be deleted only after all child resources are gone and its lifecycle state allows deletion.
 
-In **Admin → Servers**, server details group hardware and system configuration, connectivity and lifecycle timestamps, and ownership. The separate **Delete server** action is available to super administrators and keeps the same resource and confirmation requirements. From a user’s **Servers** tab, select the server name or **View server** icon to open those details in a drawer while keeping the current user tab and search.
+In **Admin → Servers**, server details group hardware and system configuration, connectivity and lifecycle timestamps, and ownership. Super administrators can select **Uninstall server** or **Remove from launchctl**. From a user’s **Servers** tab, select the server name or **View server** icon to open those details in a drawer while keeping the current user tab and search.
 
 The directory uses the same server card layout as the application. Select the **Search servers** icon at the right of the admin tabs to search across teams, then choose a result to open its detail drawer. The directory keeps the current search; reopen the palette to change or clear it.
 
@@ -192,17 +192,14 @@ Archive servers you no longer need but want to keep the configuration.
 
 ### Delete Server
 
-Remove all sites and Docker projects (including their workloads) first. Deletion is blocked while a server is starting, provisioning, or already being deleted. Server deletion does not require SSH access or a successful connection check.
+Team server deletion requires removing all sites and Docker projects first. It is blocked while a server is starting, provisioning, or already being deleted.
 
-In **Admin → Servers**, open the server and select **Delete server**. This admin action requires `super_admin` access and confirmation by typing the exact server name.
+In **Admin → Servers**, open the server and select **Uninstall server**. This action requires `super_admin` access and the exact server name. Launchctl checks SSH first. If it cannot connect, it removes the server and associated site and project records from Launchctl and shows a warning. The machine and its workloads stay in place.
 
-- **Custom server:** removes its launchctl record only. The machine, files, and installed services remain running; clean them up manually if needed.
-- **Cloud server:** uses the saved provider credentials and the provider API to request deletion of the instance and its data in the background. A successful request is not proof of completion. If provider deletion fails, the server record is retained so the failure can be investigated and deletion retried. The admin server list and user page report delayed failures through live updates.
+For a reachable server, remove its sites and Docker projects first. On a custom server, the existing deletion flow removes its Launchctl record. On a cloud server, it requests deletion of the instance and its data through the provider API. If provider deletion fails, the server record is retained and Launchctl reports the failure.
 
 AWS instance deletion is currently unsupported; its deletion job fails and retains the server record. Deletion cannot be undone.
 
 ### Remove from launchctl
 
-If cloud provider access has been revoked and you only want to remove the server from launchctl, open its admin details and select **Remove from launchctl**. This separate action requires `super_admin` access, the exact server name, no remaining sites or Docker projects, and a lifecycle state that allows deletion.
-
-This removes only the launchctl record and makes no provider request. The cloud machine, its data, and provider billing are unchanged; manage them directly with the provider. Use **Delete server** when you intend to destroy the cloud instance.
+Select **Remove from launchctl** to remove the server and its associated site and project records. This option requires `super_admin` access and the exact server name. The machine, workloads, and any provider billing stay in place. Wait for pending site uninstalls to finish before removing the server.

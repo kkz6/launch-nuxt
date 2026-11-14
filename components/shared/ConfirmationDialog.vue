@@ -19,6 +19,7 @@ interface ConfirmationOptions {
   title: string;
   description: string;
   confirmText?: string;
+  alternateConfirmText?: string;
   cancelText?: string;
   destructive?: boolean;
   warning?: string;
@@ -34,6 +35,7 @@ interface ConfirmationOptions {
 
 interface ConfirmationResult {
   ok: boolean;
+  alternate?: boolean;
   value?: string;
   checkbox?: { checked: boolean };
 }
@@ -52,6 +54,7 @@ const checkboxState = ref<{ label: string; checked: boolean } | undefined>();
 let resolvePromise: ((value: ConfirmationResult) => void) | null = null;
 
 const show = (opts: ConfirmationOptions): Promise<ConfirmationResult> => {
+  resolvePromise?.({ ok: false });
   options.value = {
     confirmText: t("common.confirm"),
     cancelText: t("common.cancel"),
@@ -74,22 +77,33 @@ const isConfirmDisabled = computed(() => {
   return false;
 });
 
-const handleConfirm = () => {
+const finish = (result: ConfirmationResult) => {
+  const resolve = resolvePromise;
+  resolvePromise = null;
   isOpen.value = false;
-  resolvePromise?.({
+  resolve?.(result);
+};
+
+const handleConfirm = (alternate = false) => {
+  if (isConfirmDisabled.value) return;
+  finish({
     ok: true,
     value: verifiedText.value || undefined,
     checkbox: checkboxState.value,
+    ...(alternate ? { alternate: true } : {}),
   });
 };
 
 const handleCancel = () => {
-  isOpen.value = false;
-  resolvePromise?.({ ok: false });
+  finish({ ok: false });
 };
 
+watch(isOpen, (open) => {
+  if (!open) handleCancel();
+});
+
 const handleKeyUp = (e: KeyboardEvent) => {
-  if (e.key === "Enter" && !isConfirmDisabled.value) {
+  if (e.key === "Enter" && !options.value.alternateConfirmText) {
     handleConfirm();
   }
 };
@@ -191,17 +205,28 @@ defineExpose({ show });
           </div>
         </section>
       </AlertDialogHeader>
-      <AlertDialogFooter>
-        <AlertDialogCancel @click="handleCancel">
+      <AlertDialogFooter :class="{ 'gap-2': options.alternateConfirmText }">
+        <AlertDialogCancel
+          :class="{ 'mt-0': options.alternateConfirmText }"
+          @click="handleCancel"
+        >
           {{ options.cancelText }}
         </AlertDialogCancel>
+        <AlertDialogAction
+          v-if="options.alternateConfirmText"
+          :disabled="isConfirmDisabled"
+          class="border border-input bg-background text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground"
+          @click="handleConfirm(true)"
+        >
+          {{ options.alternateConfirmText }}
+        </AlertDialogAction>
         <AlertDialogAction
           :disabled="isConfirmDisabled"
           :class="{
             'bg-destructive text-destructive-foreground hover:bg-destructive/90':
               options.destructive,
           }"
-          @click="handleConfirm"
+          @click="handleConfirm()"
         >
           {{ options.confirmText }}
         </AlertDialogAction>

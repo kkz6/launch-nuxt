@@ -40,6 +40,42 @@ describe("admin user management API", () => {
     },
   );
 
+  it("sends billing confirmation only when explicitly acknowledged", async () => {
+    const fetch = vi.fn().mockResolvedValue({});
+    vi.stubGlobal("useApi", () => ({ fetch }));
+    await adminService.deleteUser("user-1");
+    await adminService.deleteUser("user-1", "user_has_paid_order");
+    expect(fetch).toHaveBeenNthCalledWith(1, "/admin/users/user-1", {
+      method: "DELETE",
+      body: undefined,
+    });
+    expect(fetch).toHaveBeenNthCalledWith(2, "/admin/users/user-1", {
+      method: "DELETE",
+      body: { billing_confirmation: "user_has_paid_order" },
+    });
+  });
+
+  it("loads the deletion warning through a read-only request", async () => {
+    const get = vi
+      .fn()
+      .mockResolvedValue({ data: { billing_warning: "user_has_paid_order" } });
+    vi.stubGlobal("useApi", () => ({ get }));
+    expect(
+      (await adminService.previewUserDeletion("user-1")).data.billing_warning,
+    ).toBe("user_has_paid_order");
+    expect(get).toHaveBeenCalledWith("/admin/users/user-1/deletion-preview");
+  });
+
+  it("uses the dedicated route to remove a site record", async () => {
+    const fetch = vi.fn().mockResolvedValue({});
+    vi.stubGlobal("useApi", () => ({ fetch }));
+    await adminService.removeSiteRecord("site-1", "app.example.com");
+    expect(fetch).toHaveBeenCalledWith("/admin/sites/site-1/record", {
+      method: "DELETE",
+      body: { confirmation_domain: "app.example.com" },
+    });
+  });
+
   it("propagates queue and role refusals to the caller", async () => {
     const error = { status: 409, data: { message: "Operation unavailable" } };
     vi.stubGlobal("useApi", () => ({

@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   navigateTo: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  warning: vi.fn(),
 }));
 
 vi.mock("~/composables/useAdminLiveUpdates", () => ({
@@ -21,12 +22,12 @@ vi.mock("~/composables/useAdminLiveUpdates", () => ({
 vi.mock("~/services/adminService", () => ({
   adminService: {
     showServer: mocks.showServer,
-    deleteServer: mocks.deleteServer,
+    uninstallServer: mocks.deleteServer,
     removeServerRecord: mocks.removeServerRecord,
   },
 }));
 vi.mock("vue-sonner", () => ({
-  toast: { success: mocks.success, error: mocks.error },
+  toast: { success: mocks.success, error: mocks.error, warning: mocks.warning },
 }));
 
 const currentUser = ref({ staff_role: "super_admin" });
@@ -125,7 +126,7 @@ describe("admin server deletion", () => {
     });
     const wrapper = mountPage();
     await flushPromises();
-    expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("requires removing its 1 site");
     expect(mocks.liveUpdates).toHaveBeenCalledWith(
       expect.any(Function),
       expect.objectContaining({
@@ -142,11 +143,12 @@ describe("admin server deletion", () => {
     const refreshing = mocks.liveUpdates.mock.calls[0][0]();
     await flushPromises();
     expect(wrapper.get("h1").text()).toBe("production-web");
-    expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("requires removing its 1 site");
     finish({ data: server({ sites_count: 0 }) });
     await refreshing;
     await flushPromises();
     expect(deleteButton(wrapper).attributes("disabled")).toBeUndefined();
+    expect(wrapper.text()).not.toContain("requires removing its 1 site");
     expect(mocks.deleteServer).not.toHaveBeenCalled();
     wrapper.unmount();
   });
@@ -200,7 +202,7 @@ describe("admin server deletion", () => {
       });
       await refresh();
       await flushPromises();
-      expect(wrapper.get('[role="alert"]').text()).toBe(message);
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
       expect(mocks.error).toHaveBeenCalledWith(message);
       expect(wrapper.text()).not.toContain("raw-provider-error-with-secret");
       expect(wrapper.get("h1").text()).toBe("production-web");
@@ -257,19 +259,20 @@ describe("admin server deletion", () => {
   );
 
   it.each([
-    [{ sites_count: 2 }, "Remove the 2 site(s)"],
-    [{ projects_count: 3 }, "Remove the 3 Docker project(s)"],
+    [{ sites_count: 2 }, "requires removing its 2 site(s)"],
+    [{ projects_count: 3 }, "requires removing its 3 Docker project(s)"],
   ])(
-    "disables deletion until child resources are removed",
+    "explains the reachable-server requirements while allowing a connection check",
     async (counts, reason) => {
       mocks.showServer.mockResolvedValueOnce({ data: server(counts) });
       const wrapper = mountPage();
       await flushPromises();
       expect(wrapper.text()).toContain(reason);
-      expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+      expect(deleteButton(wrapper).attributes("disabled")).toBeUndefined();
       await deleteButton(wrapper).trigger("click");
-      expect(mocks.deleteServer).not.toHaveBeenCalled();
-      expect(mocks.confirm).not.toHaveBeenCalled();
+      await flushPromises();
+      expect(mocks.confirm).toHaveBeenCalledOnce();
+      expect(mocks.deleteServer).toHaveBeenCalledOnce();
     },
   );
 
@@ -311,6 +314,23 @@ describe("admin server deletion", () => {
     expect(mocks.success).toHaveBeenCalledWith("Server deleted");
   });
 
+  it("warns when an unreachable server and its sites were removed locally", async () => {
+    mocks.showServer.mockResolvedValue({
+      data: server({ sites_count: 2, connected: false }),
+    });
+    mocks.deleteServer.mockResolvedValueOnce({
+      data: { status: "removed_offline" },
+    });
+    const wrapper = mountPage();
+    await flushPromises();
+    await deleteButton(wrapper).trigger("click");
+    await flushPromises();
+    expect(mocks.warning).toHaveBeenCalledWith(
+      expect.stringContaining("Server unreachable"),
+    );
+    expect(mocks.navigateTo).toHaveBeenCalledWith("/admin/servers");
+  });
+
   it.each([
     { data: { message: "Remove every project before deleting this server." } },
     new Error("Network unavailable"),
@@ -322,7 +342,7 @@ describe("admin server deletion", () => {
       await flushPromises();
       await deleteButton(wrapper).trigger("click");
       await flushPromises();
-      expect(wrapper.get('[role="alert"]').text()).toBe(
+      expect(mocks.error).toHaveBeenCalledWith(
         "data" in error ? error.data.message : "Failed to delete server",
       );
       expect(deleteButton(wrapper).attributes("disabled")).toBeUndefined();
@@ -343,9 +363,9 @@ describe("admin server deletion", () => {
     await deleteButton(wrapper).trigger("click");
     await flushPromises();
     expect(mocks.showServer).toHaveBeenCalledTimes(2);
-    expect(wrapper.get('[role="alert"]').text()).toBe(message);
-    expect(wrapper.text()).toContain("Remove the 1 site(s)");
-    expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
+    expect(mocks.error).toHaveBeenCalledWith(message);
+    expect(wrapper.text()).toContain("requires removing its 1 site");
+    expect(deleteButton(wrapper).attributes("disabled")).toBeUndefined();
     expect(mocks.success).not.toHaveBeenCalled();
     expect(mocks.navigateTo).not.toHaveBeenCalled();
   });
@@ -374,8 +394,7 @@ describe("admin server deletion", () => {
         confirmText: "Remove from launchctl",
         inputVerificationText: "production-web",
         destructive: true,
-        warning:
-          "Only the launchctl record will be removed. The cloud server, its files, services, and provider billing remain unchanged.",
+        warning: expect.stringContaining("its sites, and its Docker projects"),
       }),
     );
     expect(mocks.removeServerRecord).toHaveBeenCalledWith(
@@ -385,7 +404,7 @@ describe("admin server deletion", () => {
     expect(mocks.deleteServer).not.toHaveBeenCalled();
     expect(remove.attributes("disabled")).toBeDefined();
     expect(deleteButton(wrapper).attributes("disabled")).toBeDefined();
-    expect(deleteButton(wrapper).text()).toBe("Delete server");
+    expect(deleteButton(wrapper).text()).toBe("Uninstall server");
     expect(wrapper.get("h1").text()).toBe("production-web");
     expect(mocks.navigateTo).not.toHaveBeenCalled();
     finish({ data: { status: "removed" } });
@@ -430,17 +449,17 @@ describe("admin server deletion", () => {
       "production-web",
     );
     expect(mocks.navigateTo).not.toHaveBeenCalled();
-    expect(wrapper.get('[role="alert"]').text()).toContain(
-      "Type the server name exactly",
+    expect(mocks.error).toHaveBeenCalledWith(
+      "Type the server name exactly to confirm deletion",
     );
   });
 
   it.each([
-    ["support", "digitalocean"],
-    ["super_admin", "custom_server"],
+    ["support", "digitalocean", false],
+    ["super_admin", "custom_server", true],
   ])(
-    "does not offer separate record removal for %s on %s",
-    async (role, provider) => {
+    "sets record removal availability for %s on %s",
+    async (role, provider, available) => {
       currentUser.value.staff_role = role;
       mocks.showServer.mockResolvedValue({ data: server({ provider }) });
       const wrapper = mountPage();
@@ -449,7 +468,7 @@ describe("admin server deletion", () => {
         wrapper
           .findAll("button")
           .some((button) => button.text() === "Remove from launchctl"),
-      ).toBe(false);
+      ).toBe(available);
       expect(mocks.removeServerRecord).not.toHaveBeenCalled();
     },
   );
@@ -458,25 +477,20 @@ describe("admin server deletion", () => {
     { status: "starting" },
     { status: "provisioning" },
     { status: "deleting" },
-    { sites_count: 1 },
-    { projects_count: 1 },
-  ])(
-    "retains lifecycle and workload guards for record removal: %j",
-    async (guard) => {
-      mocks.showServer.mockResolvedValue({
-        data: server({ provider: "digitalocean", ...guard }),
-      });
-      const wrapper = mountPage();
-      await flushPromises();
-      const remove = wrapper
-        .findAll("button")
-        .find((button) => button.text() === "Remove from launchctl")!;
-      expect(remove.attributes("disabled")).toBeDefined();
-      await remove.trigger("click");
-      expect(mocks.confirm).not.toHaveBeenCalled();
-      expect(mocks.removeServerRecord).not.toHaveBeenCalled();
-    },
-  );
+  ])("retains lifecycle guards for record removal: %j", async (guard) => {
+    mocks.showServer.mockResolvedValue({
+      data: server({ provider: "digitalocean", ...guard }),
+    });
+    const wrapper = mountPage();
+    await flushPromises();
+    const remove = wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Remove from launchctl")!;
+    expect(remove.attributes("disabled")).toBeDefined();
+    await remove.trigger("click");
+    expect(mocks.confirm).not.toHaveBeenCalled();
+    expect(mocks.removeServerRecord).not.toHaveBeenCalled();
+  });
 
   it("keeps the record when removal is cancelled or rejected, without falling back to cloud deletion", async () => {
     mocks.showServer.mockResolvedValue({
@@ -496,7 +510,7 @@ describe("admin server deletion", () => {
     expect(mocks.removeServerRecord).not.toHaveBeenCalled();
     await remove.trigger("click");
     await flushPromises();
-    expect(wrapper.get('[role="alert"]').text()).toBe(
+    expect(mocks.error).toHaveBeenCalledWith(
       "Remove every project before removing this server",
     );
     expect(wrapper.get("h1").text()).toBe("production-web");

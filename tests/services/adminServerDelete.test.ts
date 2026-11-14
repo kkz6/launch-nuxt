@@ -45,6 +45,21 @@ describe("admin server deletion API", () => {
     ).rejects.toBe(error);
   });
 
+  it("uses the uninstall endpoint and preserves the offline result", async () => {
+    const response = {
+      data: { server_id: "server-1", status: "removed_offline" },
+    };
+    const fetch = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal("useApi", () => ({ fetch }));
+    expect(
+      await adminService.uninstallServer("server-1", "Production Web"),
+    ).toEqual(response);
+    expect(fetch).toHaveBeenCalledWith("/admin/servers/server-1/uninstall", {
+      method: "DELETE",
+      body: { confirmation_name: "Production Web" },
+    });
+  });
+
   it("propagates a backend refusal without a success response", async () => {
     const error = { status: 422, data: { message: "Remove sites first" } };
     const fetch = vi.fn().mockRejectedValue(error);

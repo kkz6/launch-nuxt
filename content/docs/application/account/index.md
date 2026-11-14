@@ -193,7 +193,7 @@ Super administrators can change **Staff access** to **Regular user**, **Support*
 
 You cannot change your own staff role or demote the last super administrator. Ask another super administrator to change your role when needed. Support staff can view user details but cannot change roles or delete users or sites.
 
-To delete another staff account, first change its staff access to **Regular user**, then choose **More actions → Delete user**. Removing staff access does not bypass the existing billing-history restriction: users whose owned teams have a paid order or a current or past non-trial subscription cannot be deleted. Self-deletion is also blocked here.
+To delete another staff account, first change its staff access to **Regular user**, then choose **More actions → Delete user**. If the customer has a paid order or a current or past paid subscription, review the warning in the confirmation dialog before selecting **Delete anyway**. Subscription cancellation and payment refunds are handled separately. Self-deletion is blocked.
 
 See the [staff API](/docs/api/staff) for the corresponding administrative endpoints.
 
