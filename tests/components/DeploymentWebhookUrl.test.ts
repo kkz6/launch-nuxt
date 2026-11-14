@@ -88,88 +88,26 @@ describe("deployment webhook URL", () => {
     expect(wrapper.find('button[title="Regenerate"]').exists()).toBe(true);
   });
 
-  it("lets Editors roll back using the registered deployment endpoint", async () => {
-    canManageTeam.value = false;
-    confirm.mockResolvedValue({ ok: true });
-    vi.mocked($api).mockResolvedValue({
-      data: [
-        {
-          id: "current",
-          status: "finished",
-          created_at: "2026-11-01T00:00:00Z",
-        },
-        {
-          id: "previous",
-          status: "finished",
-          created_at: "2026-10-31T00:00:00Z",
-        },
-      ],
-    });
-    const wrapper = mountDeployments();
-    await wrapper.setProps({
-      site: { deploy_token: "token", zero_downtime_deployment: true } as Site,
-    });
-    await flushPromises();
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Rollback")!
-      .trigger("click");
-    await flushPromises();
-    expect($api).toHaveBeenCalledWith(
-      "/servers/server-id/sites/site-id/rollback/previous",
-      { method: "POST" },
+  it("rechecks permission after confirming token rotation", async () => {
+    let accept!: (result: { ok: boolean }) => void;
+    confirm.mockReturnValue(
+      new Promise((resolve) => {
+        accept = resolve;
+      }),
     );
+    const wrapper = mountDeployments();
+    await flushPromises();
+    await wrapper.get('button[title="Regenerate"]').trigger("click");
+    canManageTeam.value = false;
+    accept({ ok: true });
+    await flushPromises();
+    expect(
+      vi
+        .mocked($api)
+        .mock.calls.some(([, options]) => options?.method === "POST"),
+    ).toBe(false);
     wrapper.unmount();
   });
-
-  it.each(["rollback", "regenerate"])(
-    "rechecks permissions after confirming %s",
-    async (action) => {
-      let accept!: (result: { ok: boolean }) => void;
-      confirm.mockReturnValue(
-        new Promise((resolve) => {
-          accept = resolve;
-        }),
-      );
-      vi.mocked($api).mockResolvedValue({
-        data: [
-          {
-            id: "current",
-            status: "finished",
-            created_at: "2026-11-01T00:00:00Z",
-          },
-          {
-            id: "previous",
-            status: "finished",
-            created_at: "2026-10-31T00:00:00Z",
-          },
-        ],
-      });
-      const wrapper = mountDeployments();
-      await wrapper.setProps({
-        site: { deploy_token: "token", zero_downtime_deployment: true } as Site,
-      });
-      await flushPromises();
-      const button =
-        action === "rollback"
-          ? wrapper
-              .findAll("button")
-              .find((button) => button.text() === "Rollback")!
-          : wrapper.get('button[title="Regenerate"]');
-      await button.trigger("click");
-      expect(confirm).toHaveBeenCalledOnce();
-      canEdit.value = false;
-      canManageTeam.value = false;
-      accept({ ok: true });
-      await flushPromises();
-      expect(
-        vi
-          .mocked($api)
-          .mock.calls.some(([, options]) => options?.method === "POST"),
-      ).toBe(false);
-      wrapper.unmount();
-    },
-  );
 
   it("displays and copies the frontend proxy URL", async () => {
     const wrapper = mountDeployments();

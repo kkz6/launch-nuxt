@@ -311,6 +311,7 @@ export interface CertificateStatusResult {
 
 export interface Deployment {
   id: string;
+  release_name?: string | null;
   site_id: string;
   user_id: string | null;
   task_id: string;
@@ -323,6 +324,23 @@ export interface Deployment {
   updated_at: string;
   task?: Task;
   user: null | User;
+}
+
+export interface SiteRelease {
+  release_name: string;
+  deployment_id?: string;
+  deployment_ids: string[];
+  status?: string;
+  active: boolean;
+  rollback_available: boolean;
+  unavailable_reason?: "active" | "unfinished" | "unknown_deployment";
+}
+
+export interface SiteReleaseInventory {
+  status: "available" | "unavailable" | "busy" | "unsupported";
+  checked_at: string;
+  active_release: string | null;
+  releases: SiteRelease[];
 }
 
 export interface VcsData {
