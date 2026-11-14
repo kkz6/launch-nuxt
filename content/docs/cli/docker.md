@@ -60,3 +60,44 @@ returned deployment record, not service health. Inspect the stack after deploy.
 Deletion preserves named volumes unless `--remove-volumes` is explicitly used.
 Reload/deletion require `--yes` when noninteractive. Container database commands,
 application subresources and advanced Compose configuration remain API workflows.
+
+## Docker database snapshot restore
+
+Container database backups use the API workflow; `lctl databases` manages native
+server databases. First inspect the snapshot history and the intended target:
+
+```bash
+lctl api GET /api/servers/<server-id>/docker/projects/<source-project-id>/databases/<source-database-id>/backup/runs --json
+lctl api GET /api/servers/<server-id>/docker/projects/<target-project-id>/databases/<target-database-id> --json
+```
+
+Restoring is destructive and requires Admin or Owner access. After verifying the
+snapshot and backing up the target, create a request file with the selected
+snapshot and target IDs:
+
+```json
+{
+  "run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "target_database_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX"
+}
+```
+
+```bash
+lctl api POST /api/servers/<server-id>/docker/projects/<source-project-id>/databases/<source-database-id>/backup/restore --data @restore.json --json
+```
+
+The route identifies the snapshot's source database. `target_database_id` selects
+a database resource, not a raw engine database name. Omit it to restore into the
+source resource. The target must have the same engine and belong to the same team
+and server. The raw API command does not add an interactive confirmation.
+
+Restore runs during the request; a successful response means the restore command
+completed. A timeout or disconnect is an unknown outcome, so inspect the target
+before retrying. Archive validation runs before ingestion, PostgreSQL SQL errors
+fail the restore, and failed ingestion may leave partial changes.
+
+MongoDB uses the source identity saved with the snapshot to map into the selected
+target. Unknown legacy sources and full-instance snapshots are refused. Only
+matching archived target collections are replaced; unrelated collections remain.
+See [Restore Database](/docs/application/backups#restore-database) for validation
+limits and recovery guidance.
