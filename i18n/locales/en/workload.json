@@ -646,8 +646,8 @@
         "empty": "The database has not started yet. Logs will appear here once its container is running."
       },
       "restore": {
-        "crossWarning": "This replaces the contents of {target} with the snapshot from {source}. All current data in {target} will be lost.",
-        "description": "Replay this snapshot into a database. The target's current contents will be replaced, and this cannot be undone.",
+        "crossWarning": "Restoring {source} into {target} can overwrite or delete target data. A failed restore may leave partial changes.",
+        "description": "Restore this snapshot into the selected database. Target data can be overwritten or deleted. Back up the target first.",
         "engineOnly": "Only {engine} databases on this server are listed. The source database is selected by default.",
         "failed": "Restore failed",
         "intoTarget": "Restore into target",
@@ -658,7 +658,7 @@
         "restoreInto": "Restore into",
         "restored": "Database restored from snapshot",
         "restoredInto": "Snapshot restored into {name}",
-        "sameWarning": "This replaces the current contents of {name} with the snapshot data. Any changes made since the snapshot was taken will be lost.",
+        "sameWarning": "Restoring into {name} can overwrite or delete current data. A failed restore may leave partial changes.",
         "selectTarget": "Select a target database",
         "snapshot": "Snapshot",
         "source": "source",
