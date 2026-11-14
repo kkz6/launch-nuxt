@@ -14,7 +14,6 @@ const props = defineProps<{
   open: boolean;
   site: AdminSiteSummary | null;
   pending?: boolean;
-  error?: string;
 }>();
 const emit = defineEmits<{
   "update:open": [open: boolean];
@@ -120,14 +119,7 @@ const tlsLabel = computed(() => {
           </div>
         </dl>
         <p
-          v-if="error || site.uninstallation_failed_at"
-          role="alert"
-          class="mt-4 text-sm text-destructive"
-        >
-          {{ error || t("admin.userDetail.siteDeletionFailed") }}
-        </p>
-        <p
-          v-else-if="deletionPending"
+          v-if="deletionPending"
           role="status"
           class="mt-4 text-sm text-muted-foreground"
         >

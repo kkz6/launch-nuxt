@@ -126,4 +126,5 @@ The drawer is read-only. Super administrators can delete a site using the separa
 
 Open **Admin → Users → user → Sites**. Search by domain or server name, then select **Delete site** on the intended row. This action requires **Super admin** access. Type the exact site domain in the confirmation dialog.
 
-Deletion removes the site's files and configuration from its owning server. The server itself remains. After the request is accepted, the row shows **Deletion requested** while cleanup runs in the background. The list and related counts update automatically, including after reconnecting, without a manual Refresh control. Failed list requests offer **Retry**. A queued request is not completed deletion: the row remains until the API confirms it is gone. Failed cleanup retains the site record so you can investigate and retry.
+- **Remove site** deletes the site record from Launchctl. The site and its files stay on the host. Use this option when server access has been revoked.
+- **Uninstall site** removes the site's files, configuration, and queue workers in the background. The row shows **Deletion requested** until cleanup completes. If cleanup fails, you can retry or choose **Remove site**.

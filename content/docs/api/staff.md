@@ -10,8 +10,10 @@ These routes use staff authorization across teams. They are relative to the API 
 | GET | `/admin/users/{id}` | User details and owned teams |
 | GET | `/admin/users/{id}/sites` | Sites across the user's owned teams |
 | PATCH | `/admin/users/{id}/staff-role` | Change platform staff access |
-| DELETE | `/admin/users/{id}` | Delete an eligible user |
+| GET | `/admin/users/{id}/deletion-preview` | Check for a billing warning before confirming deletion |
+| DELETE | `/admin/users/{id}` | Delete a user |
 | DELETE | `/admin/sites/{id}` | Request site cleanup |
+| DELETE | `/admin/sites/{id}/record` | Remove a site from Launchctl |
 
 ## Change staff access
 
@@ -25,7 +27,13 @@ Send an explicit `staff_role` field to `PATCH /admin/users/{id}/staff-role`:
 
 Self role changes and demotion of the last super administrator return `409`. Missing users return `404`; insufficient staff access returns `403`. The actor's current role is checked again inside the update transaction. The audit record includes the actor, target, and previous and new roles. Existing sessions lose admin access on their next admin request after demotion.
 
-Removing staff access does not delete the user or change team permissions. `DELETE /admin/users/{id}` still refuses self-deletion, staff users, and users whose owned teams have paid orders or current or past non-trial subscriptions.
+Removing staff access preserves the account and its team permissions.
+
+## Delete a user
+
+The deletion preview and delete routes require `super_admin` and refuse self-deletion and staff accounts. Fetch the preview before asking the operator to confirm. Its `data.billing_warning` is empty for an account without a billing warning, or `user_has_paid_order` or `user_has_paid_subscription` when the operator must acknowledge billing history.
+
+Once confirmed, send `DELETE /admin/users/{id}`. For example, include `{"billing_confirmation":"user_has_paid_order"}` if the operator confirmed that warning. The API rechecks the account and returns HTTP 409 if the current warning requires a different acknowledgment. Subscription cancellation and refunds are handled separately.
 
 ## Delete a site
 
@@ -42,6 +50,8 @@ The API resolves the owning server and team from the site. A successful response
 ```
 
 This is an asynchronous request. Cleanup removes the site's files and configuration; it does not delete the server. A pending site remains in `GET /admin/users/{id}/sites` with `uninstallation_requested_at` set. Re-fetch that list to verify completion; the dashboard does this automatically when resource notifications arrive and after reconnecting. Queue submission failure restores the previous state. Remote cleanup failure retains the record and clears the pending flag for a later retry. Duplicate pending requests are rejected.
+
+Use `DELETE /admin/sites/{id}/record` with the same confirmation body to remove the site from Launchctl without contacting the host. The response returns `data.status: "removed"`.
 
 See [admin user management](/docs/application/account#admin-user-management), [site deletion](/docs/application/sites#delete-a-site-as-an-administrator), and [admin server deletion](/docs/api/servers#admin-server-deletion) for dashboard workflows.
 
