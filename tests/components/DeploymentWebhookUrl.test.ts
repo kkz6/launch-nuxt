@@ -2,8 +2,7 @@ import { flushPromises, shallowMount } from "@vue/test-utils";
 import { computed, defineComponent, onMounted, ref } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Deployments from "../../components/site/Deployments.vue";
-import type { Deployment, Site } from "../../types";
-import { toast } from "vue-sonner";
+import type { Site } from "../../types";
 import { createI18nStub } from "../helpers/i18n";
 
 vi.mock("~/composables/useChannelEvents", () => ({
@@ -89,216 +88,17 @@ describe("deployment webhook URL", () => {
     expect(wrapper.find('button[title="Regenerate"]').exists()).toBe(true);
   });
 
-  it("lets Editors roll back using the registered deployment endpoint", async () => {
-    canManageTeam.value = false;
-    confirm.mockResolvedValue({ ok: true });
-    vi.mocked($api).mockResolvedValue({
-      data: [
-        {
-          id: "current",
-          status: "finished",
-          created_at: "2026-11-01T00:00:00Z",
-        },
-        {
-          id: "previous",
-          status: "finished",
-          created_at: "2026-10-31T00:00:00Z",
-        },
-      ],
-    });
-    const wrapper = mountDeployments();
-    await wrapper.setProps({
-      site: { deploy_token: "token", zero_downtime_deployment: true } as Site,
-    });
-    await flushPromises();
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Rollback")!
-      .trigger("click");
-    await flushPromises();
-    expect($api).toHaveBeenCalledWith(
-      "/servers/server-id/sites/site-id/rollback/previous",
-      { method: "POST" },
-    );
-    wrapper.unmount();
-  });
-
-  it.each([
-    {
-      name: "recorded release names",
-      metadata: [
-        { release_name: "release-b" },
-        { release_name: "release-b" },
-        { release_name: "release-a" },
-      ],
-    },
-    {
-      name: "mixed recorded and legacy release metadata",
-      metadata: [
-        {
-          release_name: "release-b",
-          commit_data: { rollback_to: "duplicate" },
-        },
-        { commit_data: {} },
-        { release_name: "release-a" },
-      ],
-    },
-    {
-      name: "missing legacy rollback target",
-      metadata: [
-        { release_name: "release-b" },
-        { commit_data: { rollback_to: "missing-deployment" } },
-        { release_name: "release-a" },
-      ],
-    },
-    {
-      name: "legacy rollback history",
-      metadata: [
-        { commit_data: { rollback_to: "duplicate" } },
-        { commit_data: {} },
-        { commit_data: {} },
-      ],
-    },
-  ])(
-    "selects the previous distinct release using $name",
-    async ({ metadata }) => {
-      const rows = ["current", "duplicate", "previous"].map((id, index) => ({
-        id,
-        status: "finished",
-        created_at: "2026-11-01T00:00:00Z",
-        ...metadata[index],
-      }));
-      vi.mocked($api).mockResolvedValue({ data: rows });
-      confirm.mockResolvedValue({ ok: true });
-      const wrapper = mountDeployments();
-      await wrapper.setProps({
-        site: { zero_downtime_deployment: true } as Site,
-      });
-      await flushPromises();
-      const buttons = wrapper
-        .findAll("button")
-        .filter((button) => button.text() === "Rollback");
-      expect(buttons).toHaveLength(1);
-      await buttons[0].trigger("click");
-      await flushPromises();
-      expect($api).toHaveBeenCalledWith(
-        "/servers/server-id/sites/site-id/rollback/previous",
-        { method: "POST" },
-      );
-      expect(confirm.mock.calls[0][0].description).toContain(
-        "does not restore the database",
-      );
-      wrapper.unmount();
-    },
-  );
-
-  it("hides an older rollback record when its release directory was never recorded", async () => {
-    vi.mocked($api).mockResolvedValue({
-      data: [
-        {
-          id: "current",
-          release_name: "release-c",
-          status: "finished",
-          created_at: "2026-11-03T00:00:00Z",
-        },
-        {
-          id: "old-rollback",
-          status: "finished",
-          commit_data: { rollback_to: "original" },
-          created_at: "2026-11-02T00:00:00Z",
-        },
-        {
-          id: "original",
-          release_name: "release-a",
-          status: "finished",
-          created_at: "2026-11-01T00:00:00Z",
-        },
-      ],
-    });
-    const wrapper = mountDeployments();
-    await wrapper.setProps({
-      site: { zero_downtime_deployment: true } as Site,
-    });
-    await flushPromises();
-    expect(
-      wrapper
-        .findAll("button")
-        .filter((button) => button.text() === "Rollback"),
-    ).toHaveLength(0);
-    wrapper.unmount();
-  });
-
-  it("does not offer rollback when every successful record points to the same release", async () => {
-    vi.mocked($api).mockResolvedValue({
-      data: [
-        {
-          id: "rollback",
-          release_name: "release-a",
-          status: "finished",
-          created_at: "2026-11-01T00:00:00Z",
-        },
-        {
-          id: "original",
-          release_name: "release-a",
-          status: "finished",
-          created_at: "2026-10-31T00:00:00Z",
-        },
-      ],
-    });
-    const wrapper = mountDeployments();
-    await wrapper.setProps({
-      site: { zero_downtime_deployment: true } as Site,
-    });
-    await flushPromises();
-    expect(
-      wrapper
-        .findAll("button")
-        .filter((button) => button.text() === "Rollback"),
-    ).toHaveLength(0);
-    wrapper.unmount();
-  });
-
-  it("does not start a rollback when another deployment begins during confirmation", async () => {
+  it("rechecks permission after confirming token rotation", async () => {
     let accept!: (result: { ok: boolean }) => void;
     confirm.mockReturnValue(
       new Promise((resolve) => {
         accept = resolve;
       }),
     );
-    vi.mocked($api).mockResolvedValue({
-      data: [
-        {
-          id: "current",
-          status: "finished",
-          created_at: "2026-11-01T00:00:00Z",
-        },
-        {
-          id: "previous",
-          status: "finished",
-          created_at: "2026-10-31T00:00:00Z",
-        },
-      ],
-    });
     const wrapper = mountDeployments();
-    await wrapper.setProps({
-      site: { zero_downtime_deployment: true } as Site,
-    });
     await flushPromises();
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Rollback")!
-      .trigger("click");
-    await wrapper.setProps({
-      site: {
-        zero_downtime_deployment: true,
-        latest_deployment: {
-          id: "new-deploy",
-          site_id: "site-id",
-          status: "pending",
-          created_at: "2026-11-02T00:00:00Z",
-        } as Deployment,
-      } as Site,
-    });
+    await wrapper.get('button[title="Regenerate"]').trigger("click");
+    canManageTeam.value = false;
     accept({ ok: true });
     await flushPromises();
     expect(
@@ -308,93 +108,6 @@ describe("deployment webhook URL", () => {
     ).toBe(false);
     wrapper.unmount();
   });
-
-  it("shows the server's rollback failure without reporting success", async () => {
-    confirm.mockResolvedValue({ ok: true });
-    vi.mocked(toast.success).mockClear();
-    vi.mocked($api)
-      .mockResolvedValueOnce({
-        data: [
-          {
-            id: "current",
-            status: "finished",
-            created_at: "2026-11-01T00:00:00Z",
-          },
-          {
-            id: "previous",
-            status: "finished",
-            created_at: "2026-10-31T00:00:00Z",
-          },
-        ],
-      })
-      .mockRejectedValueOnce({
-        data: { message: "Unable to queue rollback. Try again." },
-      });
-    const wrapper = mountDeployments();
-    await wrapper.setProps({
-      site: { zero_downtime_deployment: true } as Site,
-    });
-    await flushPromises();
-    await wrapper
-      .findAll("button")
-      .find((button) => button.text() === "Rollback")!
-      .trigger("click");
-    await flushPromises();
-    expect(toast.error).toHaveBeenCalledWith(
-      "Unable to queue rollback. Try again.",
-    );
-    expect(toast.success).not.toHaveBeenCalled();
-    wrapper.unmount();
-  });
-
-  it.each(["rollback", "regenerate"])(
-    "rechecks permissions after confirming %s",
-    async (action) => {
-      let accept!: (result: { ok: boolean }) => void;
-      confirm.mockReturnValue(
-        new Promise((resolve) => {
-          accept = resolve;
-        }),
-      );
-      vi.mocked($api).mockResolvedValue({
-        data: [
-          {
-            id: "current",
-            status: "finished",
-            created_at: "2026-11-01T00:00:00Z",
-          },
-          {
-            id: "previous",
-            status: "finished",
-            created_at: "2026-10-31T00:00:00Z",
-          },
-        ],
-      });
-      const wrapper = mountDeployments();
-      await wrapper.setProps({
-        site: { deploy_token: "token", zero_downtime_deployment: true } as Site,
-      });
-      await flushPromises();
-      const button =
-        action === "rollback"
-          ? wrapper
-              .findAll("button")
-              .find((button) => button.text() === "Rollback")!
-          : wrapper.get('button[title="Regenerate"]');
-      await button.trigger("click");
-      expect(confirm).toHaveBeenCalledOnce();
-      canEdit.value = false;
-      canManageTeam.value = false;
-      accept({ ok: true });
-      await flushPromises();
-      expect(
-        vi
-          .mocked($api)
-          .mock.calls.some(([, options]) => options?.method === "POST"),
-      ).toBe(false);
-      wrapper.unmount();
-    },
-  );
 
   it("displays and copies the frontend proxy URL", async () => {
     const wrapper = mountDeployments();

@@ -326,6 +326,23 @@ export interface Deployment {
   user: null | User;
 }
 
+export interface SiteRelease {
+  release_name: string;
+  deployment_id?: string;
+  deployment_ids: string[];
+  status?: string;
+  active: boolean;
+  rollback_available: boolean;
+  unavailable_reason?: "active" | "unfinished" | "unknown_deployment";
+}
+
+export interface SiteReleaseInventory {
+  status: "available" | "unavailable" | "busy" | "unsupported";
+  checked_at: string;
+  active_release: string | null;
+  releases: SiteRelease[];
+}
+
 export interface VcsData {
   id: number;
   ref: string;

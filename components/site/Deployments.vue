@@ -4,7 +4,7 @@ import { onBeforeUnmount, watch } from "vue";
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { useDeploymentEvents } from "~/composables/useChannelEvents";
-import type { Site, Deployment } from "~/types";
+import type { Site, Deployment, SiteReleaseInventory } from "~/types";
 
 interface Props {
   serverId: string;
@@ -33,6 +33,26 @@ const TERMINAL_DEPLOYMENT_EVENTS = new Set([
   "deployment.rollback.failed",
 ]);
 const notifiedRollbackWarnings = new Set<string>();
+const deployments = ref<Deployment[]>([]);
+const isLoading = ref(true);
+const releaseInventory = ref<SiteReleaseInventory | null>(null);
+const refreshingRuntime = ref(false);
+const rollingBackId = ref<string | null>(null);
+const contextKey = computed(
+  () => `${teamId.value}/${props.serverId}/${props.siteId}`,
+);
+let liveUpdateVersion = 0;
+let latestFetchId = 0;
+let latestInventoryFetchId = 0;
+let disposed = false;
+let inventoryRetryTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const invalidateInventory = () => {
+  latestInventoryFetchId++;
+  releaseInventory.value = null;
+  if (inventoryRetryTimeout) clearTimeout(inventoryRetryTimeout);
+  inventoryRetryTimeout = null;
+};
 
 // Coalesce lifecycle refreshes without delaying them on every progress tick.
 let deployFetchTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -40,7 +60,7 @@ const scheduleRefetch = () => {
   if (deployFetchTimeout) return;
   deployFetchTimeout = setTimeout(() => {
     deployFetchTimeout = null;
-    void fetchDeployments();
+    void refreshState();
   }, 300);
 };
 
@@ -66,54 +86,87 @@ const synthesizePending = (
   user: null,
 });
 
-useDeploymentEvents(teamId, (data, event) => {
-  if (data.site_id !== props.siteId) return;
-  if (typeof data.deployment_id !== "string") return;
-
-  if (
-    event === "deployment.rollback.completed" &&
-    data.post_actions_pending === true &&
-    !notifiedRollbackWarnings.has(data.deployment_id)
-  ) {
-    notifiedRollbackWarnings.add(data.deployment_id);
-    toast.warning(t("site.deployments.rollbackPostActionsPending"));
-  }
-
-  const isTerminal = TERMINAL_DEPLOYMENT_EVENTS.has(event);
-
-  // Apply the status to the matching row (or prepend a synthesized one).
-  // This keeps the list visually in sync with `deployment.started` and
-  // every `deployment.progress` tick without a refetch per event.
-  if (typeof data.status === "string") {
-    const idx = deployments.value.findIndex((d) => d.id === data.deployment_id);
-    if (idx >= 0) {
-      deployments.value[idx].status = data.status;
-    } else if (event === "deployment.started") {
-      deployments.value.unshift(
-        synthesizePending(data.deployment_id, data.status),
-      );
+useDeploymentEvents(
+  teamId,
+  (data, event) => {
+    if (data.site_id !== props.siteId) return;
+    if (event.startsWith("deployment.runtime.")) {
+      refreshingRuntime.value = event === "deployment.runtime.started";
+      if (event === "deployment.runtime.completed") {
+        toast.success(t("site.deployments.runtimeRefreshed"));
+      } else if (event === "deployment.runtime.failed") {
+        toast.error(t("site.deployments.runtimeRefreshFailed"));
+      }
+      invalidateInventory();
+      scheduleRefetch();
+      return;
     }
-  }
+    if (typeof data.deployment_id !== "string") return;
 
-  // Deployments from other tabs/webhooks have no local Deploy response. Fetch
-  // their metadata at the start, rather than waiting for the deploy to finish.
-  const deployment = deployments.value.find((d) => d.id === data.deployment_id);
-  if (
-    isTerminal ||
-    event === "deployment.started" ||
-    event === "deployment.rollback.started" ||
-    !deployment ||
-    !deployment.task_id
-  ) {
-    scheduleRefetch();
-  }
-});
+    if (
+      event === "deployment.rollback.completed" &&
+      data.post_actions_pending === true &&
+      !notifiedRollbackWarnings.has(data.deployment_id)
+    ) {
+      notifiedRollbackWarnings.add(data.deployment_id);
+      toast.warning(t("site.deployments.rollbackPostActionsPending"));
+    }
 
-const deployments = ref<Deployment[]>([]);
-const isLoading = ref(true);
-let liveUpdateVersion = 0;
-let latestFetchId = 0;
-let disposed = false;
+    const isTerminal = TERMINAL_DEPLOYMENT_EVENTS.has(event);
+    const isStarting =
+      event === "deployment.started" || event === "deployment.rollback.started";
+    if (isTerminal || isStarting) {
+      liveUpdateVersion++;
+      invalidateInventory();
+    }
+
+    // Apply the status to the matching row (or prepend a synthesized one).
+    // This keeps the list visually in sync with `deployment.started` and
+    // every `deployment.progress` tick without a refetch per event.
+    const status =
+      typeof data.status === "string"
+        ? data.status
+        : isStarting
+          ? "installing"
+          : undefined;
+    if (status) {
+      const idx = deployments.value.findIndex(
+        (d) => d.id === data.deployment_id,
+      );
+      if (idx >= 0) {
+        if (deployments.value[idx].status !== status) liveUpdateVersion++;
+        deployments.value[idx].status = status;
+      } else if (isStarting) {
+        deployments.value.unshift(
+          synthesizePending(data.deployment_id, status),
+        );
+      }
+    }
+
+    // Deployments from other tabs/webhooks have no local Deploy response. Fetch
+    // their metadata at the start, rather than waiting for the deploy to finish.
+    const deployment = deployments.value.find(
+      (d) => d.id === data.deployment_id,
+    );
+    if (
+      isTerminal ||
+      event === "deployment.started" ||
+      event === "deployment.rollback.started" ||
+      !deployment ||
+      !deployment.task_id
+    ) {
+      scheduleRefetch();
+    }
+  },
+  {
+    onReconnect: () => {
+      // The terminal event may have been missed. Do not claim completion.
+      refreshingRuntime.value = false;
+      invalidateInventory();
+      scheduleRefetch();
+    },
+  },
+);
 
 // The parent consumes the navbar's Deploy response for the overview. Use that
 // same record here so commit details appear as soon as Deploy returns.
@@ -122,6 +175,10 @@ watch(
   (deployment) => {
     if (!deployment || deployment.site_id !== props.siteId) return;
     liveUpdateVersion++;
+    if (props.site.zero_downtime_deployment) {
+      invalidateInventory();
+      scheduleRefetch();
+    }
     const index = deployments.value.findIndex((d) => d.id === deployment.id);
     if (index >= 0) {
       const existing = deployments.value[index];
@@ -142,8 +199,8 @@ watch(
 onBeforeUnmount(() => {
   disposed = true;
   if (deployFetchTimeout) clearTimeout(deployFetchTimeout);
+  if (inventoryRetryTimeout) clearTimeout(inventoryRetryTimeout);
 });
-const rollingBackId = ref<string | null>(null);
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
@@ -173,69 +230,150 @@ const hasActiveDeployment = computed(() => {
   return deployments.value.some((d) => isInProgress(d.status));
 });
 
-// Rollbacks reuse an existing release. History can therefore contain multiple
-// successful records for the same code; choose the previous distinct release.
-const rollbackTarget = computed(() => {
-  const byId = new Map(
-    deployments.value.map((deployment) => [deployment.id, deployment]),
+// Only the server's current symlink and retained directories establish which
+// release is live and safe to select. Successful history is not proof of either.
+const liveDeploymentId = computed(() => {
+  if (releaseInventory.value?.status !== "available") return;
+  const active = releaseInventory.value.releases.find(
+    (release) => release.active,
   );
-  const releaseReferences = (deployment: Deployment): Set<string> | null => {
-    const references = new Set<string>();
-    const visited = new Set<string>();
-    let current = deployment;
-    let hasRecordedRelease = false;
-    while (!visited.has(current.id)) {
-      visited.add(current.id);
-      references.add(`deployment:${current.id}`);
-      if (current.release_name) {
-        references.add(`release:${current.release_name}`);
-        hasRecordedRelease = true;
-      }
-      const targetId = current.commit_data?.rollback_to;
-      if (!targetId) return references;
-      references.add(`deployment:${targetId}`);
-      const target = byId.get(targetId);
-      // A dangling legacy reference cannot prove which release it represents.
-      if (!target) return hasRecordedRelease ? references : null;
-      current = target;
-    }
-    return null;
-  };
-  const finished = deployments.value.filter(
-    (deployment) => deployment.status === "finished",
-  );
-  if (finished.length < 2) return;
-  const currentRelease = releaseReferences(finished[0]);
-  if (!currentRelease) return;
-  const target = finished.slice(1).find((deployment) => {
-    const release = releaseReferences(deployment);
-    return (
-      release &&
-      ![...release].some((reference) => currentRelease.has(reference))
-    );
-  });
-  // Old rollback tasks do not record a recoverable release directory. Do not
-  // offer a target that the server cannot resolve, or silently choose another.
-  if (target?.commit_data?.rollback_to && !target.release_name) return;
-  return target;
+  return deployments.value.find((deployment) =>
+    active?.deployment_ids.includes(deployment.id),
+  )?.id;
 });
 
 const canRollback = (deployment: Deployment) =>
   canEdit.value &&
   props.site.zero_downtime_deployment &&
-  deployment.id === rollbackTarget.value?.id;
+  releaseInventory.value?.status === "available" &&
+  releaseInventory.value.releases.some(
+    (release) =>
+      release.rollback_available &&
+      !release.active &&
+      release.deployment_id === deployment.id,
+  );
 
 const canStartRollback = (deployment: Deployment) =>
-  canRollback(deployment) && !hasActiveDeployment.value && !rollingBackId.value;
+  canRollback(deployment) &&
+  !hasActiveDeployment.value &&
+  !rollingBackId.value &&
+  !refreshingRuntime.value;
+
+const releaseUnavailable = (deployment: Deployment) =>
+  props.site.zero_downtime_deployment &&
+  releaseInventory.value?.status === "available" &&
+  deployment.status === "finished" &&
+  !releaseInventory.value.releases.some((release) =>
+    release.deployment_ids.includes(deployment.id),
+  );
+
+const inventoryMessage = computed(() => {
+  if (
+    !props.site.zero_downtime_deployment ||
+    releaseInventory.value?.status === "available"
+  )
+    return "";
+  if (!releaseInventory.value) return t("site.deployments.checkingReleases");
+  if (releaseInventory.value.status === "busy")
+    return t("site.deployments.releasesBusy");
+  if (releaseInventory.value.status === "unsupported")
+    return t("site.deployments.releasesUnsupported");
+  return t("site.deployments.releasesUnavailable");
+});
+
+const fetchReleaseInventory = async () => {
+  invalidateInventory();
+  if (!props.site.zero_downtime_deployment || disposed) return;
+  const fetchId = latestInventoryFetchId;
+  const context = contextKey.value;
+  try {
+    const response = await $api<{ data: SiteReleaseInventory }>(
+      `/servers/${props.serverId}/sites/${props.siteId}/releases`,
+    );
+    if (
+      disposed ||
+      fetchId !== latestInventoryFetchId ||
+      context !== contextKey.value
+    )
+      return;
+    releaseInventory.value = response.data;
+  } catch {
+    if (
+      disposed ||
+      fetchId !== latestInventoryFetchId ||
+      context !== contextKey.value
+    )
+      return;
+    releaseInventory.value = {
+      status: "unavailable",
+      active_release: null,
+      releases: [],
+      checked_at: "",
+    };
+  }
+  if (
+    releaseInventory.value?.status === "unavailable" ||
+    releaseInventory.value?.status === "busy"
+  ) {
+    inventoryRetryTimeout = setTimeout(
+      () => {
+        inventoryRetryTimeout = null;
+        void fetchReleaseInventory();
+      },
+      releaseInventory.value.status === "busy" ? 3000 : 30000,
+    );
+  }
+};
+
+const canRefreshRuntime = computed(
+  () =>
+    canEdit.value &&
+    props.site.zero_downtime_deployment &&
+    Boolean(props.site.php_version),
+);
+
+const handleRefreshRuntime = async () => {
+  if (
+    !canRefreshRuntime.value ||
+    refreshingRuntime.value ||
+    hasActiveDeployment.value ||
+    releaseInventory.value?.status === "busy" ||
+    rollingBackId.value
+  )
+    return;
+  const context = contextKey.value;
+  refreshingRuntime.value = true;
+  try {
+    await $api(
+      `/servers/${props.serverId}/sites/${props.siteId}/runtime/refresh`,
+      { method: "POST" },
+    );
+    // A queue receipt does not establish that PHP has reloaded. Socket events
+    // report the outcome; reconnect reconciles an interrupted connection.
+    if (!disposed && context === contextKey.value) {
+      invalidateInventory();
+      scheduleRefetch();
+    }
+  } catch (error) {
+    if (disposed || context !== contextKey.value) return;
+    refreshingRuntime.value = false;
+    const err = error as { data?: { message?: string } };
+    toast.error(
+      err.data?.message || t("site.deployments.runtimeRefreshFailed"),
+    );
+  }
+};
 
 const fetchDeployments = async () => {
   const fetchId = ++latestFetchId;
   const requestVersion = liveUpdateVersion;
+  const context = contextKey.value;
   try {
     const data = await $api<{ data: Deployment[] }>(
       `/servers/${props.serverId}/sites/${props.siteId}/deployments`,
     );
-    if (disposed || fetchId !== latestFetchId) return;
+    if (disposed || fetchId !== latestFetchId || context !== contextKey.value)
+      return;
     // A list request started before Deploy returned must not erase its new row.
     if (requestVersion !== liveUpdateVersion) {
       scheduleRefetch();
@@ -243,15 +381,39 @@ const fetchDeployments = async () => {
     }
     deployments.value = data.data;
   } catch {
-    if (disposed || fetchId !== latestFetchId) return;
+    if (disposed || fetchId !== latestFetchId || context !== contextKey.value)
+      return;
     toast.error(t("site.deployments.loadFailed"));
   } finally {
     if (!disposed && fetchId === latestFetchId) isLoading.value = false;
   }
 };
 
+const refreshState = async () => {
+  await Promise.allSettled([fetchDeployments(), fetchReleaseInventory()]);
+};
+
+watch(contextKey, () => {
+  liveUpdateVersion++;
+  latestFetchId++;
+  deployments.value = [];
+  isLoading.value = true;
+  rollingBackId.value = null;
+  refreshingRuntime.value = false;
+  notifiedRollbackWarnings.clear();
+  invalidateInventory();
+  scheduleRefetch();
+});
+watch(
+  () => props.site.zero_downtime_deployment,
+  () => {
+    void fetchReleaseInventory();
+  },
+);
+
 const handleRollback = async (deployment: Deployment) => {
   if (!canStartRollback(deployment) || !confirmationDialog.value) return;
+  const context = contextKey.value;
 
   const result = await confirmationDialog.value.show({
     title: t("site.deployments.rollbackTitle"),
@@ -260,7 +422,15 @@ const handleRollback = async (deployment: Deployment) => {
     cancelText: t("site.common.cancel"),
   });
 
-  if (!result.ok || !canStartRollback(deployment)) return;
+  if (
+    !result.ok ||
+    context !== contextKey.value ||
+    !canStartRollback(deployment)
+  )
+    return;
+  await fetchReleaseInventory();
+  if (disposed || context !== contextKey.value || !canStartRollback(deployment))
+    return;
 
   rollingBackId.value = deployment.id;
   try {
@@ -270,13 +440,15 @@ const handleRollback = async (deployment: Deployment) => {
         method: "POST",
       },
     );
+    if (disposed || context !== contextKey.value) return;
     toast.success(t("site.deployments.rollbackStarted"));
-    await fetchDeployments();
+    await refreshState();
   } catch (error) {
+    if (disposed || context !== contextKey.value) return;
     const err = error as { data?: { message?: string } };
     toast.error(err.data?.message || t("site.deployments.rollbackFailed"));
   } finally {
-    rollingBackId.value = null;
+    if (context === contextKey.value) rollingBackId.value = null;
   }
 };
 
@@ -328,7 +500,7 @@ const copyToClipboard = (text: string) => {
   }
 };
 
-onMounted(fetchDeployments);
+onMounted(refreshState);
 </script>
 
 <template>
@@ -342,7 +514,40 @@ onMounted(fetchDeployments);
           {{ t("site.deployments.description") }}
         </p>
       </div>
+      <Button
+        v-if="canRefreshRuntime"
+        variant="outline"
+        size="sm"
+        :title="t('site.deployments.runtimeRefreshDescription')"
+        :disabled="
+          refreshingRuntime ||
+          hasActiveDeployment ||
+          releaseInventory?.status === 'busy' ||
+          !!rollingBackId
+        "
+        @click="handleRefreshRuntime"
+      >
+        <Icon
+          :name="refreshingRuntime ? 'lucide:loader-2' : 'lucide:rotate-cw'"
+          :class="['mr-1 block size-4', { 'animate-spin': refreshingRuntime }]"
+        />
+        {{
+          t(
+            refreshingRuntime
+              ? "site.deployments.runtimeRefreshing"
+              : "site.deployments.runtimeRefresh",
+          )
+        }}
+      </Button>
     </div>
+
+    <p
+      v-if="inventoryMessage"
+      role="status"
+      class="mb-4 text-sm text-muted-foreground"
+    >
+      {{ inventoryMessage }}
+    </p>
 
     <div v-if="isLoading" class="flex items-center justify-center py-8">
       <Icon
@@ -419,6 +624,12 @@ onMounted(fetchDeployments);
                 <Icon name="lucide:history" class="block size-3" />
                 {{ t("site.deployments.rollback") }}
               </Badge>
+              <Badge
+                v-if="deployment.id === liveDeploymentId"
+                variant="outline"
+              >
+                {{ t("site.deployments.liveRelease") }}
+              </Badge>
               {{ statusLabels[deployment.status] || deployment.status }}
               <span
                 :class="[
@@ -466,7 +677,7 @@ onMounted(fetchDeployments);
                 variant="outline"
                 size="sm"
                 :disabled="
-                  hasActiveDeployment || rollingBackId === deployment.id
+                  hasActiveDeployment || !!rollingBackId || refreshingRuntime
                 "
                 @click="handleRollback(deployment)"
               >
@@ -482,6 +693,12 @@ onMounted(fetchDeployments);
                 />
                 {{ t("site.deployments.rollback") }}
               </Button>
+              <span
+                v-if="releaseUnavailable(deployment)"
+                class="text-sm text-muted-foreground"
+              >
+                {{ t("site.deployments.releaseUnavailable") }}
+              </span>
               <SiteDeploymentLogs
                 v-if="deployment.task_id"
                 :server-id="serverId"

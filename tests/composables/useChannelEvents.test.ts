@@ -12,6 +12,7 @@ import {
   useChannelEvents,
   useSiteEvents,
   useDeploymentGhaStepsEvents,
+  useDeploymentEvents,
 } from "../../composables/useChannelEvents";
 
 const connected = ref(false);
@@ -104,6 +105,25 @@ describe("scoped realtime subscriptions", () => {
     await nextTick();
     expect(handlers.size).toBe(0);
   });
+  it("subscribes to PHP runtime recovery events with team scoping", () => {
+    const callback = vi.fn();
+    scope.run(() => useDeploymentEvents("a", callback));
+    for (const event of [
+      "deployment.runtime.started",
+      "deployment.runtime.completed",
+      "deployment.runtime.failed",
+    ]) {
+      expect(handlers.has(event)).toBe(true);
+      handlers.get(event)!({ team_id: "b", site_id: "site" });
+      handlers.get(event)!({
+        team_id: "a",
+        site_id: "site",
+        task_id: "runtime",
+      });
+    }
+    expect(callback).toHaveBeenCalledTimes(3);
+  });
+
   it("subscribes to deletion failures and forwards reconnect options through wrappers", async () => {
     const siteRefresh = vi.fn();
     const stepsRefresh = vi.fn();
