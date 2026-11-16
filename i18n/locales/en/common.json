@@ -228,6 +228,7 @@
       "packages": "Packages",
       "services": "Services",
       "traefik": "Traefik",
+      "systemUpdates": "System Updates",
       "maintenance": "Maintenance",
       "deployments": "Deployments",
       "files": "Files",

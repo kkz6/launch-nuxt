@@ -29,6 +29,10 @@ defineProps<Props>();
       :server-id="server.id"
       :server-type="server.type"
     />
+    <ServerSettingsSystemUpdates
+      v-if="activeSubTab === 'system-updates'"
+      :server-id="server.id"
+    />
     <!--
       Traefik panel is docker-only; Navbar only emits subtab=traefik
       for docker servers (see advancedSubTabs computed there). Still

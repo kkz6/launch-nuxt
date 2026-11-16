@@ -228,6 +228,7 @@
       "packages": "パッケージ",
       "services": "サービス",
       "traefik": "Traefik",
+      "systemUpdates": "システム更新",
       "maintenance": "メンテナンス",
       "deployments": "デプロイ",
       "files": "ファイル",

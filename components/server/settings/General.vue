@@ -4,7 +4,6 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Textarea } from "~/components/ui/textarea";
-import { Switch } from "~/components/ui/switch";
 import { Separator } from "~/components/ui/separator";
 import type { Server } from "~/types";
 
@@ -17,9 +16,6 @@ const { t } = useI18n();
 
 const name = ref(props.server.name);
 const description = ref(props.server.description || "");
-const autoUpdate = ref(
-  props.server.auto_update === "true" || props.server.auto_update === "1",
-);
 const isLoading = ref(false);
 const deleteLoading = ref(false);
 const confirmationDialog = ref<InstanceType<
@@ -77,7 +73,6 @@ const updateServer = async () => {
       body: {
         name: name.value,
         description: description.value,
-        auto_update: autoUpdate.value,
       },
     });
     toast.success(t("server.settings.general.updated"));
@@ -176,16 +171,6 @@ const deleteServer = async () => {
             :placeholder="t('server.settings.general.descriptionPlaceholder')"
             :rows="3"
           />
-        </div>
-
-        <div class="flex items-center justify-between rounded-lg border p-4">
-          <div class="space-y-0.5">
-            <Label>{{ t("server.settings.general.autoUpdates") }}</Label>
-            <p class="text-sm text-muted-foreground">
-              {{ t("server.settings.general.autoUpdatesDescription") }}
-            </p>
-          </div>
-          <Switch v-model="autoUpdate" />
         </div>
 
         <Button :disabled="isLoading" @click="updateServer">
