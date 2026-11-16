@@ -104,6 +104,7 @@ const validSubTabs = [
   "ssh-keys",
   "packages",
   "services",
+  "system-updates",
   "traefik",
   "maintenance",
 ];

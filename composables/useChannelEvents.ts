@@ -293,6 +293,19 @@ export const useServerEvents = (
   );
 };
 
+export const useSystemUpdateEvents = (
+  teamId: string | Ref<string>,
+  onEvent: ChannelEventHandler,
+  options?: ChannelEventsOptions,
+) => {
+  return useTeamChannelEvents(
+    teamId,
+    ["server.system_updates.updated", "server.reboot.updated"],
+    onEvent,
+    options,
+  );
+};
+
 export const useDockerApplicationEvents = (
   teamId: string | Ref<string>,
   onEvent: ChannelEventHandler,

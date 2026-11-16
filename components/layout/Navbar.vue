@@ -445,6 +445,12 @@ const advancedSubTabs = computed(() => {
     query: "services",
     icon: "lucide:cog",
   });
+  tabs.push({
+    value: "system-updates",
+    label: navLabel("systemUpdates"),
+    query: "system-updates",
+    icon: "lucide:shield-check",
+  });
   // Docker-only: Traefik config editing sits under Advanced rather than
   // as a top-level tab — admins occasionally inspect it, but it's not a
   // day-to-day workflow.

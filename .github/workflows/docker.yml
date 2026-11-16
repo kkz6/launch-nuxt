@@ -56,12 +56,42 @@ jobs:
   deploy:
     name: Dispatch frontend deploy
     needs: build-and-push
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Pause dispatch for coordinated API/frontend releases without blocking
+    # image builds. Resume only after the compatible API has been deployed.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.FRONTEND_DEPLOY_PAUSED != 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: frontend-production
-    permissions: {}
+    permissions:
+      actions: read
 
     steps:
+      - name: Require successful CI and security checks for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for workflow in ci.yml central-security.yml; do
+            passed=false
+            for attempt in $(seq 1 90); do
+              run=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow/runs?head_sha=$GITHUB_SHA&event=push&per_page=1" --jq '.workflow_runs[0]')
+              if [ "$(jq -r '.status // "pending"' <<< "$run")" = completed ]; then
+                conclusion=$(jq -r '.conclusion' <<< "$run")
+                if [ "$conclusion" != success ]; then
+                  echo "::error::$workflow concluded $conclusion for $GITHUB_SHA; deployment blocked."
+                  exit 1
+                fi
+                passed=true
+                break
+              fi
+              sleep 10
+            done
+            if [ "$passed" != true ]; then
+              echo "::error::Timed out waiting for $workflow on $GITHUB_SHA; deployment blocked."
+              exit 1
+            fi
+          done
+
       - name: Create a short-lived deployment token
         id: deploy-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0

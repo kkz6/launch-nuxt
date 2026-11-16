@@ -50,6 +50,47 @@ export interface CreateServerData {
   install_agent?: boolean;
 }
 
+export interface SystemUpdateSettings {
+  enabled: boolean;
+  schedule: string;
+  notifications: boolean;
+}
+
+interface SystemUpdatePackage {
+  name: string;
+  version: string;
+}
+
+export interface SystemUpdateStatus extends SystemUpdateSettings {
+  supported: boolean;
+  updater_installed?: boolean;
+  timer_active: boolean;
+  native_enabled: boolean;
+  running: boolean;
+  reboot_required: boolean;
+  security_patches_this_month: number;
+  last_run: {
+    finished_at: string;
+    packages: SystemUpdatePackage[];
+    status: "succeeded" | "failed";
+  } | null;
+  recently_updated: SystemUpdatePackage[];
+}
+
+export interface ServerRestartStatus {
+  status:
+    | "idle"
+    | "queued"
+    | "restarting"
+    | "verifying"
+    | "succeeded"
+    | "failed";
+  requested_at?: string;
+  completed_at?: string;
+  message?: string;
+  can_verify?: boolean;
+}
+
 /**
  * Server service for handling all server-related API calls
  */
@@ -116,12 +157,56 @@ export const serverService = {
     return del<ApiResponse<null>>(`/servers/${id}`);
   },
 
+  systemUpdates: {
+    get: (id: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<SystemUpdateStatus>>(
+        `/servers/${id}/system-updates`,
+      );
+    },
+    save: (id: string, settings: SystemUpdateSettings) => {
+      const { put } = useApi();
+      return put<ApiResponse<SystemUpdateStatus>>(
+        `/servers/${id}/system-updates`,
+        settings,
+      );
+    },
+    repair: (id: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<SystemUpdateStatus>>(
+        `/servers/${id}/system-updates/repair`,
+      );
+    },
+    retry: (id: string) => {
+      const { post } = useApi();
+      return post<ApiResponse<SystemUpdateStatus>>(
+        `/servers/${id}/system-updates/retry`,
+      );
+    },
+    logs: (id: string) => {
+      const { get } = useApi();
+      return get<ApiResponse<{ logs: string }>>(
+        `/servers/${id}/system-updates/logs`,
+      );
+    },
+  },
+
   /**
    * Reboot a server
    */
   reboot: (id: string) => {
     const { post } = useApi();
     return post<ApiResponse<null>>(`/servers/${id}/reboot`);
+  },
+  rebootStatus: (id: string) => {
+    const { get } = useApi();
+    return get<ApiResponse<ServerRestartStatus>>(`/servers/${id}/reboot`);
+  },
+  verifyReboot: (id: string) => {
+    const { post } = useApi();
+    return post<ApiResponse<ServerRestartStatus>>(
+      `/servers/${id}/reboot/verify`,
+    );
   },
 
   /**
