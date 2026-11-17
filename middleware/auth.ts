@@ -1,4 +1,9 @@
+import { authRedirect } from "~/utils/authRedirect";
+
 export default defineNuxtRouteMiddleware(async (to) => {
+  const redirect =
+    to.path === "/servers" ? authRedirect(to.fullPath) : undefined;
+  const login = redirect ? { path: "/login", query: { redirect } } : "/login";
   // The access token lives in the `auth_token` cookie, which IS readable
   // during SSR — read it directly via useCookie. (Do NOT use
   // useApi().getAccessToken() here: it short-circuits to null on the server,
@@ -13,7 +18,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   // is SSR'd with its own layout from the start.
   const token = useCookie("auth_token").value;
   if (!token) {
-    return navigateTo("/login");
+    return navigateTo(login);
   }
 
   // Everything below needs the fetched user profile, which is only available
@@ -29,7 +34,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   // Check if authenticated (has token AND user data)
   if (!isAuthenticated.value || !user.value) {
-    return navigateTo("/login");
+    return navigateTo(login);
   }
 
   const path = to.path.replace(/\/$/, "");

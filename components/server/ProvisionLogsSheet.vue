@@ -68,25 +68,31 @@ const storeServer = computed(() => {
 });
 
 const fetchProvisionStatus = async (silent = false) => {
-  if (!props.server) return;
+  const id = serverId.value;
+  if (!id || props.server?.status === "running") return;
 
   if (!silent) isLoading.value = true;
   try {
-    const response = await serverService.getProvisionStatus(props.server.id);
-    provisionStatus.value = response.data;
+    const response = await serverService.getProvisionStatus(id);
+    if (serverId.value === id) provisionStatus.value = response.data;
   } catch {
-    if (!silent) provisionStatus.value = null;
+    if (!silent && serverId.value === id) provisionStatus.value = null;
   } finally {
-    isLoading.value = false;
+    if (serverId.value === id) isLoading.value = false;
   }
 };
 
-watch(open, (isOpen) => {
-  if (isOpen && props.server) {
-    showLogs.value = false;
-    fetchProvisionStatus();
-  }
-});
+watch(
+  [open, serverId],
+  ([isOpen, id]) => {
+    if (isOpen && id) {
+      provisionStatus.value = null;
+      showLogs.value = false;
+      fetchProvisionStatus();
+    }
+  },
+  { immediate: true },
+);
 
 let statusFetchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -201,7 +207,22 @@ const currentStepLabel = computed(() => {
         </SheetDescription>
       </SheetHeader>
 
-      <div v-if="server" class="mt-4 flex-1 min-h-0 flex flex-col">
+      <div
+        v-if="server?.status === 'running'"
+        class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted/30 p-4"
+      >
+        <p class="flex items-center gap-2 text-sm font-medium" role="status">
+          <Icon name="lucide:circle-check" class="h-4 w-4 text-emerald-600" />
+          {{ t("server.provisionStatus.complete") }}
+        </p>
+        <Button variant="outline" size="sm" as-child>
+          <NuxtLink :to="`/servers/${server.id}`">
+            {{ t("server.provisionStatus.openServer") }}
+          </NuxtLink>
+        </Button>
+      </div>
+
+      <div v-else-if="server" class="mt-4 flex-1 min-h-0 flex flex-col">
         <div
           v-if="provisionStatus?.failed"
           class="mb-4 flex-shrink-0 overflow-hidden rounded-xl border border-destructive/30 bg-gradient-to-b from-destructive/[0.06] to-transparent"
@@ -314,31 +335,7 @@ const currentStepLabel = computed(() => {
           />
         </div>
         <div
-          v-if="
-            (server.status === 'awaiting_connection' ||
-              server.status === 'new') &&
-            server.provider === 'custom_server' &&
-            server.provision_command
-          "
-          class="space-y-4 rounded-lg border bg-muted/30 p-4"
-        >
-          <div>
-            <h4 class="font-semibold">
-              {{ t("server.provisionStatus.script") }}
-            </h4>
-            <p class="text-sm text-muted-foreground">
-              {{ t("server.provisionStatus.scriptHelp") }}
-            </p>
-          </div>
-          <div
-            class="relative flex items-start gap-2 rounded border bg-background p-3 font-mono text-sm"
-          >
-            <code class="flex-1 break-all">{{ server.provision_command }}</code>
-          </div>
-        </div>
-
-        <div
-          v-else-if="showLogs && provisionStatus?.latest_task"
+          v-if="showLogs && provisionStatus?.latest_task"
           class="flex-1 min-h-0 flex flex-col overflow-hidden rounded-lg border border-zinc-800 bg-zinc-950"
         >
           <div

@@ -1,5 +1,5 @@
-import { shallowMount } from "@vue/test-utils";
-import { computed, nextTick, ref, watch } from "vue";
+import { flushPromises, shallowMount } from "@vue/test-utils";
+import { computed, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ProvisionLogsSheet from "../../components/server/ProvisionLogsSheet.vue";
 import PhpExtensionsDialog from "../../components/server/settings/PhpExtensionsDialog.vue";
@@ -36,18 +36,6 @@ vi.mock("vue-sonner", () => ({
 
 const passthroughStub = { template: "<div><slot /></div>" };
 
-const setupRef = (
-  wrapper: ReturnType<typeof shallowMount>,
-  key: string,
-  value: unknown,
-) => {
-  (
-    wrapper.vm.$ as unknown as {
-      devtoolsRawSetupState: Record<string, { value: unknown }>;
-    }
-  ).devtoolsRawSetupState[key].value = value;
-};
-
 beforeEach(() => {
   mocks.getProvisionStatus.mockReset();
   mocks.retryProvision.mockReset();
@@ -70,6 +58,25 @@ afterEach(() => {
 
 describe("stable-value Japanese translations", () => {
   it("renders provisioning errors and steps from stable codes, not backend English", async () => {
+    mocks.getProvisionStatus.mockResolvedValue({
+      data: {
+        failed: true,
+        error_code: "disk_space",
+        error_message: "Backend English: the disk is full",
+        steps: [
+          {
+            name: "install_docker",
+            description: "Backend English: install Docker",
+            status: "current",
+          },
+          {
+            name: "configure_firewall",
+            description: "Backend English: configure firewall",
+            status: "pending",
+          },
+        ],
+      },
+    });
     const wrapper = shallowMount(ProvisionLogsSheet, {
       props: {
         open: true,
@@ -83,6 +90,7 @@ describe("stable-value Japanese translations", () => {
       global: {
         stubs: {
           Icon: true,
+          NuxtLink: true,
           Button: passthroughStub,
           ServerLogViewer: true,
           Sheet: passthroughStub,
@@ -94,24 +102,8 @@ describe("stable-value Japanese translations", () => {
       },
     });
 
-    setupRef(wrapper, "provisionStatus", {
-      failed: true,
-      error_code: "disk_space",
-      error_message: "Backend English: the disk is full",
-      steps: [
-        {
-          name: "install_docker",
-          description: "Backend English: install Docker",
-          status: "current",
-        },
-        {
-          name: "configure_firewall",
-          description: "Backend English: configure firewall",
-          status: "pending",
-        },
-      ],
-    });
-    await nextTick();
+    await flushPromises();
+    expect(mocks.getProvisionStatus).toHaveBeenCalledWith("server-1");
 
     const text = wrapper.text();
     expect(text).toContain(

@@ -1,4 +1,4 @@
-import { cliAuthRedirect } from "~/utils/cliAuthRedirect";
+import { authRedirect } from "~/utils/authRedirect";
 
 export default defineNuxtRouteMiddleware(async (to) => {
   // Mirror of the auth middleware: read the token cookie directly (useCookie
@@ -11,7 +11,7 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   if (import.meta.server) {
-    return navigateTo(cliAuthRedirect(to.query.redirect) || "/dashboard");
+    return navigateTo(authRedirect(to.query.redirect) || "/dashboard");
   }
 
   const { waitForAuth, isAuthenticated } = useAuth();
@@ -21,6 +21,6 @@ export default defineNuxtRouteMiddleware(async (to) => {
 
   // If authenticated, redirect to dashboard
   if (isAuthenticated.value) {
-    return navigateTo(cliAuthRedirect(to.query.redirect) || "/dashboard");
+    return navigateTo(authRedirect(to.query.redirect) || "/dashboard");
   }
 });
