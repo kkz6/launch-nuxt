@@ -254,8 +254,11 @@ export const useServersStore = defineStore('servers', () => {
         scheduleRefetch()
         return
 
-      case 'server.provisioned':
       case 'server.connected':
+        scheduleRefetch()
+        return
+
+      case 'server.provisioned':
         // Terminal-success states. Flip status inline; refetch for the
         // full row (provisioned_at, public_ip changes, etc.).
         if (id) patch(id, { status: 'running' })

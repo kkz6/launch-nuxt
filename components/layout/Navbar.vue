@@ -1098,8 +1098,6 @@ const serverConnected = ref(false);
 const serverProvider = ref<string | null>(null);
 const serverStatus = ref<string | null>(null);
 const serverType = ref<string | null>(null);
-const serverProvisionCommand = ref<string | null>(null);
-const showProvisionDialog = ref(false);
 
 // Site data for detail page
 const siteAddress = ref<string | null>(null);
@@ -1289,7 +1287,6 @@ const applyServerData = (data: {
   provider: string;
   status: string;
   type: string;
-  provision_command?: string;
 }) => {
   serverName.value = data.name;
   serverIp.value = data.public_ipv4;
@@ -1298,7 +1295,6 @@ const applyServerData = (data: {
   serverProvider.value = data.provider;
   serverStatus.value = data.status;
   serverType.value = data.type;
-  serverProvisionCommand.value = data.provision_command || null;
 };
 
 // Fetch server info when on server / site / project detail page.
@@ -1329,7 +1325,6 @@ watch(
                 provider: string;
                 status: string;
                 type: string;
-                provision_command?: string;
               };
             }>(`/servers/${sId}`);
             if (!current) return;
@@ -1361,7 +1356,6 @@ watch(
                 provider: string;
                 status: string;
                 type: string;
-                provision_command?: string;
               };
             }>(`/servers/${sId}`),
             $api<{ data: { address: string; type: string; url: string } }>(
@@ -1397,7 +1391,6 @@ watch(
                 provider: string;
                 status: string;
                 type: string;
-                provision_command?: string;
               };
             }>(`/servers/${sId}`),
             $api<{ data: { name: string } }>(
@@ -1423,7 +1416,6 @@ watch(
         serverProvider.value = null;
         serverStatus.value = null;
         serverType.value = null;
-        serverProvisionCommand.value = null;
         siteAddress.value = null;
         siteType.value = null;
         currentServerPublicIp.value = null;
@@ -1595,7 +1587,10 @@ const isDnsTabActive = (tabPath: string) => {
 // Show provision button for custom servers that need provisioning
 const showProvisionButton = computed(() => {
   return (
-    serverProvider.value === "custom_server" && serverStatus.value === "new"
+    canEdit.value &&
+    serverId.value &&
+    serverProvider.value === "custom_server" &&
+    ["new", "awaiting_connection"].includes(serverStatus.value || "")
   );
 });
 
@@ -2225,7 +2220,7 @@ const navigateTo = (path: string) => {
             variant="outline"
             size="sm"
             class="border-amber-500/50 text-amber-600 hover:bg-amber-50 dark:border-amber-500/30 dark:text-amber-400 dark:hover:bg-amber-950/50"
-            @click="showProvisionDialog = true"
+            @click="navigateTo(`/servers?provision=${serverId}`)"
           >
             <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
             {{ actionLabel("provision") }}
@@ -2923,13 +2918,5 @@ const navigateTo = (path: string) => {
     </div>
 
     <SettingsSheet />
-
-    <!-- Provision Command Dialog -->
-    <ServerProvisionCommandDialog
-      v-if="serverId && serverProvisionCommand"
-      v-model:open="showProvisionDialog"
-      :server-id="serverId"
-      :provision-command="serverProvisionCommand"
-    />
   </nav>
 </template>

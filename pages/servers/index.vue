@@ -20,6 +20,8 @@ definePageMeta({
 });
 
 const { t, locale } = useI18n();
+const route = useRoute();
+const { canEdit } = useCan();
 const dateFnsLocale = computed(() => (locale.value === "ja" ? ja : enUS));
 useHead(() => ({ title: t("server.list.title") }));
 
@@ -35,20 +37,48 @@ const loadServers = () => serversStore.fetchAll().catch(() => {});
 
 // Provision dialog state
 const showProvisionDialog = ref(false);
-const selectedServer = ref<Server | null>(null);
+const selectedServerId = ref<string | null>(null);
+const selectedServer = computed(
+  () =>
+    servers.value.find((server) => server.id === selectedServerId.value) ??
+    null,
+);
 
 // Logs dialog state
 const showLogsDialog = ref(false);
 
 const openProvisionDialog = (server: Server) => {
-  selectedServer.value = server;
+  selectedServerId.value = server.id;
+  showLogsDialog.value = false;
   showProvisionDialog.value = true;
 };
 
 const openLogsDialog = (server: Server) => {
-  selectedServer.value = server;
+  selectedServerId.value = server.id;
+  showProvisionDialog.value = false;
   showLogsDialog.value = true;
 };
+
+const linkedServer = computed(() =>
+  servers.value.find((server) => server.id === route.query.provision),
+);
+
+watch(
+  [linkedServer, canEdit],
+  ([server, canManage]) => {
+    if (!server) return;
+    if (
+      canManage &&
+      server.provider === "custom_server" &&
+      ["new", "awaiting_connection"].includes(server.status)
+    ) {
+      openProvisionDialog(server);
+    } else {
+      openLogsDialog(server);
+    }
+  },
+  { immediate: true },
+);
 
 // Navigate to detail page on card click — only when the server is running.
 // We do this manually (instead of <NuxtLink>) because the previous
@@ -86,10 +116,9 @@ const handleRetryProvision = async (server: Server) => {
   }
 };
 
-const handleConnected = async () => {
-  // Try Connection succeeded; the server is now in provisioning.
-  // Pull the fresh list so the row flips out of awaiting_connection.
-  await serversStore.fetchAll();
+const handleConnected = () => {
+  if (selectedServer.value) openLogsDialog(selectedServer.value);
+  void loadServers();
 };
 
 // Check if server needs pending actions UI
@@ -204,31 +233,21 @@ const formatSiteCount = (count: number): string =>
     count,
   });
 
-// Auto-close provision dialogs when the selected server's status changes.
-// Reads directly from the store's reactive list — no local state to keep
-// in sync.
-watch(servers, (newServers) => {
-  if (!selectedServer.value) return;
-
-  const updated = newServers.find((s) => s.id === selectedServer.value!.id);
-  if (!updated) return;
-
-  // Close provision command dialog once the server moves past the
-  // pre-connect states. Cloud servers start in 'new' and flip when the
-  // wait-for-connect job sees SSH; custom servers start in
-  // 'awaiting_connection' and flip when the user clicks Try Connection.
-  if (
-    showProvisionDialog.value &&
-    !["new", "awaiting_connection"].includes(updated.status)
-  ) {
-    showProvisionDialog.value = false;
-  }
-
-  // Close logs sheet when provisioning completes
-  if (showLogsDialog.value && updated.status === "running") {
-    showLogsDialog.value = false;
-  }
-});
+watch(
+  () => selectedServer.value?.status,
+  (status) => {
+    if (!status) {
+      showProvisionDialog.value = false;
+      showLogsDialog.value = false;
+    } else if (
+      selectedServer.value &&
+      showProvisionDialog.value &&
+      !["new", "awaiting_connection"].includes(status)
+    ) {
+      openLogsDialog(selectedServer.value);
+    }
+  },
+);
 
 // Cache server data for Navbar when navigating to detail page
 const { cacheServer } = useNavbarCache();
@@ -238,7 +257,7 @@ const { cacheServer } = useNavbarCache();
 // subscription has already been keeping the list current in the
 // background — no spinner flash on return visits.
 onMounted(() => {
-  if (!serversStore.hasFetched) {
+  if (!serversStore.hasFetched || route.query.provision) {
     void loadServers();
   } else {
     serversStore.ensureSubscribed();
@@ -248,6 +267,19 @@ onMounted(() => {
 
 <template>
   <div class="pb-10">
+    <p
+      v-if="
+        route.query.provision &&
+        hasFetched &&
+        !isLoading &&
+        !hasLoadError &&
+        !linkedServer
+      "
+      class="mb-4 rounded-lg border bg-card p-4 text-sm"
+      role="status"
+    >
+      {{ t("server.provisionStatus.unavailable") }}
+    </p>
     <div
       v-if="hasLoadError"
       class="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4"
@@ -568,7 +600,6 @@ onMounted(() => {
       v-if="selectedServer"
       v-model:open="showProvisionDialog"
       :server-id="selectedServer.id"
-      :provision-command="selectedServer.provision_command || null"
       @connected="handleConnected"
     />
 

@@ -10,7 +10,7 @@ import {
   PinInputSlot,
 } from "~/components/ui/pin-input";
 import { authService } from "~/services/authService";
-import { cliAuthRedirect } from "~/utils/cliAuthRedirect";
+import { authRedirect } from "~/utils/authRedirect";
 
 definePageMeta({
   layout: "guest",
@@ -32,7 +32,7 @@ const { setTokens } = useApi();
 const { isInitialized, setUser } = useAuth();
 const route = useRoute();
 const returnToLogin = () => {
-  const redirect = cliAuthRedirect(route.query.redirect);
+  const redirect = authRedirect(route.query.redirect);
   return navigateTo(
     redirect ? { path: "/login", query: { redirect } } : "/login",
   );
@@ -86,7 +86,7 @@ const handleSubmit = async (codeValue?: string) => {
 
     toast.success(t("auth.login.signedIn"));
     navigateTo(
-      cliAuthRedirect(route.query.redirect) ||
+      authRedirect(route.query.redirect) ||
         (response.data.user.onboarded ? "/dashboard" : "/onboarding"),
     );
   } catch (error: unknown) {

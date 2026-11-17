@@ -230,7 +230,11 @@ const onSubmit = handleSubmit(async (data) => {
     };
     const response = await serverService.create(payload);
     toast.success(t("server.create.creationStarted"));
-    navigateTo(`/servers/${response.data.id}`);
+    if (response.data.status === "awaiting_connection") {
+      navigateTo({ path: "/servers", query: { provision: response.data.id } });
+    } else {
+      navigateTo(`/servers/${response.data.id}`);
+    }
   } catch (error: unknown) {
     const err = error as {
       data?: { message?: string; errors?: Record<string, string[]> };

@@ -261,11 +261,14 @@ const onSubmit = async () => {
 
   isLoading.value = true;
   try {
-    await serverService.create(data);
+    const response = await serverService.create(data);
     toast.success(t("server.create.creationStarted"));
     isOpen.value = false;
     // Trigger server list refresh
     serversRefreshKey.value++;
+    if (response.data.status === "awaiting_connection") {
+      navigateTo({ path: "/servers", query: { provision: response.data.id } });
+    }
   } catch (error: unknown) {
     const err = error as {
       data?: { message?: string; errors?: Record<string, string[]> };

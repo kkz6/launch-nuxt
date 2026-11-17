@@ -37,6 +37,7 @@ const emit = defineEmits<{
 
 const showDeleteDialog = ref(false);
 const isDeleting = ref(false);
+const { canEdit } = useCan();
 
 // Check if server can be deleted (not during active provisioning)
 const canDelete = computed(() => {
@@ -45,12 +46,11 @@ const canDelete = computed(() => {
   );
 });
 
-// Check if this is a custom server that needs manual provisioning.
-// Drives the Provision button on the card; the dialog it opens now
-// owns the Try Connection step as well.
 const isCustomServerPending = computed(() => {
   return (
-    props.server.provider === "custom_server" && props.server.provision_command
+    canEdit.value &&
+    props.server.provider === "custom_server" &&
+    ["new", "awaiting_connection"].includes(props.server.status)
   );
 });
 
@@ -130,15 +130,6 @@ const handleDelete = async () => {
     <!-- All other transitional states (new, starting, custom-server pending)
          keep the compact dots menu so the card doesn't grow taller. -->
     <template v-else>
-      <!--
-        Single Provision button for custom servers awaiting connection.
-        Try Connection lives inside the dialog this opens — the user
-        copies the command, runs it on their box, and clicks Try
-        Connection right there without ever leaving the dialog. Keeping
-        both actions in one workflow surface stops new users from
-        clicking Try Connection on the card before they've even seen
-        the script they were supposed to run.
-      -->
       <!--
         Tint matches the yellow dot the server card already shows in
         awaiting_connection state (see pages/servers/index.vue:135-136).

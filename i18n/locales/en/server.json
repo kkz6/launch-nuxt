@@ -1196,6 +1196,9 @@
     },
     "provisionStatus": {
       "title": "Server Provision Status",
+      "complete": "Server is ready",
+      "openServer": "Open server",
+      "unavailable": "This server is unavailable in your current workspace.",
       "retryQueued": "Provisioning queued — we'll try again now.",
       "retryFailed": "Couldn't queue the retry. Please try again.",
       "failed": "We couldn't provision this server",
@@ -1203,8 +1206,6 @@
       "manageCredentials": "Manage credentials",
       "steps": "Steps",
       "stepsCount": "steps",
-      "script": "Provision Script",
-      "scriptHelp": "Run this script as root on your server to start provisioning.",
       "live": "Live",
       "waiting": "Waiting for provision task to start...",
       "loading": "Loading provision status...",
@@ -1244,7 +1245,7 @@
     },
     "provisionCommand": {
       "title": "Provision Command",
-      "description": "Run this command as root on your server to authorize Launch to manage it.",
+      "description": "Run this command on your server to start provisioning.",
       "connected": "Connected — provisioning started",
       "connectionFailed": "Try Connection failed",
       "connectionFailedHelp": "Make sure the provision command ran successfully and try again.",
@@ -1252,8 +1253,8 @@
       "copyFailed": "Failed to copy to clipboard",
       "scriptEmpty": "Script content is empty",
       "scriptFailed": "Failed to fetch provision script",
-      "quickCommand": "Quick Command",
-      "quickCommandHelp": "This command downloads and runs the provisioning script from the server.",
+      "loadingCommand": "Loading provisioning command…",
+      "commandFailed": "Could not load the provisioning command.",
       "scriptContent": "Script Content (for local development)",
       "hideScript": "Hide Script",
       "showScript": "Show Script",
@@ -1262,9 +1263,6 @@
       "copy": "Copy",
       "loadScript": "Load Script",
       "localHelp": "Use this if the server cannot reach the application URL (for example, during local development). Copy and paste this script directly into your server's terminal.",
-      "pending": "Server pending provisioning",
-      "pendingPrefix": "Run the provision command on your server. Once it finishes, click",
-      "pendingSuffix": "below and Launch will take over from there.",
       "tryConnection": "Try Connection"
     },
     "docker": {

@@ -19,7 +19,6 @@ import { serverService } from "~/services/serverService";
 
 interface Props {
   serverId: string;
-  provisionCommand: string | null;
 }
 
 const props = defineProps<Props>();
@@ -32,13 +31,35 @@ const emit = defineEmits<{
 const open = defineModel<boolean>("open", { default: false });
 
 const isTryingConnection = ref(false);
+const provisionCommand = ref("");
+const commandError = ref("");
+const commandRequest = ref(0);
 
-// Try the SSH connection from inside the dialog so the entire
-// "copy the script → run it on your box → confirm reachability"
-// loop lives in one place. The card outside used to carry a parallel
-// Try Connection button, which split the flow: users would dismiss
-// the script dialog, click Try on the card, fail, reopen the dialog,
-// copy again. One workflow surface is cleaner.
+watch(
+  [open, () => props.serverId, commandRequest],
+  async ([isOpen, serverId], _, onCleanup) => {
+    provisionCommand.value = "";
+    commandError.value = "";
+    if (!isOpen) return;
+
+    let current = true;
+    onCleanup(() => {
+      current = false;
+    });
+    try {
+      const response = await serverService.getProvisionCommand(serverId);
+      if (current) provisionCommand.value = response.data.command;
+    } catch (error: unknown) {
+      const err = error as { data?: { message?: string } };
+      if (current) {
+        commandError.value =
+          err.data?.message || t("server.provisionCommand.commandFailed");
+      }
+    }
+  },
+  { immediate: true },
+);
+
 const handleTryConnection = async () => {
   isTryingConnection.value = true;
   try {
@@ -131,15 +152,6 @@ watch(
   },
 );
 
-// Fetch script when dialog opens
-watch(open, (isOpen) => {
-  if (isOpen) {
-    provisionScriptError.value = "";
-    provisionScript.value = "";
-    fetchProvisionScript();
-  }
-});
-
 // Also fetch when collapsible is opened (if not already loaded)
 watch(showScriptContent, (isOpen) => {
   if (isOpen && !provisionScript.value && !provisionScriptLoading.value) {
@@ -162,9 +174,7 @@ watch(showScriptContent, (isOpen) => {
       </DialogHeader>
 
       <div class="space-y-4 overflow-x-hidden">
-        <!-- Quick Command -->
         <div v-if="provisionCommand" class="space-y-2">
-          <Label>{{ t("server.provisionCommand.quickCommand") }}</Label>
           <div class="flex items-center gap-2">
             <div
               class="flex-1 overflow-hidden rounded-md border bg-muted/50 p-3"
@@ -174,6 +184,7 @@ watch(showScriptContent, (isOpen) => {
             <Button
               variant="outline"
               size="icon"
+              :aria-label="t('server.provisionCommand.copy')"
               @click="copyToClipboard(provisionCommand, 'command')"
             >
               <Icon
@@ -182,10 +193,20 @@ watch(showScriptContent, (isOpen) => {
               />
             </Button>
           </div>
-          <p class="text-xs text-muted-foreground">
-            {{ t("server.provisionCommand.quickCommandHelp") }}
-          </p>
         </div>
+        <div
+          v-else-if="commandError"
+          class="flex items-center gap-3"
+          role="alert"
+        >
+          <p class="text-sm text-destructive">{{ commandError }}</p>
+          <Button variant="outline" size="sm" @click="commandRequest++">
+            {{ t("server.common.retry") }}
+          </Button>
+        </div>
+        <p v-else class="text-sm text-muted-foreground" role="status">
+          {{ t("server.provisionCommand.loadingCommand") }}
+        </p>
 
         <!-- Collapsible Script Content (only visible in development) -->
         <Collapsible
@@ -282,48 +303,15 @@ watch(showScriptContent, (isOpen) => {
             </div>
           </CollapsibleContent>
         </Collapsible>
-
-        <!-- Status indicator -->
-        <div
-          class="flex items-start gap-3 rounded-lg bg-amber-50 p-4 dark:bg-amber-950/50"
-        >
-          <Icon
-            name="lucide:alert-triangle"
-            class="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-400"
-          />
-          <div class="space-y-1">
-            <p class="text-sm font-medium text-amber-800 dark:text-amber-200">
-              {{ t("server.provisionCommand.pending") }}
-            </p>
-            <p class="text-sm text-amber-700 dark:text-amber-300">
-              {{ t("server.provisionCommand.pendingPrefix") }}
-              <strong>{{ t("server.provisionCommand.tryConnection") }}</strong>
-              {{ t("server.provisionCommand.pendingSuffix") }}
-            </p>
-          </div>
-        </div>
       </div>
 
       <DialogFooter class="gap-2 sm:gap-2">
+        <Button variant="ghost" @click="open = false">
+          {{ t("server.common.close") }}
+        </Button>
         <Button
           variant="outline"
           :disabled="isTryingConnection"
-          @click="open = false"
-        >
-          {{ t("server.common.close") }}
-        </Button>
-        <!--
-          Picks up the same amber palette as the warning banner directly
-          above so the dialog reads as one coherent "this is the pending
-          action" surface. Darker than the secondary variant (amber-100
-          fill vs secondary gray) with a visible border so it's
-          unmistakably the primary CTA next to Close, and so it carries
-          the same bordered look as the Provision button that opened
-          this dialog in the first place.
-        -->
-        <Button
-          :disabled="isTryingConnection"
-          class="border border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200 dark:border-amber-700/60 dark:bg-amber-900/50 dark:text-amber-100 dark:hover:bg-amber-800/60"
           @click="handleTryConnection"
         >
           <Icon
