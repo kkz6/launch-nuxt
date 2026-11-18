@@ -1,18 +1,8 @@
 <script setup lang="ts">
 import { reactive, toRefs } from "vue";
 import { toast } from "vue-sonner";
-import {
-  ComboboxAnchor,
-  ComboboxContent,
-  ComboboxEmpty,
-  ComboboxGroup,
-  ComboboxInput,
-  ComboboxItem,
-  ComboboxItemIndicator,
-  ComboboxPortal,
-  ComboboxRoot,
-  ComboboxTrigger,
-} from "reka-ui";
+import RepositoryPicker from "~/components/shared/RepositoryPicker.vue";
+import { Checkbox } from "~/components/ui/checkbox";
 import type { Repository, SourceControl } from "~/types";
 import { sourceControlService } from "~/services/sourceControlService";
 import { useGitRequestScope } from "~/composables/useGitRequestScope";
@@ -206,15 +196,6 @@ const handleRepoSelect = (repo: Repository) => {
   gitBranch.value = repo.default_branch || "main";
   repositorySearchTerm.value = "";
 };
-
-const filteredRepositories = computed(() => {
-  if (!repositorySearchTerm.value) return repositories.value;
-  const q = repositorySearchTerm.value.toLowerCase();
-  return repositories.value.filter(
-    (r) =>
-      r.full_name.toLowerCase().includes(q) || r.name.toLowerCase().includes(q),
-  );
-});
 
 watch(sourceType, clearGitSelection);
 watch(isOpen, (open) => {
@@ -669,70 +650,19 @@ const submit = async () => {
             </div>
 
             <div class="min-w-0 space-y-2">
-              <Label>{{ t("workload.fields.repository") }}</Label>
-              <ComboboxRoot
+              <Label for="application-repository">{{ t("workload.fields.repository") }}</Label>
+              <RepositoryPicker
+                id="application-repository"
+                :key="sourceControlId"
                 v-model:search-term="repositorySearchTerm"
                 :model-value="selectedRepo"
+                :repositories="repositories"
                 :disabled="!sourceControlId || isLoadingRepositories"
-                :filter-function="(list: Repository[]) => list"
-                class="relative min-w-0"
-                @update:model-value="
-                  (val: Repository | null) => val && handleRepoSelect(val)
-                "
-              >
-                <ComboboxAnchor
-                  class="repository-picker flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
-                >
-                  <ComboboxInput
-                    class="h-full min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none placeholder:text-muted-foreground"
-                    :placeholder="
-                      isLoadingRepositories
-                        ? t('workload.actions.loading')
-                        : t('workload.git.searchRepository')
-                    "
-                    :display-value="(repo: Repository) => repo?.name || ''"
-                  />
-                  <ComboboxTrigger class="flex items-center justify-center">
-                    <Icon
-                      name="lucide:chevron-down"
-                      class="h-4 w-4 opacity-50"
-                    />
-                  </ComboboxTrigger>
-                </ComboboxAnchor>
-                <ComboboxPortal>
-                  <ComboboxContent
-                    position="popper"
-                    :side-offset="4"
-                    class="z-[200] max-h-60 w-[--reka-combobox-trigger-width] overflow-hidden rounded-md border bg-popover shadow-md"
-                  >
-                    <ComboboxEmpty
-                      class="py-6 text-center text-sm text-muted-foreground"
-                    >
-                      {{ t("workload.git.noRepositoryFound") }}
-                    </ComboboxEmpty>
-                    <ComboboxGroup class="overflow-auto p-1">
-                      <ComboboxItem
-                        v-for="repo in filteredRepositories"
-                        :key="repo.id"
-                        :value="repo"
-                        class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground"
-                        @select="handleRepoSelect(repo)"
-                      >
-                        <ComboboxItemIndicator class="mr-2 h-4 w-4">
-                          <Icon name="lucide:check" class="h-4 w-4" />
-                        </ComboboxItemIndicator>
-                        <Icon
-                          :name="
-                            repo.public ? 'lucide:globe' : 'lucide:lock-keyhole'
-                          "
-                          class="mr-2 h-4 w-4 shrink-0 text-muted-foreground"
-                        />
-                        <span class="truncate">{{ repo.name }}</span>
-                      </ComboboxItem>
-                    </ComboboxGroup>
-                  </ComboboxContent>
-                </ComboboxPortal>
-              </ComboboxRoot>
+                :placeholder="isLoadingRepositories ? t('workload.actions.loading') : t('workload.git.searchRepository')"
+                :empty-text="t('workload.git.noRepositoryFound')"
+                :label="t('workload.fields.repository')"
+                @update:model-value="handleRepoSelect"
+              />
             </div>
           </div>
 
@@ -757,19 +687,21 @@ const submit = async () => {
               <p class="text-xs text-muted-foreground">
                 {{ t("workload.git.dependenciesHelp") }}
               </p>
-              <label
+              <div
                 v-for="repo in repositories.filter(
                   (item) => item.id !== selectedRepo?.id,
                 )"
                 :key="repo.id"
-                class="flex items-center gap-2 text-sm"
+                class="flex items-start gap-2 text-sm"
               >
-                <input
-                  v-model="dependencyRepositoryIds"
-                  type="checkbox"
-                  :value="repo.id"
-                >{{ repo.full_name }}
-              </label>
+                <Checkbox
+                  :id="`application-dependency-${repo.id}`"
+                  :model-value="dependencyRepositoryIds.includes(repo.id)"
+                  class="mt-0.5"
+                  @update:model-value="(checked) => dependencyRepositoryIds = checked === true ? [...new Set([...dependencyRepositoryIds, repo.id])] : dependencyRepositoryIds.filter((id) => id !== repo.id)"
+                />
+                <Label :for="`application-dependency-${repo.id}`" class="break-all font-normal leading-5">{{ repo.full_name }}</Label>
+              </div>
             </fieldset>
           </div>
           <p v-if="dependencyRepositoryIds.length" class="text-sm text-muted-foreground">{{ t("workload.githubActions.privateDependenciesRequireServer") }}</p>
