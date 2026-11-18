@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { toast } from "vue-sonner";
+import type { Repository, SourceControl } from "~/types";
+import { sourceControlService } from "~/services/sourceControlService";
+import { useGitRequestScope } from "~/composables/useGitRequestScope";
 import * as z from "zod";
 import { Settings } from "lucide-vue-next";
 import { useDebounceFn } from "@vueuse/core";
@@ -86,26 +89,6 @@ interface DatabaseUser {
   status: string;
 }
 
-interface SourceControl {
-  id: string;
-  provider: string;
-  provider_label: string;
-  login: string;
-  avatar_url?: string;
-  repository_count: number;
-  installation_id?: string;
-}
-
-interface Repository {
-  id: string;
-  name: string;
-  full_name: string;
-  default_branch: string;
-  html_url: string;
-  public: boolean;
-  ssh_url?: string;
-}
-
 interface SiteTypeOption {
   value: string;
   label: string;
@@ -137,6 +120,20 @@ const zeroDowntimeDeployment = ref(false);
 const sourceControlId = ref("");
 const sourceControlRepositoriesId = ref("");
 const repositoryBranch = ref("main");
+const dependencyRepositoryIds = ref<string[]>([]);
+const gitScope = useGitRequestScope(() => {
+  sourceControls.value = [];
+  repositories.value = [];
+  dependencyRepositoryIds.value = [];
+  isLoadingRepositories.value = false;
+  isRefreshingRepositories.value = false;
+  isOpen.value = false;
+  resetForm();
+});
+const optionRequest = gitScope.channel(() => props.serverId);
+const repositoryRequest = gitScope.channel(() => sourceControlId.value);
+const refreshRequest = gitScope.channel(() => sourceControlId.value);
+const submitRequest = gitScope.channel(() => props.serverId);
 
 // Get selected site type option
 const selectedSiteType = computed(() => {
@@ -218,7 +215,9 @@ const supportsSourceControl = computed(() => {
 });
 
 const canSubmit = computed(() => {
-  if (isLoading.value) return false;
+  if (isLoading.value || isLoadingRepositories.value || !gitScope.ready.value)
+    return false;
+  if (sourceControlId.value && !selectedRepository.value) return false;
   if (address.value.trim().length === 0) return false;
   if (phpVersion.value.length === 0) return false;
 
@@ -248,6 +247,7 @@ const resetForm = () => {
   sourceControlId.value = "";
   sourceControlRepositoriesId.value = "";
   repositoryBranch.value = "main";
+  dependencyRepositoryIds.value = [];
   errors.value = {};
 };
 
@@ -280,14 +280,20 @@ const fetchHookDefaults = async () => {
 };
 
 const fetchOptions = async () => {
+  const request = optionRequest.start();
+  sourceControls.value = [];
+  if (!gitScope.ready.value) return;
   try {
     const [phpData, scData, siteTypeData] = await Promise.all([
       $api<{ data: PhpVersion[] }>(`/servers/${props.serverId}/php-versions`),
-      $api<{ data: SourceControl[] }>("/source-controls"),
+      sourceControlService.list(request.signal),
       $api<{ data: { site_types: SiteTypeOption[] } }>("/sites/create-options"),
     ]);
+    if (!request.isCurrent()) return;
     phpVersions.value = phpData.data;
-    sourceControls.value = scData.data || [];
+    sourceControls.value = (scData.data || []).filter(
+      (item) => !item.status || item.status === "active",
+    );
     siteTypes.value = siteTypeData.data?.site_types || [];
 
     if (phpVersions.value.length > 0) {
@@ -300,6 +306,7 @@ const fetchOptions = async () => {
     // Silent fail - options will be empty
   }
 
+  if (!request.isCurrent()) return;
   // Fetch database info for advanced options (optional - don't fail if endpoints don't exist)
   try {
     const [dbData, dbUserData] = await Promise.all([
@@ -308,6 +315,7 @@ const fetchOptions = async () => {
         `/servers/${props.serverId}/database-users`,
       ),
     ]);
+    if (!request.isCurrent()) return;
     // Transform arrays to Record<id, name> for dropdowns
     databases.value = (dbData.data || []).reduce(
       (acc, db) => {
@@ -330,21 +338,33 @@ const fetchOptions = async () => {
 
 // Fetch repositories for a source control
 const fetchRepositories = async (scId: string) => {
-  if (!scId) {
-    repositories.value = [];
-    return;
-  }
-
+  const request = repositoryRequest.start();
+  repositories.value = [];
+  if (!scId || !gitScope.ready.value) return;
   isLoadingRepositories.value = true;
   try {
-    const result = await $api<{ data: Repository[] }>(
-      `/source-controls/${scId}/repositories`,
+    const result = await sourceControlService.repositories(
+      scId,
+      request.signal,
     );
+    if (!request.isCurrent()) return;
     repositories.value = result.data || [];
+    sourceControls.value = sourceControls.value.map((sc) =>
+      sc.id === scId ? { ...sc, repository_count: repositories.value.length } : sc,
+    );
+    if (
+      !repositories.value.some(
+        (repo) => repo.id === sourceControlRepositoriesId.value,
+      )
+    )
+      sourceControlRepositoriesId.value = "";
+    dependencyRepositoryIds.value = dependencyRepositoryIds.value.filter((id) =>
+      repositories.value.some((repo) => repo.id === id),
+    );
   } catch {
-    repositories.value = [];
+    if (request.isCurrent()) repositories.value = [];
   } finally {
-    isLoadingRepositories.value = false;
+    if (request.isCurrent()) isLoadingRepositories.value = false;
   }
 };
 
@@ -362,26 +382,35 @@ const refreshRepositories = async () => {
     return;
   }
 
+  const request = refreshRequest.start();
   isRefreshingRepositories.value = true;
   try {
     await $api(
       `/settings/git-providers/${sc.provider}/installations/${sc.installation_id}/refresh-repositories`,
       {
         method: "POST",
+        signal: request.signal,
       },
     );
+    if (!request.isCurrent()) return;
     toast.success(t("server.addSite.repositoriesSynced"));
     // Re-fetch the repositories after sync
     await fetchRepositories(sourceControlId.value);
   } catch {
-    toast.error(t("server.addSite.repositoriesRefreshFailed"));
+    if (request.isCurrent())
+      toast.error(t("server.addSite.repositoriesRefreshFailed"));
   } finally {
-    isRefreshingRepositories.value = false;
+    if (request.isCurrent()) isRefreshingRepositories.value = false;
   }
 };
 
 // Handle source control change
 const handleSourceControlChange = (scId: string) => {
+  repositoryRequest.cancel();
+  refreshRequest.cancel();
+  dependencyRepositoryIds.value = [];
+  isLoadingRepositories.value = false;
+  isRefreshingRepositories.value = false;
   sourceControlId.value = scId;
   sourceControlRepositoriesId.value = "";
   repositoryBranch.value = "main";
@@ -394,6 +423,10 @@ const handleSourceControlChange = (scId: string) => {
 
 // Handle repository selection from combobox
 const handleRepositorySelect = (repo: Repository) => {
+  if (!repositories.value.some((item) => item.id === repo.id)) return;
+  dependencyRepositoryIds.value = dependencyRepositoryIds.value.filter(
+    (id) => id !== repo.id,
+  );
   sourceControlRepositoriesId.value = repo.id;
   repositoryBranch.value = repo.default_branch || "main";
   repositorySearchTerm.value = "";
@@ -449,6 +482,12 @@ const handleDomainChange = (value: string | number) => {
 const validate = () => {
   // Reset errors
   errors.value = {};
+  if (sourceControlId.value && !selectedRepository.value) {
+    errors.value.source_control_repositories_id = t(
+      "server.addSite.repositoryRequired",
+    );
+    return null;
+  }
 
   const result = getSchema().safeParse({
     address: address.value.trim(),
@@ -515,6 +554,8 @@ const validate = () => {
 };
 
 const onSubmit = async () => {
+  if (!gitScope.ready.value) return;
+  const request = submitRequest.start();
   const data = validate();
   if (!data) return;
 
@@ -527,6 +568,7 @@ const onSubmit = async () => {
     cancelText: t("server.common.cancel"),
   });
 
+  if (!request.isCurrent()) return;
   if (!result.ok) {
     toast.info(t("server.common.cancelled"));
     return;
@@ -562,6 +604,9 @@ const onSubmit = async () => {
 
     const payload = {
       ...data,
+      ...(sourceControlId.value
+        ? { repository_dependency_ids: dependencyRepositoryIds.value }
+        : {}),
       ...advanced,
       ...hooks,
       // DNS record creation options
@@ -574,13 +619,16 @@ const onSubmit = async () => {
     await $api(`/servers/${props.serverId}/sites`, {
       method: "POST",
       body: payload,
+      signal: request.signal,
     });
+    if (!request.isCurrent()) return;
     toast.success(t("server.addSite.created"));
     emit("created");
     isOpen.value = false;
     resetForm();
     resetAdvancedOptions();
   } catch (error: unknown) {
+    if (!request.isCurrent()) return;
     const err = error as {
       data?: { message?: string; errors?: Record<string, string[]> };
     };
@@ -639,6 +687,7 @@ watch(siteType, () => {
 watch([siteType, zeroDowntimeDeployment], fetchHookDefaults);
 
 watch(isOpen, (open) => {
+  gitScope.cancel();
   if (open) {
     fetchOptions();
   } else {
@@ -741,7 +790,7 @@ watch(isOpen, (open) => {
           </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div class="space-y-2">
             <Label for="php_version">{{ t("server.create.phpVersion") }}</Label>
             <Select v-model="phpVersion">
@@ -819,8 +868,8 @@ watch(isOpen, (open) => {
           v-if="sourceControls.length > 0 && selectedSiteType?.supports_git"
           class="space-y-4"
         >
-          <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-2">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="min-w-0 space-y-2">
               <Label for="source_control">{{
                 t("server.addSite.gitProvider")
               }}</Label>
@@ -847,7 +896,7 @@ watch(isOpen, (open) => {
                         class="h-4 w-4"
                       />
                       <span
-                        >{{ sc.login }} ({{ sc.repository_count }}
+                        >{{ sc.login }} (
                         {{
                           t("server.addSite.repositoryCount", {
                             count: sc.repository_count,
@@ -866,7 +915,7 @@ watch(isOpen, (open) => {
               </p>
             </div>
 
-            <div class="space-y-2">
+            <div class="min-w-0 space-y-2">
               <Label for="repository">{{
                 t("server.addSite.repository")
               }}</Label>
@@ -875,16 +924,17 @@ watch(isOpen, (open) => {
                 :model-value="selectedRepository"
                 :disabled="!sourceControlId || isLoadingRepositories"
                 :filter-function="(list: Repository[]) => list"
-                class="relative"
+                class="relative min-w-0"
                 @update:model-value="
                   (val: Repository | null) => val && handleRepositorySelect(val)
                 "
               >
                 <ComboboxAnchor
-                  class="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+                  class="repository-picker flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
                 >
                   <ComboboxInput
-                    class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+                    id="repository"
+                    class="h-full min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none placeholder:text-muted-foreground"
                     :placeholder="
                       isLoadingRepositories
                         ? t('server.common.loading')
@@ -897,6 +947,7 @@ watch(isOpen, (open) => {
                       sourceControlId && selectedSourceControl?.installation_id
                     "
                     type="button"
+                    :aria-label="t('server.common.refresh')"
                     class="mr-1 flex h-6 items-center rounded px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:opacity-50"
                     :disabled="
                       isRefreshingRepositories || isLoadingRepositories
@@ -960,6 +1011,33 @@ watch(isOpen, (open) => {
             </div>
           </div>
 
+          <fieldset
+            v-if="sourceControlRepositoriesId && repositories.length > 1"
+            class="space-y-2 rounded-md border p-3"
+          >
+            <legend class="px-1 text-sm font-medium">
+              {{ t("workload.git.dependencies") }}
+            </legend>
+            <p class="text-xs text-muted-foreground">
+              {{ t("workload.git.dependenciesHelp") }}
+            </p>
+            <label
+              v-for="repo in repositories.filter(
+                (item) => item.id !== sourceControlRepositoriesId,
+              )"
+              :key="repo.id"
+              class="flex items-center gap-2 text-sm"
+            >
+              <input
+                v-model="dependencyRepositoryIds"
+                type="checkbox"
+                :value="repo.id"
+              >{{ repo.full_name }}
+            </label>
+          </fieldset>
+          <p v-if="sourceControlId" class="text-xs text-muted-foreground">
+            {{ t("workload.git.selectedOnly") }}
+          </p>
           <div v-if="sourceControlRepositoriesId" class="space-y-2">
             <Label for="repository_branch">{{
               t("server.addSite.branch")

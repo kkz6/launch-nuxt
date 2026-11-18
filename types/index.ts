@@ -417,6 +417,13 @@ export interface SourceControl {
   login: string;
   avatar_url?: string;
   repository_count: number;
+  installation_id?: string;
+  cleanup_pending?: boolean;
+  html_url?: string;
+  status?: "active" | "reconnect_required" | "disconnected" | "suspended";
+  generation?: number;
+  selection_version?: number;
+  repositories?: Repository[];
 }
 
 export interface Repository {
@@ -427,6 +434,9 @@ export interface Repository {
   html_url: string;
   public: boolean;
   ssh_url?: string;
+  github_repository_id?: string;
+  source_control_id?: string;
+  version?: number;
 }
 
 export interface Subscription {

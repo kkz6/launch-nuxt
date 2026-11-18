@@ -14,6 +14,8 @@ import {
   ComboboxTrigger,
 } from "reka-ui";
 import type { Repository, SourceControl } from "~/types";
+import { sourceControlService } from "~/services/sourceControlService";
+import { useGitRequestScope } from "~/composables/useGitRequestScope";
 import {
   dockerService,
   type CreateDockerApplicationData,
@@ -119,49 +121,88 @@ const {
   isSubmitting,
 } = toRefs(state);
 
+const gitScope = useGitRequestScope(() => {
+  sourceControls.value = [];
+  registryCredentials.value = [];
+  clearGitSelection();
+  isOpen.value = false;
+});
+const sourceRequest = gitScope.channel();
+const repositoryRequest = gitScope.channel(() => sourceControlId.value);
+const registryRequest = gitScope.channel();
+const submitRequest = gitScope.channel(
+  () => `${props.serverId}:${props.projectId}`,
+);
+const dependencyRepositoryIds = ref<string[]>([]);
+
+const clearGitSelection = () => {
+  repositoryRequest.cancel();
+  sourceControlId.value = "";
+  selectedRepo.value = null;
+  repositories.value = [];
+  dependencyRepositoryIds.value = [];
+  gitRepoFallback.value = "";
+  gitBranch.value = "main";
+  repositorySearchTerm.value = "";
+  isLoadingRepositories.value = false;
+};
+
 const fetchRegistryCredentials = async () => {
+  const request = registryRequest.start();
   try {
     const res = await dockerService.registryCredentials.list();
-    registryCredentials.value = res.data;
+    if (request.isCurrent()) registryCredentials.value = res.data;
   } catch {
-    registryCredentials.value = [];
+    if (request.isCurrent()) registryCredentials.value = [];
   }
 };
 
 const fetchSourceControls = async () => {
+  const request = sourceRequest.start();
+  sourceControls.value = [];
+  if (!gitScope.ready.value) return;
   try {
-    const res = await sourceControlService.list();
-    sourceControls.value = res.data;
+    const res = await sourceControlService.list(request.signal);
+    if (request.isCurrent())
+      sourceControls.value = res.data.filter(
+        (item) => !item.status || item.status === "active",
+      );
   } catch {
-    sourceControls.value = [];
+    if (request.isCurrent()) sourceControls.value = [];
   }
 };
 
 const fetchRepositories = async (scId: string) => {
-  if (!scId) {
-    repositories.value = [];
-    return;
-  }
+  const request = repositoryRequest.start();
+  repositories.value = [];
+  if (!scId || !gitScope.ready.value) return;
   isLoadingRepositories.value = true;
   try {
-    const res = await sourceControlService.repositories(scId);
+    const res = await sourceControlService.repositories(scId, request.signal);
+    if (!request.isCurrent()) return;
     repositories.value = res.data ?? [];
+    sourceControls.value = sourceControls.value.map((sc) =>
+      sc.id === scId ? { ...sc, repository_count: repositories.value.length } : sc,
+    );
   } catch {
-    repositories.value = [];
+    if (request.isCurrent()) repositories.value = [];
   } finally {
-    isLoadingRepositories.value = false;
+    if (request.isCurrent()) isLoadingRepositories.value = false;
   }
 };
 
 const handleSourceControlChange = (scId: string) => {
+  clearGitSelection();
   sourceControlId.value = scId;
-  selectedRepo.value = null;
-  gitBranch.value = "main";
   void fetchRepositories(scId);
 };
 
 const handleRepoSelect = (repo: Repository) => {
+  if (!repositories.value.some((item) => item.id === repo.id)) return;
   selectedRepo.value = repo;
+  dependencyRepositoryIds.value = dependencyRepositoryIds.value.filter(
+    (id) => id !== repo.id,
+  );
   gitBranch.value = repo.default_branch || "main";
   repositorySearchTerm.value = "";
 };
@@ -175,7 +216,10 @@ const filteredRepositories = computed(() => {
   );
 });
 
+watch(sourceType, clearGitSelection);
 watch(isOpen, (open) => {
+  gitScope.cancel();
+  clearGitSelection();
   if (open) {
     sourceType.value = "image";
     name.value = "";
@@ -202,6 +246,11 @@ watch(isOpen, (open) => {
 });
 
 const submit = async () => {
+  if (!gitScope.ready.value) return;
+  if (sourceType.value === "git" && gitBuildLocation.value === "github_actions" && dependencyRepositoryIds.value.length) {
+    toast.error(t("workload.githubActions.privateDependenciesRequireServer"));
+    return;
+  }
   const trimmedName = name.value.trim();
   if (!trimmedName) {
     toast.error(t("workload.application.create.nameRequired"));
@@ -253,11 +302,15 @@ const submit = async () => {
     }
     case "git": {
       let repoUrl = "";
-      if (selectedRepo.value) {
+      if (
+        sourceControlId.value &&
+        selectedRepo.value &&
+        repositories.value.some((item) => item.id === selectedRepo.value?.id)
+      ) {
         repoUrl =
           selectedRepo.value.ssh_url ||
           `https://github.com/${selectedRepo.value.full_name}.git`;
-      } else if (gitRepoFallback.value.trim()) {
+      } else if (!sourceControlId.value && gitRepoFallback.value.trim()) {
         repoUrl = gitRepoFallback.value.trim();
       }
       const branch = gitBranch.value.trim();
@@ -273,7 +326,11 @@ const submit = async () => {
         repo: repoUrl,
         branch,
         ...(sourceControlId.value
-          ? { source_control_id: sourceControlId.value }
+          ? {
+              source_control_id: sourceControlId.value,
+              repository_id: selectedRepo.value!.id,
+              dependency_repository_ids: dependencyRepositoryIds.value,
+            }
           : {}),
         ...(gitBuildType.value !== "auto"
           ? { build_type: gitBuildType.value }
@@ -305,6 +362,7 @@ const submit = async () => {
     }
   }
 
+  const request = submitRequest.start();
   isSubmitting.value = true;
   try {
     const res = await dockerService.applications.create(
@@ -312,9 +370,11 @@ const submit = async () => {
       props.projectId,
       payload,
     );
+    if (!request.isCurrent()) return;
     toast.success(t("workload.application.create.success"));
     emit("created", res.data);
   } catch (err: unknown) {
+    if (!request.isCurrent()) return;
     const e = err as { data?: { message?: string } };
     toast.error(e.data?.message || t("workload.application.create.failed"));
   } finally {
@@ -563,8 +623,11 @@ const submit = async () => {
             {{ t("workload.git.noProviderConnected") }}
           </div>
 
-          <div v-if="sourceControls.length > 0" class="grid grid-cols-2 gap-4">
-            <div class="space-y-2">
+          <div
+            v-if="sourceControls.length > 0"
+            class="grid grid-cols-1 gap-4 sm:grid-cols-2"
+          >
+            <div class="min-w-0 space-y-2">
               <Label>{{ t("workload.fields.gitProvider") }}</Label>
               <Select
                 :model-value="sourceControlId"
@@ -591,7 +654,7 @@ const submit = async () => {
                       <span>
                         {{ sc.login }}
                         <span class="text-muted-foreground">
-                          ({{ sc.repository_count }}
+                          (
                           {{
                             t("workload.git.repositoryCount", {
                               count: sc.repository_count,
@@ -605,23 +668,23 @@ const submit = async () => {
               </Select>
             </div>
 
-            <div class="space-y-2">
+            <div class="min-w-0 space-y-2">
               <Label>{{ t("workload.fields.repository") }}</Label>
               <ComboboxRoot
                 v-model:search-term="repositorySearchTerm"
                 :model-value="selectedRepo"
                 :disabled="!sourceControlId || isLoadingRepositories"
                 :filter-function="(list: Repository[]) => list"
-                class="relative"
+                class="relative min-w-0"
                 @update:model-value="
                   (val: Repository | null) => val && handleRepoSelect(val)
                 "
               >
                 <ComboboxAnchor
-                  class="flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
+                  class="repository-picker flex h-10 w-full items-center rounded-md border border-input bg-background px-3 text-sm data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50"
                 >
                   <ComboboxInput
-                    class="h-full flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+                    class="h-full min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none placeholder:text-muted-foreground"
                     :placeholder="
                       isLoadingRepositories
                         ? t('workload.actions.loading')
@@ -673,7 +736,44 @@ const submit = async () => {
             </div>
           </div>
 
-          <div v-if="!selectedRepo" class="space-y-2">
+          <div v-if="sourceControlId" class="space-y-2">
+            <p class="text-sm text-muted-foreground">
+              {{ t("workload.git.selectedOnly") }}
+            </p>
+            <Button
+              type="button"
+              variant="link"
+              class="h-auto p-0"
+              @click="clearGitSelection"
+              >{{ t("workload.git.usePublicUrl") }}</Button
+            >
+            <fieldset
+              v-if="selectedRepo && repositories.length > 1"
+              class="space-y-2 rounded-md border p-3"
+            >
+              <legend class="px-1 text-sm font-medium">
+                {{ t("workload.git.dependencies") }}
+              </legend>
+              <p class="text-xs text-muted-foreground">
+                {{ t("workload.git.dependenciesHelp") }}
+              </p>
+              <label
+                v-for="repo in repositories.filter(
+                  (item) => item.id !== selectedRepo?.id,
+                )"
+                :key="repo.id"
+                class="flex items-center gap-2 text-sm"
+              >
+                <input
+                  v-model="dependencyRepositoryIds"
+                  type="checkbox"
+                  :value="repo.id"
+                >{{ repo.full_name }}
+              </label>
+            </fieldset>
+          </div>
+          <p v-if="dependencyRepositoryIds.length" class="text-sm text-muted-foreground">{{ t("workload.githubActions.privateDependenciesRequireServer") }}</p>
+          <div v-if="!sourceControlId" class="space-y-2">
             <Label for="app-git-repo-url">{{
               t("workload.git.pastePublicUrl")
             }}</Label>
@@ -685,8 +785,8 @@ const submit = async () => {
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div class="space-y-2">
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="min-w-0 space-y-2">
               <Label for="app-git-branch">{{
                 t("workload.fields.branch")
               }}</Label>
@@ -697,7 +797,7 @@ const submit = async () => {
                 autocomplete="off"
               />
             </div>
-            <div class="space-y-2">
+            <div class="min-w-0 space-y-2">
               <Label>{{ t("workload.fields.builder") }}</Label>
               <Select v-model="gitBuildType">
                 <SelectTrigger>
@@ -763,6 +863,7 @@ const submit = async () => {
                     ? 'border-primary bg-background ring-1 ring-primary'
                     : 'border-input bg-background hover:bg-accent/40',
                 ]"
+                :disabled="dependencyRepositoryIds.length > 0"
                 @click="gitBuildLocation = 'github_actions'"
               >
                 <span class="flex items-center gap-2 text-sm font-medium">

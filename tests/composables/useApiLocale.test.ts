@@ -174,6 +174,31 @@ describe("API locale headers", () => {
     });
   });
 
+  it.each([
+    ["membership", { data: { code: "team.not_member" } }],
+    ["subscription", { response: { status: 402 } }],
+  ])("ignores a stale %s error after the session changes", async (_kind, error) => {
+    cookies.set("auth_token", { value: "same-access-token" });
+    cookies.set("auth_refresh_token", { value: "original-session" });
+    cookies.set("current_team_id", { value: "team-id" });
+    activeUser.value = {
+      current_team_id: "team-id",
+      current_team: { is_subscribed: true },
+      role: "owner",
+    };
+    fetchMock.mockImplementationOnce(async () => {
+      cookies.get("auth_refresh_token")!.value = "replacement-session";
+      throw error;
+    });
+
+    await expect(useApi().get("/servers")).rejects.toBe(error);
+    expect(cookies.get("current_team_id")?.value).toBe("team-id");
+    expect(activeUser.value.current_team_id).toBe("team-id");
+    expect(activeUser.value.current_team?.is_subscribed).toBe(true);
+    expect(activeUser.value.role).toBe("owner");
+    expect(navigateToMock).not.toHaveBeenCalled();
+  });
+
   it("uses stable error codes in useApiQuery response handling", () => {
     cookies.set("current_team_id", { value: "team-id" });
     useApiQuery("/servers", { immediate: false });
@@ -318,6 +343,88 @@ describe("API locale headers", () => {
       translateForLocale("ja", "common.permissions.readOnly"),
     );
     expect(response._data.code).toBe("permission.read_only");
+    expect(navigateToMock).not.toHaveBeenCalled();
+  });
+  it("does not retry a GitHub mutation under a changed team after a token refresh", async () => {
+    cookies.set("auth_token", { value: "expired" });
+    cookies.set("auth_refresh_token", { value: "refresh-token" });
+    cookies.set("current_team_id", { value: "team-A" });
+    fetchMock
+      .mockRejectedValueOnce({ response: { status: 401 } })
+      .mockImplementationOnce(async () => {
+        cookies.get("current_team_id")!.value = "team-B";
+        return { data: { access_token: "new-token" } };
+      });
+    await expect(
+      useApi().post(
+        "/settings/git-providers/github/connection-attempts/attempt/selection",
+        { repository_ids: ["1"] },
+      ),
+    ).rejects.toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not replace a newly signed-in account's tokens with an old refresh response", async () => {
+    cookies.set("auth_token", { value: "expired-A" });
+    cookies.set("auth_refresh_token", { value: "refresh-A" });
+    fetchMock
+      .mockRejectedValueOnce({ response: { status: 401 } })
+      .mockImplementationOnce(async () => {
+        cookies.get("auth_token")!.value = "session-B";
+        cookies.get("auth_refresh_token")!.value = "refresh-B";
+        return { data: { access_token: "new-token-A" } };
+      });
+    await expect(useApi().get("/source-controls")).rejects.toBeDefined();
+    expect(cookies.get("auth_token")!.value).toBe("session-B");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("forwards cancellation and never retries an aborted repository request", async () => {
+    cookies.set("auth_token", { value: "expired" });
+    cookies.set("auth_refresh_token", { value: "refresh-token" });
+    const controller = new AbortController();
+    fetchMock.mockImplementationOnce(async () => {
+      controller.abort();
+      throw { response: { status: 401 } };
+    });
+    await expect(
+      useApi().get("/source-controls/connection/repositories", {
+        signal: controller.signal,
+      }),
+    ).rejects.toBeDefined();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]![1].signal).toBe(controller.signal);
+  });
+
+  it("refreshes B independently while an abandoned A refresh is still pending", async () => {
+    let finishA!: (value: { data: { access_token: string } }) => void;
+    cookies.set("auth_token", { value: "expired-A" });
+    cookies.set("auth_refresh_token", { value: "refresh-A" });
+    fetchMock.mockImplementationOnce(() => new Promise((resolve) => { finishA = resolve; }))
+      .mockResolvedValueOnce({ data: { access_token: "new-B" } });
+    const refreshingA = useApi().refreshAccessToken();
+    cookies.get("auth_token")!.value = "expired-B";
+    cookies.get("auth_refresh_token")!.value = "refresh-B";
+    expect(await useApi().refreshAccessToken()).toBe("new-B");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    finishA({ data: { access_token: "new-A" } });
+    expect(await refreshingA).toBeNull();
+    expect(cookies.get("auth_token")!.value).toBe("new-B");
+  });
+
+  it.each(["account", "team"])("rejects a successful response from an abandoned %s context", async (context) => {
+    cookies.set("auth_token", { value: "access-A" });
+    cookies.set("auth_refresh_token", { value: "refresh-A" });
+    cookies.set("current_team_id", { value: "team-A" });
+    fetchMock.mockImplementationOnce(async () => {
+      if (context === "account") {
+        cookies.get("auth_token")!.value = "access-B";
+        cookies.get("auth_refresh_token")!.value = "refresh-B";
+      } else cookies.get("current_team_id")!.value = "team-B";
+      return { data: { repositories: ["account-A-private-repo"] } };
+    });
+    await expect(useApi().get("/source-controls/connection/repositories"))
+      .rejects.toMatchObject({ name: "AbortError" });
     expect(navigateToMock).not.toHaveBeenCalled();
   });
 });

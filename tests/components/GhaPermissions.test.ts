@@ -113,6 +113,15 @@ for (const testCase of cases) {
       expect(wrapper.text()).toContain("launch-deploy.yml");
     });
 
+    it("links to this workload's generation-specific workflow path", async () => {
+      const wrapper = mountView(testCase);
+      await wrapper.setProps({ [testCase.name]: { ...resource, source_config: { ...resource.source_config, gha_workflow_path: ".github/workflows/launch-connection-workload-g3.yml", branch: "release/v1" } } });
+      await flushPromises();
+      const link = wrapper.findAll("a").find((item) => item.attributes("to")?.includes("/blob/"));
+      expect(link?.attributes("to")).toBe("https://github.com/team/example/blob/release%2Fv1/.github/workflows/launch-connection-workload-g3.yml");
+      expect(wrapper.text()).toContain("launch-connection-workload-g3.yml");
+    });
+
     it("keeps token rotation available to Editors", async () => {
       const wrapper = mountView(testCase);
       await flushPromises();

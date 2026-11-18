@@ -13,6 +13,7 @@ interface ApiOptions {
   body?: RequestBody;
   headers?: Record<string, string>;
   query?: Record<string, unknown>;
+  signal?: AbortSignal;
   params?: Record<string, unknown>; // Alias for query (backwards compatibility)
 }
 

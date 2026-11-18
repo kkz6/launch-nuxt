@@ -29,6 +29,7 @@ type SourceConfig = {
   repo?: string;
   branch?: string;
   gha_workflow_sha?: string;
+  gha_workflow_path?: string;
   gha_image_repository?: string;
   source_control_id?: string;
   // auto_deploy: when true the committed workflow triggers on push to
@@ -61,9 +62,12 @@ const repoSlug = computed(() => {
 
 const branch = computed(() => sc.value.branch || "main");
 
+const workflowPath = computed(() => sc.value.gha_workflow_path || ".github/workflows/launch-deploy.yml");
+
 const workflowURL = computed(() => {
   if (!repoSlug.value) return "";
-  return `https://github.com/${repoSlug.value}/blob/${branch.value}/.github/workflows/launch-deploy.yml`;
+  const path = workflowPath.value.split("/").map(encodeURIComponent).join("/");
+  return `https://github.com/${repoSlug.value}/blob/${encodeURIComponent(branch.value)}/${path}`;
 });
 
 const repoActionsURL = computed(() => {
@@ -438,7 +442,7 @@ useDockerComposeEvents(teamId, (data, event) => {
             target="_blank"
             class="inline-flex items-center gap-1 font-mono hover:underline"
           >
-            .github/workflows/launch-deploy.yml
+            {{ workflowPath }}
             <Icon name="lucide:external-link" class="h-3 w-3 opacity-70" />
           </NuxtLink>
           <span v-else class="font-mono text-muted-foreground">—</span>
@@ -547,7 +551,7 @@ useDockerComposeEvents(teamId, (data, event) => {
             </div>
             <p class="text-xs text-muted-foreground">
               {{ t("workload.githubActions.resyncFileBefore") }}
-              <span class="font-mono">launch-deploy.yml</span>
+              <span class="font-mono">{{ workflowPath.split("/").pop() }}</span>
               {{ t("workload.githubActions.resyncFileAfter") }}
             </p>
           </div>
@@ -635,7 +639,7 @@ useDockerComposeEvents(teamId, (data, event) => {
           </div>
           <p class="text-xs text-muted-foreground">
             {{ t("workload.githubActions.disableComposeBeforeFile") }}
-            <span class="font-mono">launch-deploy.yml</span>
+            <span class="font-mono">{{ workflowPath.split("/").pop() }}</span>
             {{ t("workload.githubActions.disableAfterFile") }}
           </p>
         </div>

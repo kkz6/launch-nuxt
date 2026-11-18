@@ -279,6 +279,24 @@
 }
 
 @layer components {
+  /* The repository search and its buttons are one field. Keep focus on its
+     rounded boundary instead of outlining the inner input a second time. */
+  .repository-picker:focus-within {
+    border-color: hsl(var(--focus-ring));
+    box-shadow: 0 0 0 1px hsl(var(--focus-ring));
+  }
+
+  .repository-picker :is(input, button):focus {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+
+  .repository-picker button:focus-visible {
+    border-radius: calc(var(--radius) - 4px);
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
   .dropdown-menu-item {
     @apply relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0;
   }

@@ -643,7 +643,7 @@
       "noGitProviderDescription": "リポジトリから{type}をデプロイするには、設定からGitプロバイダー（GitHub、GitLab、Bitbucket）を接続してください。",
       "gitProvider": "Gitプロバイダー",
       "selectGitProvider": "Gitプロバイダーを選択",
-      "repositoryCount": "リポジトリ {count}件",
+      "repositoryCount": "リポジトリ {count}件 | リポジトリ {count}件",
       "repository": "リポジトリ",
       "searchRepository": "リポジトリを検索...",
       "noRepository": "リポジトリが見つかりません。",

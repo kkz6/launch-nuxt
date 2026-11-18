@@ -238,6 +238,7 @@
       "download": "Download"
     },
     "teamDialogs": {
+      "repositorySharing": "Invited members can access this workspace's selected GitHub repositories according to their role. Keep separate accounts in separate private workspaces when repository access must remain separate.",
       "nameLength": "Enter a team name between 2 and 255 characters.",
       "created": "Team created successfully",
       "createFailed": "Failed to create team",
@@ -519,6 +520,64 @@
       }
     },
     "connections": {
+      "gitAccess": {
+        "unavailable": "Unavailable on GitHub. Restore access or confirm removal when saving.",
+        "affectedWorkloads": "Affected workloads: {workloads}",
+        "kind": {
+          "site": "Site",
+          "application": "Application",
+          "compose": "Compose"
+        },
+        "destination": "Repositories for {team}",
+        "chooseWorkspace": "Select a workspace before connecting GitHub.",
+        "isolationHelp": "Only repositories explicitly selected here are available to this workspace. Other launchctl accounts keep their own selections.",
+        "loading": "Loading repository access…",
+        "empty": "No GitHub connections in this workspace.",
+        "connect": "Connect GitHub",
+        "manageSelection": "Manage repositories for this account",
+        "selectedCount": "{count} repositories selected",
+        "loadFailed": "Could not load connections. Reload this page to try again.",
+        "authorizeFailed": "Could not start GitHub verification. Check your workspace and try again.",
+        "attemptFailed": "This connection attempt expired or belongs to another session or workspace. Start Connect GitHub again.",
+        "candidatesFailed": "Could not verify available repositories. Choose the GitHub account again to retry.",
+        "saveFailed": "The selection could not be saved. Access may have changed. Verify GitHub again and review your selection.",
+        "saved": "Repository selection saved for this workspace.",
+        "selectTitle": "Select repositories for {team}",
+        "selectionHelp": "Check each repository this workspace may use. Existing selections are preserved until you save. A new connection starts with none selected. Your GitHub administration rights authorize this access and must remain valid.",
+        "awaitingAuthorization": "Complete GitHub authorization to choose repositories.",
+        "githubAccount": "GitHub account or organization",
+        "selectInstallation": "Choose an existing installation",
+        "search": "Search eligible repositories",
+        "noCandidates": "No eligible repositories match. Check your GitHub access or app installation.",
+        "zeroAccess": "No repositories selected. Saving this selection gives this workspace no repository access.",
+        "save": "Save repository selection",
+        "manageGitHub": "Manage GitHub app access",
+        "githubAccessHelp": "GitHub app access is shared by every account using this installation. Adding a repository there only makes it eligible here; select and save it separately for this workspace. Removing a repository or uninstalling the app on GitHub affects every workspace using that installation. To change only this workspace, edit its selection here.",
+        "confirmDestination": "Confirm the destination workspace",
+        "destinationHelp": "You are connecting GitHub to {team}. Authorized members of this workspace can use its selected repositories. Choose your own private workspace for access isolated from other logins.",
+        "acknowledge": "I want to share the repositories I select with authorized members of {team}, including members invited later.",
+        "continueGitHub": "Continue to GitHub",
+        "disconnect": "Disconnect from this account",
+        "disconnectDescription": "Disconnect {account} from {team}? Running applications remain running, but future authenticated deployments, queued GitHub work, and GitHub Actions callbacks for this connection will stop. Other workspaces retain their selections. GitHub workflows and secrets may require separate cleanup.",
+        "disconnected": "Disconnected from this workspace.",
+        "disconnectFailed": "Could not disconnect this connection. Try again.",
+        "removeTitle": "Remove repository access?",
+        "removeDescription": "Remove access to {repositories} in {team}? Running applications remain running. Future authenticated deployments and queued GitHub work that depend on these repositories will stop.",
+        "removeConfirm": "Remove access and save",
+        "cleanupPending": "GitHub workflows or secrets may still need cleanup. Review the resources on GitHub before reconnecting.",
+        "status": {
+          "active": "Active",
+          "reconnect_required": "Verify GitHub to reconnect",
+          "disconnected": "Disconnected",
+          "suspended": "Access suspended"
+        },
+        "callback": {
+          "access_denied": "GitHub authorization was cancelled. No repository access was added.",
+          "session_required": "Sign in to the original launchctl account and start the connection again.",
+          "invalid_callback": "This GitHub callback is incomplete. Start a new connection from this workspace.",
+          "connection_failed": "GitHub verification failed or the destination changed. No repository access was added. Start the connection again."
+        }
+      },
       "contabo": {
         "clientId": "Client ID",
         "clientSecret": "Client secret",

@@ -71,7 +71,9 @@ lctl api POST /api/servers/<server-id>/docker/projects/<project-id>/applications
   }'
 ```
 
-Optional Git fields are `source_control_id`, `build_type` (`nixpacks` or `dockerfile`), `dockerfile_path`, and `build_location` (`server` or `github_actions`). GitHub Actions builds require a connected GitHub source control.
+This example uses a public repository without integration credentials. For authenticated GitHub access, send both `source_control_id` and `repository_id`. Obtain the local repository ID from `GET /api/source-controls/{sourceControlId}/repositories`; it must be explicitly selected for that connection in the current workspace. The server derives the authenticated clone destination from verified repository metadata. A connection ID plus an arbitrary URL cannot grant access.
+
+Optional Git fields are `dependency_repository_ids` (local IDs of explicitly selected private dependencies on the same connection), `build_type` (`nixpacks` or `dockerfile`), `dockerfile_path`, and `build_location` (`server` or `github_actions`). GitHub Actions builds require the connection and selected repository IDs. These repository fields also apply to Compose Git sources. Added GitHub installation repositories do not become available until selected separately for this workspace.
 
 ### Inline Dockerfile
 

@@ -238,6 +238,7 @@
       "download": "ダウンロード"
     },
     "teamDialogs": {
+      "repositorySharing": "招待されたメンバーは、役割に応じてこのワークスペースで選択されたGitHubリポジトリにアクセスできます。アクセスを分離する場合は、アカウントごとに別の非共有ワークスペースを利用してください。",
       "invitationDeliveryFailed": "招待は保留中ですが、メールを送信できませんでした。「再送」で再試行してください。",
       "nameLength": "チーム名は2〜255文字で入力してください。",
       "created": "チームを作成しました",
@@ -519,6 +520,64 @@
       }
     },
     "connections": {
+      "gitAccess": {
+        "unavailable": "GitHubで利用できません。アクセスを復元するか、保存時に削除を確認してください。",
+        "affectedWorkloads": "影響を受けるワークロード: {workloads}",
+        "kind": {
+          "site": "サイト",
+          "application": "アプリケーション",
+          "compose": "Compose"
+        },
+        "destination": "{team} のリポジトリ",
+        "chooseWorkspace": "GitHubを接続する前にワークスペースを選択してください。",
+        "isolationHelp": "ここで明示的に選択したリポジトリのみ、このワークスペースで利用できます。他のlaunchctlアカウントの選択は独立しています。",
+        "loading": "アクセスを読み込み中…",
+        "empty": "このワークスペースにはGitHub接続がありません。",
+        "connect": "GitHubを接続",
+        "manageSelection": "このアカウントのリポジトリを管理",
+        "selectedCount": "{count}件のリポジトリを選択中",
+        "loadFailed": "接続を読み込めませんでした。ページを再読み込みしてください。",
+        "authorizeFailed": "GitHubの確認を開始できませんでした。ワークスペースを確認して再試行してください。",
+        "attemptFailed": "接続の有効期限が切れたか、別のセッションまたはワークスペースの接続です。GitHub接続を最初からやり直してください。",
+        "candidatesFailed": "利用可能なリポジトリを確認できませんでした。GitHubアカウントを選び直してください。",
+        "saveFailed": "選択を保存できませんでした。権限が変更された可能性があります。GitHubを再確認して選択を見直してください。",
+        "saved": "このワークスペースのリポジトリ選択を保存しました。",
+        "selectTitle": "{team} のリポジトリを選択",
+        "selectionHelp": "利用するリポジトリを選択してください。保存するまで既存の選択は維持されます。新規接続の初期選択は0件です。アクセスには有効なGitHubの管理権限が必要です。",
+        "awaitingAuthorization": "GitHubの認証を完了してリポジトリを選択してください。",
+        "githubAccount": "GitHubアカウントまたは組織",
+        "selectInstallation": "既存のインストールを選択",
+        "search": "選択可能なリポジトリを検索",
+        "noCandidates": "選択可能なリポジトリが見つかりません。GitHubの権限とアプリの設定を確認してください。",
+        "zeroAccess": "リポジトリは選択されていません。保存すると、このワークスペースはリポジトリにアクセスできなくなります。",
+        "save": "リポジトリ選択を保存",
+        "manageGitHub": "GitHubアプリのアクセスを管理",
+        "githubAccessHelp": "GitHubアプリのアクセスは同じインストールを使う全アカウントで共有されます。GitHubで追加するだけでは、このワークスペースにアクセスは付与されません。ここで別途選択して保存してください。GitHub上でリポジトリを削除したりアプリをアンインストールしたりすると、同じインストールを使うすべてのワークスペースに影響します。このワークスペースだけを変更するには、ここで選択を編集してください。",
+        "confirmDestination": "接続先ワークスペースを確認",
+        "destinationHelp": "GitHubを {team} に接続します。このワークスペースの権限を持つメンバーは、選択したリポジトリを利用できます。他のログインからアクセスを分離するには、自分の非共有ワークスペースを選んでください。",
+        "acknowledge": "選択したリポジトリを、後から招待するメンバーを含む {team} の権限を持つメンバーと共有します。",
+        "continueGitHub": "GitHubで続行",
+        "disconnect": "このアカウントから接続を解除",
+        "disconnectDescription": "{team} から {account} の接続を解除しますか？稼働中のアプリは継続しますが、今後の認証が必要なデプロイ、待機中のGitHub処理、GitHub Actionsのコールバックは停止します。他のワークスペースの選択は維持されます。GitHub上のワークフローやシークレットは別途削除が必要な場合があります。",
+        "disconnected": "このワークスペースから接続を解除しました。",
+        "disconnectFailed": "接続を解除できませんでした。再試行してください。",
+        "removeTitle": "アクセスを削除しますか？",
+        "removeDescription": "{team} で {repositories} へのアクセスを削除しますか？稼働中のアプリは継続しますが、これらに依存する認証が必要なデプロイと待機中のGitHub処理は停止します。",
+        "removeConfirm": "アクセスを削除して保存",
+        "cleanupPending": "GitHubのワークフローやシークレットの削除が必要な場合があります。再接続する前にGitHub上のリソースを確認してください。",
+        "status": {
+          "active": "有効",
+          "reconnect_required": "GitHubを確認して再接続",
+          "disconnected": "接続解除済み",
+          "suspended": "アクセス停止中"
+        },
+        "callback": {
+          "access_denied": "GitHubの認証をキャンセルしました。アクセスは追加されていません。",
+          "session_required": "元のlaunchctlアカウントにログインし、接続を最初からやり直してください。",
+          "invalid_callback": "GitHubからの応答が不完全です。このワークスペースで新しい接続を開始してください。",
+          "connection_failed": "GitHubの確認に失敗したか接続先が変更されました。アクセスは追加されていません。接続をやり直してください。"
+        }
+      },
       "contabo": {
         "clientId": "クライアント ID",
         "clientSecret": "クライアントシークレット",

@@ -8,6 +8,7 @@ const TEAM_ID_KEY = "current_team_id";
 
 let isRefreshing = false;
 let refreshPromise: Promise<string | null> | null = null;
+let refreshSession: { token: string; userId: User["id"] | undefined } | null = null;
 
 let isRedirectingToLogin = false;
 
@@ -43,6 +44,7 @@ interface RequestOptions {
   body?: RequestBody;
   headers?: Record<string, string>;
   query?: Record<string, unknown>;
+  signal?: AbortSignal;
 }
 
 const redirectToLogin = () => {
@@ -128,16 +130,24 @@ export const useApi = () => {
   };
 
   const refreshAccessToken = async (): Promise<string | null> => {
-    if (isRefreshing && refreshPromise) {
-      return refreshPromise;
-    }
-
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
       return null;
     }
+    const refreshUser = useState<User | null>("auth_user", () => null);
+    const refreshUserId = refreshUser.value?.id;
+    if (
+      isRefreshing && refreshPromise &&
+      refreshSession?.token === refreshToken &&
+      refreshSession.userId === refreshUserId
+    ) return refreshPromise;
+    const session = { token: refreshToken, userId: refreshUserId };
+    const isSameSession = () =>
+      getRefreshToken() === refreshToken &&
+      refreshUser.value?.id === refreshUserId;
 
     isRefreshing = true;
+    refreshSession = session;
     refreshPromise = (async () => {
       try {
         const response = await $fetch<
@@ -156,16 +166,22 @@ export const useApi = () => {
           },
         });
 
+        if (!isSameSession()) return null;
         const newAccessToken = response.data.access_token;
         setTokens(newAccessToken);
         return newAccessToken;
       } catch {
-        clearTokens();
-        redirectToLogin();
+        if (isSameSession()) {
+          clearTokens();
+          redirectToLogin();
+        }
         return null;
       } finally {
-        isRefreshing = false;
-        refreshPromise = null;
+        if (refreshSession === session) {
+          isRefreshing = false;
+          refreshPromise = null;
+          refreshSession = null;
+        }
       }
     })();
 
@@ -177,14 +193,26 @@ export const useApi = () => {
     options: RequestOptions = {},
   ): Promise<T> => {
     const token = getAccessToken();
+    const refreshToken = getRefreshToken();
     const teamId = getCurrentTeamId();
     const activeUser = useState<User | null>("auth_user", () => null);
+    const requestUserId = activeUser.value?.id;
+    const requireCurrentContext = () => {
+      if (
+        options.signal?.aborted ||
+        refreshToken !== getRefreshToken() ||
+        (!refreshToken && token !== getAccessToken()) ||
+        teamId !== getCurrentTeamId() ||
+        requestUserId !== activeUser.value?.id
+      ) throw new DOMException("Account context changed", "AbortError");
+    };
 
     const fetchOptions = {
       baseURL,
       method: options.method || ("GET" as const),
       body: options.body,
       query: options.query,
+      signal: options.signal,
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
@@ -203,18 +231,34 @@ export const useApi = () => {
     };
 
     try {
-      return await $fetch<T>(url, fetchOptions);
+      const response = await $fetch<T>(url, fetchOptions);
+      requireCurrentContext();
+      return response;
     } catch (error: unknown) {
       const errorResponse = error as {
         response?: { status?: number };
         data?: { code?: string; message?: string };
       };
 
-      if (errorResponse?.response?.status === 401 && getRefreshToken()) {
+      if (
+        errorResponse?.response?.status === 401 &&
+        getRefreshToken() &&
+        !options.signal?.aborted &&
+        token === getAccessToken() &&
+        teamId === getCurrentTeamId() &&
+        requestUserId === activeUser.value?.id
+      ) {
         const newToken = await refreshAccessToken();
 
-        if (newToken) {
-          return await $fetch<T>(url, {
+        if (
+          newToken &&
+          newToken === getAccessToken() &&
+          refreshToken === getRefreshToken() &&
+          !options.signal?.aborted &&
+          teamId === getCurrentTeamId() &&
+          requestUserId === activeUser.value?.id
+        ) {
+          const response = await $fetch<T>(url, {
             ...fetchOptions,
             headers: {
               ...fetchOptions.headers,
@@ -222,11 +266,17 @@ export const useApi = () => {
               "Accept-Language": getEffectiveLocale(),
             },
           });
+          requireCurrentContext();
+          return response;
         }
       }
 
       const isCurrentRequest =
-        token === getAccessToken() && teamId === getCurrentTeamId();
+        !options.signal?.aborted &&
+        token === getAccessToken() &&
+        refreshToken === getRefreshToken() &&
+        teamId === getCurrentTeamId() &&
+        requestUserId === activeUser.value?.id;
       if (isCurrentRequest && hasInvalidTeamContext(errorResponse?.data)) {
         recoverTeamContext(activeUser.value, clearCurrentTeamId);
       } else if (

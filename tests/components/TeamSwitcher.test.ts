@@ -122,6 +122,8 @@ describe("team switcher", () => {
     vi.stubGlobal("ref", ref);
     vi.stubGlobal("useApi", () => ({
       setCurrentTeamId: mocks.setCurrentTeamId,
+      getRefreshToken: () => `session-${user.value.id}`,
+      getAccessToken: () => `access-${user.value.id}`,
     }));
     vi.stubGlobal("useAuth", () => ({ user, fetchUser: mocks.fetchUser }));
     vi.stubGlobal("useImpersonation", () => ({ isImpersonating: ref(false) }));
@@ -287,6 +289,26 @@ describe("team switcher", () => {
     await flushPromises();
     await setupState(wrapper).switchTeam("personal");
     expect(mocks.api).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not change the new account when an old account's switch finishes late", async () => {
+    const wrapper = mountSwitcher();
+    await flushPromises();
+    let finishSwitch!: () => void;
+    mocks.api.mockImplementationOnce(() => new Promise((resolve) => {
+      finishSwitch = () => resolve({ data: null });
+    }));
+    const switching = setupState(wrapper).switchTeam("01TEAM123456");
+    user.value = { id: "account-B", current_team_id: "private-B", role: "owner" };
+    finishSwitch();
+    await switching;
+    expect(user.value).toEqual({ id: "account-B", current_team_id: "private-B", role: "owner" });
+    expect(mocks.setCurrentTeamId).not.toHaveBeenCalled();
+    expect(mocks.fetchUser).not.toHaveBeenCalled();
+    expect(mocks.reconnect).not.toHaveBeenCalled();
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
+    expect(mocks.success).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it("handles team list and switch failures", async () => {

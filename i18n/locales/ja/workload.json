@@ -103,6 +103,7 @@
       "title": "危険な操作"
     },
     "githubActions": {
+      "privateDependenciesRequireServer": "非公開の依存リポジトリは現在サーバービルドが必要です。ビルド場所に「サーバー」を選択してください。",
       "accessLostDescription": "Launch GitHub App がアンインストールされたか、権限が変更されました。再インストールするまで、ワークフローの同期とデプロイトークンの更新は利用できません。",
       "accessLostTitle": "GitHub App へのアクセスが失われました",
       "autoDeployAfterBranch": " へのプッシュで GitHub Actions のビルドとデプロイが実行されます。無効の場合、デプロイは手動です。",
@@ -174,7 +175,11 @@
       "workflowShaHelp": "Launch がリポジトリにコミットしたワークフローファイルのコミット SHA"
     },
     "git": {
-      "noProviderConnected": "Git プロバイダーが接続されていません。下に公開リポジトリ URL を貼り付けるか、［設定］→［インテグレーション］で GitHub、GitLab、Bitbucket を接続してください。",
+      "selectedOnly": "このワークスペースで選択したリポジトリのみ利用できます。「設定 → 接続」で選択を管理してください。",
+      "usePublicUrl": "接続の認証情報を使わず公開URLを利用",
+      "dependencies": "非公開の依存リポジトリ（任意）",
+      "dependenciesHelp": "非公開サブモジュールなど、このワークロードに必要な追加リポジトリのみ選択してください。認証情報は主リポジトリと選択した依存先に限定されます。",
+      "noProviderConnected": "有効なGitHub接続がありません。公開リポジトリのURLを入力するか、「設定 → 接続」でGitHubを接続してリポジトリを選択してください。",
       "noRepositoryFound": "リポジトリが見つかりません。",
       "pastePublicUrl": "または公開リポジトリ URL を貼り付け",
       "repositoryCount": "{count} 件のリポジトリ | {count} 件のリポジトリ",
