@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { onBeforeUnmount } from "vue";
+import { createScopedRequest } from "~/utils/scopedRequest";
 import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -14,6 +16,7 @@ import { authRedirect } from "~/utils/authRedirect";
 
 definePageMeta({
   layout: "guest",
+  middleware: "guest",
 });
 
 const { t } = useI18n();
@@ -28,8 +31,16 @@ const isRecovery = ref(false);
 const errors = ref<Record<string, string>>({});
 const loading = ref(false);
 
-const { setTokens } = useApi();
-const { isInitialized, setUser } = useAuth();
+const { setTokens, getAccessToken, getRefreshToken } = useApi();
+const { isInitialized, setUser, user } = useAuth();
+const loginSession = () => getRefreshToken() || getAccessToken();
+const challengeRequest = createScopedRequest(() => JSON.stringify([loginSession(), user.value?.id]));
+const originatingContext = challengeRequest.start();
+let active = true;
+onBeforeUnmount(() => {
+  active = false;
+  challengeRequest.cancel();
+});
 const route = useRoute();
 const returnToLogin = () => {
   const redirect = authRedirect(route.query.redirect);
@@ -49,10 +60,12 @@ onMounted(() => {
 });
 
 const handleSubmit = async (codeValue?: string) => {
+  if (!originatingContext.isCurrent() || loading.value) return;
   if (!challengeToken.value) {
     returnToLogin();
     return;
   }
+  if (sessionStorage.getItem("2fa_challenge_token") !== challengeToken.value) return;
 
   const code = codeValue ?? otpDigits.value.join("");
 
@@ -72,13 +85,16 @@ const handleSubmit = async (codeValue?: string) => {
       : { challenge_token: challengeToken.value, code };
 
     const response = await authService.twoFactor.challenge(body);
+    if (!originatingContext.isCurrent()) return;
 
     // Store tokens from the response
     setTokens(response.data.access_token, response.data.refresh_token);
+    const signedInSession = loginSession();
 
     // Set user state and wait for the saved locale before rendering the
     // authenticated destination or its success toast.
     await setUser(response.data.user);
+    if (!active || loginSession() !== signedInSession || user.value?.id !== response.data.user.id) return;
     isInitialized.value = true;
 
     // Clean up the challenge token
@@ -90,6 +106,7 @@ const handleSubmit = async (codeValue?: string) => {
         (response.data.user.onboarded ? "/dashboard" : "/onboarding"),
     );
   } catch (error: unknown) {
+    if (!originatingContext.isCurrent()) return;
     if (error && typeof error === "object" && "data" in error) {
       const fetchError = error as {
         data?: { message?: string; errors?: Record<string, string[]> };

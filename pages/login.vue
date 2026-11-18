@@ -11,6 +11,8 @@ import { Label } from "~/components/ui/label";
 import { Checkbox } from "~/components/ui/checkbox";
 import { Separator } from "~/components/ui/separator";
 import { authRedirect } from "~/utils/authRedirect";
+import { createScopedRequest } from "~/utils/scopedRequest";
+import { onBeforeUnmount } from "vue";
 
 definePageMeta({
   layout: "guest",
@@ -34,7 +36,16 @@ const userHasPasskeys = ref(false);
 const showPasskeyOption = ref(false);
 const passkeyLoading = ref(false);
 
-const { login, checkUserStatus, isLoading: authLoading } = useAuth();
+const { login, checkUserStatus, isLoading: authLoading, user, setUser, isInitialized } = useAuth();
+const { post, setTokens, getAccessToken, getRefreshToken } = useApi();
+const loginSession = () => getRefreshToken() || getAccessToken();
+const passkeyRequest = createScopedRequest(() => JSON.stringify([loginSession(), user.value?.id]));
+const originatingContext = passkeyRequest.start();
+let active = true;
+onBeforeUnmount(() => {
+  active = false;
+  passkeyRequest.cancel();
+});
 const route = useRoute();
 
 const redirectAfterLogin = (onboarded: boolean) => {
@@ -127,19 +138,20 @@ const handleChangeEmail = () => {
 };
 
 const handlePasskeyLogin = async () => {
+  if (!originatingContext.isCurrent() || passkeyLoading.value) return;
+  const request = originatingContext;
   passkeyLoading.value = true;
   errors.value = {};
 
   try {
-    const { post, setTokens } = useApi();
-    const { setUser, isInitialized } = useAuth();
-
     const optionsResponse = await post<{
       publicKey: PublicKeyCredentialRequestOptions;
     }>(
       "/auth/passkey/login/options",
       email.value ? { email: email.value } : {},
+      { signal: request.signal },
     );
+    if (!request.isCurrent()) return;
 
     const publicKey = optionsResponse.publicKey;
     publicKey.challenge = base64UrlToArrayBuffer(
@@ -155,7 +167,9 @@ const handlePasskeyLogin = async () => {
 
     const credential = (await navigator.credentials.get({
       publicKey,
+      signal: request.signal,
     })) as PublicKeyCredential;
+    if (!request.isCurrent()) return;
     if (!credential) throw new Error("Failed to get credential");
 
     const assertion = credential.response as AuthenticatorAssertionResponse;
@@ -177,15 +191,19 @@ const handlePasskeyLogin = async () => {
           ? arrayBufferToBase64Url(assertion.userHandle)
           : null,
       },
-    });
+    }, { signal: request.signal });
+    if (!request.isCurrent()) return;
 
     setTokens(authResponse.access_token, authResponse.refresh_token);
+    const signedInSession = loginSession();
     await setUser(authResponse.user);
+    if (!active || loginSession() !== signedInSession || user.value?.id !== authResponse.user.id) return;
     isInitialized.value = true;
 
     toast.success(t("auth.login.signedIn"));
     redirectAfterLogin(authResponse.user.onboarded);
   } catch (error: unknown) {
+    if (!request.isCurrent()) return;
     if (error instanceof DOMException && error.name === "NotAllowedError") {
       toast.error(t("auth.errors.passkeyCancelled"));
     } else if (error && typeof error === "object" && "data" in error) {

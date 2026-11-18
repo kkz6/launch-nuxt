@@ -5,6 +5,8 @@ description: Site management API endpoints
 
 Create and manage sites on your servers through the API.
 
+For GitHub-backed sites, send `source_control_id` and `source_control_repositories_id` from the current workspace's selected connection and repository list. The repository must belong to that exact connection and have active selected access. Optional `repository_dependency_ids` contains local IDs of explicitly selected private dependencies on the same connection. Removing selection pauses future authenticated deployments while the running site remains available.
+
 ## Endpoints
 | Method | Endpoint | Description |
 |--------|----------|-------------|

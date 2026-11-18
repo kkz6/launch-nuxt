@@ -136,6 +136,9 @@ const onSubmit = async () => {
       </DialogHeader>
 
       <form class="grid w-full gap-4" @submit.prevent="onSubmit">
+        <p class="text-sm text-muted-foreground">
+          {{ t("settings.teamDialogs.repositorySharing") }}
+        </p>
         <div class="space-y-2">
           <Label for="email">{{ t("settings.teamDialogs.email") }}</Label>
           <Input

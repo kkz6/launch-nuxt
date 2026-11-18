@@ -139,27 +139,26 @@ See all your tokens:
 Revoked tokens immediately stop working.
 
 ## Connected Accounts
-### Git Providers
+### GitHub repositories
 
-Connect your Git accounts:
+1. Select the destination workspace, then open **Settings** > **Connections**.
+2. Choose **Connect GitHub** and confirm the named workspace. Authorized team members, including people invited later, can use its selected repositories. Use separate private workspaces for separate account access.
+3. Verify your GitHub identity and choose an existing app installation. You can reuse the same installation from another launchctl login without revoking the first connection.
+4. Explicitly select the repositories for this workspace and save. A new connection starts with no repositories selected.
 
-1. Go to **Settings** → **Source Control**
-2. Click **Connect** for your provider:
-   - GitHub
-   - GitLab
-   - Bitbucket
-3. Authorize launchctl
-4. Select repositories (if applicable)
+**Manage repositories for this account** changes only this workspace's selection. Existing selections are preserved during verification until you save a reviewed change. You must retain the GitHub administration rights used to authorize access; if access expires or is revoked, verify GitHub again.
 
-### Disconnecting Accounts
+**Manage GitHub app access** changes which repositories the shared installation can access. A repository added there does not automatically become selected in any launchctl account. Each workspace must select it separately. Removing a repository or uninstalling the app directly on GitHub affects every workspace using that installation. Use the repository selection in launchctl to change access for only the current workspace. GitLab and Bitbucket connections are not currently available.
 
-1. Go to **Settings** → **Source Control**
-2. Click **Disconnect**
-3. Confirm
+Sites, applications, and Compose list only selected repositories. When a workload needs private submodules or other private dependencies, select those repositories explicitly as dependencies. Public URL builds require HTTPS without embedded credentials and use no GitHub connection credentials or inherited server credentials.
 
-::callout{type="info"}
-Disconnecting removes launchctl's access but doesn't affect existing deployments.
-::
+The same repository can be selected independently in more than one workspace. GitHub Actions setup is limited to one workspace at a time because GitHub secrets are shared within the repository. Selecting it in another workspace does not interrupt existing workflows; enabling Actions there requires the previous workspace's cleanup to finish.
+
+### Disconnecting an account
+
+Choose **Disconnect from this account** on the connection in **Settings** > **Connections**. This disconnects only the current workspace; other workspace selections remain intact. Running applications remain running, but future authenticated deployments and queued GitHub work for the disconnected connection stop. Removing a repository from the selection has the same effect for workloads that depend on it.
+
+GitHub workflows and secrets may remain on GitHub and need separate cleanup. Revoking the app's authorization directly on GitHub can affect the same GitHub identity's connections across multiple launchctl logins. Reconnect locally first when recovering this workspace's access.
 
 ## Danger Zone
 ### Deleting Account

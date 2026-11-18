@@ -2,8 +2,7 @@
 import { reactive, toRefs } from "vue";
 import { toast } from "vue-sonner";
 import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "~/components/ui/avatar";
+import GitConnections from "~/components/settings/GitConnections.vue";
 import { differenceInDays, format, formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
 import { certificateService } from "~/services/certificateService";
@@ -19,18 +18,6 @@ const dateLocale = computed(() => (locale.value === "ja" ? ja : enUS));
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
-
-interface AppInstallation {
-  id: string;
-  accountLogin: string;
-  accountType: string;
-  accountAvatarUrl: string;
-  htmlUrl?: string;
-  createdAt?: string;
-  repositorySelection?: string;
-  hasMultipleRepositories: boolean;
-  repositoryCount?: number;
-}
 
 interface ServerProvider {
   id: string;
@@ -94,13 +81,10 @@ interface DnsProvider {
 }
 
 interface ConnectionsState {
-  isGitLoading: boolean;
   isServerProvidersLoading: boolean;
   isStorageProvidersLoading: boolean;
   isDnsProvidersLoading: boolean;
   isStoredCertificatesLoading: boolean;
-  appInstallations: Record<string, AppInstallation[]>;
-  refreshingInstallations: Record<string, boolean>;
   serverProviders: ServerProvider[];
   storageProviders: StorageProvider[];
   dnsProviders: DnsProvider[];
@@ -115,13 +99,10 @@ interface ConnectionsState {
 }
 
 const state = reactive({
-  isGitLoading: true,
   isServerProvidersLoading: true,
   isStorageProvidersLoading: true,
   isDnsProvidersLoading: true,
   isStoredCertificatesLoading: true,
-  appInstallations: {},
-  refreshingInstallations: {},
   serverProviders: [],
   storageProviders: [],
   dnsProviders: [],
@@ -136,13 +117,10 @@ const state = reactive({
 }) as ConnectionsState;
 
 const {
-  isGitLoading,
   isServerProvidersLoading,
   isStorageProvidersLoading,
   isDnsProvidersLoading,
   isStoredCertificatesLoading,
-  appInstallations,
-  refreshingInstallations,
   serverProviders,
   storageProviders,
   dnsProviders,
@@ -156,7 +134,6 @@ const {
   isRegistryDialogOpen,
 } = toRefs(state);
 
-const githubInstallations = computed(() => appInstallations.value.github || []);
 const dnsProviderLabels: Record<string, string> = {
   cloudflare: "Cloudflare",
   route53: "Amazon Route 53",
@@ -166,45 +143,6 @@ const dnsProviderIcons: Record<string, string> = {
   cloudflare: "simple-icons:cloudflare",
   route53: "simple-icons:amazonaws",
   digitalocean: "simple-icons:digitalocean",
-};
-
-const gitProviders = [
-  {
-    key: "github",
-    name: "GitHub",
-    icon: "simple-icons:github",
-    className: "bg-[#24292f] hover:bg-[#24292f]/90 text-white",
-    enabled: true,
-  },
-  {
-    key: "gitlab",
-    name: "GitLab",
-    icon: "simple-icons:gitlab",
-    className: "bg-[#FC6D26] hover:bg-[#FC6D26]/90 text-white",
-    enabled: false,
-  },
-  {
-    key: "bitbucket",
-    name: "Bitbucket",
-    icon: "simple-icons:bitbucket",
-    className: "bg-[#0052CC] hover:bg-[#0052CC]/90 text-white",
-    enabled: false,
-  },
-];
-
-const fetchGitProviders = async () => {
-  try {
-    const response = await $api<{
-      data?: { appInstallations: Record<string, AppInstallation[]> };
-      appInstallations?: Record<string, AppInstallation[]>;
-    }>("/settings/git-providers");
-    appInstallations.value =
-      response.data?.appInstallations || response.appInstallations || {};
-  } catch {
-    toast.error(t("settings.connections.git.loadFailed"));
-  } finally {
-    isGitLoading.value = false;
-  }
 };
 
 const fetchServerProviders = async () => {
@@ -241,83 +179,6 @@ const fetchDnsProviders = async () => {
     toast.error(t("settings.connections.dns.loadFailed"));
   } finally {
     isDnsProvidersLoading.value = false;
-  }
-};
-
-const getRepoLabel = (installation: AppInstallation) => {
-  if (installation.repositorySelection === "selected") {
-    const count = installation.repositoryCount || 0;
-    return count === 1
-      ? t("settings.connections.git.repositoryCountOne", { count })
-      : t("settings.connections.git.repositoryCountOther", { count });
-  }
-  return t("settings.connections.git.allRepositories");
-};
-
-const handleRefreshRepositories = async (installationId: string) => {
-  const key = `github-${installationId}`;
-  refreshingInstallations.value[key] = true;
-
-  try {
-    const response = await $api<{ data: { status: string } }>(
-      `/settings/git-providers/github/installations/${installationId}/refresh-repositories`,
-      {
-        method: "POST",
-      },
-    );
-    if (response.data?.status === "success") {
-      toast.success(t("settings.connections.git.refreshQueued"));
-      setTimeout(() => window.location.reload(), 2000);
-    }
-  } catch {
-    toast.error(t("settings.connections.git.refreshFailed"));
-  } finally {
-    refreshingInstallations.value[key] = false;
-  }
-};
-
-const handleConfigureInstallation = async () => {
-  try {
-    const response = await $api<{ data: { url: string } }>(
-      "/settings/git-providers/github/installation-url",
-    );
-    const url = response.data?.url;
-    if (url) {
-      window.location.href = url;
-    } else {
-      toast.error(t("settings.connections.git.noInstallationUrl"));
-    }
-  } catch {
-    toast.error(t("settings.connections.git.installationUrlFailed"));
-  }
-};
-
-const handleInstallApp = async (provider: string) => {
-  const toastId = toast.loading(t("settings.connections.git.connecting"));
-  try {
-    const response = await $api<{ data: { url: string } }>(
-      `/settings/git-providers/${provider}/installation-url`,
-    );
-    const url = response.data?.url;
-    if (url) {
-      window.location.href = url;
-    } else {
-      toast.error(t("settings.connections.git.noInstallationUrl"), {
-        id: toastId,
-      });
-    }
-  } catch {
-    toast.error(t("settings.connections.git.connectFailed"), {
-      id: toastId,
-    });
-  }
-};
-
-const handleManageInstallation = (installation: AppInstallation) => {
-  if (installation.htmlUrl) {
-    window.location.href = installation.htmlUrl;
-  } else {
-    void handleConfigureInstallation();
   }
 };
 
@@ -648,7 +509,6 @@ const registryDisplayHost = (c: DockerRegistryCredential): string => {
 };
 
 onMounted(() => {
-  fetchGitProviders();
   fetchServerProviders();
   fetchStorageProviders();
   fetchDnsProviders();
@@ -661,116 +521,7 @@ onMounted(() => {
   <div class="divide-y">
     <SharedConfirmationDialog ref="confirmationDialog" />
 
-    <div class="px-6 pb-6">
-      <h3 class="mb-4 text-base font-semibold">
-        {{ t("settings.connections.git.title") }}
-      </h3>
-
-      <div v-if="isGitLoading" class="flex items-center justify-center py-4">
-        <Icon
-          name="lucide:loader-2"
-          class="h-5 w-5 animate-spin text-muted-foreground"
-        />
-      </div>
-
-      <template v-else>
-        <div
-          v-if="githubInstallations.length === 0"
-          class="rounded-lg border p-4"
-        >
-          <div class="flex flex-col items-center gap-3 py-2">
-            <Icon
-              name="simple-icons:git"
-              class="h-8 w-8 text-muted-foreground"
-            />
-            <span class="text-sm text-muted-foreground">
-              {{ t("settings.connections.git.empty") }}
-            </span>
-            <GitAddProvider
-              :providers="gitProviders"
-              @install="handleInstallApp"
-            />
-          </div>
-        </div>
-
-        <div v-else class="space-y-3">
-          <div
-            v-for="installation in githubInstallations"
-            :key="installation.id"
-            class="flex items-center justify-between rounded-lg border p-4"
-          >
-            <div class="flex items-center gap-3">
-              <Avatar class="h-8 w-8">
-                <AvatarImage
-                  :src="installation.accountAvatarUrl"
-                  :alt="installation.accountLogin"
-                />
-                <AvatarFallback>{{
-                  installation.accountLogin.charAt(0).toUpperCase()
-                }}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="text-sm font-medium">{{
-                    installation.accountLogin
-                  }}</span>
-                  <Badge variant="secondary" class="text-xs">{{
-                    installation.accountType
-                  }}</Badge>
-                  <Badge
-                    v-if="installation.repositorySelection"
-                    variant="outline"
-                    class="text-xs"
-                  >
-                    {{ getRepoLabel(installation) }}
-                  </Badge>
-                </div>
-                <p
-                  v-if="installation.createdAt"
-                  class="text-xs text-muted-foreground"
-                >
-                  {{
-                    t("settings.connections.git.installedOn", {
-                      date: format(new Date(installation.createdAt), "PP", {
-                        locale: dateLocale,
-                      }),
-                    })
-                  }}
-                </p>
-              </div>
-            </div>
-            <div class="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                :disabled="refreshingInstallations[`github-${installation.id}`]"
-                @click="handleRefreshRepositories(installation.id)"
-              >
-                <Icon
-                  name="lucide:refresh-cw"
-                  class="h-4 w-4"
-                  :class="{
-                    'animate-spin':
-                      refreshingInstallations[`github-${installation.id}`],
-                  }"
-                />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                @click="handleManageInstallation(installation)"
-              >
-                <Icon name="lucide:settings" class="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <GitAddProvider
-            :providers="gitProviders"
-            @install="handleInstallApp"
-          />
-        </div>
-      </template>
-    </div>
+    <GitConnections />
 
     <div class="px-6 py-6">
       <h3 class="mb-4 text-base font-semibold">

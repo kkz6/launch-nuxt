@@ -643,7 +643,7 @@
       "noGitProviderDescription": "Connect a Git provider (GitHub, GitLab, or Bitbucket) in Settings to deploy {type} from a repository.",
       "gitProvider": "Git Provider",
       "selectGitProvider": "Select Git provider",
-      "repositoryCount": "{count} repo(s)",
+      "repositoryCount": "{count} repo | {count} repos",
       "repository": "Repository",
       "searchRepository": "Search repository...",
       "noRepository": "No repository found.",

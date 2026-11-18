@@ -10,7 +10,7 @@ import { duplicateTeamNames, teamQualifier } from "~/utils/teams";
 
 const { user, fetchUser } = useAuth();
 const { t } = useI18n();
-const { setCurrentTeamId } = useApi();
+const { setCurrentTeamId, getRefreshToken, getAccessToken } = useApi();
 const { refreshActiveTeam } = useActiveTeamRefresh();
 const { isImpersonating } = useImpersonation();
 const { teams, loading, loadTeams } = useTeams();
@@ -47,13 +47,20 @@ const switchTeam = async (teamId: string) => {
   )
     return;
   isSwitching.value = true;
+  const userId = user.value?.id;
+  const session = getRefreshToken() || getAccessToken();
+  const isCurrent = () =>
+    userId === user.value?.id &&
+    session === (getRefreshToken() || getAccessToken());
   const team = teams.value.find((item) => item.id === teamId);
   try {
     await $api(`/teams/${teamId}/switch`, { method: "POST" });
+    if (!isCurrent()) return;
     // The old team's role must not authorize controls against the new team.
     if (user.value) user.value.role = undefined;
     setCurrentTeamId(teamId);
     const updatedUser = await fetchUser();
+    if (!isCurrent()) return;
     if (!updatedUser) throw new Error("Could not load the selected team");
     refreshActiveTeam();
     await navigateTo("/dashboard");
@@ -63,7 +70,7 @@ const switchTeam = async (teamId: string) => {
       }),
     );
   } catch {
-    toast.error(t("common.teams.switchFailed"));
+    if (isCurrent()) toast.error(t("common.teams.switchFailed"));
   } finally {
     isSwitching.value = false;
   }

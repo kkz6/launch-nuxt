@@ -8,16 +8,19 @@ export const sourceControlService = {
   /**
    * Get all connected source controls
    */
-  list: () => {
+  list: (signal?: AbortSignal) => {
     const { get } = useApi();
-    return get<ApiResponse<SourceControl[]>>("/source-controls");
+    return get<ApiResponse<SourceControl[]>>("/source-controls", { signal });
   },
 
   /**
    * Get repositories for a specific source control
    */
-  repositories: (sourceControlId: string) => {
+  repositories: (sourceControlId: string, signal?: AbortSignal) => {
     const { get } = useApi();
-    return get<ApiResponse<Repository[]>>(`/source-controls/${sourceControlId}/repositories`);
+    return get<ApiResponse<Repository[]>>(
+      `/source-controls/${encodeURIComponent(sourceControlId)}/repositories`,
+      { signal },
+    );
   },
 };

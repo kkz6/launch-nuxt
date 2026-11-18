@@ -9,7 +9,14 @@ interface UserLocaleSyncOptions {
 }
 
 export const useAuth = () => {
-  const { setTokens, clearTokens, getAccessToken, setCurrentTeamId } = useApi();
+  const {
+    setTokens,
+    clearTokens,
+    getAccessToken,
+    getRefreshToken,
+    getCurrentTeamId,
+    setCurrentTeamId,
+  } = useApi();
   const { applySavedUserLocale } = useLocalePreference();
 
   const user = useState<User | null>("auth_user", () => null);
@@ -18,6 +25,22 @@ export const useAuth = () => {
 
   const isAuthenticated = computed(() => !!getAccessToken() && !!user.value);
   const token = computed(() => getAccessToken());
+
+  // Access tokens can refresh during a request. The refresh token identifies
+  // the login that owns the response, including a new login by the same user.
+  const captureContext = (includeTeam = true) => {
+    const session = getRefreshToken() || getAccessToken();
+    const userId = user.value?.id;
+    const teamId = getCurrentTeamId();
+    return () =>
+      session === (getRefreshToken() || getAccessToken()) &&
+      userId === user.value?.id &&
+      (!includeTeam || teamId === getCurrentTeamId());
+  };
+
+  const requireCurrentContext = (isCurrent: () => boolean) => {
+    if (!isCurrent()) throw new DOMException("Account context changed", "AbortError");
+  };
 
   const initAuth = async (): Promise<void> => {
     if (import.meta.server) {
@@ -64,6 +87,7 @@ export const useAuth = () => {
     newUser: User | null,
     options: UserLocaleSyncOptions = {},
   ): Promise<void> => {
+    // Publish the team context before synchronous account-change watchers fetch.
     setCurrentTeamId(newUser?.current_team_id ?? null);
     user.value = newUser;
 
@@ -101,7 +125,9 @@ export const useAuth = () => {
 
   const login = (credentials: { email: string; password: string }) =>
     withLoading(async () => {
+      const isCurrent = captureContext(false);
       const response = await authService.login(credentials);
+      requireCurrentContext(isCurrent);
 
       if (response.data.two_factor_required) {
         return response.data;
@@ -121,7 +147,9 @@ export const useAuth = () => {
     password_confirmation: string;
   }) =>
     withLoading(async () => {
+      const isCurrent = captureContext(false);
       const response = await authService.register(data);
+      requireCurrentContext(isCurrent);
       setTokens(response.data.access_token!, response.data.refresh_token!);
       await setUser(response.data.user ?? null);
       isInitialized.value = true;
@@ -130,26 +158,32 @@ export const useAuth = () => {
     });
 
   const logout = async () => {
+    const isCurrent = captureContext(false);
     try {
       if (getAccessToken()) {
         await authService.logout().catch(() => {});
       }
     } finally {
-      clearTokens();
-      await setUser(null);
-      navigateTo("/login");
+      if (isCurrent()) {
+        clearTokens();
+        await setUser(null);
+        navigateTo("/login");
+      }
     }
   };
 
   const fetchUser = async (options: UserLocaleSyncOptions = {}) => {
     if (!getAccessToken()) return null;
+    const isCurrent = captureContext();
 
     return withLoading(async () => {
       try {
         const response = await authService.getUser();
+        if (!isCurrent()) return null;
         await setUser(response.data, options);
         return response.data;
       } catch {
+        if (!isCurrent()) return null;
         clearTokens();
         await setUser(null);
         return null;
@@ -163,14 +197,18 @@ export const useAuth = () => {
     timezone?: string;
   }) =>
     withLoading(async () => {
+      const isCurrent = captureContext();
       const response = await authService.updateProfile(data);
+      requireCurrentContext(isCurrent);
       await setUser(response.data);
       return response.data;
     });
 
   const updateLocale = (locale: LocalePreference) =>
     withLoading(async () => {
+      const isCurrent = captureContext();
       const response = await authService.updateLocale(locale);
+      requireCurrentContext(isCurrent);
       await setUser(response.data);
       return response.data;
     });

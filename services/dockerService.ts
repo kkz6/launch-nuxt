@@ -144,6 +144,8 @@ export interface CreateDockerApplicationData {
     repo: string;
     branch: string;
     source_control_id?: string;
+    repository_id?: string;
+    dependency_repository_ids?: string[];
     build_type?: "nixpacks" | "dockerfile";
     dockerfile_path?: string;
     /**
@@ -746,6 +748,8 @@ export interface CreateDockerComposeData {
     repo: string;
     branch: string;
     source_control_id?: string;
+    repository_id?: string;
+    dependency_repository_ids?: string[];
     compose_file_path?: string;
     /**
      * Mirror of CreateDockerApplicationData.git.build_location.

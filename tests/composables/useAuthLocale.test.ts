@@ -34,6 +34,8 @@ describe("useAuth locale synchronization", () => {
       setTokens: mocks.setTokens,
       clearTokens: vi.fn(),
       getAccessToken: mocks.getAccessToken,
+      getRefreshToken: () => null,
+      getCurrentTeamId: () => null,
       setCurrentTeamId: mocks.setCurrentTeamId,
     }));
     vi.stubGlobal("useLocalePreference", () => ({

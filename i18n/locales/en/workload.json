@@ -103,6 +103,7 @@
       "title": "Danger Zone"
     },
     "githubActions": {
+      "privateDependenciesRequireServer": "Private dependency repositories currently require server builds. Choose Server as the build location.",
       "accessLostDescription": "The Launch GitHub App was uninstalled or its permissions changed. Workflow syncing and deploy-token updates are unavailable until it is reinstalled.",
       "accessLostTitle": "GitHub App access was lost",
       "autoDeployAfterBranch": " triggers a build and deployment through GitHub Actions. When disabled, deployments are manual.",
@@ -174,7 +175,11 @@
       "workflowShaHelp": "Commit SHA of the workflow file Launch committed to your repository"
     },
     "git": {
-      "noProviderConnected": "No Git provider is connected. Paste a public repository URL below, or connect GitHub, GitLab, or Bitbucket in Settings → Integrations to choose from a list.",
+      "noProviderConnected": "No active GitHub connection. Paste a public repository URL, or connect GitHub and select repositories in Settings → Connections.",
+      "selectedOnly": "Only repositories selected for this workspace are available. Manage the selection in Settings → Connections.",
+      "usePublicUrl": "Use a public URL without connection credentials",
+      "dependencies": "Private dependency repositories (optional)",
+      "dependenciesHelp": "Select only the additional repositories this workload needs, such as private submodules. Credentials are limited to the primary repository and these dependencies.",
       "noRepositoryFound": "No repository found.",
       "pastePublicUrl": "Or paste a public repository URL",
       "repositoryCount": "{count} repo | {count} repos",
