@@ -652,6 +652,10 @@ describe("workspace GitHub selection", () => {
     const wrapper = render();
     await flushPromises();
     expect(wrapper.get('[role="alert"]').text()).toContain("Could not verify");
+    expect(wrapper.get('[role="alert"]').text()).toContain(
+      "Your saved selection has not changed",
+    );
+    expect(wrapper.text()).not.toContain("0 repositories selected");
     expect(
       button(wrapper, "Save repository selection").attributes("disabled"),
     ).toBeDefined();
@@ -667,6 +671,60 @@ describe("workspace GitHub selection", () => {
     expect(
       (wrapper.get('input[value="1"]').element as HTMLInputElement).checked,
     ).toBe(false);
+  });
+
+  it("loads the original organization on reconnect even when multiple installations are returned", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.attempt.mockResolvedValue({
+      data: {
+        ...attempt().data,
+        source_control_id: "organization-connection",
+        target_installation_id: "organization-installation",
+        installations: [
+          { id: "personal-installation", account_login: "personal" },
+          { id: "organization-installation", account_login: "organization" },
+        ],
+      },
+    });
+    mocks.candidates.mockResolvedValue({
+      data: { repositories: [repo("1", true)] },
+    });
+    const wrapper = render();
+    await flushPromises();
+    expect(mocks.candidates).toHaveBeenCalledWith(
+      "attempt-A",
+      "organization-installation",
+      expect.any(AbortSignal),
+    );
+    const select = wrapper.findComponent({ name: "Select" });
+    expect(select.props("disabled")).toBe(true);
+    select.vm.$emit("update:modelValue", "personal-installation");
+    await flushPromises();
+    expect(mocks.candidates).toHaveBeenCalledTimes(1);
+    expect(wrapper.text()).toContain("1 repository selected");
+  });
+
+  it("keeps an unavailable original installation separate from other accounts", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.attempt.mockResolvedValue({
+      data: {
+        ...attempt().data,
+        target_installation_id: "unavailable-organization",
+        installation_unavailable: true,
+        installations: [],
+      },
+    });
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.text()).toContain("original account or organization");
+    expect(wrapper.text()).toContain(
+      "Your saved repository selection has not changed",
+    );
+    expect(wrapper.text()).not.toContain("0 repositories selected");
+    expect(mocks.candidates).not.toHaveBeenCalled();
+    expect(
+      button(wrapper, "Save repository selection").attributes("disabled"),
+    ).toBeDefined();
   });
 
   it("does not disconnect A after its confirmation is accepted in account B", async () => {
