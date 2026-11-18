@@ -28,7 +28,11 @@ export interface GitHubRepositoryChoice {
   private: boolean;
   selected: boolean;
   unavailable?: boolean;
-  affected_workloads?: { kind: "site" | "application" | "compose"; id: string; name: string }[];
+  affected_workloads?: {
+    kind: "site" | "application" | "compose";
+    id: string;
+    name: string;
+  }[];
 }
 
 const base = "/settings/git-providers/github/connection-attempts";
@@ -72,6 +76,7 @@ export const githubConnectionService = {
     return get<
       ApiResponse<{
         repositories: GitHubRepositoryChoice[];
+        source_control_id?: string | null;
         connection_generation?: number;
         selection_version?: number;
       }>
@@ -87,6 +92,7 @@ export const githubConnectionService = {
     generation?: number,
     selectionVersion?: number,
     signal?: AbortSignal,
+    sourceControlId?: string | null,
   ) => {
     const { post } = useApi();
     return post<ApiResponse<SourceControl>>(
@@ -94,10 +100,15 @@ export const githubConnectionService = {
       {
         installation_id: installationId,
         repository_ids: repositoryIds,
+        ...(sourceControlId === undefined
+          ? {}
+          : { source_control_id: sourceControlId }),
         ...(generation === undefined
           ? {}
           : { expected_generation: generation }),
-        ...(selectionVersion === undefined ? {} : { expected_selection_version: selectionVersion }),
+        ...(selectionVersion === undefined
+          ? {}
+          : { expected_selection_version: selectionVersion }),
       },
       { signal },
     );

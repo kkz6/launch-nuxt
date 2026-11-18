@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CreateApplicationSheet from "../../components/project/CreateApplicationSheet.vue";
 import CreateComposeSheet from "../../components/project/CreateComposeSheet.vue";
 import AddSite from "../../components/server/AddSite.vue";
+import RepositoryPicker from "../../components/shared/RepositoryPicker.vue";
+import { Checkbox } from "../../components/ui/checkbox";
 import type { Repository } from "../../types";
 import { createI18nStub } from "../helpers/i18n";
 const mocks = vi.hoisted(() => ({
@@ -185,6 +187,31 @@ for (const [label, component] of [
   ["application", CreateApplicationSheet],
   ["Compose", CreateComposeSheet],
 ] as const) {
+  it(`${label} applies shadcn repository and dependency selections explicitly`, async () => {
+    const { wrapper, vm } = await render(component);
+    if (component !== AddSite) {
+      vm.sourceType = "git";
+      await flushPromises();
+    }
+    vm.handleSourceControlChange("connection-A");
+    await flushPromises();
+    wrapper.getComponent(RepositoryPicker).vm.$emit("update:modelValue", granted[0]);
+    await flushPromises();
+    expect(component === AddSite ? vm.sourceControlRepositoriesId : vm.selectedRepo?.id).toBe(granted[0]!.id);
+    expect(vm.dependencyRepositoryIds).toEqual([]);
+    const dependency = wrapper.getComponent(Checkbox);
+    dependency.vm.$emit("update:modelValue", true);
+    await flushPromises();
+    expect(vm.dependencyRepositoryIds).toEqual([granted[1]!.id]);
+    dependency.vm.$emit("update:modelValue", false);
+    await flushPromises();
+    expect(vm.dependencyRepositoryIds).toEqual([]);
+    vm.handleSourceControlChange("other-connection");
+    await flushPromises();
+    expect(component === AddSite ? vm.sourceControlRepositoriesId : vm.selectedRepo).toBe(component === AddSite ? "" : null);
+    expect(vm.dependencyRepositoryIds).toEqual([]);
+  });
+
   it(`${label} reconciles a stale provider count with its available repositories`, async () => {
     mocks.list.mockResolvedValue({
       data: [
