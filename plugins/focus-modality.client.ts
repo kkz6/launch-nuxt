@@ -1,6 +1,10 @@
 export const installFocusModality = () => {
   const root = document.documentElement;
-  const setKeyboard = () => {
+  const setKeyboard = (event: KeyboardEvent) => {
+    if (
+      event.metaKey || event.ctrlKey || event.altKey ||
+      ["Meta", "Control", "Alt", "Shift", "CapsLock", "NumLock", "ScrollLock"].includes(event.key)
+    ) return;
     root.dataset.focusModality = "keyboard";
   };
   const setPointer = () => {
