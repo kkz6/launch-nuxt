@@ -15,6 +15,8 @@ export interface GitHubConnectionAttempt {
   source_control_id?: string;
   connection_generation?: number;
   selection_version?: number;
+  target_installation_id?: string;
+  installation_unavailable?: boolean;
   installations: GitHubInstallationChoice[];
   install_url?: string;
   expires_at: string;

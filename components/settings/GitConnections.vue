@@ -147,6 +147,11 @@ const selectedCountLabel = (count: number) =>
 const selectInstallation = (value: unknown) => {
   if (busy.value || typeof value !== "string" || value === installationId.value)
     return;
+  if (
+    attempt.value?.target_installation_id &&
+    value !== attempt.value.target_installation_id
+  )
+    return;
   installationId.value = value;
   search.value = "";
   void loadCandidates();
@@ -251,8 +256,19 @@ const loadAttempt = async (id: string) => {
     attempt.value = response.data;
     generation.value = response.data.connection_generation;
     selectionVersion.value = response.data.selection_version;
-    // A single installation is still explicitly reviewed before its selection is saved.
-    if (response.data.installations?.length === 1) {
+    // Reconnect is bound to its original installation, even when GitHub
+    // authorizes several personal or organization installations.
+    if (response.data.installation_unavailable) return;
+    if (
+      response.data.target_installation_id &&
+      response.data.installations.some(
+        (installation) =>
+          String(installation.id) === response.data.target_installation_id,
+      )
+    ) {
+      installationId.value = response.data.target_installation_id;
+      await loadCandidates();
+    } else if (response.data.installations?.length === 1) {
       installationId.value = String(response.data.installations[0]!.id);
       await loadCandidates();
     }
@@ -494,7 +510,7 @@ onMounted(() => {
         {{ t("settings.connections.gitAccess.connect") }}
       </Button>
     </div>
-    <Alert v-if="callbackError || error" variant="destructive" class="mb-4">
+    <Alert v-if="callbackError || error" variant="destructive" class="mb-4 dark:text-red-400 dark:[&>svg]:text-red-400">
       <Icon name="lucide:circle-alert" class="h-4 w-4" aria-hidden="true" />
       <AlertDescription>{{ error || callbackError }}</AlertDescription>
     </Alert>
@@ -533,21 +549,19 @@ onMounted(() => {
       <Card
         v-for="connection in visibleConnections"
         :key="connection.id"
-        class="shadow-none"
+        class="bg-transparent shadow-none"
         data-testid="github-connection"
       >
         <CardHeader
-          class="flex flex-col gap-4 space-y-0 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+          class="flex flex-col gap-3 space-y-0 p-4 sm:flex-row sm:items-center sm:justify-between"
         >
           <div class="flex min-w-0 items-center gap-3">
-            <Avatar shape="square"
-              ><AvatarFallback
-                ><Icon
-                  name="simple-icons:github"
-                  class="h-5 w-5"
-                  aria-hidden="true" /></AvatarFallback
-            ></Avatar>
-            <div class="min-w-0 space-y-1.5">
+            <Icon
+              name="simple-icons:github"
+              class="h-5 w-5 shrink-0"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <CardTitle class="break-all text-sm font-medium leading-5">{{
                   connection.login
@@ -574,7 +588,7 @@ onMounted(() => {
           <div v-if="canManageTeam" class="flex shrink-0 items-center gap-2">
             <Button
               size="sm"
-              :variant="connection.status === 'active' ? 'outline' : 'default'"
+              :variant="connection.status === 'active' ? 'ghost' : 'outline'"
               :disabled="busy"
               class="flex-1 sm:flex-none"
               @click="openAuthorization(connection.id)"
@@ -673,13 +687,23 @@ onMounted(() => {
           {{ t("settings.connections.gitAccess.awaitingAuthorization") }}
         </p>
         <template v-else>
-          <div class="space-y-2">
+          <Alert v-if="attempt.installation_unavailable" variant="destructive" class="dark:text-red-400 dark:[&>svg]:text-red-400">
+            <Icon
+              name="lucide:circle-alert"
+              class="h-4 w-4"
+              aria-hidden="true"
+            />
+            <AlertDescription>{{
+              t("settings.connections.gitAccess.targetUnavailable")
+            }}</AlertDescription>
+          </Alert>
+          <div v-else class="space-y-2">
             <Label for="github-installation">{{
               t("settings.connections.gitAccess.githubAccount")
             }}</Label>
             <Select
               :model-value="installationId"
-              :disabled="busy"
+              :disabled="busy || !!attempt.target_installation_id"
               @update:model-value="selectInstallation"
             >
               <SelectTrigger id="github-installation">
@@ -789,7 +813,11 @@ onMounted(() => {
               >
                 {{ t("settings.connections.gitAccess.noCandidates") }}
               </p>
-              <p class="text-xs text-muted-foreground" role="status">
+              <p
+                v-if="candidatesLoaded"
+                class="text-xs text-muted-foreground"
+                role="status"
+              >
                 {{ selectedCountLabel(selectedIds.length) }}
               </p>
             </div>
