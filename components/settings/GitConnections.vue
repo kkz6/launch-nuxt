@@ -733,7 +733,7 @@ onMounted(() => {
               </Button>
               <ScrollArea
                 v-else-if="visibleCandidates.length"
-                class="h-64 rounded-md border"
+                class="rounded-md border [&_[data-reka-scroll-area-viewport]]:h-auto [&_[data-reka-scroll-area-viewport]]:max-h-64"
               >
                 <div class="divide-y">
                   <div

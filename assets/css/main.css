@@ -201,6 +201,12 @@
     outline-offset: 2px;
   }
 
+  /* Focus traps can briefly focus the modal itself. Keep its outline absent
+     on blur too, so duration utilities cannot animate a temporary outline. */
+  html[data-focus-modality] :is([role="dialog"], [role="alertdialog"]) {
+    outline: none;
+  }
+
   /* Text fields already have a boundary. Highlight that border instead of
      drawing another outline or shadow ring around the editable area. Keep
      the general keyboard indicator above for buttons and other controls. */
