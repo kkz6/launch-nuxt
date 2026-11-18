@@ -510,7 +510,7 @@ onMounted(() => {
         {{ t("settings.connections.gitAccess.connect") }}
       </Button>
     </div>
-    <Alert v-if="callbackError || error" variant="destructive" class="mb-4">
+    <Alert v-if="callbackError || error" variant="destructive" class="mb-4 dark:text-red-400 dark:[&>svg]:text-red-400">
       <Icon name="lucide:circle-alert" class="h-4 w-4" aria-hidden="true" />
       <AlertDescription>{{ error || callbackError }}</AlertDescription>
     </Alert>
@@ -687,7 +687,7 @@ onMounted(() => {
           {{ t("settings.connections.gitAccess.awaitingAuthorization") }}
         </p>
         <template v-else>
-          <Alert v-if="attempt.installation_unavailable" variant="destructive">
+          <Alert v-if="attempt.installation_unavailable" variant="destructive" class="dark:text-red-400 dark:[&>svg]:text-red-400">
             <Icon
               name="lucide:circle-alert"
               class="h-4 w-4"
