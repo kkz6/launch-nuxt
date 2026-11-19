@@ -1273,14 +1273,22 @@ onBeforeUnmount(() => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          :disabled="isServiceActionPending(service)"
+                          :aria-label="`${t('server.common.actions')}: ${service.name}`"
                         >
                           <Icon name="lucide:more-horizontal" class="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" class="w-48">
                         <DropdownMenuItem
+                          v-if="service.install_task_id"
+                          @select="openInstallationLog(service)"
+                        >
+                          <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
+                          {{ t("server.settings.services.installLog") }}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                           v-if="canStart(service)"
+                          :disabled="isServiceActionPending(service)"
                           @click="serviceAction(service, 'start')"
                         >
                           <Icon name="lucide:play" class="mr-2 h-4 w-4" />
@@ -1288,6 +1296,7 @@ onBeforeUnmount(() => {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           v-if="canStop(service)"
+                          :disabled="isServiceActionPending(service)"
                           @click="serviceAction(service, 'stop')"
                         >
                           <Icon name="lucide:power" class="mr-2 h-4 w-4" />
@@ -1295,6 +1304,7 @@ onBeforeUnmount(() => {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           v-if="canRestart(service)"
+                          :disabled="isServiceActionPending(service)"
                           @click="serviceAction(service, 'restart')"
                         >
                           <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
@@ -1313,6 +1323,7 @@ onBeforeUnmount(() => {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           v-if="service.software === 'launch_agent'"
+                          :disabled="isServiceActionPending(service)"
                           @click="serviceAction(service, 'update')"
                         >
                           <Icon name="lucide:download" class="mr-2 h-4 w-4" />
@@ -1330,17 +1341,22 @@ onBeforeUnmount(() => {
                         </DropdownMenuItem>
                         <template v-if="service.type === 'php'">
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem @click="openOpcacheDialog(service)">
+                          <DropdownMenuItem
+                            :disabled="isServiceActionPending(service)"
+                            @click="openOpcacheDialog(service)"
+                          >
                             <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
                             OPcache
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            :disabled="isServiceActionPending(service)"
                             @click="openExtensionsDialog(service)"
                           >
                             <Icon name="lucide:package" class="mr-2 h-4 w-4" />
                             {{ t("server.settings.services.extensions") }}
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            :disabled="isServiceActionPending(service)"
                             @click="openPhpConfigurationDialog(service)"
                           >
                             <Icon name="lucide:file-cog" class="mr-2 h-4 w-4" />
@@ -1349,13 +1365,14 @@ onBeforeUnmount(() => {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             v-if="!service.is_default"
+                            :disabled="isServiceActionPending(service)"
                             @click="setPhpDefault(service)"
                           >
                             <Icon name="lucide:star" class="mr-2 h-4 w-4" />
                             {{ t("server.settings.services.setDefault") }}
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            :disabled="isPhpPatching(service)"
+                            :disabled="isServiceActionPending(service)"
                             @click="patchPhpVersion(service)"
                           >
                             <Icon
@@ -1388,6 +1405,7 @@ onBeforeUnmount(() => {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             class="text-destructive focus:text-destructive"
+                            :disabled="isServiceActionPending(service)"
                             @click="uninstallService(service)"
                           >
                             <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />
@@ -1472,16 +1490,6 @@ onBeforeUnmount(() => {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  <Button
-                    v-if="Boolean(service.install_task_id)"
-                    variant="outline"
-                    size="sm"
-                    class="ml-2"
-                    @click="openInstallationLog(service)"
-                  >
-                    <Icon name="lucide:terminal" class="mr-1.5 h-3.5 w-3.5" />
-                    {{ t("server.settings.services.installLog") }}
-                  </Button>
                 </div>
               </div>
 
@@ -1601,16 +1609,6 @@ onBeforeUnmount(() => {
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
-                  <Button
-                    v-if="Boolean(service.install_task_id)"
-                    variant="outline"
-                    size="sm"
-                    class="ml-2"
-                    @click="openInstallationLog(service)"
-                  >
-                    <Icon name="lucide:terminal" class="mr-1.5 h-3.5 w-3.5" />
-                    {{ t("server.settings.services.installLog") }}
-                  </Button>
                 </div>
 
                 <div class="col-span-3 flex items-center justify-end gap-2">
@@ -1624,14 +1622,22 @@ onBeforeUnmount(() => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        :disabled="isServiceActionPending(service)"
+                        :aria-label="`${t('server.common.actions')}: ${service.name}`"
                       >
                         <Icon name="lucide:more-horizontal" class="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" class="w-48">
                       <DropdownMenuItem
+                        v-if="service.install_task_id"
+                        @select="openInstallationLog(service)"
+                      >
+                        <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
+                        {{ t("server.settings.services.installLog") }}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
                         v-if="canStart(service)"
+                        :disabled="isServiceActionPending(service)"
                         @click="serviceAction(service, 'start')"
                       >
                         <Icon name="lucide:play" class="mr-2 h-4 w-4" />
@@ -1639,6 +1645,7 @@ onBeforeUnmount(() => {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         v-if="canStop(service)"
+                        :disabled="isServiceActionPending(service)"
                         @click="serviceAction(service, 'stop')"
                       >
                         <Icon name="lucide:power" class="mr-2 h-4 w-4" />
@@ -1646,6 +1653,7 @@ onBeforeUnmount(() => {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         v-if="canRestart(service)"
+                        :disabled="isServiceActionPending(service)"
                         @click="serviceAction(service, 'restart')"
                       >
                         <Icon name="lucide:rotate-ccw" class="mr-2 h-4 w-4" />
@@ -1671,17 +1679,22 @@ onBeforeUnmount(() => {
                       </DropdownMenuItem>
                       <template v-if="service.type === 'php'">
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem @click="openOpcacheDialog(service)">
+                        <DropdownMenuItem
+                          :disabled="isServiceActionPending(service)"
+                          @click="openOpcacheDialog(service)"
+                        >
                           <Icon name="lucide:zap" class="mr-2 h-4 w-4" />
                           OPcache
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          :disabled="isServiceActionPending(service)"
                           @click="openExtensionsDialog(service)"
                         >
                           <Icon name="lucide:package" class="mr-2 h-4 w-4" />
                           {{ t("server.settings.services.extensions") }}
                         </DropdownMenuItem>
                         <DropdownMenuItem
+                          :disabled="isServiceActionPending(service)"
                           @click="openPhpConfigurationDialog(service)"
                         >
                           <Icon name="lucide:file-cog" class="mr-2 h-4 w-4" />
@@ -1690,13 +1703,14 @@ onBeforeUnmount(() => {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           v-if="!service.is_default"
+                          :disabled="isServiceActionPending(service)"
                           @click="setPhpDefault(service)"
                         >
                           <Icon name="lucide:star" class="mr-2 h-4 w-4" />
                           {{ t("server.settings.services.setDefault") }}
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          :disabled="isPhpPatching(service)"
+                          :disabled="isServiceActionPending(service)"
                           @click="patchPhpVersion(service)"
                         >
                           <Icon
@@ -1729,6 +1743,7 @@ onBeforeUnmount(() => {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           class="text-destructive focus:text-destructive"
+                          :disabled="isServiceActionPending(service)"
                           @click="uninstallService(service)"
                         >
                           <Icon name="lucide:trash-2" class="mr-2 h-4 w-4" />

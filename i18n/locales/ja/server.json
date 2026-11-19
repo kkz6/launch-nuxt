@@ -574,6 +574,8 @@
       "empty": "スケジュールタスクがありません"
     },
     "sites": {
+      "installLogTitle": "インストールログ: {address}",
+      "installLogDescription": "このサイトのインストール時の出力です。",
       "deleteTitle": "サイトを削除",
       "deleteDescription": "「{address}」を削除しますか？この操作は取り消せません。",
       "deleteStarted": "サイトの削除を開始しました",

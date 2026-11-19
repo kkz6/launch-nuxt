@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Button } from "~/components/ui/button";
 import {
   dockerService,
   type DockerDeploymentGhaSteps,
@@ -195,9 +196,9 @@ const stepDurationLabel = (step: DockerDeploymentGhaStep): string => {
     >
       <Icon name="lucide:triangle-alert" class="size-4" />
       {{ t("shared.githubActions.loadFailed") }}
-      <button class="underline hover:text-foreground" @click="fetchSteps">
+      <Button variant="link" class="h-auto p-0 font-normal text-muted-foreground underline hover:text-foreground" @click="fetchSteps">
         {{ t("shared.githubActions.retry") }}
-      </button>
+      </Button>
     </div>
 
     <!-- Active runs can have a URL before GitHub exposes their jobs. -->

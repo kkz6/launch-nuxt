@@ -37,6 +37,16 @@ export interface GitHubRepositoryChoice {
   }[];
 }
 
+export interface GitHubCandidatesResponse {
+  repositories: GitHubRepositoryChoice[];
+  source_control_id?: string | null;
+  connection_generation?: number;
+  selection_version?: number;
+  page?: number;
+  next_page?: number;
+  selected_repositories?: GitHubRepositoryChoice[];
+}
+
 const base = "/settings/git-providers/github/connection-attempts";
 const attemptPath = (id: string) => `${base}/${encodeURIComponent(id)}`;
 
@@ -73,18 +83,12 @@ export const githubConnectionService = {
     attemptId: string,
     installationId: string,
     signal?: AbortSignal,
+    page = 1,
   ) => {
     const { get } = useApi();
-    return get<
-      ApiResponse<{
-        repositories: GitHubRepositoryChoice[];
-        source_control_id?: string | null;
-        connection_generation?: number;
-        selection_version?: number;
-      }>
-    >(
+    return get<ApiResponse<GitHubCandidatesResponse>>(
       `${attemptPath(attemptId)}/installations/${encodeURIComponent(installationId)}/repositories`,
-      { signal },
+      { signal, query: { page } },
     );
   },
   select: (

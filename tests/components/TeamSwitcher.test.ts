@@ -1,5 +1,5 @@
 import { flushPromises, shallowMount } from "@vue/test-utils";
-import { computed, onMounted, ref } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TeamSwitcher from "../../components/shared/TeamSwitcher.vue";
 import { useCan } from "../../composables/useCan";
@@ -183,6 +183,61 @@ describe("team switcher", () => {
     ).toEqual([1, 1, 1, 1]);
     expect(mocks.navigateTo).toHaveBeenCalledWith("/dashboard");
     expect(mocks.success).toHaveBeenCalledWith("Switched to Launch");
+  });
+
+  it("waits for the team cookie before capturing the refreshed user context", async () => {
+    const cookieDraft = ref("personal");
+    let publishedCookie = cookieDraft.value;
+    const stop = watch(cookieDraft, (value) => {
+      publishedCookie = value;
+    });
+    mocks.setCurrentTeamId.mockImplementation((teamId: string) => {
+      cookieDraft.value = teamId;
+    });
+    mocks.fetchUser.mockImplementation(async () => {
+      const requestTeam = publishedCookie;
+      await nextTick();
+      if (requestTeam !== publishedCookie) return null;
+      user.value = {
+        id: "user",
+        current_team_id: requestTeam,
+        role: "member",
+      };
+      return user.value;
+    });
+    const wrapper = mountSwitcher();
+    await flushPromises();
+
+    await setupState(wrapper).switchTeam("01TEAM123456");
+
+    expect(user.value.current_team_id).toBe("01TEAM123456");
+    expect(mocks.success).toHaveBeenCalledWith("Switched to Launch");
+    expect(mocks.error).not.toHaveBeenCalled();
+    stop();
+    wrapper.unmount();
+  });
+
+  it("does not refresh another account after waiting for the team cookie", async () => {
+    mocks.setCurrentTeamId.mockImplementation(() => {
+      void nextTick(() => {
+        user.value = {
+          id: "account-B",
+          current_team_id: "private-B",
+          role: "owner",
+        };
+      });
+    });
+    const wrapper = mountSwitcher();
+    await flushPromises();
+
+    await setupState(wrapper).switchTeam("01TEAM123456");
+
+    expect(user.value.current_team_id).toBe("private-B");
+    expect(user.value.role).toBe("owner");
+    expect(mocks.fetchUser).not.toHaveBeenCalled();
+    expect(mocks.reconnect).not.toHaveBeenCalled();
+    expect(mocks.success).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it("clears the old role before changing team context and waits for the new role", async () => {

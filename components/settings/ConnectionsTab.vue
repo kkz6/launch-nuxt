@@ -579,6 +579,7 @@ onMounted(() => {
                 variant="ghost"
                 size="sm"
                 @click="deleteServerProvider(provider)"
+                :aria-label="`${t('settings.connections.delete')} ${provider.profile}`"
               >
                 <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
               </Button>
@@ -645,6 +646,7 @@ onMounted(() => {
               variant="ghost"
               size="sm"
               @click="deleteStorageProvider(provider)"
+              :aria-label="`${t('settings.connections.delete')} ${provider.label}`"
             >
               <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
             </Button>
@@ -704,6 +706,7 @@ onMounted(() => {
               variant="ghost"
               size="sm"
               @click="deleteDnsProvider(provider)"
+              :aria-label="`${t('settings.connections.delete')} ${provider.profile}`"
             >
               <Icon name="lucide:trash-2" class="h-4 w-4 text-destructive" />
             </Button>

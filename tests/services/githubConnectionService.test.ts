@@ -3,6 +3,16 @@ import { githubConnectionService } from "../../services/githubConnectionService"
 
 afterEach(() => vi.unstubAllGlobals());
 describe("GitHub selection request contract", () => {
+  it("loads one repository page with the caller's cancellation signal", async () => {
+    const get = vi.fn().mockResolvedValue({ data: { repositories: [] } });
+    const controller = new AbortController();
+    vi.stubGlobal("useApi", () => ({ get }));
+    await githubConnectionService.candidates("attempt-A", "installation", controller.signal, 3);
+    expect(get).toHaveBeenCalledWith(
+      "/settings/git-providers/github/connection-attempts/attempt-A/installations/installation/repositories",
+      { signal: controller.signal, query: { page: 3 } },
+    );
+  });
   it.each(["connection-A", null])(
     "sends the explicitly reviewed connection identity %s",
     async (sourceControlId) => {

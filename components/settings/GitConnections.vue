@@ -65,6 +65,9 @@ const selectionVersion = ref<number>();
 const search = ref("");
 const candidatesLoading = ref(false);
 const candidatesLoaded = ref(false);
+const candidatesNeedReauthorization = ref(false);
+const nextCandidatePage = ref(1);
+const savedCandidates = ref<GitHubRepositoryChoice[]>([]);
 const authorizeConnection = ref<string | null | undefined>(undefined);
 const acknowledged = ref(false);
 const disconnectConnection = ref<SourceControl | null>(null);
@@ -91,7 +94,10 @@ const resetSelection = () => {
   generation.value = undefined;
   selectionVersion.value = undefined;
   candidatesLoaded.value = false;
+  candidatesNeedReauthorization.value = false;
   candidatesLoading.value = false;
+  nextCandidatePage.value = 1;
+  savedCandidates.value = [];
   search.value = "";
 };
 
@@ -161,7 +167,11 @@ const toggleRepository = (
   repo: GitHubRepositoryChoice,
   checked: boolean | "indeterminate",
 ) => {
-  if (busy.value || !candidatesLoaded.value || repo.unavailable) return;
+  if (
+    busy.value ||
+    repo.unavailable ||
+    !candidates.value.some((item) => item.github_repository_id === repo.github_repository_id)
+  ) return;
   const id = repo.github_repository_id;
   selectedIds.value =
     checked === true
@@ -254,6 +264,7 @@ const loadAttempt = async (id: string) => {
       return;
     }
     attempt.value = response.data;
+    busy.value = false;
     generation.value = response.data.connection_generation;
     selectionVersion.value = response.data.selection_version;
     // Reconnect is bound to its original installation, even when GitHub
@@ -279,13 +290,17 @@ const loadAttempt = async (id: string) => {
   }
 };
 
-const loadCandidates = async () => {
+const loadCandidates = async (resume = false) => {
   const currentAttempt = attempt.value;
-  candidates.value = [];
-  selectedIds.value = [];
-  reviewedConnectionId.value = undefined;
-  generation.value = undefined;
-  selectionVersion.value = undefined;
+  if (!resume || nextCandidatePage.value <= 1) {
+    candidates.value = [];
+    selectedIds.value = [];
+    savedCandidates.value = [];
+    reviewedConnectionId.value = undefined;
+    generation.value = undefined;
+    selectionVersion.value = undefined;
+    nextCandidatePage.value = 1;
+  }
   candidatesLoaded.value = false;
   const request = candidateRequest.start();
   if (
@@ -295,40 +310,87 @@ const loadCandidates = async () => {
   )
     return;
   candidatesLoading.value = true;
+  candidatesNeedReauthorization.value = false;
   error.value = "";
   try {
-    const response = await githubConnectionService.candidates(
-      currentAttempt.attempt_id,
-      installationId.value,
-      request.signal,
-    );
-    if (
-      !request.isCurrent() ||
-      attempt.value?.attempt_id !== currentAttempt.attempt_id
-    )
-      return;
-    candidates.value = response.data.repositories;
-    selectedIds.value = response.data.repositories
-      .filter((repo) => repo.selected && !repo.unavailable)
-      .map((repo) => repo.github_repository_id);
-    const hasReviewedConnection = response.data.source_control_id !== undefined;
-    reviewedConnectionId.value = hasReviewedConnection
-      ? response.data.source_control_id
-      : currentAttempt.source_control_id;
-    // A current candidate response is authoritative, including an explicit new
-    // connection (null). Only older responses use the initial attempt snapshot.
-    generation.value = hasReviewedConnection
-      ? response.data.connection_generation
-      : (response.data.connection_generation ??
-        currentAttempt.connection_generation);
-    selectionVersion.value = hasReviewedConnection
-      ? response.data.selection_version
-      : (response.data.selection_version ?? currentAttempt.selection_version);
-    if (generation.value === undefined || selectionVersion.value === undefined)
-      throw new Error("Repository review is missing its concurrency snapshot");
-    candidatesLoaded.value = true;
-  } catch {
-    if (request.isCurrent()) showError("candidatesFailed");
+    while (nextCandidatePage.value > 0) {
+      const page = nextCandidatePage.value;
+      const response = await githubConnectionService.candidates(
+        currentAttempt.attempt_id,
+        installationId.value,
+        request.signal,
+        page,
+      );
+      if (
+        !request.isCurrent() ||
+        attempt.value?.attempt_id !== currentAttempt.attempt_id
+      ) return;
+      const data = response.data;
+      const hasReviewedConnection = data.source_control_id !== undefined;
+      const connectionId = hasReviewedConnection
+        ? data.source_control_id
+        : currentAttempt.source_control_id;
+      const connectionGeneration = hasReviewedConnection
+        ? data.connection_generation
+        : (data.connection_generation ?? currentAttempt.connection_generation);
+      const reviewedVersion = hasReviewedConnection
+        ? data.selection_version
+        : (data.selection_version ?? currentAttempt.selection_version);
+      const nextPage = data.next_page ?? 0;
+      if (
+        connectionGeneration === undefined || reviewedVersion === undefined ||
+        (data.page !== undefined && data.page !== page) ||
+        !Number.isInteger(nextPage) || nextPage < 0 || nextPage > 10000 ||
+        (nextPage !== 0 && nextPage !== page + 1) ||
+        (page > 1 && (
+          reviewedConnectionId.value !== connectionId ||
+          generation.value !== connectionGeneration ||
+          selectionVersion.value !== reviewedVersion
+        ))
+      ) {
+        nextCandidatePage.value = 1;
+        throw new Error("Repository review changed; reload the complete selection");
+      }
+      if (page === 1) {
+        reviewedConnectionId.value = connectionId;
+        generation.value = connectionGeneration;
+        selectionVersion.value = reviewedVersion;
+        savedCandidates.value = data.selected_repositories ?? [];
+      }
+
+      const byId = new Map(candidates.value.map((repo) => [repo.github_repository_id, repo]));
+      const selected = new Set(selectedIds.value);
+      for (const repo of data.repositories) {
+        // Later pages may repeat a repository. Retain the user's edits.
+        if (!byId.has(repo.github_repository_id) && repo.selected && !repo.unavailable)
+          selected.add(repo.github_repository_id);
+        if (repo.unavailable) selected.delete(repo.github_repository_id);
+        byId.set(repo.github_repository_id, repo);
+      }
+      if (!nextPage) {
+        // A saved repository is unavailable only once every page was checked.
+        for (const repo of savedCandidates.value) {
+          if (!byId.has(repo.github_repository_id)) {
+            byId.set(repo.github_repository_id, { ...repo, unavailable: true });
+          }
+        }
+      }
+      candidates.value = [...byId.values()];
+      selectedIds.value = [...selected];
+      nextCandidatePage.value = nextPage;
+      candidatesLoaded.value = nextPage === 0;
+    }
+  } catch (failure) {
+    if (request.isCurrent()) {
+      const code = (failure as { data?: { code?: string } } | null)?.data?.code;
+      candidatesNeedReauthorization.value = code === "git.github_reauthorization_required";
+      const messages: Record<string, string> = {
+        "git.github_reauthorization_required": "candidatesReauthorizationRequired",
+        "git.github_unavailable": "candidatesTemporarilyUnavailable",
+        "git.github_access_restricted": "candidatesAccessRestricted",
+      };
+      showError(messages[code ?? ""] ?? "candidatesFailed");
+    }
   } finally {
     if (request.isCurrent()) candidatesLoading.value = false;
   }
@@ -405,8 +467,13 @@ const saveSelection = async () => {
     clearAttemptQuery();
     toast.success(t("settings.connections.gitAccess.saved"));
     await loadConnections();
-  } catch {
-    if (request.isCurrent()) showError("saveFailed");
+  } catch (failure) {
+    if (request.isCurrent()) {
+      const code = (failure as { data?: { code?: string } } | null)?.data?.code;
+      showError(code === "git.github_access_restricted"
+        ? "candidatesAccessRestricted"
+        : "saveFailed");
+    }
   } finally {
     if (request.isCurrent()) busy.value = false;
   }
@@ -510,7 +577,7 @@ onMounted(() => {
         {{ t("settings.connections.gitAccess.connect") }}
       </Button>
     </div>
-    <Alert v-if="callbackError || error" variant="destructive" class="mb-4 dark:text-red-400 dark:[&>svg]:text-red-400">
+    <Alert v-if="callbackError || error" variant="destructive" class="mb-4 text-red-700 [&>svg]:text-red-700 dark:text-red-400 dark:[&>svg]:text-red-400">
       <Icon name="lucide:circle-alert" class="h-4 w-4" aria-hidden="true" />
       <AlertDescription>{{ error || callbackError }}</AlertDescription>
     </Alert>
@@ -687,7 +754,7 @@ onMounted(() => {
           {{ t("settings.connections.gitAccess.awaitingAuthorization") }}
         </p>
         <template v-else>
-          <Alert v-if="attempt.installation_unavailable" variant="destructive" class="dark:text-red-400 dark:[&>svg]:text-red-400">
+        <Alert v-if="attempt.installation_unavailable" variant="destructive" class="text-red-700 [&>svg]:text-red-700 dark:text-red-400 dark:[&>svg]:text-red-400">
             <Icon
               name="lucide:circle-alert"
               class="h-4 w-4"
@@ -735,28 +802,8 @@ onMounted(() => {
                 type="search"
                 :placeholder="t('settings.connections.gitAccess.search')"
               />
-              <div
-                v-if="candidatesLoading"
-                role="status"
-                class="flex items-center gap-2 py-6 text-sm text-muted-foreground"
-              >
-                <Icon
-                  name="lucide:loader-circle"
-                  class="h-4 w-4 animate-spin"
-                  aria-hidden="true"
-                />
-                {{ t("settings.connections.gitAccess.loading") }}
-              </div>
-              <Button
-                v-else-if="!candidatesLoaded"
-                variant="outline"
-                :disabled="busy"
-                @click="loadCandidates"
-              >
-                {{ t("settings.connections.gitAccess.retryCandidates") }}
-              </Button>
               <ScrollArea
-                v-else-if="visibleCandidates.length"
+                v-if="visibleCandidates.length"
                 class="rounded-md border [&_[data-reka-scroll-area-viewport]]:h-auto [&_[data-reka-scroll-area-viewport]]:max-h-64"
               >
                 <div class="divide-y">
@@ -813,6 +860,32 @@ onMounted(() => {
               >
                 {{ t("settings.connections.gitAccess.noCandidates") }}
               </p>
+              <div
+                v-if="candidatesLoading"
+                role="status"
+                class="flex items-center gap-2 py-3 text-sm text-muted-foreground"
+              >
+                <Icon
+                  name="lucide:loader-circle"
+                  class="h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+                {{ candidates.length
+                  ? t("settings.connections.gitAccess.loadingMore", { count: candidates.length })
+                  : t("settings.connections.gitAccess.loading") }}
+              </div>
+              <Button
+                v-else-if="!candidatesLoaded"
+                variant="outline"
+                :disabled="busy"
+                @click="candidatesNeedReauthorization
+                  ? openAuthorization(reviewedConnectionId ?? attempt.source_control_id ?? undefined)
+                  : loadCandidates(true)"
+              >
+                {{ t(candidatesNeedReauthorization
+                  ? "settings.connections.gitAccess.reconnect"
+                  : "settings.connections.gitAccess.retryCandidates") }}
+              </Button>
               <p
                 v-if="candidatesLoaded"
                 class="text-xs text-muted-foreground"

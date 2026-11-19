@@ -2,6 +2,14 @@
 import { toast } from "vue-sonner";
 import { formatDistanceToNow } from "date-fns";
 import { enUS, ja } from "date-fns/locale";
+import { Button } from "~/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
 import type { Server, Site } from "~/types";
 
 interface Props {
@@ -18,6 +26,22 @@ const emit = defineEmits<{
 }>();
 
 const isDeleting = ref<string | null>(null);
+const isInstallLogOpen = ref(false);
+const installLogSite = ref<Site | null>(null);
+const installationTaskId = (site: Site) =>
+  !site.installed_at || site.installation_failed_at
+    ? site.latest_deployment?.task_id
+    : undefined;
+const openInstallationLog = (site: Site) => {
+  if (!installationTaskId(site)) return;
+  installLogSite.value = site;
+  isInstallLogOpen.value = true;
+};
+const canDeleteFailedSite = (site: Site) =>
+  Boolean(
+    (site.installation_failed_at || site.uninstallation_failed_at) &&
+    !site.uninstallation_requested_at,
+  );
 const confirmationDialog = ref<InstanceType<
   typeof import("~/components/shared/ConfirmationDialog.vue").default
 > | null>(null);
@@ -145,6 +169,18 @@ const formatDate = (date: string): string => {
 <template>
   <div>
     <SharedConfirmationDialog ref="confirmationDialog" />
+    <SharedLogViewerDialog
+      v-if="installLogSite?.latest_deployment?.task_id"
+      :key="installLogSite.latest_deployment.task_id"
+      v-model:open="isInstallLogOpen"
+      :server-id="server.id"
+      entity="task"
+      :entity-id="installLogSite.latest_deployment.task_id"
+      :title="
+        t('server.sites.installLogTitle', { address: installLogSite.address })
+      "
+      :description="t('server.sites.installLogDescription')"
+    />
 
     <div v-if="isLoading" class="flex items-center justify-center py-12">
       <Icon
@@ -167,97 +203,125 @@ const formatDate = (date: string): string => {
     </div>
 
     <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <NuxtLink
-        v-for="site in sites"
-        :key="site.id"
-        :to="
-          isAccessible(site) ? `/servers/${server.id}/sites/${site.id}` : '#'
-        "
-        class="group"
-        :class="{ 'pointer-events-none': !isAccessible(site) }"
-        @click="cacheSite(site)"
-      >
-        <div
-          class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
-          :class="{
-            'opacity-60': !isAccessible(site),
-          }"
+      <div v-for="site in sites" :key="site.id" class="group relative">
+        <NuxtLink
+          :to="
+            isAccessible(site) ? `/servers/${server.id}/sites/${site.id}` : '#'
+          "
+          :class="{ 'pointer-events-none': !isAccessible(site) }"
+          :aria-disabled="!isAccessible(site) || undefined"
+          :tabindex="isAccessible(site) ? undefined : -1"
+          @click="cacheSite(site)"
         >
-          <!-- Delete button for failed or uninstalling sites -->
-          <button
-            v-if="
-              (site.installation_failed_at || site.uninstallation_failed_at) &&
-              !site.uninstallation_requested_at
-            "
-            type="button"
-            class="pointer-events-auto absolute right-2 top-2 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            :disabled="isDeleting === site.id"
-            @click.prevent.stop="deleteSite(site)"
+          <div
+            class="relative rounded-lg border bg-card p-4 transition-colors hover:bg-muted/50"
+            :class="{
+              'opacity-60': !isAccessible(site),
+            }"
           >
-            <Icon
-              v-if="isDeleting === site.id"
-              name="lucide:loader-2"
-              class="h-4 w-4 animate-spin"
-            />
-            <Icon v-else name="lucide:trash-2" class="h-4 w-4" />
-          </button>
-
-          <div class="flex items-start gap-3">
-            <div
-              class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
-              :style="{ '--brand-color': getSiteTypeColor(site.type) }"
-            >
-              <Icon
-                :name="getSiteTypeIcon(site.type)"
-                class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
-              />
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2">
-                <h3 class="font-semibold truncate">{{ site.address }}</h3>
-                <span
-                  class="h-2 w-2 shrink-0 rounded-full"
-                  :class="getStatusColor(site)"
+            <div class="flex items-start gap-3 pr-6">
+              <div
+                class="brand-icon-bg flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted transition-colors duration-200"
+                :style="{ '--brand-color': getSiteTypeColor(site.type) }"
+              >
+                <Icon
+                  :name="getSiteTypeIcon(site.type)"
+                  class="brand-icon h-5 w-5 text-muted-foreground transition-colors duration-200"
                 />
               </div>
-              <div class="flex items-center gap-1.5">
-                <p class="text-sm text-muted-foreground truncate">
-                  {{ getSiteTypeLabel(site.type) }}
-                </p>
-                <span
-                  v-if="site.load_balanced_upstream_id"
-                  class="inline-flex shrink-0 items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
-                >
-                  LB
-                </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <h3 class="font-semibold truncate">{{ site.address }}</h3>
+                  <span
+                    class="h-2 w-2 shrink-0 rounded-full"
+                    :class="getStatusColor(site)"
+                  />
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <p class="text-sm text-muted-foreground truncate">
+                    {{ getSiteTypeLabel(site.type) }}
+                  </p>
+                  <span
+                    v-if="site.load_balanced_upstream_id"
+                    class="inline-flex shrink-0 items-center rounded-full bg-indigo-100 px-1.5 py-0.5 text-[10px] font-medium text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400"
+                  >
+                    LB
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div class="mt-4 flex items-center justify-between text-sm">
-            <div class="flex items-center gap-1.5">
-              <Icon
-                v-if="getStatusLabel(site).loading"
-                name="lucide:loader-2"
-                class="h-3.5 w-3.5 animate-spin text-muted-foreground"
-              />
-              <span
-                :class="[
-                  getStatusLabel(site).loading ? 'text-muted-foreground' : '',
-                  site.installation_failed_at || site.uninstallation_failed_at
-                    ? 'text-destructive'
-                    : '',
-                ]"
-              >
-                {{ getStatusLabel(site).text }}
+            <div class="mt-4 flex items-center justify-between text-sm">
+              <div class="flex items-center gap-1.5">
+                <Icon
+                  v-if="getStatusLabel(site).loading"
+                  name="lucide:loader-2"
+                  class="h-3.5 w-3.5 animate-spin text-muted-foreground"
+                />
+                <span
+                  :class="[
+                    getStatusLabel(site).loading ? 'text-muted-foreground' : '',
+                    site.installation_failed_at || site.uninstallation_failed_at
+                      ? 'text-destructive'
+                      : '',
+                  ]"
+                >
+                  {{ getStatusLabel(site).text }}
+                </span>
+              </div>
+              <span class="text-muted-foreground">
+                {{ formatDate(site.installed_at || site.created_at) }}
               </span>
             </div>
-            <span class="text-muted-foreground">
-              {{ formatDate(site.installed_at || site.created_at) }}
-            </span>
           </div>
+        </NuxtLink>
+        <div
+          v-if="installationTaskId(site) || canDeleteFailedSite(site)"
+          class="absolute right-2 top-2"
+        >
+          <DropdownMenu>
+            <DropdownMenuTrigger as-child>
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-8 w-8"
+                :aria-label="`${t('server.common.actions')}: ${site.address}`"
+              >
+                <Icon name="lucide:more-horizontal" class="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                v-if="installationTaskId(site)"
+                @select="openInstallationLog(site)"
+              >
+                <Icon name="lucide:terminal" class="mr-2 h-4 w-4" />
+                {{ t("server.settings.services.installLog") }}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator
+                v-if="installationTaskId(site) && canDeleteFailedSite(site)"
+              />
+              <DropdownMenuItem
+                v-if="canDeleteFailedSite(site)"
+                class="text-destructive focus:text-destructive"
+                :disabled="isDeleting === site.id"
+                @select="deleteSite(site)"
+              >
+                <Icon
+                  :name="
+                    isDeleting === site.id
+                      ? 'lucide:loader-2'
+                      : 'lucide:trash-2'
+                  "
+                  class="mr-2 h-4 w-4"
+                  :class="{ 'animate-spin': isDeleting === site.id }"
+                />
+                {{ t("server.common.delete") }}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-      </NuxtLink>
+      </div>
     </div>
   </div>
 </template>
