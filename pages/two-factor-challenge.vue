@@ -89,7 +89,7 @@ const handleSubmit = async (codeValue?: string) => {
 
     // Store tokens from the response
     setTokens(response.data.access_token, response.data.refresh_token);
-    const signedInSession = loginSession();
+    const signedInSession = response.data.refresh_token || response.data.access_token;
 
     // Set user state and wait for the saved locale before rendering the
     // authenticated destination or its success toast.

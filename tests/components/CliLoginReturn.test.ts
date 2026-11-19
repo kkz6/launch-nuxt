@@ -23,6 +23,7 @@ let redirect: unknown;
 let accessToken: string | null;
 let refreshToken: string | null;
 const user = ref<{ id?: number; onboarded: boolean } | null>(null);
+const isInitialized = ref(false);
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => { resolve = done; });
@@ -59,6 +60,7 @@ describe("returning to CLI approval after sign-in", () => {
     accessToken = null;
     refreshToken = null;
     user.value = null;
+    isInitialized.value = false;
     sessionStorage.clear();
     mocks.login.mockReset().mockResolvedValue({ user: { onboarded: true } });
     mocks.challenge.mockReset().mockResolvedValue({
@@ -97,7 +99,7 @@ describe("returning to CLI approval after sign-in", () => {
       login: mocks.login,
       checkUserStatus: vi.fn(),
       isLoading: ref(false),
-      isInitialized: ref(false),
+      isInitialized,
       setUser: mocks.setUser,
       user,
     }));
@@ -196,6 +198,58 @@ describe("returning to CLI approval after sign-in", () => {
     expect(mocks.post).toHaveBeenCalledTimes(2);
     expect(user.value?.id).toBe(1);
     expect(mocks.navigateTo).toHaveBeenCalledWith("/cli/auth");
+  });
+
+  it.each(["passkey", "two-factor"])("finishes %s login when cookies persist after setTokens returns", async (method) => {
+    // Nuxt persists a changed cookie ref through a queued Vue watcher.
+    mocks.setTokens.mockImplementation((access: string, refresh: string) => {
+      queueMicrotask(() => {
+        accessToken = access;
+        refreshToken = refresh;
+      });
+    });
+    sessionStorage.setItem("2fa_challenge_token", "challenge");
+    const wrapper = shallowMount(method === "passkey" ? LoginPage : TwoFactorPage, { global: { stubs } });
+    const state = (wrapper.vm.$ as unknown as {
+      setupState: {
+        handlePasskeyLogin: () => Promise<void>;
+        handleSubmit: (code: string) => Promise<void>;
+      };
+    }).setupState;
+
+    if (method === "passkey") await state.handlePasskeyLogin();
+    else await state.handleSubmit("123456");
+
+    expect(isInitialized.value).toBe(true);
+    expect(mocks.navigateTo).toHaveBeenCalledWith("/cli/auth");
+    if (method === "two-factor") {
+      expect(sessionStorage.getItem("2fa_challenge_token")).toBeNull();
+    }
+    wrapper.unmount();
+  });
+
+  it("does not redirect an earlier passkey login after the account changes during locale setup", async () => {
+    const localeSetup = deferred<undefined>();
+    mocks.setUser.mockImplementationOnce((value) => {
+      user.value = value;
+      return localeSetup.promise;
+    });
+    const wrapper = shallowMount(LoginPage, { global: { stubs } });
+    const state = (wrapper.vm.$ as unknown as { setupState: { handlePasskeyLogin: () => Promise<void> } }).setupState;
+    const login = state.handlePasskeyLogin();
+    await flushPromises();
+    expect(user.value?.id).toBe(1);
+
+    accessToken = "access-B";
+    refreshToken = "refresh-B";
+    user.value = { id: 2, onboarded: true };
+    localeSetup.resolve(undefined);
+    await login;
+
+    expect(user.value?.id).toBe(2);
+    expect(isInitialized.value).toBe(false);
+    expect(mocks.navigateTo).not.toHaveBeenCalled();
+    wrapper.unmount();
   });
 
   it.each(["account switch", "unmount"])("does not resume an old biometric prompt after %s", async (change) => {
