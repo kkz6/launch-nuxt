@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick } from "vue";
 import { Check, Plus } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import {
@@ -59,6 +60,9 @@ const switchTeam = async (teamId: string) => {
     // The old team's role must not authorize controls against the new team.
     if (user.value) user.value.role = undefined;
     setCurrentTeamId(teamId);
+    // Let Nuxt publish the team cookie before fetchUser captures its context.
+    await nextTick();
+    if (!isCurrent()) return;
     const updatedUser = await fetchUser();
     if (!isCurrent()) return;
     if (!updatedUser) throw new Error("Could not load the selected team");

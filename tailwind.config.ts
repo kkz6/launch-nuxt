@@ -3,7 +3,7 @@ const require = createRequire(import.meta.url);
 import type { Config } from "tailwindcss";
 
 const config = {
-  darkMode: ["class"],
+  darkMode: "class",
   content: {
     files: [
       "./components/**/*.{vue,ts}",

@@ -106,6 +106,9 @@ export const useApi = () => {
         sameSite: "lax",
       });
       refreshCookie.value = refreshToken;
+      // A new login (including the same user) or logout owns a fresh cache.
+      // Ordinary access-token refreshes keep the existing session state.
+      useState("auth_session_version", () => 0).value++;
     }
   };
 

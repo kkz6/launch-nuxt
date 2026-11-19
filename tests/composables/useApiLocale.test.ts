@@ -15,6 +15,7 @@ const cookies = new Map<string, { value: string | null }>();
 const fetchMock = vi.fn();
 const useFetchMock = vi.fn((url, options) => ({ url, options }));
 const navigateToMock = vi.fn();
+const states = new Map<string, ReturnType<typeof ref>>();
 const activeUser = ref<{
   current_team_id: string | null;
   current_team?: { is_subscribed: boolean };
@@ -24,6 +25,7 @@ const activeUser = ref<{
 describe("API locale headers", () => {
   beforeEach(() => {
     cookies.clear();
+    states.clear();
     activeUser.value = null;
     fetchMock.mockReset();
     useFetchMock.mockClear();
@@ -49,10 +51,27 @@ describe("API locale headers", () => {
       return cookies.get(key);
     });
     vi.stubGlobal("navigateTo", navigateToMock);
-    vi.stubGlobal("useState", () => activeUser);
+    vi.stubGlobal("useState", (key: string, factory: () => unknown) => {
+      if (key === "auth_user") return activeUser;
+      if (!states.has(key)) states.set(key, ref(factory()));
+      return states.get(key);
+    });
   });
 
   afterEach(() => vi.unstubAllGlobals());
+
+  it("resets session caches for login and logout but preserves them for token refresh and team switching", () => {
+    const api = useApi();
+    api.setTokens("first-access", "first-session");
+    expect(states.get("auth_session_version")?.value).toBe(1);
+    api.setTokens("refreshed-access");
+    api.setCurrentTeamId("other-team");
+    expect(states.get("auth_session_version")?.value).toBe(1);
+    api.clearTokens();
+    expect(states.get("auth_session_version")?.value).toBe(2);
+    api.setTokens("second-access", "second-session");
+    expect(states.get("auth_session_version")?.value).toBe(3);
+  });
 
   it("adds the effective locale to regular API requests", async () => {
     fetchMock.mockResolvedValue({ success: true, data: {} });

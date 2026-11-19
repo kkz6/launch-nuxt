@@ -169,17 +169,16 @@ const getCommitUrl = (sha: string): string | null => {
         </div>
       </div>
 
-      <!-- Deployment logs for pending -->
-      <div
-        v-if="
-          site.latest_deployment?.task_id &&
-          site.latest_deployment.status === 'pending'
-        "
-        class="mt-4 border-t pt-4"
-      >
+      <!-- Task output remains available after completion or failure. -->
+      <div v-if="site.latest_deployment.task_id" class="mt-4 border-t pt-4">
         <div class="mb-2 flex items-center justify-between">
           <h4 class="text-sm font-medium">{{ t("site.deployBlock.logs") }}</h4>
-          <Button variant="ghost" size="sm" @click="showLogs = !showLogs">
+          <Button
+            variant="ghost"
+            size="sm"
+            :aria-expanded="showLogs"
+            @click="showLogs = !showLogs"
+          >
             <Icon
               :name="showLogs ? 'lucide:chevron-up' : 'lucide:chevron-down'"
               class="mr-1.5 size-4"
@@ -190,6 +189,7 @@ const getCommitUrl = (sha: string): string | null => {
 
         <ServerLogViewer
           v-if="showLogs"
+          :key="site.latest_deployment.task_id"
           :server-id="server.id"
           entity="task"
           :entity-id="site.latest_deployment.task_id"

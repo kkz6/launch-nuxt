@@ -574,6 +574,8 @@
       "empty": "No scheduled tasks found"
     },
     "sites": {
+      "installLogTitle": "Installation logs: {address}",
+      "installLogDescription": "Output from installing this site.",
       "deleteTitle": "Delete Site",
       "deleteDescription": "Are you sure you want to delete \"{address}\"? This action cannot be undone.",
       "deleteStarted": "Site deletion initiated",

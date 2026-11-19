@@ -695,6 +695,7 @@ describe("workspace GitHub selection", () => {
       "attempt-A",
       "organization-installation",
       expect.any(AbortSignal),
+      1,
     );
     const select = wrapper.findComponent({ name: "Select" });
     expect(select.props("disabled")).toBe(true);
@@ -801,5 +802,198 @@ describe("workspace GitHub selection", () => {
     await flushPromises();
     expect(mocks.select).not.toHaveBeenCalled();
     expect(wrapper.text()).toContain("org/repo-2");
+  });
+});
+
+
+describe("progressive repository loading", () => {
+  const page = (number: number, repositories: ReturnType<typeof repo>[], next = 0) => ({
+    data: {
+      repositories,
+      source_control_id: "connection-A",
+      connection_generation: 3,
+      selection_version: 4,
+      page: number,
+      next_page: next,
+    },
+  });
+
+  it("shows verified rows immediately and preserves edits and search as later pages arrive", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    const second = deferred<ReturnType<typeof page>>();
+    mocks.candidates.mockResolvedValueOnce(page(1, [repo("1", true), repo("2")], 2));
+    mocks.candidates.mockReturnValueOnce(second.promise);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.text()).toContain("org/repo-1");
+    expect(wrapper.text()).toContain("Loading more repositories");
+    expect(button(wrapper, "Save repository selection").attributes("disabled")).toBeDefined();
+    expect(wrapper.get('input[value="1"]').attributes("disabled")).toBeUndefined();
+    await wrapper.get('input[value="1"]').setValue(false);
+    await wrapper.get('input[value="2"]').setValue(true);
+    await wrapper.get('input[type="search"]').setValue("repo-3");
+    expect(wrapper.text()).not.toContain("No eligible repositories");
+    second.resolve(page(2, [repo("1", true), repo("3", true)]));
+    await flushPromises();
+    expect(wrapper.text()).toContain("org/repo-3");
+    expect(wrapper.text()).not.toContain("Loading more repositories");
+    await wrapper.get('input[type="search"]').setValue("");
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(3);
+    expect((wrapper.get('input[value="1"]').element as HTMLInputElement).checked).toBe(false);
+    await button(wrapper, "Save repository selection").trigger("click");
+    await flushPromises();
+    expect(mocks.select).toHaveBeenCalledWith("attempt-A", "shared-installation", ["2", "3"], 3, 4, expect.any(AbortSignal), "connection-A");
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("org/repo-1") }));
+  });
+
+  it("marks missing saved repositories unavailable only after the last page and retains their removal impact", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    const second = deferred<ReturnType<typeof page>>();
+    mocks.candidates.mockResolvedValueOnce({ data: {
+      ...page(1, [repo("1")], 2).data,
+      selected_repositories: [repo("2", true), { ...repo("missing", true), affected_workloads: [{ kind: "site", name: "Existing site" }] }],
+    }});
+    mocks.candidates.mockReturnValueOnce(second.promise);
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("org/repo-missing");
+    expect(wrapper.find('input[value="2"]').exists()).toBe(false);
+    second.resolve(page(2, [repo("2", true)]));
+    await flushPromises();
+    expect((wrapper.get('input[value="2"]').element as HTMLInputElement).checked).toBe(true);
+    expect(wrapper.get('input[value="missing"]').attributes("disabled")).toBeDefined();
+    await button(wrapper, "Save repository selection").trigger("click");
+    await flushPromises();
+    expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({ description: expect.stringContaining("Existing site") }));
+    expect(mocks.select).toHaveBeenCalledWith("attempt-A", "shared-installation", ["2"], 3, 4, expect.any(AbortSignal), "connection-A");
+  });
+
+  it("keeps loaded rows and edits on failure and retries only the failed page", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.candidates.mockResolvedValueOnce(page(1, [repo("1")], 2));
+    mocks.candidates.mockRejectedValueOnce(new Error("temporary failure"));
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.get('input[value="1"]').setValue(true);
+    expect(wrapper.text()).toContain("Could not verify");
+    expect(button(wrapper, "Save repository selection").attributes("disabled")).toBeDefined();
+    mocks.candidates.mockResolvedValueOnce(page(2, [repo("2")]));
+    await button(wrapper, "Retry loading repositories").trigger("click");
+    await flushPromises();
+    expect(mocks.candidates.mock.calls.map((call) => call[3])).toEqual([1, 2, 2]);
+    expect((wrapper.get('input[value="1"]').element as HTMLInputElement).checked).toBe(true);
+    expect(wrapper.text()).not.toContain("Could not verify");
+    await button(wrapper, "Save repository selection").trigger("click");
+    await flushPromises();
+    expect(mocks.select.mock.calls[0]?.[2]).toEqual(["1"]);
+  });
+
+  it("drops a pending later page when the login changes", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    const second = deferred<ReturnType<typeof page>>();
+    mocks.candidates.mockResolvedValueOnce(page(1, [repo("A")], 2));
+    mocks.candidates.mockReturnValueOnce(second.promise);
+    const wrapper = render();
+    await flushPromises();
+    const signal = mocks.candidates.mock.calls[1]![2] as AbortSignal;
+    team.value = "team-B";
+    user.value = { id: "user-B", current_team_id: "team-B", current_team: { name: "Private B" } };
+    await flushPromises();
+    expect(signal.aborted).toBe(true);
+    mocks.attempt.mockResolvedValue(attempt("attempt-B", "team-B"));
+    mocks.candidates.mockResolvedValue(page(1, [repo("B")]));
+    route.query = { github_attempt: "attempt-B" };
+    await flushPromises();
+    second.resolve(page(2, [repo("secret-A")]));
+    await flushPromises();
+    expect(wrapper.text()).toContain("org/repo-B");
+    expect(wrapper.text()).not.toContain("org/repo-A");
+    expect(wrapper.text()).not.toContain("secret-A");
+  });
+
+  it("blocks a changed review across pages and restarts from page one", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.candidates.mockResolvedValueOnce(page(1, [repo("1")], 2));
+    mocks.candidates.mockResolvedValueOnce({ data: { ...page(2, [repo("2")]).data, selection_version: 5 } });
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.text()).toContain("Could not verify");
+    expect(wrapper.text()).not.toContain("org/repo-2");
+    expect(button(wrapper, "Save repository selection").attributes("disabled")).toBeDefined();
+    mocks.candidates.mockResolvedValueOnce(page(1, [repo("fresh")]));
+    await button(wrapper, "Retry loading repositories").trigger("click");
+    await flushPromises();
+    expect(mocks.candidates.mock.calls.map((call) => call[3])).toEqual([1, 2, 1]);
+    expect(wrapper.text()).not.toContain("org/repo-1");
+    expect(wrapper.text()).toContain("org/repo-fresh");
+  });
+
+  it.each([1, 3, -1, 1.5, 10001])("rejects invalid continuation page %s", async (next) => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.candidates.mockResolvedValueOnce(page(1, [repo("1")], next));
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.text()).toContain("Could not verify");
+    expect(mocks.candidates).toHaveBeenCalledTimes(1);
+    expect(button(wrapper, "Save repository selection").attributes("disabled")).toBeDefined();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("repository access failures", () => {
+  it("preserves choices and explains a restriction discovered while saving", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.select.mockRejectedValue({ data: { code: "git.github_access_restricted" } });
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.get('input[value="1"]').setValue(true);
+    await button(wrapper, "Save repository selection").trigger("click");
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain("GitHub has restricted access");
+    expect((wrapper.get('input[value="1"]').element as HTMLInputElement).checked).toBe(true);
+    expect(wrapper.find('[data-testid="github-selection"]').exists()).toBe(true);
+  });
+
+  it("explains a GitHub restriction without treating it as an outage or expired login", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.candidates.mockRejectedValue({ data: { code: "git.github_access_restricted" } });
+    const wrapper = render();
+    await flushPromises();
+    const alert = wrapper.get('[role="alert"]').text();
+    expect(alert).toContain("GitHub has restricted access");
+    expect(alert).toContain("saved repository selection has not changed");
+    expect(alert).not.toContain("temporarily unavailable");
+    expect(alert).not.toContain("Reconnect");
+    expect(button(wrapper, "Save repository selection").attributes("disabled")).toBeDefined();
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("offers retry for a temporary GitHub failure without asking to reconnect", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.candidates.mockRejectedValue({ data: { code: "git.github_unavailable" } });
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain("GitHub is temporarily unavailable");
+    expect(button(wrapper, "Retry loading repositories").exists()).toBe(true);
+    expect(wrapper.get('[role="alert"]').text()).not.toContain("Reconnect");
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it("offers a targeted reconnect only for confirmed invalid GitHub authorization", async () => {
+    route.query = { github_attempt: "attempt-A" };
+    mocks.attempt.mockResolvedValue({ data: { ...attempt().data, source_control_id: "connection-A" } });
+    mocks.candidates.mockRejectedValue({ data: { code: "git.github_reauthorization_required" } });
+    mocks.start.mockResolvedValue({ data: { team_id: "team-A", url: "https://github.com/login/oauth/authorize?state=bound" } });
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.get('[role="alert"]').text()).toContain("authorization is no longer valid");
+    expect(button(wrapper, "Save repository selection").attributes("disabled")).toBeDefined();
+    await button(wrapper, "Reconnect GitHub").trigger("click");
+    await wrapper.get('input[type="checkbox"]').setValue(true);
+    await button(wrapper, "Continue to GitHub").trigger("click");
+    await flushPromises();
+    expect(mocks.start).toHaveBeenCalledWith("connection-A", true, expect.any(AbortSignal));
+    expect(mocks.select).not.toHaveBeenCalled();
   });
 });
