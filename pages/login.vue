@@ -12,7 +12,7 @@ import { Checkbox } from "~/components/ui/checkbox";
 import { Separator } from "~/components/ui/separator";
 import { authRedirect } from "~/utils/authRedirect";
 import { createScopedRequest } from "~/utils/scopedRequest";
-import { onBeforeUnmount } from "vue";
+import { onBeforeUnmount, onMounted } from "vue";
 
 definePageMeta({
   layout: "guest",
@@ -39,25 +39,34 @@ const passkeyLoading = ref(false);
 const { login, checkUserStatus, isLoading: authLoading, user, setUser, isInitialized } = useAuth();
 const { post, setTokens, getAccessToken, getRefreshToken } = useApi();
 const loginSession = () => getRefreshToken() || getAccessToken();
-const passkeyRequest = createScopedRequest(() => JSON.stringify([loginSession(), user.value?.id]));
-const originatingContext = passkeyRequest.start();
+const loginContext = () => JSON.stringify([loginSession(), user.value?.id]);
+const originatingContext = loginContext();
+const passkeyRequest = createScopedRequest(loginContext);
+let currentPasskeyRequest: ReturnType<typeof passkeyRequest.start> | undefined;
 let active = true;
+const isLoginCurrent = () => active && loginContext() === originatingContext;
+const cancelPasskeyLogin = () => {
+  passkeyRequest.cancel();
+  currentPasskeyRequest = undefined;
+  passkeyLoading.value = false;
+};
 onBeforeUnmount(() => {
   active = false;
-  passkeyRequest.cancel();
+  cancelPasskeyLogin();
 });
 const route = useRoute();
 
 const redirectAfterLogin = (onboarded: boolean) => {
-  navigateTo(
+  return navigateTo(
     authRedirect(route.query.redirect) ||
       (onboarded ? "/dashboard" : "/onboarding"),
   );
 };
 
 const handleEmailSubmit = async () => {
-  if (!email.value) return;
+  if (!email.value || loading.value || passkeyLoading.value) return;
 
+  cancelPasskeyLogin();
   loading.value = true;
   errors.value = {};
 
@@ -76,10 +85,13 @@ const handleEmailSubmit = async () => {
     errors.value = { email: t("auth.errors.generic") };
   } finally {
     loading.value = false;
+    if (!showPasswordField.value) void startPasskeyAutofill();
   }
 };
 
 const handlePasswordSubmit = async () => {
+  if (loading.value || passkeyLoading.value) return;
+  cancelPasskeyLogin();
   loading.value = true;
   errors.value = {};
 
@@ -130,25 +142,43 @@ const handlePasswordSubmit = async () => {
 };
 
 const handleChangeEmail = () => {
+  if (loading.value) return;
+  cancelPasskeyLogin();
   showPasswordField.value = false;
   password.value = "";
   userHasPasskeys.value = false;
   showPasskeyOption.value = false;
   errors.value = {};
+  void startPasskeyAutofill();
 };
 
-const handlePasskeyLogin = async () => {
-  if (!originatingContext.isCurrent() || passkeyLoading.value) return;
-  const request = originatingContext;
-  passkeyLoading.value = true;
-  errors.value = {};
+const signInWithPasskey = async (conditional: boolean) => {
+  if (!isLoginCurrent() || loading.value || passkeyLoading.value) return;
+  const request = passkeyRequest.start();
+  currentPasskeyRequest = request;
+  // Autofill waits in the background without disabling the normal form.
+  if (!conditional) {
+    passkeyLoading.value = true;
+    errors.value = {};
+  }
+  let verifying = false;
+  let autofillRenewal: ReturnType<typeof setTimeout> | undefined;
 
   try {
+    if (conditional) {
+      if (
+        typeof PublicKeyCredential === "undefined" ||
+        !PublicKeyCredential.isConditionalMediationAvailable ||
+        !(await PublicKeyCredential.isConditionalMediationAvailable()) ||
+        !request.isCurrent()
+      ) return;
+    }
+
     const optionsResponse = await post<{
       publicKey: PublicKeyCredentialRequestOptions;
     }>(
       "/auth/passkey/login/options",
-      email.value ? { email: email.value } : {},
+      !conditional && email.value ? { email: email.value } : {},
       { signal: request.signal },
     );
     if (!request.isCurrent()) return;
@@ -165,13 +195,28 @@ const handlePasskeyLogin = async () => {
       }));
     }
 
+    if (conditional) {
+      // Conditional requests ignore the browser timeout. Renew before the
+      // server's five-minute challenge expiry while the form remains idle.
+      autofillRenewal = setTimeout(() => {
+        if (!request.isCurrent()) return;
+        cancelPasskeyLogin();
+        void startPasskeyAutofill();
+      }, 4 * 60 * 1000);
+    }
+
     const credential = (await navigator.credentials.get({
       publicKey,
       signal: request.signal,
+      ...(conditional ? { mediation: "conditional" as const } : {}),
     })) as PublicKeyCredential;
+    clearTimeout(autofillRenewal);
     if (!request.isCurrent()) return;
     if (!credential) throw new Error("Failed to get credential");
 
+    verifying = true;
+    passkeyLoading.value = true;
+    errors.value = {};
     const assertion = credential.response as AuthenticatorAssertionResponse;
     const authResponse = await post<{
       user: import("~/types").User;
@@ -195,15 +240,19 @@ const handlePasskeyLogin = async () => {
     if (!request.isCurrent()) return;
 
     setTokens(authResponse.access_token, authResponse.refresh_token);
-    const signedInSession = loginSession();
+    // Cookie writes flush asynchronously; compare against the verified session.
+    const signedInSession = authResponse.refresh_token || authResponse.access_token;
     await setUser(authResponse.user);
     if (!active || loginSession() !== signedInSession || user.value?.id !== authResponse.user.id) return;
     isInitialized.value = true;
 
     toast.success(t("auth.login.signedIn"));
-    redirectAfterLogin(authResponse.user.onboarded);
+    await redirectAfterLogin(authResponse.user.onboarded);
   } catch (error: unknown) {
     if (!request.isCurrent()) return;
+    // Background capability checks and dismissed autofill prompts are optional.
+    if (conditional && !verifying) return;
+    if (error instanceof DOMException && error.name === "AbortError") return;
     if (error instanceof DOMException && error.name === "NotAllowedError") {
       toast.error(t("auth.errors.passkeyCancelled"));
     } else if (error && typeof error === "object" && "data" in error) {
@@ -213,9 +262,21 @@ const handlePasskeyLogin = async () => {
       toast.error(t("auth.errors.passkeyFailedRetry"));
     }
   } finally {
-    passkeyLoading.value = false;
+    clearTimeout(autofillRenewal);
+    if (currentPasskeyRequest === request) {
+      currentPasskeyRequest = undefined;
+      passkeyLoading.value = false;
+    }
   }
 };
+
+const handlePasskeyLogin = () => signInWithPasskey(false);
+const startPasskeyAutofill = () => {
+  if (showPasswordField.value || currentPasskeyRequest) return;
+  return signInWithPasskey(true);
+};
+
+onMounted(() => { void startPasskeyAutofill(); });
 
 watch(showPasswordField, (show) => {
   if (show) {
@@ -264,15 +325,19 @@ watch(showPasswordField, (show) => {
                 id="email"
                 v-model="email"
                 type="email"
+                name="email"
+                autocomplete="username webauthn"
                 placeholder="m@example.com"
                 autofocus
                 required
+                :disabled="passkeyLoading"
+                @focus="startPasskeyAutofill"
               />
               <p v-if="errors.email" class="text-sm text-destructive">
                 {{ errors.email }}
               </p>
             </div>
-            <Button type="submit" class="w-full" :disabled="loading || !email">
+            <Button type="submit" class="w-full" :disabled="loading || passkeyLoading || !email">
               <Icon
                 v-if="loading"
                 name="lucide:loader-2"
@@ -344,6 +409,7 @@ watch(showPasswordField, (show) => {
               type="button"
               variant="ghost"
               size="sm"
+              :disabled="loading || passkeyLoading"
               @click="handleChangeEmail"
             >
               {{ t("auth.actions.change") }}
@@ -401,6 +467,7 @@ watch(showPasswordField, (show) => {
                   ref="passwordInputRef"
                   v-model="password"
                   type="password"
+                  autocomplete="current-password"
                   required
                 />
                 <p v-if="errors.password" class="text-sm text-destructive">
