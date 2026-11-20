@@ -138,3 +138,43 @@ DELETE /v1/database-users/{id}
 | GET /databases | databases:read |
 | POST /databases | databases:write |
 | DELETE /databases | databases:delete |
+
+## Container Database Snapshot Restore
+
+Docker-managed databases have a separate restore endpoint:
+
+```http
+POST /api/servers/{server_id}/docker/projects/{source_project_id}/databases/{source_database_id}/backup/restore
+```
+
+```json
+{
+  "run_id": "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  "target_database_id": "01ARZ3NDEKTSV4RRFFQ69G5FAX"
+}
+```
+
+`run_id` must identify a successful snapshot belonging to the source database's
+backup configuration. The optional `target_database_id` is a database resource ID;
+omitting it selects the source resource. The target must belong to the same team
+and server and use the same engine. Admin or Owner access is required.
+
+Restore executes synchronously. Success returns the normal response envelope with
+`message: "Restore complete"` (with no data payload), and emits
+`docker.database.backup.restored` with the source and target IDs. Download,
+archive-validation, execution, and database-client failures return errors without
+a restored event. A lost client connection does not establish whether remote work
+completed; inspect target state before retrying.
+
+The archive is checked completely before ingestion. PostgreSQL runs with startup
+files disabled and stops on SQL errors. An ingest failure may leave partial
+changes; the operation is not an atomic database replacement.
+
+New backup-run responses include `source_database` when recorded. It identifies
+the database actually dumped, independently of later configuration changes. An
+absent value means unknown legacy metadata; an empty value means a full-instance
+snapshot. MongoDB restore maps this recorded source into the authorized target. Existing matching target collections are
+dropped; unrelated collections and databases remain intact. Legacy snapshots with
+unknown source identity, full-instance snapshots, and absent source namespaces are
+rejected before writes. Current backup settings are not used to guess an old
+snapshot's source. See [restore guidance](/docs/application/backups#restore-database).
